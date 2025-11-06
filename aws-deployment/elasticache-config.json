@@ -1,0 +1,31 @@
+{
+  "replicationGroupId": "qualitative-research-redis",
+  "replicationGroupDescription": "Redis for Celery task queue - Qualitative Research Tool",
+  "engine": "redis",
+  "engineVersion": "7.0",
+  "cacheNodeType": "cache.t3.micro",
+  "numCacheClusters": 1,
+  "automaticFailoverEnabled": false,
+  "multiAZEnabled": false,
+  "cacheSubnetGroupName": "default",
+  "securityGroupIds": [],
+  "tags": [
+    {
+      "Key": "Name",
+      "Value": "qualitative-research-redis"
+    },
+    {
+      "Key": "Environment",
+      "Value": "production"
+    },
+    {
+      "Key": "Purpose",
+      "Value": "Celery task queue"
+    }
+  ],
+  "atRestEncryptionEnabled": true,
+  "transitEncryptionEnabled": false,
+  "snapshotRetentionLimit": 1,
+  "preferredMaintenanceWindow": "sun:05:00-sun:06:00",
+  "port": 6379
+}

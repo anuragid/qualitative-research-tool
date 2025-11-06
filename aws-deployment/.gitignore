@@ -1,0 +1,8 @@
+# Task definitions contain sensitive API keys
+# Do not commit these files to version control
+api-task-definition.json
+worker-task-definition.json
+
+# Other AWS files that may contain secrets
+*.env
+*-secrets.json
