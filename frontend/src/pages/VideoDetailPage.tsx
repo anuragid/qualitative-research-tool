@@ -241,7 +241,7 @@ export default function VideoDetailPage() {
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Speaker Labels</h3>
                 <div className="grid gap-3 max-w-2xl">
                   {Array.from(
-                    new Set(transcript.processed_transcript.utterances.map((u) => u.speaker))
+                    new Set(transcript.processed_transcript?.utterances?.map((u) => u.speaker) || [])
                   ).map((speaker) => {
                     const label = speakerLabels?.find((l) => l.speaker_label === speaker);
 

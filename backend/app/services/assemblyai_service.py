@@ -34,21 +34,16 @@ class AssemblyAIService:
             Exception: If transcription start fails
         """
         try:
+            # Create config with speaker labels enabled
             config = aai.TranscriptionConfig(
                 speaker_labels=True,  # Enable speaker diarization
-                speakers_expected=None,  # Let AI detect number of speakers
-                speech_model=aai.SpeechModel.best,  # Use best model for accuracy
             )
 
-            # Enable speaker identification to auto-detect speaker names from context
-            # AI will infer names from conversation (e.g., introductions, people addressing each other)
-            # Falls back to generic labels (A, B, C) if names can't be inferred
-            config.speech_understanding = aai.SpeechUnderstandingConfig(
-                speaker_identification=aai.SpeakerIdentificationConfig(
-                    speaker_type="name",  # Infer actual names from context
-                    # known_values is omitted - AI infers names automatically
-                )
-            )
+            # Try to use best speech model if available (newer SDK versions)
+            try:
+                config.speech_model = aai.SpeechModel.best
+            except AttributeError:
+                logger.info("SpeechModel not available in this AssemblyAI version, using default")
 
             transcript = self.transcriber.transcribe(
                 audio_url,

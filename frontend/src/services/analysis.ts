@@ -14,32 +14,28 @@ export const analysisService = {
   },
 
   getVideoChunks: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis/chunks`);
-    return response.data;
+    const response = await api.get(`/api/videos/${videoId}/analysis`);
+    return response.data?.chunks || [];
   },
 
   getVideoInferences: async (videoId: string) => {
-    const response = await api.get(
-      `/api/videos/${videoId}/analysis/inferences`
-    );
-    return response.data;
+    const response = await api.get(`/api/videos/${videoId}/analysis`);
+    return response.data?.inferences || [];
   },
 
   getVideoPatterns: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis/patterns`);
-    return response.data;
+    const response = await api.get(`/api/videos/${videoId}/analysis`);
+    return response.data?.patterns || [];
   },
 
   getVideoInsights: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis/insights`);
-    return response.data;
+    const response = await api.get(`/api/videos/${videoId}/analysis`);
+    return response.data?.insights || [];
   },
 
   getVideoPrinciples: async (videoId: string) => {
-    const response = await api.get(
-      `/api/videos/${videoId}/analysis/principles`
-    );
-    return response.data;
+    const response = await api.get(`/api/videos/${videoId}/analysis`);
+    return response.data?.design_principles || [];
   },
 
   // Project Analysis (Cross-Video)
@@ -56,24 +52,18 @@ export const analysisService = {
   },
 
   getMetaPatterns: async (projectId: string) => {
-    const response = await api.get(
-      `/api/projects/${projectId}/analysis/meta-patterns`
-    );
-    return response.data;
+    const response = await api.get(`/api/projects/${projectId}/analysis`);
+    return response.data?.cross_video_patterns || [];
   },
 
   getCrossInsights: async (projectId: string) => {
-    const response = await api.get(
-      `/api/projects/${projectId}/analysis/cross-insights`
-    );
-    return response.data;
+    const response = await api.get(`/api/projects/${projectId}/analysis`);
+    return response.data?.cross_video_insights || [];
   },
 
   getSystemPrinciples: async (projectId: string) => {
-    const response = await api.get(
-      `/api/projects/${projectId}/analysis/system-principles`
-    );
-    return response.data;
+    const response = await api.get(`/api/projects/${projectId}/analysis`);
+    return response.data?.cross_video_principles || [];
   },
 
   // Task monitoring
