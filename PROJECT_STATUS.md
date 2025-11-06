@@ -260,7 +260,7 @@ All features working in production:
 
 - ✅ **RDS Database**: `qualitative-research-db`
   - Endpoint: `qualitative-research-db.cpwycicsibkm.us-east-2.rds.amazonaws.com:5432`
-  - Password: `08185991`
+  - Password: `[REDACTED - Store in password manager]`
   - Schema: Migrated with test data
   - **Note**: Contains test data only - real data still in local database
 
