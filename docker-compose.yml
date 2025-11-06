@@ -1,6 +1,10 @@
 version: '3.8'
 
+# This Docker Compose setup mirrors AWS architecture exactly
+# Everything runs in containers just like in production
+
 services:
+  # PostgreSQL - Mimics AWS RDS
   postgres:
     image: postgres:15-alpine
     container_name: qualitative-research-db
@@ -17,7 +21,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - qualitative-network
 
+  # Redis - Mimics AWS ElastiCache
   redis:
     image: redis:7-alpine
     container_name: qualitative-research-redis
@@ -30,6 +37,69 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - qualitative-network
+
+  # Backend API - Mimics ECS Fargate API Service
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.unified
+      platforms:
+        - "linux/amd64"  # Always use AWS architecture
+    container_name: qualitative-research-api
+    env_file:
+      - ./backend/.env.docker-local
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - qualitative-network
+    volumes:
+      - ./backend:/app  # For development hot-reload
+      - /app/__pycache__  # Exclude pycache
+      - /app/.pytest_cache  # Exclude pytest cache
+    environment:
+      - SERVICE_TYPE=api
+
+  # Celery Worker - Mimics ECS Fargate Worker Service
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.unified
+      platforms:
+        - "linux/amd64"  # Always use AWS architecture
+    container_name: qualitative-research-worker
+    env_file:
+      - ./backend/.env.docker-local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - qualitative-network
+    volumes:
+      - ./backend:/app  # For development
+      - /app/__pycache__  # Exclude pycache
+      - /app/.pytest_cache  # Exclude pytest cache
+    environment:
+      - SERVICE_TYPE=worker
+    command: ["worker"]
+
+networks:
+  qualitative-network:
+    driver: bridge
 
 volumes:
   postgres_data:

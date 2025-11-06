@@ -1,46 +1,55 @@
 # Qualitative Research Tool - Project Status & Instructions
 
-**Last Updated:** 2025-11-06 03:00 PM CST
-**Status:** ✅ FULLY OPERATIONAL - Both Local and AWS Production Working
+**Last Updated:** 2025-11-06 03:50 PM CST
+**Status:** ✅ FULLY OPERATIONAL - Unified Local-AWS Architecture Implemented
 
-## 🚨 CRITICAL RULES - READ THIS FIRST
+## 🚀 MAJOR UPDATE: Unified Architecture (Nov 6, 2025 - 3:50 PM)
 
-### Rule #1: NEVER Touch the Working Local Setup
-- The local development environment is SACRED
-- All user work (transcriptions, analysis, speaker identification) is in the local database
-- Never modify, stop, or reconfigure the local setup without explicit user permission
-- If deploying to AWS, create separate infrastructure - NEVER migrate until tested and approved
+### What Changed:
+- **Local now mirrors AWS exactly** - Everything runs in Docker containers
+- **Platform consistency** - Using linux/amd64 architecture (matches AWS)
+- **Unified configuration** - Auto-detects environment (local vs AWS)
+- **One-command deployment** - Validated deployment to AWS
+- **All data preserved** - 7 projects intact in local database
 
-### Rule #2: Local Setup is the Source of Truth
-- Local PostgreSQL database contains all real data
-- Local Redis handles background tasks
-- Docker backend on port 8000 connects to LOCAL database
-- Frontend on port 5173 connects to backend on port 8000
+### New Setup Benefits:
+- ✅ **No more "works on my machine"** - Local = AWS architecture
+- ✅ **Seamless deployment** - What works locally WILL work on AWS
+- ✅ **Consistent platform** - linux/amd64 everywhere
+- ✅ **Smart configuration** - Automatically adjusts based on environment
 
 ---
 
-## Current Working Setup (LOCAL)
+## Current Working Setup (LOCAL - Unified Architecture)
 
-### Architecture
+### Architecture (Mirrors AWS Exactly)
 ```
-Frontend (Vite)          → http://localhost:5173
+Frontend (Vite)              → http://localhost:5173
     ↓
-Backend API (Docker)     → http://localhost:8000
+Backend API (Docker)         → http://localhost:8000
     ↓
-Local PostgreSQL         → localhost:5432 (Docker: qualitative-research-db)
-Local Redis              → localhost:6379 (Docker: qualitative-research-redis)
-AWS S3                   → qualitative-research-videos-ad (video storage)
+PostgreSQL (Docker)          → postgres:5432 (Container: qualitative-research-db)
+Redis (Docker)               → redis:6379 (Container: qualitative-research-redis)
+Celery Worker (Docker)       → Container: qualitative-research-worker
+AWS S3                       → qualitative-research-videos-ad (video storage)
 ```
 
-### Running Services
+### Running Services (All in Docker Containers)
 
 #### Backend API
 - **Container**: `qualitative-research-api`
 - **Port**: 8000
-- **Image**: `723913710517.dkr.ecr.us-east-2.amazonaws.com/qualitative-research-api:latest`
-- **Database**: PostgreSQL at `host.docker.internal:5432` (LOCAL)
-- **Environment**: development
+- **Image**: `qualitative-research-tool-api` (unified, linux/amd64)
+- **Database**: PostgreSQL at `postgres:5432` (Docker networking)
+- **Environment**: development (auto-detected)
 - **CORS**: Allows `http://localhost:5173` and `http://localhost:3000`
+- **Created**: Nov 6, 2025 3:35 PM CST
+
+#### Celery Worker
+- **Container**: `qualitative-research-worker`
+- **Image**: `qualitative-research-tool-worker` (unified, linux/amd64)
+- **Purpose**: Background tasks (transcription, analysis)
+- **Created**: Nov 6, 2025 3:35 PM CST
 
 #### Database (PostgreSQL)
 - **Container**: `qualitative-research-db`
@@ -59,15 +68,8 @@ AWS S3                   → qualitative-research-videos-ad (video storage)
 
 #### Frontend
 - **Port**: 5173
-- **Dev Server**: Vite (running in background)
-- **Config**: `/Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool/frontend/.env`
-  ```
-  VITE_API_URL=http://localhost:8000
-  ```
-
-### Background Workers
-- **Celery workers** running for async transcription and analysis tasks
-- Multiple worker processes active (check with `ps aux | grep celery`)
+- **Dev Server**: Vite (running separately)
+- **Config**: Uses `.env.development` for local, `.env.production` for AWS
 
 ---
 
@@ -105,20 +107,32 @@ AWS S3                   → qualitative-research-videos-ad (video storage)
 
 ### Backend
 - **Root**: `/Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool/backend/`
-- **Environment**: `.env` (local development config)
-- **Production Env**: `.env.production` (AWS RDS config - NOT USED LOCALLY)
+- **Environment Files**:
+  - `.env` - Original environment variables
+  - `.env.docker-local` - Docker container environment
+  - `.env.aws-production` - AWS production template
+- **Docker**: `Dockerfile.unified` - Works for both local and AWS
+- **Startup Script**: `scripts/startup.sh` - Unified startup with migrations
+- **Config**: `app/config_enhanced.py` - Smart configuration with auto-detection
 - **Migrations**: `alembic/versions/`
-- **Main App**: `app/main.py`
 
 ### Frontend
 - **Root**: `/Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool/frontend/`
-- **Environment**: `.env`
-- **Config**: Points to `http://localhost:8000`
+- **Environment Files**:
+  - `.env.development` - Local development
+  - `.env.production` - AWS production
+- **Config**: Auto-switches based on build mode
+
+### Scripts
+- **Start Local**: `scripts/start-local.sh` - Start unified environment
+- **Deploy to AWS**: `scripts/deploy-to-aws.sh` - Deploy with validation
 
 ### Project Root
 - **Git Repo**: `/Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool/`
 - **GitHub**: https://github.com/anuragid/qualitative-research-tool
 - **Branch**: main
+- **Docker Compose**: `docker-compose.yml` - Unified AWS-mirror setup
+- **Documentation**: `UNIFIED_SETUP_README.md` - Complete unified setup guide
 
 ---
 
@@ -329,44 +343,50 @@ ECS Fargate Worker Service (1 task)
 
 ## Common Tasks
 
-### Start Local Development
+### Start Local Development (NEW UNIFIED WAY)
 ```bash
-# 1. Ensure Docker containers are running
-docker start qualitative-research-db qualitative-research-redis qualitative-research-api
+# 1. Start all backend services with one command
+./scripts/start-local.sh
 
-# 2. Start frontend (if not running)
-cd /Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool/frontend
+# 2. Start frontend in another terminal
+cd frontend
 npm run dev
 
 # 3. Access app
 open http://localhost:5173
 ```
 
-### Stop Everything (Use with Caution!)
+### Stop Everything
 ```bash
-# Stop backend
-docker stop qualitative-research-api
+# Stop all Docker services
+docker-compose stop
 
-# Stop database (⚠️ Data persists in volume)
-docker stop qualitative-research-db
-
-# Stop Redis
-docker stop qualitative-research-redis
-
-# Kill frontend
+# Kill frontend if running
 # Find process: lsof -i :5173
 # Kill it: kill <PID>
 ```
 
-### Restart Backend Only
+### Restart Services
 ```bash
-docker restart qualitative-research-api
+# Restart all services
+docker-compose restart
 
-# Wait a few seconds
-sleep 5
+# Restart specific service
+docker-compose restart api
+docker-compose restart worker
 
-# Test
+# Test health
 curl http://localhost:8000/health
+```
+
+### View Logs
+```bash
+# View all logs
+docker-compose logs
+
+# Follow specific service logs
+docker-compose logs -f api
+docker-compose logs -f worker
 ```
 
 ### Run Database Migrations (LOCAL)
@@ -529,20 +549,20 @@ LOCAL (develop) → TEST (verify) → COMMIT (git) → DEPLOY (AWS)
    git push
    ```
 
-4. **Deploy to AWS** (only after local testing)
+4. **Deploy to AWS** (NEW AUTOMATED WAY)
    ```bash
-   # Backend deployment
-   docker buildx build --platform linux/amd64 -t qualitative-research-api .
-   docker tag qualitative-research-api:latest 723913710517.dkr.ecr.us-east-2.amazonaws.com/qualitative-research-api:latest
-   aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 723913710517.dkr.ecr.us-east-2.amazonaws.com
-   docker push 723913710517.dkr.ecr.us-east-2.amazonaws.com/qualitative-research-api:latest
-   aws ecs update-service --cluster qualitative-research-prod --service api --force-new-deployment --region us-east-2
-   aws ecs update-service --cluster qualitative-research-prod --service workers --force-new-deployment --region us-east-2
+   # One command that validates and deploys everything
+   ./scripts/deploy-to-aws.sh
 
-   # Frontend deployment
-   cd frontend
-   npm run build
-   aws s3 sync dist/ s3://qualitative-research-frontend/ --delete --region us-east-2
+   # This script:
+   # - Validates local environment is running
+   # - Runs tests (if available)
+   # - Checks git status
+   # - Builds Docker image (linux/amd64)
+   # - Pushes to ECR
+   # - Updates ECS services
+   # - Builds and deploys frontend
+   # - Verifies deployment health
    ```
 
 ### DO's and DON'Ts:

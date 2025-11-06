@@ -1,0 +1,68 @@
+# Unified Dockerfile for both local and AWS deployment
+# Always builds for linux/amd64 to match AWS architecture
+
+FROM --platform=linux/amd64 python:3.11-slim as builder
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Production stage
+FROM --platform=linux/amd64 python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
+COPY . .
+
+# Make scripts executable
+RUN chmod +x /app/scripts/*.sh
+
+# Update PATH to include local Python packages
+ENV PATH=/root/.local/bin:$PATH
+
+# Create a marker file to indicate we're in Docker
+RUN touch /.dockerenv
+
+# Environment variables that help detect context
+ENV DOCKER_CONTAINER=true
+ENV PYTHONUNBUFFERED=1
+
+# Expose port
+EXPOSE 8000
+
+# Health check - works for both API and worker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD if [ "$SERVICE_TYPE" = "worker" ]; then \
+            celery -A app.tasks.celery_app inspect ping || exit 1; \
+        else \
+            curl -f http://localhost:8000/health || exit 1; \
+        fi
+
+# Use the startup script as entrypoint
+ENTRYPOINT ["/app/scripts/startup.sh"]
+
+# Default command (can be overridden)
+CMD ["api"]
