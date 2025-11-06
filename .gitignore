@@ -90,3 +90,12 @@ temp/
 *_accessKeys.csv
 api-keys.txt
 credentials.json
+
+# Test/Demo files
+backend/test_video.mp4
+backend/patricia_and_mozart.mp4
+backend/*.mp4
+backend/*.txt
+*.mp4
+*.mov
+*.avi
