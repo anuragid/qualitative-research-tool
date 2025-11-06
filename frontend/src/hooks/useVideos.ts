@@ -65,8 +65,9 @@ export function useVideoPlaybackUrl(videoId: string | null) {
   return useQuery({
     queryKey: ["videos", videoId, "playback-url"],
     queryFn: async () => {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
       const response = await fetch(
-        `http://localhost:8000/api/videos/${videoId}/playback-url`
+        `${apiUrl}/api/videos/${videoId}/playback-url`
       );
       if (!response.ok) {
         throw new Error("Failed to get playback URL");

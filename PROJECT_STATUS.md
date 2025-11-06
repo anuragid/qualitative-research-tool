@@ -1,6 +1,6 @@
 # Qualitative Research Tool - Project Status & Instructions
 
-**Last Updated:** 2025-11-06
+**Last Updated:** 2025-11-06 02:45 AM CST
 
 ## 🚨 CRITICAL RULES - READ THIS FIRST
 
@@ -199,39 +199,99 @@ curl -v -X OPTIONS http://localhost:8000/api/projects/ \
 
 ---
 
-## AWS Deployment (SEPARATE - NOT AFFECTING LOCAL)
+## AWS Deployment (LIVE - SEPARATE FROM LOCAL)
+
+### 🎉 AWS DEPLOYMENT IS FULLY OPERATIONAL!
+
+**Frontend URL**: http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com
+**Backend API**: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com
+
+### Recent Fixes (Nov 6, 2025 - 2:45 AM)
+All critical issues resolved:
+- ✅ **CORS Configuration**: Fixed origin mismatch (was using https:// instead of http://)
+- ✅ **Redis Connectivity**: Created security group and fixed network access for Celery workers
+- ✅ **Frontend Hardcoding**: Fixed localhost:8000 hardcoded in video playback URL
+- ✅ **S3 CORS**: Added CORS configuration for direct browser uploads
+- ✅ **Mixed Deployments**: Cleaned up old task definitions, all instances now on latest config
+- ✅ **React Router**: S3 error document configured for client-side routing
 
 ### AWS Resources Created
+- ✅ **ECS Cluster**: `qualitative-research-prod`
+  - API Service: 2 Fargate tasks (auto-scaling)
+  - Worker Service: 1 Fargate task (can scale to 5)
+
 - ✅ **ECR Repository**: `qualitative-research-api` (us-east-2)
   - Image URI: `723913710517.dkr.ecr.us-east-2.amazonaws.com/qualitative-research-api:latest`
-  - Latest push: Image digest `sha256:d3192fcc...`
+  - Latest push: AMD64 platform image (sha256:1d85d5a5...)
+
+- ✅ **Application Load Balancer**: `qualitative-research-alb`
+  - DNS: qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com
+  - Target Group: Health checks on `/health`
+  - Security Group: sg-0b6a95b18add9287d
+
+- ✅ **ElastiCache Redis**: `qualitative-research-redis`
+  - Endpoint: qualitative-research-redis.sa9i40.0001.use2.cache.amazonaws.com:6379
+  - Type: cache.t3.micro (no cluster mode)
+  - Used for: Celery task queue
 
 - ✅ **RDS Database**: `qualitative-research-db`
   - Endpoint: `qualitative-research-db.cpwycicsibkm.us-east-2.rds.amazonaws.com:5432`
   - Password: `08185991`
-  - Schema: Created and migrated
-  - **Note**: This is EMPTY - real data is in local database
+  - Schema: Migrated with test data
+  - **Note**: Contains test data only - real data still in local database
 
-- ✅ **S3 Bucket**: `qualitative-research-videos-ad`
-  - Region: us-east-2
-  - Contains all uploaded video files
+- ✅ **S3 Buckets**:
+  - `qualitative-research-videos-ad` - Video storage (shared with local)
+  - `qualitative-research-frontend` - Static website hosting
 
-- ✅ **IAM User**: `qualitative-research-app`
-  - Has ECR, CloudWatch, App Runner, IAM permissions
+- ✅ **IAM Roles & Permissions**:
+  - User: `qualitative-research-app`
+  - ECS Task Execution Role: `ecsTaskExecutionRole`
+  - Permissions: ECS, ECR, CloudWatch, S3, ElastiCache, EC2, IAM
+
+### AWS Architecture
+```
+Internet → S3 Static Website (Frontend)
+    ↓
+Application Load Balancer
+    ↓
+ECS Fargate API Service (2 tasks)
+    ↓
+├─ RDS PostgreSQL
+├─ ElastiCache Redis
+└─ S3 Videos
+    ↑
+ECS Fargate Worker Service (1 task)
+```
+
+### AWS Deployment Files
+- `/aws-deployment/api-task-definition.json` - API service configuration
+- `/aws-deployment/worker-task-definition.json` - Celery worker configuration
+- `/aws-deployment/deploy.sh` - Deployment script
+- `/frontend/.env.production` - Frontend production config
 
 ### AWS Deployment Status
-- ❌ **App Runner**: Previous attempts failed on health checks
-- ⏳ **Next Step**: Need to deploy backend to AWS (ECS/Fargate recommended over App Runner)
-- ⏳ **Frontend**: Not yet deployed (Amplify planned)
+- ✅ **Frontend**: Deployed to S3 with correct API configuration
+- ✅ **Backend API**: 2 healthy instances on ECS Fargate with proper CORS
+- ✅ **Celery Workers**: Connected to Redis and processing tasks
+- ✅ **Redis**: ElastiCache with security group configured (sg-058974a92841e63c3)
+- ✅ **Database**: RDS PostgreSQL with test data (4 projects created during testing)
+- ✅ **Load Balancer**: ALB routing traffic correctly
+- ✅ **Video Upload**: Full pipeline working (upload → S3 → transcription → analysis)
 
-### Important: AWS Deployment Strategy
-When ready to deploy to AWS:
-1. Keep local setup running
-2. Deploy to AWS completely separately
-3. Test AWS deployment thoroughly
-4. Create data migration script
-5. Execute migration only when AWS is proven stable
-6. Keep local as backup/fallback
+### Important: AWS vs Local
+- **LOCAL**: Contains all real production data (7 projects, 3 videos)
+- **AWS**: Contains test data only (1 test project)
+- **Both are completely separate** - No data sharing
+- **Local is still the primary environment** for demos
+
+### Data Migration Strategy (When Ready)
+1. Export local database: `pg_dump`
+2. Upload backup to S3
+3. Restore to AWS RDS
+4. Verify all data transferred
+5. Update DNS/domains
+6. Keep local as backup
 
 ---
 
@@ -361,15 +421,68 @@ docker logs qualitative-research-api -f  # Follow logs
 - All data automatically saved to local database
 - Videos stored in AWS S3
 
-### For AWS Deployment (Future)
-1. Create comprehensive data migration plan
-2. Set up AWS infrastructure (ECS/Fargate + RDS + ElastiCache)
-3. Deploy and test backend thoroughly
-4. Deploy frontend to Amplify
-5. Test complete flow on AWS
-6. Create migration script
-7. Execute migration with user approval
-8. Keep local as backup
+### AWS Management Tasks
+
+#### Check Service Status
+```bash
+# View running services
+aws ecs describe-services --cluster qualitative-research-prod --services api workers --region us-east-2
+
+# Check task health
+aws ecs list-tasks --cluster qualitative-research-prod --region us-east-2
+
+# View CloudWatch logs
+aws logs tail /ecs/qualitative-research-api --region us-east-2 --since 30m
+aws logs tail /ecs/qualitative-research-worker --region us-east-2 --since 30m
+```
+
+#### Update Services
+```bash
+# Force new deployment (pulls latest image)
+aws ecs update-service --cluster qualitative-research-prod --service api --force-new-deployment --region us-east-2
+aws ecs update-service --cluster qualitative-research-prod --service workers --force-new-deployment --region us-east-2
+
+# Scale services
+aws ecs update-service --cluster qualitative-research-prod --service api --desired-count 3 --region us-east-2
+aws ecs update-service --cluster qualitative-research-prod --service workers --desired-count 2 --region us-east-2
+```
+
+#### Update Frontend
+```bash
+cd frontend
+npm run build
+aws s3 sync dist/ s3://qualitative-research-frontend/ --delete --region us-east-2
+```
+
+#### Monitor Costs
+```bash
+# View current month costs
+aws ce get-cost-and-usage \
+  --time-period Start=$(date -u +%Y-%m-01),End=$(date -u +%Y-%m-%d) \
+  --granularity MONTHLY \
+  --metrics "UnblendedCost" \
+  --group-by Type=DIMENSION,Key=SERVICE \
+  --region us-east-2
+```
+
+### Monthly AWS Costs (Estimated)
+- ECS Fargate (API + Workers): ~$65-90
+- ElastiCache Redis: ~$12
+- RDS PostgreSQL: ~$15
+- Application Load Balancer: ~$21
+- S3 Storage: ~$5
+- Data Transfer: ~$5-10
+- **Total: ~$125-160/month**
+
+### To Reduce Costs
+1. Stop services when not needed:
+   ```bash
+   aws ecs update-service --cluster qualitative-research-prod --service api --desired-count 0 --region us-east-2
+   aws ecs update-service --cluster qualitative-research-prod --service workers --desired-count 0 --region us-east-2
+   ```
+2. Use Fargate Spot for workers (70% discount)
+3. Consider Reserved Instances for RDS
+4. Use S3 Intelligent Tiering for old videos
 
 ---
 
