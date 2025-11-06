@@ -44,12 +44,21 @@ def chunk_node(state: VideoAnalysisState) -> Dict[str, Any]:
 
         transcript_text = "\n\n".join(formatted_segments)
 
+        # Include speaker mapping in the message
+        speaker_mapping_text = "SPEAKER MAPPING:\n"
+        for speaker_id, speaker_name in speaker_labels.items():
+            speaker_mapping_text += f"- {speaker_id} = {speaker_name}\n"
+
         user_message = f"""Please analyze the following interview transcript and break it down into chunks.
+
+{speaker_mapping_text}
 
 TRANSCRIPT:
 {transcript_text}
 
-Remember: Each chunk should be a single, discrete piece of information that cannot be broken down further without losing meaning."""
+Remember:
+- Each chunk should be a single, discrete piece of information that cannot be broken down further without losing meaning.
+- Use the actual speaker names (not A, B, C) as shown in the transcript."""
 
         # Call Claude with retry logic
         chunks = claude_service.call_with_json_response(
@@ -61,6 +70,19 @@ Remember: Each chunk should be a single, discrete piece of information that cann
         # Validate response
         if not isinstance(chunks, list):
             raise ValueError("Expected list of chunks from Claude")
+
+        # Post-process chunks to ensure speaker names are used (not IDs)
+        # This is a safety net in case Claude returns speaker IDs instead of names
+        for chunk in chunks:
+            if "speaker" in chunk:
+                # If the speaker field contains a speaker ID (A, B, C, etc.), map it to the name
+                speaker_value = chunk["speaker"]
+                if speaker_value in speaker_labels:
+                    chunk["speaker"] = speaker_labels[speaker_value]
+                # Also check for common variations like "Speaker A" or "SPEAKER_A"
+                elif speaker_value.replace("Speaker ", "").replace("SPEAKER_", "").strip() in speaker_labels:
+                    clean_id = speaker_value.replace("Speaker ", "").replace("SPEAKER_", "").strip()
+                    chunk["speaker"] = speaker_labels[clean_id]
 
         logger.info(f"[CHUNK] Generated {len(chunks)} chunks for video {state['video_id']}")
 

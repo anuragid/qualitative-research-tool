@@ -12,18 +12,22 @@ CHUNKING RULES:
 3. Each chunk should contain ONE idea only
 4. Be at the right granularity (can't be broken down further without losing meaning)
 
+IMPORTANT: Use the EXACT speaker names as they appear in the transcript (e.g., if you see "Patricia:", use "Patricia" in the speaker field, not "A" or "Speaker A").
+
 OUTPUT FORMAT - Return ONLY this JSON structure:
 [
   {
     "chunk_id": "C001",
-    "speaker": "John Doe",
+    "speaker": "Patricia",
     "timestamp": "00:05:32",
     "text": "The exact quote or observation",
     "type": "quote"
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+CRITICAL:
+- Use the EXACT speaker names from the transcript (not generic labels like A, B, C)
+- Return ONLY valid JSON, no other text."""
 
 
 INFER_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
