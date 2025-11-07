@@ -4,7 +4,7 @@ import { useProject } from "../hooks/useProjects";
 import { useProjectVideos } from "../hooks/useVideos";
 import { useProjectAnalysis, useStartProjectAnalysis, useMetaPatterns, useCrossInsights, useSystemPrinciples } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
-import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import VideoUploadDialog from "../components/videos/VideoUploadDialog";
 import VideoCard from "../components/videos/VideoCard";
@@ -14,6 +14,15 @@ import { SystemPrinciplesList } from "../components/analysis/SystemPrinciplesLis
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/DropdownMenu";
+import { DeleteProjectDialog } from "../components/projects/DeleteProjectDialog";
+import { EditProjectDialog } from "../components/projects/EditProjectDialog";
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -30,6 +39,8 @@ export default function ProjectDetailPage() {
   const startProjectAnalysis = useStartProjectAnalysis();
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   // Check if we can run project analysis
   const canRunProjectAnalysis = useMemo(() => {
@@ -89,10 +100,38 @@ export default function ProjectDetailPage() {
               <p className="text-gray-500 mt-1">{project.description}</p>
             )}
           </div>
-          <Button onClick={() => setUploadDialogOpen(true)}>
-            <Upload className="h-4 w-4" />
-            Upload Video
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setUploadDialogOpen(true)}>
+              <Upload className="h-4 w-4" />
+              Upload Video
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Project
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Videos Section */}
@@ -306,6 +345,32 @@ export default function ProjectDetailPage() {
         open={uploadDialogOpen}
         onOpenChange={setUploadDialogOpen}
       />
+
+      {project && (
+        <>
+          <DeleteProjectDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            project={{
+              id: project.id,
+              name: project.name,
+              videoCount: videos?.length || 0,
+            }}
+            navigateAfterDelete={true}
+          />
+
+          <EditProjectDialog
+            open={showEditDialog}
+            onOpenChange={setShowEditDialog}
+            project={{
+              id: project.id,
+              name: project.name,
+              description: project.description,
+              status: project.status,
+            }}
+          />
+        </>
+      )}
     </Layout>
   );
 }

@@ -12,6 +12,7 @@ class ProjectBase(BaseModel):
     """Base project schema."""
     name: str
     description: Optional[str] = None
+    status: Optional[str] = "active"
 
 
 class ProjectCreate(ProjectBase):
@@ -23,6 +24,7 @@ class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
     name: Optional[str] = None
     description: Optional[str] = None
+    status: Optional[str] = None
 
 
 class ProjectResponse(ProjectBase):
@@ -30,6 +32,7 @@ class ProjectResponse(ProjectBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    status: str
     created_at: datetime
     updated_at: datetime
 

@@ -22,7 +22,7 @@ export const projectsService = {
 
   // Update project
   update: async (id: string, data: UpdateProjectDto): Promise<Project> => {
-    const response = await api.put(`/api/projects/${id}/`, data);
+    const response = await api.patch(`/api/projects/${id}/`, data);
     return response.data;
   },
 

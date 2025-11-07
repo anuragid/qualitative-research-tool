@@ -34,12 +34,21 @@ api.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
+      const url = error.config?.url || '';
 
       if (status === 401) {
         // Handle unauthorized
         console.error("Unauthorized access");
       } else if (status === 404) {
-        console.error("Resource not found");
+        // Don't log 404s for analysis endpoints - these are expected when no analysis exists
+        const isAnalysisEndpoint = url.includes('/analysis') ||
+                                   url.includes('/transcript/words') ||
+                                   url.includes('/meta-patterns') ||
+                                   url.includes('/cross-insights') ||
+                                   url.includes('/system-principles');
+        if (!isAnalysisEndpoint) {
+          console.error("Resource not found");
+        }
       } else if (status === 500) {
         console.error("Server error");
       }
