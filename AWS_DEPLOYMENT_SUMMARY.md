@@ -3,9 +3,19 @@
 ## Deployment Completed: November 6, 2025, 2:05 AM CST
 ## All Issues Fixed: November 6, 2025, 3:00 PM CST
 ## Unified Architecture Implemented: November 6, 2025, 3:50 PM CST
-## Status: ✅ FULLY OPERATIONAL - Unified Local-AWS Architecture
+## Security & Connectivity Fixed: November 6, 2025, 6:10 PM CST
+## Status: ✅ FULLY OPERATIONAL - All Services Running Stable
 
-### Latest Update: Unified Architecture (3:50 PM CST)
+### Latest Update: Security & ECS Connectivity Fixed (6:10 PM CST)
+
+**Critical fixes implemented:**
+- ✅ **RDS Password Security** - Updated password after exposure, removed from all public files
+- ✅ **ECS Connection Issue** - Fixed startup.sh to parse DATABASE_URL dynamically
+- ✅ **Platform Compatibility** - Deployed AMD64 image with proper manifest
+- ✅ **Services Stable** - API (1/1) and Workers (1/1) running successfully
+- ✅ **Health Checks Passing** - All endpoints returning 200 OK
+
+### Previous Update: Unified Architecture (3:50 PM CST)
 
 **Major improvement implemented:** Local development now exactly mirrors AWS architecture:
 - ✅ **Everything runs in Docker containers locally** (API, Worker, DB, Redis)
@@ -86,10 +96,15 @@ ECS Fargate (1 Celery Worker)
 ### AWS Resources Created
 
 1. **ECS Cluster**: `qualitative-research-prod`
-   - API Service: 2 tasks (auto-scaling 2-4)
-   - Worker Service: 1 task (can scale to 5)
+   - API Service: 1 task running (revision 7, stable)
+   - Worker Service: 1 task running (revision 6, stable)
+   - Task Definitions:
+     - `qualitative-research-api:7` (with DATABASE_URL parsing fix)
+     - `qualitative-research-worker:6` (with DATABASE_URL parsing fix)
 
 2. **Container Registry**: ECR repository with AMD64 Docker image
+   - Latest image: `amd64-20251106-180359`
+   - Fixed startup script with dynamic DATABASE_URL parsing
 
 3. **Load Balancer**: Application Load Balancer with health checks
 
