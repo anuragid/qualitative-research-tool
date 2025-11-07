@@ -27,8 +27,22 @@ echo "⏳ Waiting for database..."
 max_retries=30
 retries=0
 
+# Parse database host from DATABASE_URL
+# DATABASE_URL format: postgresql://user:pass@host:port/dbname
+if [ ! -z "$DATABASE_URL" ]; then
+    # Extract host from DATABASE_URL
+    DB_HOST=$(echo $DATABASE_URL | sed -E 's/.*@([^:\/]+).*/\1/')
+    DB_USER=$(echo $DATABASE_URL | sed -E 's/.*:\/\/([^:]+):.*/\1/')
+    echo "   Using database host: $DB_HOST"
+else
+    # Fallback for local development
+    DB_HOST="postgres"
+    DB_USER="postgres"
+    echo "   Using default database host: $DB_HOST"
+fi
+
 while [ $retries -lt $max_retries ]; do
-    if pg_isready -h postgres -U postgres >/dev/null 2>&1; then
+    if pg_isready -h "$DB_HOST" -U "$DB_USER" >/dev/null 2>&1; then
         echo "✅ Database is ready!"
         break
     fi
