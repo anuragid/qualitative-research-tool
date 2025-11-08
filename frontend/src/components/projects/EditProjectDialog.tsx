@@ -54,7 +54,7 @@ export function EditProjectDialog({
         id: project.id,
         data: {
           name: name.trim(),
-          description: description.trim() || null,
+          description: description.trim() || undefined,
         },
       },
       {

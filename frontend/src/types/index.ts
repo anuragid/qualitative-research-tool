@@ -1,4 +1,12 @@
 // Project types
+export type ProjectStatus =
+  | "planning"    // Project created, no files yet
+  | "ready"       // Has files, ready for analysis
+  | "processing"  // Analysis/transcription running
+  | "completed"   // All processing done
+  | "archived"    // Stored for reference (can be unarchived)
+  | "error";      // Something failed
+
 export interface Project {
   id: string;
   name: string;
@@ -6,7 +14,8 @@ export interface Project {
   created_by: string;
   created_at: string;
   updated_at: string;
-  status: "active" | "archived";
+  status: ProjectStatus;
+  error_message?: string | null;  // For error state details
   videos?: Video[];
 }
 
@@ -19,7 +28,7 @@ export interface CreateProjectDto {
 export interface UpdateProjectDto {
   name?: string;
   description?: string;
-  status?: "active" | "archived";
+  status?: ProjectStatus;
 }
 
 // Video types
