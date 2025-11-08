@@ -12,7 +12,7 @@ class ProjectBase(BaseModel):
     """Base project schema."""
     name: str
     description: Optional[str] = None
-    status: Optional[str] = "active"
+    status: Optional[str] = "planning"
 
 
 class ProjectCreate(ProjectBase):
@@ -33,6 +33,7 @@ class ProjectResponse(ProjectBase):
 
     id: UUID
     status: str
+    error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
