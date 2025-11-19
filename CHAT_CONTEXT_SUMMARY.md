@@ -1,6 +1,6 @@
 # Qualitative Research Tool - Chat Context Summary
-**Date:** November 6, 2025
-**Time:** 6:15 PM CST
+**Last Updated:** November 8, 2025
+**Time:** 1:45 PM CST
 
 ## Project Overview
 A full-stack qualitative research application for video transcription and analysis using AI:
@@ -28,7 +28,26 @@ A full-stack qualitative research application for video transcription and analys
 
 ## Recent Major Work Completed
 
-### 1. Security Update (Critical)
+### 1. Project State System Implementation (November 8, 2025)
+- **Implemented 6 Project States:**
+  - `planning` - Project created, no files yet (gray badge)
+  - `ready` - Has files, ready for analysis (blue badge)
+  - `processing` - Analysis running (yellow badge)
+  - `completed` - All processing done (green badge)
+  - `archived` - Stored for reference, can be unarchived (gray badge)
+  - `error` - Something failed with error message (red badge)
+- **Features Added:**
+  - Color-coded status badges on project cards
+  - Archive/unarchive functionality with UI buttons
+  - Error state handling with message display
+  - Automatic state transitions based on project activity
+  - Database migration for error_message field
+- **Deployment Fix:**
+  - Resolved ECS stuck on revision 7 (API returning null status)
+  - Force-updated to revision 8 with fixed Pydantic schemas
+  - Both API and Worker services now on revision 8
+
+### 2. Security Update (Critical)
 - **Issue:** RDS database password was exposed in PROJECT_STATUS.md
 - **Resolution:**
   - Updated RDS password to secure credential (stored in password manager)
@@ -67,20 +86,23 @@ A full-stack qualitative research application for video transcription and analys
 
 ### ECS Deployment
 - **Cluster:** `qualitative-research-prod`
-- **API Task Definition:** `qualitative-research-api:7`
-- **Worker Task Definition:** `qualitative-research-worker:6`
-- **Docker Image:** `723913710517.dkr.ecr.us-east-2.amazonaws.com/qualitative-research-api:amd64-20251106-180359`
+- **API Task Definition:** `qualitative-research-api:8` (with project states)
+- **Worker Task Definition:** `qualitative-research-api:8` (unified task definition)
+- **Docker Image:** `723913710517.dkr.ecr.us-east-2.amazonaws.com/qualitative-research-api:latest`
 
 ### Critical Files
 - `/backend/scripts/startup.sh` - Fixed to parse DATABASE_URL
 - `/backend/.env.aws-production` - Contains production config (gitignored)
 - `/docker-compose.yml` - Unified local setup
 - `/.gitignore` - Updated to exclude sensitive files
+- `/backend/app/services/project_state_service.py` - State transition logic
+- `/frontend/src/components/projects/ProjectCard.tsx` - UI with badges and archive
+- `/backend/app/models/schemas.py` - Fixed with error_message field
 
 ### Git Repository
 - **URL:** https://github.com/anuragid/qualitative-research-tool
 - **Status:** All changes committed and pushed
-- **Last Commit:** "Fix ECS database connection by parsing DATABASE_URL in startup script"
+- **Last Commit:** "Implement project state system with 6 states and archive functionality"
 
 ## AWS Resources & Access
 - **Account ID:** 723913710517
