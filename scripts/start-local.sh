@@ -44,6 +44,16 @@ echo "🛑 Stopping existing containers..."
 # The -v flag removes volumes containing your database. Always backup first!
 docker-compose down
 
+# Kill any stray Celery workers running on the host (not in Docker)
+echo "🧹 Cleaning up any stray Celery workers..."
+if pgrep -f "celery.*worker" > /dev/null; then
+    echo "   Found stray Celery workers, killing them..."
+    pkill -9 -f "celery.*worker" 2>/dev/null || true
+    echo "   ✅ Cleaned up stray workers"
+else
+    echo "   ✅ No stray workers found"
+fi
+
 # Build with the correct platform
 echo "🔨 Building containers for linux/amd64 (matching AWS)..."
 docker-compose build
