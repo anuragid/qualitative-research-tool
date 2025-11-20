@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Upload, X, FileVideo, Loader2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Upload, X, FileVideo, Loader2, CheckCircle, AlertCircle, RotateCw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,17 +15,41 @@ interface VideoUploadDialogProps {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialFiles?: File[];
+}
+
+interface FileUploadStatus {
+  file: File;
+  progress: number;
+  status: 'pending' | 'uploading' | 'completed' | 'error';
+  error?: string;
 }
 
 export default function VideoUploadDialog({
   projectId,
   open,
   onOpenChange,
+  initialFiles = [],
 }: VideoUploadDialogProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedFiles, setSelectedFiles] = useState<FileUploadStatus[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [currentUploadIndex, setCurrentUploadIndex] = useState(0);
   const uploadMutation = useUploadVideo();
+
+  // Process initial files when dialog opens
+  useEffect(() => {
+    if (initialFiles.length > 0 && open) {
+      const videoFiles = initialFiles.filter((file) => file.type.startsWith("video/"));
+      if (videoFiles.length > 0) {
+        setSelectedFiles(videoFiles.map(file => ({
+          file,
+          progress: 0,
+          status: 'pending' as const
+        })));
+      }
+    }
+  }, [open, initialFiles]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -42,46 +66,162 @@ export default function VideoUploadDialog({
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const videoFile = files.find((file) => file.type.startsWith("video/"));
+    const videoFiles = files.filter((file) => file.type.startsWith("video/"));
 
-    if (videoFile) {
-      setSelectedFile(videoFile);
+    if (videoFiles.length > 0) {
+      const newFiles = videoFiles.map(file => ({
+        file,
+        progress: 0,
+        status: 'pending' as const
+      }));
+
+      // Always append to existing files
+      setSelectedFiles(prev => [...prev, ...newFiles]);
     }
   }, []);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        setSelectedFile(file);
+      const files = Array.from(e.target.files || []);
+      const videoFiles = files.filter((file) => file.type.startsWith("video/"));
+
+      if (videoFiles.length > 0) {
+        const newFiles = videoFiles.map(file => ({
+          file,
+          progress: 0,
+          status: 'pending' as const
+        }));
+
+        // Always append to existing files
+        setSelectedFiles(prev => [...prev, ...newFiles]);
       }
     },
     []
   );
 
-  const handleUpload = async () => {
-    if (!selectedFile) return;
+  const removeFile = (index: number) => {
+    if (selectedFiles[index].status === 'uploading') return; // Can't remove while uploading
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const retryFile = async (index: number) => {
+    if (selectedFiles[index].status !== 'error' || isUploading) return;
+
+    // Reset the file status to pending
+    setSelectedFiles(prev => prev.map((f, i) =>
+      i === index ? { ...f, status: 'pending', error: undefined, progress: 0 } : f
+    ));
+
+    // Start uploading just this file
+    setIsUploading(true);
+    await uploadNextFile(index);
+  };
+
+  const retryAllFailed = async () => {
+    if (isUploading) return;
+
+    // Find all failed files before resetting
+    const failedIndexes = selectedFiles
+      .map((f, i) => f.status === 'error' ? i : -1)
+      .filter(i => i !== -1);
+
+    if (failedIndexes.length === 0) return;
+
+    // Reset all failed files to pending
+    setSelectedFiles(prev => prev.map(f =>
+      f.status === 'error' ? { ...f, status: 'pending', error: undefined, progress: 0 } : f
+    ));
+
+    // Start uploading from the first failed file
+    setIsUploading(true);
+    await uploadNextFile(failedIndexes[0]);
+  };
+
+  const uploadNextFile = async (index: number) => {
+    if (index >= selectedFiles.length) {
+      setIsUploading(false);
+      setCurrentUploadIndex(0);
+
+      // Check if all files uploaded successfully
+      const allSuccess = selectedFiles.every(f => f.status === 'completed');
+      if (allSuccess) {
+        setTimeout(() => {
+          setSelectedFiles([]);
+          onOpenChange(false);
+        }, 1500); // Give time to see the success state
+      }
+      return;
+    }
+
+    const fileStatus = selectedFiles[index];
+    if (fileStatus.status !== 'pending') {
+      // Skip already processed files
+      await uploadNextFile(index + 1);
+      return;
+    }
+
+    setCurrentUploadIndex(index);
+
+    // Update status to uploading
+    setSelectedFiles(prev => prev.map((f, i) =>
+      i === index ? { ...f, status: 'uploading' } : f
+    ));
 
     try {
       await uploadMutation.mutateAsync({
         projectId,
-        file: selectedFile,
-        onProgress: setUploadProgress,
+        file: fileStatus.file,
+        onProgress: (progress) => {
+          setSelectedFiles(prev => prev.map((f, i) =>
+            i === index ? { ...f, progress } : f
+          ));
+        },
       });
 
-      // Reset state on success
-      setSelectedFile(null);
-      setUploadProgress(0);
-      onOpenChange(false);
-    } catch (error) {
-      console.error("Upload failed:", error);
+      // Mark as completed
+      setSelectedFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'completed', progress: 100 } : f
+      ));
+
+      // Upload next file
+      await uploadNextFile(index + 1);
+    } catch (error: any) {
+      console.error(`Upload failed for file ${index}:`, error);
+
+      // Get detailed error message
+      let errorMessage = 'Upload failed';
+      if (error?.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      // Mark as error with detailed message
+      setSelectedFiles(prev => prev.map((f, i) =>
+        i === index ? {
+          ...f,
+          status: 'error',
+          error: errorMessage
+        } : f
+      ));
+
+      // Continue with next file even if this one failed
+      await uploadNextFile(index + 1);
     }
   };
 
-  const handleCancel = () => {
-    setSelectedFile(null);
-    setUploadProgress(0);
-    onOpenChange(false);
+  const handleUploadAll = async () => {
+    if (selectedFiles.length === 0) return;
+    setIsUploading(true);
+    await uploadNextFile(0);
+  };
+
+  const handleClose = () => {
+    if (!isUploading) {
+      setSelectedFiles([]);
+      setCurrentUploadIndex(0);
+      onOpenChange(false);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -92,20 +232,26 @@ export default function VideoUploadDialog({
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
   };
 
-  const isUploading = uploadMutation.isPending;
+  const totalFiles = selectedFiles.length;
+  const completedFiles = selectedFiles.filter(f => f.status === 'completed').length;
+  const errorFiles = selectedFiles.filter(f => f.status === 'error').length;
+  const pendingFiles = selectedFiles.filter(f => f.status === 'pending').length;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Upload Video</DialogTitle>
+          <DialogTitle>Upload Videos</DialogTitle>
           <DialogDescription>
-            Upload a video file to this project for analysis
+            {totalFiles > 0
+              ? `${totalFiles} file${totalFiles > 1 ? 's' : ''} selected${isUploading ? ` - Uploading ${currentUploadIndex + 1} of ${totalFiles}` : ''}`
+              : "Select or drag video files to upload"
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {!selectedFile ? (
+          {selectedFiles.length === 0 ? (
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -118,99 +264,174 @@ export default function VideoUploadDialog({
             >
               <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <p className="text-sm text-gray-600 mb-2">
-                Drag and drop a video file here, or click to browse
+                Drag and drop video files here, or click to browse
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                You can select multiple files at once
               </p>
               <input
                 type="file"
                 accept="video/*"
+                multiple
                 onChange={handleFileSelect}
                 className="hidden"
                 id="video-upload-input"
+                disabled={isUploading}
               />
               <Button
-                type="button"
                 variant="outline"
+                disabled={isUploading}
                 onClick={() => document.getElementById('video-upload-input')?.click()}
               >
-                Browse Files
+                Select Videos
               </Button>
-              <p className="text-xs text-gray-500 mt-2">
-                Supported formats: MP4, MOV, AVI, MKV
-              </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-4 border rounded-lg">
-                <FileVideo className="h-10 w-10 text-gray-600 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {selectedFile.name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {formatFileSize(selectedFile.size)}
-                  </p>
-                </div>
-                {!isUploading && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedFile(null)}
+            <div className="space-y-3">
+              {/* File list */}
+              <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2">
+                {selectedFiles.map((fileStatus, index) => (
+                  <div
+                    key={`${fileStatus.file.name}-${index}`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border ${
+                      fileStatus.status === 'error' ? 'border-red-200 bg-red-50' :
+                      fileStatus.status === 'completed' ? 'border-green-200 bg-green-50' :
+                      fileStatus.status === 'uploading' ? 'border-blue-200 bg-blue-50' :
+                      'border-gray-200 bg-white'
+                    }`}
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
+                    <FileVideo className={`h-5 w-5 flex-shrink-0 ${
+                      fileStatus.status === 'error' ? 'text-red-600' :
+                      fileStatus.status === 'completed' ? 'text-green-600' :
+                      fileStatus.status === 'uploading' ? 'text-blue-600' :
+                      'text-gray-400'
+                    }`} />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">
+                          {fileStatus.file.name}
+                        </p>
+                        {fileStatus.status === 'completed' && (
+                          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                        )}
+                        {fileStatus.status === 'error' && (
+                          <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                        )}
+                        {fileStatus.status === 'uploading' && (
+                          <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {formatFileSize(fileStatus.file.size)}
+                        {fileStatus.error && (
+                          <span className="text-red-600 ml-2">{fileStatus.error}</span>
+                        )}
+                      </p>
+                      {fileStatus.status === 'uploading' && (
+                        <Progress value={fileStatus.progress} className="mt-2 h-1" />
+                      )}
+                    </div>
+
+                    {fileStatus.status !== 'uploading' && (
+                      <div className="flex items-center gap-1">
+                        {fileStatus.status === 'error' && !isUploading && (
+                          <button
+                            onClick={() => retryFile(index)}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            title="Retry upload"
+                          >
+                            <RotateCw className="h-4 w-4 text-orange-500" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="p-1 hover:bg-gray-100 rounded"
+                          disabled={isUploading && fileStatus.status === 'pending'}
+                          title="Remove file"
+                        >
+                          <X className="h-4 w-4 text-gray-400" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
 
-              {isUploading && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Uploading...</span>
-                    <span className="text-gray-900 font-medium">
-                      {uploadProgress}%
-                    </span>
-                  </div>
-                  <Progress value={uploadProgress} />
-                </div>
-              )}
-
-              {uploadMutation.isError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                  <p className="text-sm text-red-800">
-                    Failed to upload video. Please try again.
+              {/* Add more files area */}
+              {!isUploading && (
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                    isDragging
+                      ? "border-gray-900 bg-gray-50"
+                      : "border-gray-300 hover:border-gray-400"
+                  }`}
+                >
+                  <p className="text-xs text-gray-500 mb-2">
+                    Drag more files here or
                   </p>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="video-upload-input-add"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('video-upload-input-add')?.click()}
+                  >
+                    Add More Files
+                  </Button>
                 </div>
               )}
             </div>
           )}
-        </div>
 
-        <div className="flex justify-end gap-2 mt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isUploading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleUpload}
-            disabled={!selectedFile || isUploading}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4" />
-                Upload
-              </>
-            )}
-          </Button>
+          {/* Action buttons */}
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-500">
+              {totalFiles > 0 && (
+                <>
+                  {completedFiles > 0 && (
+                    <span className="text-green-600">{completedFiles} completed</span>
+                  )}
+                  {errorFiles > 0 && (
+                    <span className="text-red-600 ml-2">{errorFiles} failed</span>
+                  )}
+                  {pendingFiles > 0 && !isUploading && (
+                    <span className="ml-2">{pendingFiles} ready</span>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={isUploading}
+              >
+                {isUploading ? "Close After Upload" : "Cancel"}
+              </Button>
+              {selectedFiles.length > 0 && !isUploading && pendingFiles > 0 && (
+                <Button onClick={handleUploadAll}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload {pendingFiles === totalFiles ? 'All' : `${pendingFiles} File${pendingFiles > 1 ? 's' : ''}`}
+                </Button>
+              )}
+              {errorFiles > 0 && !isUploading && (
+                <Button onClick={retryAllFailed} variant="outline" className="text-orange-600 border-orange-600 hover:bg-orange-50">
+                  <RotateCw className="h-4 w-4 mr-2" />
+                  Retry {errorFiles} Failed
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

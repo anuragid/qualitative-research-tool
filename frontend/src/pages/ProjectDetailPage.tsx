@@ -41,6 +41,46 @@ export default function ProjectDetailPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set isDragging to false if we're leaving the drop zone entirely
+    if (e.currentTarget === e.target) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const videoFiles = files.filter((file) => file.type.startsWith("video/"));
+
+    if (videoFiles.length > 0) {
+      setDroppedFiles(videoFiles);
+      setUploadDialogOpen(true);
+    }
+  };
+
+  // Clear dropped files when dialog closes
+  const handleDialogClose = (open: boolean) => {
+    setUploadDialogOpen(open);
+    if (!open) {
+      setDroppedFiles([]);
+    }
+  };
 
   // Check if we can run project analysis
   const canRunProjectAnalysis = useMemo(() => {
@@ -149,24 +189,60 @@ export default function ProjectDetailPage() {
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : videos && videos.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div
+              className={`relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg transition-all ${
+                isDragging ? 'bg-blue-50 border-2 border-dashed border-blue-400' : ''
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              {isDragging && (
+                <div className="absolute inset-0 flex items-center justify-center bg-blue-50 bg-opacity-90 rounded-lg z-10">
+                  <div className="text-center">
+                    <Upload className="h-12 w-12 text-blue-600 mx-auto mb-2" />
+                    <p className="text-blue-700 font-medium">Drop videos here to upload</p>
+                  </div>
+                </div>
+              )}
               {videos.map((video) => (
                 <VideoCard key={video.id} video={video} />
               ))}
             </div>
           ) : (
-            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-              <VideoIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No videos yet
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Get started by uploading your first video for analysis
-              </p>
-              <Button onClick={() => setUploadDialogOpen(true)}>
-                <Upload className="h-4 w-4" />
-                Upload Video
-              </Button>
+            <div
+              className={`bg-gray-50 border-2 border-dashed rounded-lg p-12 text-center transition-all ${
+                isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              {isDragging ? (
+                <>
+                  <Upload className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-bounce" />
+                  <h3 className="text-lg font-medium text-blue-900 mb-2">
+                    Drop videos here
+                  </h3>
+                  <p className="text-blue-700">
+                    Release to upload your video files
+                  </p>
+                </>
+              ) : (
+                <>
+                  <VideoIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No videos yet
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Drag and drop video files here, or click to upload
+                  </p>
+                  <Button onClick={() => setUploadDialogOpen(true)}>
+                    <Upload className="h-4 w-4" />
+                    Upload Video
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -343,7 +419,8 @@ export default function ProjectDetailPage() {
       <VideoUploadDialog
         projectId={projectId!}
         open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
+        onOpenChange={handleDialogClose}
+        initialFiles={droppedFiles}
       />
 
       {project && (

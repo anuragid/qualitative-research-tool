@@ -24,12 +24,13 @@ export const videosService = {
     formData.append("file", file);
 
     const response = await api.post(
-      `/api/videos/${projectId}/upload/`,
+      `/api/videos/${projectId}/upload`,
       formData,
       {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        timeout: 600000, // 10 minutes timeout for large video uploads
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total && onProgress) {
             const percentCompleted = Math.round(
