@@ -36,6 +36,7 @@ class ProjectResponse(ProjectBase):
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    videos: Optional[List["VideoResponse"]] = []
 
 
 # ========== Video Schemas ==========
@@ -175,3 +176,7 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     status_code: int
+
+
+# Rebuild models to resolve forward references
+ProjectResponse.model_rebuild()

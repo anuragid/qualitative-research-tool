@@ -23,6 +23,10 @@ interface FileUploadStatus {
   progress: number;
   status: 'pending' | 'uploading' | 'completed' | 'error';
   error?: string;
+  uploadedBytes?: number;
+  uploadSpeed?: number; // bytes per second
+  startTime?: number;
+  eta?: number; // seconds remaining
 }
 
 export default function VideoUploadDialog({
@@ -162,18 +166,34 @@ export default function VideoUploadDialog({
 
     setCurrentUploadIndex(index);
 
-    // Update status to uploading
+    // Update status to uploading with start time
+    const startTime = Date.now();
     setSelectedFiles(prev => prev.map((f, i) =>
-      i === index ? { ...f, status: 'uploading' } : f
+      i === index ? { ...f, status: 'uploading', startTime } : f
     ));
 
     try {
       await uploadMutation.mutateAsync({
         projectId,
         file: fileStatus.file,
-        onProgress: (progress) => {
+        onProgress: (progress, loaded, total) => {
+          const now = Date.now();
+          const elapsed = (now - startTime) / 1000; // seconds
+          const uploadedBytes = loaded;
+          const uploadSpeed = elapsed > 0 ? loaded / elapsed : 0; // bytes per second
+
+          // Calculate ETA
+          const remainingBytes = total - loaded;
+          const eta = uploadSpeed > 0 ? remainingBytes / uploadSpeed : Infinity;
+
           setSelectedFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, progress } : f
+            i === index ? {
+              ...f,
+              progress,
+              uploadedBytes,
+              uploadSpeed,
+              eta
+            } : f
           ));
         },
       });
@@ -232,6 +252,27 @@ export default function VideoUploadDialog({
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
   };
 
+  const formatSpeed = (bytesPerSecond: number): string => {
+    if (bytesPerSecond === 0) return "0 MB/s";
+    const mbps = bytesPerSecond / (1024 * 1024);
+    return mbps >= 1
+      ? `${mbps.toFixed(1)} MB/s`
+      : `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
+  };
+
+  const formatETA = (seconds: number): string => {
+    if (seconds === Infinity || isNaN(seconds)) return "calculating...";
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const secs = Math.round(seconds % 60);
+      return `${minutes}m ${secs}s`;
+    }
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
   const totalFiles = selectedFiles.length;
   const completedFiles = selectedFiles.filter(f => f.status === 'completed').length;
   const errorFiles = selectedFiles.filter(f => f.status === 'error').length;
@@ -288,6 +329,32 @@ export default function VideoUploadDialog({
             </div>
           ) : (
             <div className="space-y-3">
+              {/* Upload summary when uploading */}
+              {isUploading && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900">
+                        Uploading file {currentUploadIndex + 1} of {selectedFiles.length}
+                      </span>
+                    </div>
+                    <span className="text-sm text-blue-700">
+                      {completedFiles} completed
+                      {errorFiles > 0 && <span className="text-red-600 ml-2">, {errorFiles} failed</span>}
+                    </span>
+                  </div>
+                  {selectedFiles[currentUploadIndex] && selectedFiles[currentUploadIndex].status === 'uploading' && (
+                    <div className="text-xs text-blue-700">
+                      Current: {selectedFiles[currentUploadIndex].file.name}
+                      {selectedFiles[currentUploadIndex].uploadSpeed && selectedFiles[currentUploadIndex].uploadSpeed! > 0 && (
+                        <> - {formatSpeed(selectedFiles[currentUploadIndex].uploadSpeed!)}</>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* File list */}
               <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2">
                 {selectedFiles.map((fileStatus, index) => (
@@ -323,13 +390,39 @@ export default function VideoUploadDialog({
                         )}
                       </div>
                       <p className="text-xs text-gray-500">
-                        {formatFileSize(fileStatus.file.size)}
+                        {fileStatus.status === 'uploading' && fileStatus.uploadedBytes ? (
+                          <>
+                            {formatFileSize(fileStatus.uploadedBytes)} / {formatFileSize(fileStatus.file.size)}
+                            {fileStatus.uploadSpeed && fileStatus.uploadSpeed > 0 && (
+                              <>
+                                <span className="mx-1">•</span>
+                                {formatSpeed(fileStatus.uploadSpeed)}
+                                {fileStatus.eta && fileStatus.eta !== Infinity && (
+                                  <>
+                                    <span className="mx-1">•</span>
+                                    {formatETA(fileStatus.eta)}
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          formatFileSize(fileStatus.file.size)
+                        )}
                         {fileStatus.error && (
                           <span className="text-red-600 ml-2">{fileStatus.error}</span>
                         )}
                       </p>
                       {fileStatus.status === 'uploading' && (
-                        <Progress value={fileStatus.progress} className="mt-2 h-1" />
+                        <div className="mt-2 space-y-1">
+                          <Progress value={fileStatus.progress} className="h-1" />
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-blue-600 font-medium">{fileStatus.progress}%</span>
+                            {fileStatus.eta && fileStatus.eta !== Infinity && (
+                              <span className="text-gray-500">~{formatETA(fileStatus.eta)} remaining</span>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
 

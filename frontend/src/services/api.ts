@@ -49,6 +49,15 @@ api.interceptors.response.use(
         if (!isAnalysisEndpoint) {
           console.error("Resource not found");
         }
+        // Silently handle 404s for analysis endpoints
+        if (isAnalysisEndpoint) {
+          return Promise.reject({
+            status: 404,
+            message: "Analysis not found",
+            data,
+            silent: true
+          });
+        }
       } else if (status === 500) {
         console.error("Server error");
       }

@@ -18,7 +18,8 @@ export const videosService = {
   upload: async (
     projectId: string,
     file: File,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, loaded: number, total: number) => void,
+    cancelToken?: any
   ): Promise<Video> => {
     const formData = new FormData();
     formData.append("file", file);
@@ -31,12 +32,13 @@ export const videosService = {
           "Content-Type": "multipart/form-data",
         },
         timeout: 600000, // 10 minutes timeout for large video uploads
+        cancelToken: cancelToken,
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total && onProgress) {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
-            onProgress(percentCompleted);
+            onProgress(percentCompleted, progressEvent.loaded, progressEvent.total);
           }
         },
       }

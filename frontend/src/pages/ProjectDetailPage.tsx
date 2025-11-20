@@ -6,7 +6,7 @@ import { useProjectAnalysis, useStartProjectAnalysis, useMetaPatterns, useCrossI
 import Layout from "../components/Layout";
 import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import VideoUploadDialog from "../components/videos/VideoUploadDialog";
+import VideoUploadDialog from "../components/videos/VideoUploadDialogSimple";
 import VideoCard from "../components/videos/VideoCard";
 import { MetaPatternsList } from "../components/analysis/MetaPatternsList";
 import { CrossInsightsList } from "../components/analysis/CrossInsightsList";

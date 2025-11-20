@@ -1,7 +1,7 @@
 """Project management API routes."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List
 from uuid import UUID
 import logging
@@ -78,6 +78,7 @@ async def list_projects(
     """
     try:
         projects = db.query(Project)\
+            .options(selectinload(Project.videos))\
             .order_by(Project.created_at.desc())\
             .offset(skip)\
             .limit(limit)\
@@ -110,7 +111,10 @@ async def get_project(
         Project details
     """
     try:
-        project = db.query(Project).filter(Project.id == project_id).first()
+        project = db.query(Project)\
+            .options(selectinload(Project.videos))\
+            .filter(Project.id == project_id)\
+            .first()
 
         if not project:
             raise HTTPException(

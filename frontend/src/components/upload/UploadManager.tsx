@@ -1,0 +1,535 @@
+import { useState } from 'react';
+import { useUploadContext } from '../../contexts/UploadContext';
+import {
+  Upload,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  RotateCw,
+  Pause,
+  Play,
+  X,
+  Clock,
+  PauseCircle,
+  XCircle,
+  AlertTriangle,
+  Wifi,
+  WifiOff,
+  Server,
+  FileX,
+  HelpCircle,
+  CheckCircle2,
+  Circle,
+  CircleDot
+} from 'lucide-react';
+import { Progress } from '../ui/Progress';
+
+export function UploadManager() {
+  const {
+    uploads,
+    removeUpload,
+    retryUpload,
+    clearCompleted,
+    activeUploads,
+    isUploading,
+    cancelUpload,
+    pauseUpload,
+    resumeUpload,
+    pauseAll,
+    resumeAll,
+    isPaused
+  } = useUploadContext();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState<string | null>(null);
+
+  if (uploads.length === 0) {
+    return null;
+  }
+
+  const totalCount = uploads.length;
+  const completedCount = uploads.filter(u => u.status === 'completed').length;
+  const errorCount = uploads.filter(u => u.status === 'error').length;
+  const pendingCount = uploads.filter(u => u.status === 'pending').length;
+  const uploadingCount = uploads.filter(u => u.status === 'uploading').length;
+  const processingCount = uploads.filter(u => u.status === 'processing').length;
+  const pausedCount = uploads.filter(u => u.status === 'paused').length;
+  const cancelledCount = uploads.filter(u => u.status === 'cancelled').length;
+  const activeCount = uploadingCount + processingCount;
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+  };
+
+  const formatSpeed = (bytesPerSecond: number): string => {
+    if (bytesPerSecond === 0) return "0 MB/s";
+    const mbps = bytesPerSecond / (1024 * 1024);
+    return mbps >= 1
+      ? `${mbps.toFixed(1)} MB/s`
+      : `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
+  };
+
+  const formatETA = (seconds: number): string => {
+    if (seconds === Infinity || isNaN(seconds)) return "calculating...";
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const secs = Math.round(seconds % 60);
+      return `${minutes}m ${secs}s`;
+    }
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  const getErrorIcon = (errorType?: string) => {
+    switch (errorType) {
+      case 'network':
+        return <WifiOff className="h-3 w-3 text-red-600 flex-shrink-0" />;
+      case 'timeout':
+        return <Clock className="h-3 w-3 text-red-600 flex-shrink-0" />;
+      case 'server':
+        return <Server className="h-3 w-3 text-red-600 flex-shrink-0" />;
+      case 'validation':
+        return <FileX className="h-3 w-3 text-red-600 flex-shrink-0" />;
+      default:
+        return <AlertCircle className="h-3 w-3 text-red-600 flex-shrink-0" />;
+    }
+  };
+
+  const handleCancelClick = (uploadId: string) => {
+    setConfirmingCancel(uploadId);
+  };
+
+  const confirmCancel = (uploadId: string) => {
+    cancelUpload(uploadId);
+    setConfirmingCancel(null);
+  };
+
+  const cancelConfirmation = () => {
+    setConfirmingCancel(null);
+  };
+
+  // Determine header icon and message
+  const getHeaderStatus = () => {
+    if (isPaused) {
+      return {
+        icon: <PauseCircle className="h-4 w-4 text-amber-600" />,
+        message: `Queue paused • ${pausedCount} file${pausedCount === 1 ? '' : 's'} waiting`
+      };
+    }
+    if (activeCount > 0) {
+      return {
+        icon: <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />,
+        message: processingCount > 0
+          ? `Processing ${processingCount} file${processingCount === 1 ? '' : 's'}`
+          : `Uploading ${uploadingCount} of ${totalCount} files`
+      };
+    }
+    if (pausedCount > 0) {
+      return {
+        icon: <PauseCircle className="h-4 w-4 text-amber-600" />,
+        message: `${completedCount}/${totalCount} complete • ${pausedCount} paused`
+      };
+    }
+    if (errorCount > 0 && completedCount === 0) {
+      return {
+        icon: <AlertTriangle className="h-4 w-4 text-red-600" />,
+        message: `${errorCount} upload${errorCount === 1 ? '' : 's'} failed`
+      };
+    }
+    if (errorCount > 0) {
+      return {
+        icon: <AlertTriangle className="h-4 w-4 text-amber-600" />,
+        message: `${completedCount} complete • ${errorCount} failed`
+      };
+    }
+    return {
+      icon: <CheckCircle2 className="h-4 w-4 text-green-600" />,
+      message: `All ${completedCount} uploads complete`
+    };
+  };
+
+  const headerStatus = getHeaderStatus();
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 w-96">
+      {/* Header */}
+      <div
+        className="bg-white border border-gray-200 rounded-lg shadow-lg cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between p-3">
+          <div className="flex items-center gap-2">
+            {headerStatus.icon}
+            <span className="text-sm font-medium">{headerStatus.message}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {(activeCount > 0 || pausedCount > 0 || pendingCount > 0) && (
+              <>
+                {!isPaused ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      pauseAll();
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    title="Pause all uploads"
+                    aria-label="Pause all uploads"
+                  >
+                    <Pause className="h-4 w-4 text-gray-600" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      resumeAll();
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    title="Resume all uploads"
+                    aria-label="Resume all uploads"
+                  >
+                    <Play className="h-4 w-4 text-green-600" />
+                  </button>
+                )}
+              </>
+            )}
+            {completedCount > 0 && activeCount === 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearCompleted();
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            ) : (
+              <ChevronUp className="h-4 w-4 text-gray-400" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+          {/* Summary Bar */}
+          {(pendingCount > 0 || activeCount > 0 || pausedCount > 0) && (
+            <div className="p-2 border-b border-gray-100 bg-gray-50 text-xs text-gray-600">
+              <div className="flex items-center gap-3">
+                {uploadingCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    <CircleDot className="h-3 w-3 text-blue-600" />
+                    Uploading: {uploadingCount}
+                  </span>
+                )}
+                {processingCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 text-purple-600 animate-spin" />
+                    Processing: {processingCount}
+                  </span>
+                )}
+                {pendingCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Circle className="h-3 w-3 text-gray-500" />
+                    Waiting: {pendingCount}
+                  </span>
+                )}
+                {pausedCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    <PauseCircle className="h-3 w-3 text-amber-600" />
+                    Paused: {pausedCount}
+                  </span>
+                )}
+              </div>
+              {isPaused && (
+                <div className="mt-1 text-amber-600 font-medium">
+                  Queue paused - click play to resume
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="p-3 space-y-2">
+            {uploads.map((upload, index) => {
+              const queuePosition = upload.status === 'pending'
+                ? uploads.slice(0, index).filter(u => u.status === 'pending').length + 1
+                : 0;
+
+              // Determine visual state styling
+              const getUploadStyles = () => {
+                switch (upload.status) {
+                  case 'completed':
+                    return 'border-green-200 bg-green-50/50';
+                  case 'uploading':
+                    return 'border-blue-200 bg-blue-50/50 shadow-sm';
+                  case 'processing':
+                    return 'border-purple-200 bg-purple-50/50 shadow-sm animate-pulse';
+                  case 'paused':
+                    return 'border-amber-200 bg-amber-50/50 ring-2 ring-amber-200/30';
+                  case 'error':
+                    return 'border-red-200 bg-red-50/50';
+                  case 'cancelled':
+                    return 'border-gray-200 bg-gray-50/50 opacity-60';
+                  case 'pending':
+                    return 'border-gray-200 bg-white';
+                  default:
+                    return 'border-gray-200 bg-white';
+                }
+              };
+
+              const uploadStyles = getUploadStyles();
+
+              return (
+                <div
+                  key={upload.id}
+                  className={`relative flex items-start gap-2 p-2 rounded-lg border transition-all duration-200 ${uploadStyles}`}
+                >
+                  {/* Confirmation overlay */}
+                  {confirmingCancel === upload.id && (
+                    <div className="absolute inset-0 bg-white/95 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center p-3">
+                      <div className="text-center">
+                        <p className="text-xs font-medium text-gray-900 mb-2">
+                          Cancel this upload?
+                        </p>
+                        <p className="text-xs text-gray-600 mb-3">
+                          Progress will be lost and cannot be recovered.
+                        </p>
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={() => confirmCancel(upload.id)}
+                            className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                          >
+                            Cancel Upload
+                          </button>
+                          <button
+                            onClick={cancelConfirmation}
+                            className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300 transition-colors"
+                          >
+                            Keep
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    {/* File name and status */}
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium truncate text-gray-900">
+                        {upload.file.name}
+                      </p>
+                      {upload.status === 'completed' && (
+                        <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+                      )}
+                      {upload.status === 'error' && getErrorIcon(upload.errorType)}
+                      {upload.status === 'uploading' && (
+                        <CircleDot className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                      )}
+                      {upload.status === 'processing' && (
+                        <Loader2 className="h-3 w-3 text-purple-600 animate-spin flex-shrink-0" />
+                      )}
+                      {upload.status === 'paused' && (
+                        <PauseCircle className="h-3 w-3 text-amber-600 flex-shrink-0" />
+                      )}
+                      {upload.status === 'cancelled' && (
+                        <XCircle className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                      )}
+                      {upload.status === 'pending' && (
+                        <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                      )}
+                    </div>
+
+                    {/* Project name and status details */}
+                    <p className="text-xs text-gray-600 truncate">
+                      {upload.projectName}
+                      {upload.status === 'pending' && queuePosition > 0 && (
+                        <span className="text-gray-500"> • Position {queuePosition} in queue</span>
+                      )}
+                      {upload.status === 'paused' && upload.pausedProgress !== undefined && upload.pausedProgress > 0 && (
+                        <span className="text-amber-700 font-medium"> • Ready to resume ({Math.round(upload.pausedProgress)}% uploaded)</span>
+                      )}
+                      {upload.status === 'processing' && (
+                        <span className="text-purple-700 font-medium"> • {upload.processingMessage || 'Processing on server...'}</span>
+                      )}
+                      {upload.status === 'cancelled' && (
+                        <span className="text-gray-500"> • Cancelled by user</span>
+                      )}
+                      {upload.status === 'completed' && (
+                        <span className="text-green-700"> • Upload complete</span>
+                      )}
+                    </p>
+
+                    {/* Upload progress details */}
+                    {upload.status === 'uploading' && upload.uploadedBytes && (
+                      <>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(upload.uploadedBytes)} / {formatFileSize(upload.file.size)}
+                          {upload.uploadSpeed && upload.uploadSpeed > 0 && (
+                            <> • {formatSpeed(upload.uploadSpeed)}</>
+                          )}
+                        </p>
+                        <Progress
+                          value={upload.progress}
+                          className="mt-1 h-1.5"
+                        />
+                        {upload.eta && upload.eta !== Infinity && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            ~{formatETA(upload.eta)} remaining
+                          </p>
+                        )}
+                      </>
+                    )}
+
+                    {/* Processing progress */}
+                    {upload.status === 'processing' && (
+                      <>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-purple-200">
+                          <div
+                            className="h-full bg-purple-500 animate-pulse rounded-full transition-all duration-300"
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                        <p className="text-xs text-purple-600 mt-1">
+                          Server is processing your video...
+                        </p>
+                      </>
+                    )}
+
+                    {/* Error details */}
+                    {upload.status === 'error' && upload.error && (
+                      <div className="mt-1">
+                        <p className="text-xs text-red-700 font-medium">{upload.error}</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          {upload.errorType === 'network' && "Check your connection and try again"}
+                          {upload.errorType === 'timeout' && "Try uploading a smaller file"}
+                          {upload.errorType === 'server' && "Wait a moment and retry"}
+                          {upload.errorType === 'validation' && "Check file requirements"}
+                          {upload.errorType === 'unknown' && "Click retry or contact support"}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Paused progress */}
+                    {upload.status === 'paused' && upload.pausedProgress && upload.pausedProgress > 0 && (
+                      <>
+                        <p className="text-xs text-gray-500">
+                          {upload.pausedUploadedBytes ? formatFileSize(upload.pausedUploadedBytes) : '0 Bytes'} / {formatFileSize(upload.file.size)}
+                        </p>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-amber-200/50">
+                          <div
+                            className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                            style={{ width: `${upload.pausedProgress}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-amber-600 mt-1">
+                          Click play to continue • Upload will restart from beginning
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1">
+                    {/* Pause button for uploading/pending */}
+                    {upload.status === 'uploading' && (
+                      <button
+                        onClick={() => pauseUpload(upload.id)}
+                        className="p-1.5 hover:bg-white/60 rounded transition-colors group"
+                        title="Pause upload"
+                        aria-label="Pause upload"
+                      >
+                        <Pause className="h-3.5 w-3.5 text-gray-600 group-hover:text-amber-600" />
+                      </button>
+                    )}
+
+                    {/* Resume button for paused */}
+                    {upload.status === 'paused' && (
+                      <button
+                        onClick={() => resumeUpload(upload.id)}
+                        className="p-1.5 hover:bg-white/60 rounded transition-colors group"
+                        title="Resume upload"
+                        aria-label="Resume upload"
+                      >
+                        <Play className="h-3.5 w-3.5 text-green-600 group-hover:text-green-700" />
+                      </button>
+                    )}
+
+                    {/* Cancel button for active uploads */}
+                    {(upload.status === 'uploading' || upload.status === 'pending') && (
+                      <button
+                        onClick={() => handleCancelClick(upload.id)}
+                        className="p-1.5 hover:bg-white/60 rounded transition-colors group"
+                        title="Cancel upload permanently"
+                        aria-label="Cancel upload"
+                      >
+                        <X className="h-3.5 w-3.5 text-gray-500 group-hover:text-red-600" />
+                      </button>
+                    )}
+
+                    {/* Cancel button for paused uploads */}
+                    {upload.status === 'paused' && (
+                      <button
+                        onClick={() => handleCancelClick(upload.id)}
+                        className="p-1.5 hover:bg-white/60 rounded transition-colors group"
+                        title="Cancel upload permanently"
+                        aria-label="Cancel upload"
+                      >
+                        <X className="h-3.5 w-3.5 text-gray-500 group-hover:text-red-600" />
+                      </button>
+                    )}
+
+                    {/* Retry button for errors */}
+                    {upload.status === 'error' && (
+                      <button
+                        onClick={() => retryUpload(upload.id)}
+                        className="p-1.5 hover:bg-white/60 rounded transition-colors group"
+                        title="Retry upload"
+                        aria-label="Retry upload"
+                      >
+                        <RotateCw className="h-3.5 w-3.5 text-orange-600 group-hover:text-orange-700" />
+                      </button>
+                    )}
+
+                    {/* Remove button for completed/cancelled/error */}
+                    {(upload.status === 'completed' || upload.status === 'cancelled' || upload.status === 'error') && (
+                      <button
+                        onClick={() => removeUpload(upload.id)}
+                        className="p-1.5 hover:bg-white/60 rounded transition-colors group"
+                        title="Remove from list"
+                        aria-label="Remove from list"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600" />
+                      </button>
+                    )}
+
+                    {/* Help icon for errors */}
+                    {upload.status === 'error' && (
+                      <button
+                        className="p-1.5 hover:bg-white/60 rounded transition-colors group"
+                        title={`Error type: ${upload.errorType || 'unknown'}`}
+                        aria-label="Error information"
+                      >
+                        <HelpCircle className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { FolderKanban } from "lucide-react";
+import { UploadManager } from "./upload/UploadManager";
 
 interface LayoutProps {
   children: ReactNode;
@@ -21,6 +22,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main Content */}
       <main className="container mx-auto p-6">{children}</main>
+
+      {/* Global Upload Manager */}
+      <UploadManager />
     </div>
   );
 }

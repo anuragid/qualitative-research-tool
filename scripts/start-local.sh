@@ -40,6 +40,8 @@ fi
 
 # Stop any existing containers
 echo "🛑 Stopping existing containers..."
+# SAFETY WARNING: Never use 'docker-compose down -v' as it will DELETE ALL DATA
+# The -v flag removes volumes containing your database. Always backup first!
 docker-compose down
 
 # Build with the correct platform
@@ -91,12 +93,14 @@ echo "   cd frontend && npm run dev"
 echo "   Opens at:     http://localhost:5173"
 echo ""
 echo "📝 Useful commands:"
+echo "   ./scripts/backup-db.sh          # Backup database (DO THIS REGULARLY!)"
+echo "   ./scripts/restore-db.sh <file>  # Restore database from backup"
 echo "   docker-compose logs -f api      # View API logs"
 echo "   docker-compose logs -f worker   # View worker logs"
 echo "   docker-compose restart api      # Restart API"
 echo "   docker-compose ps               # Check status"
 echo "   docker-compose stop             # Stop all services"
-echo "   docker-compose down             # Stop and remove containers"
+echo "   docker-compose down             # Stop and remove containers (preserves data)"
 echo ""
 echo "🚀 To deploy changes to AWS:"
 echo "   1. Test everything locally first"
