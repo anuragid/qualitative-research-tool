@@ -5,8 +5,12 @@
 .env.production
 backend/.env
 backend/.env.production
+backend/.env.docker-local
+backend/.env.docker-local.backup
+backend/.env.aws-production
 frontend/.env
 frontend/.env.production
+frontend/.env.development
 
 # Python
 __pycache__/
