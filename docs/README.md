@@ -10,14 +10,16 @@
 ### Development
 - [Data Management](../DATA_MANAGEMENT.md) - Backup and safety procedures
 - [Usability Fixes](../USABILITY_FIXES_REQUIRED.md) - Ongoing improvements
+- [AI Agent Guide](../AI_AGENT_GUIDE.md) - Safe development practices
+- [Quick Context](../QUICK_CONTEXT.md) - Rapid session starts
+
+### Architecture & Design
+- [System Architecture](./ARCHITECTURE.md) - LangGraph system design
+- [Requirements](./REQUIREMENTS.md) - Original project specifications
 
 ### Reference
 - [Documentation Audit](../DOCUMENTATION_AUDIT_2024.md) - Documentation review
 - [Consolidation Summary](../DOCUMENTATION_CONSOLIDATION_SUMMARY.md) - Documentation changes
-
-### Architecture
-- [LangGraph Architecture](../../LangGraph_Architecture_Guide.md) - System design
-- [Requirements](../../Qualitative_Research_Tool_Requirements.md) - Original specifications
 
 ## Archived Documentation
 
