@@ -234,11 +234,11 @@ VITE_APP_ENV=development
 
 ## 📚 Documentation
 
-- [Status & Deployment](./STATUS.md) - Current status and deployment info
-- [AWS Deployment Guide](./AWS_DEPLOYMENT_GUIDE.md) - Detailed AWS setup
-- [Data Management](./DATA_MANAGEMENT.md) - Backup and recovery
-- [Architecture](../LangGraph_Architecture_Guide.md) - System design
-- [API Reference](./docs/API_REFERENCE.md) - Endpoint documentation
+- [Documentation Index](./docs/README.md) - All documentation
+- [Status & Deployment](./docs/STATUS.md) - Current status and deployment info
+- [AWS Deployment Guide](./docs/AWS_DEPLOYMENT_GUIDE.md) - Detailed AWS setup
+- [Data Management](./docs/DATA_MANAGEMENT.md) - Backup and recovery
+- [Architecture](./docs/ARCHITECTURE.md) - System design
 
 ## 🐛 Troubleshooting
 

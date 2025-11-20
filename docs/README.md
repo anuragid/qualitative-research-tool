@@ -4,22 +4,22 @@
 
 ### Getting Started
 - [Main README](../README.md) - Setup, features, quick start
-- [Project Status](../STATUS.md) - Current operational status
-- [AWS Deployment Guide](../AWS_DEPLOYMENT_GUIDE.md) - Production deployment
+- [Project Status](./STATUS.md) - Current operational status
+- [AWS Deployment Guide](./AWS_DEPLOYMENT_GUIDE.md) - Production deployment
 
 ### Development
-- [Data Management](../DATA_MANAGEMENT.md) - Backup and safety procedures
-- [Usability Fixes](../USABILITY_FIXES_REQUIRED.md) - Ongoing improvements
-- [AI Agent Guide](../AI_AGENT_GUIDE.md) - Safe development practices
-- [Quick Context](../QUICK_CONTEXT.md) - Rapid session starts
+- [Data Management](./DATA_MANAGEMENT.md) - Backup and safety procedures
+- [Usability Fixes](./USABILITY_FIXES_REQUIRED.md) - Ongoing improvements
+- [AI Agent Guide](./AI_AGENT_GUIDE.md) - Safe development practices
+- [Quick Context](./QUICK_CONTEXT.md) - Rapid session starts
 
 ### Architecture & Design
 - [System Architecture](./ARCHITECTURE.md) - LangGraph system design
 - [Requirements](./REQUIREMENTS.md) - Original project specifications
 
 ### Reference
-- [Documentation Audit](../DOCUMENTATION_AUDIT_2024.md) - Documentation review
-- [Consolidation Summary](../DOCUMENTATION_CONSOLIDATION_SUMMARY.md) - Documentation changes
+- [Documentation Audit](./DOCUMENTATION_AUDIT_2024.md) - Documentation review
+- [Consolidation Summary](./DOCUMENTATION_CONSOLIDATION_SUMMARY.md) - Documentation changes
 
 ## Archived Documentation
 
