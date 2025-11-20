@@ -29,36 +29,60 @@ def chunk_node(state: VideoAnalysisState) -> Dict[str, Any]:
         # Build user message with transcript data
         transcript = state["transcript"]
         speaker_labels = state.get("speaker_labels", {})
+        speaker_roles = state.get("speaker_roles", {})
 
-        # Format transcript segments for Claude
-        formatted_segments = []
+        # Separate participant and interviewer utterances
+        participant_segments = []
+        all_segments = []  # Full transcript for context
+
         for utterance in transcript.get("utterances", []):
             speaker_id = utterance["speaker"]
             speaker_name = speaker_labels.get(speaker_id, speaker_id)
+            speaker_role = speaker_roles.get(speaker_id, "unknown")
             timestamp = utterance["start"]
             text = utterance["text"]
 
-            formatted_segments.append(
-                f"[{timestamp}] {speaker_name}: {text}"
-            )
+            formatted_segment = f"[{timestamp}] {speaker_name}: {text}"
+            all_segments.append(formatted_segment)
 
-        transcript_text = "\n\n".join(formatted_segments)
+            # Only add to participant segments if speaker is a participant
+            if speaker_role == "participant":
+                participant_segments.append(formatted_segment)
 
-        # Include speaker mapping in the message
-        speaker_mapping_text = "SPEAKER MAPPING:\n"
+        # Full transcript for context
+        full_transcript_text = "\n\n".join(all_segments)
+        # Participant-only transcript for chunking
+        participant_transcript_text = "\n\n".join(participant_segments)
+
+        # Debug logging
+        logger.info(f"[CHUNK] Total utterances: {len(transcript.get('utterances', []))}")
+        logger.info(f"[CHUNK] Participant segments: {len(participant_segments)}")
+        logger.info(f"[CHUNK] Speaker roles: {speaker_roles}")
+
+        # Include speaker mapping with roles in the message
+        speaker_mapping_text = "SPEAKER MAPPING WITH ROLES:\n"
         for speaker_id, speaker_name in speaker_labels.items():
-            speaker_mapping_text += f"- {speaker_id} = {speaker_name}\n"
+            role = speaker_roles.get(speaker_id, "unknown")
+            speaker_mapping_text += f"- {speaker_id} = {speaker_name} (Role: {role})\n"
 
         user_message = f"""Please analyze the following interview transcript and break it down into chunks.
 
+IMPORTANT: You should ONLY create chunks from PARTICIPANT responses. Interviewer questions should be used for context but NOT chunked.
+
 {speaker_mapping_text}
 
-TRANSCRIPT:
-{transcript_text}
+FULL TRANSCRIPT (for context):
+{full_transcript_text}
+
+PARTICIPANT RESPONSES TO CHUNK:
+{participant_transcript_text}
 
 Remember:
-- Each chunk should be a single, discrete piece of information that cannot be broken down further without losing meaning.
-- Use the actual speaker names (not A, B, C) as shown in the transcript."""
+- ONLY chunk the participant responses shown above
+- Each chunk should be a single, discrete piece of information from a participant that cannot be broken down further without losing meaning
+- Use interviewer questions from the full transcript to understand context, but do NOT create chunks from interviewer speech
+- Include relevant context in each chunk to maintain meaning (e.g., what question the participant is responding to)
+- Use the actual speaker names (not A, B, C) as shown in the transcript"""
 
         # Call Claude with retry logic
         chunks = claude_service.call_with_json_response(
@@ -71,9 +95,31 @@ Remember:
         if not isinstance(chunks, list):
             raise ValueError("Expected list of chunks from Claude")
 
+        # Debug: Log chunk types
+        chunk_types = {}
+        for chunk in chunks:
+            chunk_type = chunk.get("type", "unknown")
+            chunk_types[chunk_type] = chunk_types.get(chunk_type, 0) + 1
+        logger.info(f"[CHUNK] Chunk type distribution: {chunk_types}")
+
         # Post-process chunks to ensure speaker names are used (not IDs)
         # This is a safety net in case Claude returns speaker IDs instead of names
         for chunk in chunks:
+            # Ensure chunk has a valid type
+            if "type" not in chunk or chunk["type"] not in ["quote", "observation", "context", "fact"]:
+                # Fallback: analyze the text to determine type
+                text_lower = chunk.get("text", "").lower()
+                if "i noticed" in text_lower or "i observed" in text_lower or "looking at" in text_lower:
+                    chunk["type"] = "observation"
+                elif "context" in text_lower or "background" in text_lower or "setting" in text_lower:
+                    chunk["type"] = "context"
+                elif any(word in text_lower for word in ["data", "number", "percent", "statistic", "fact"]):
+                    chunk["type"] = "fact"
+                else:
+                    # Default to quote for direct speech
+                    chunk["type"] = "quote"
+                logger.debug(f"[CHUNK] Auto-assigned type '{chunk['type']}' to chunk {chunk.get('chunk_id')}")
+
             if "speaker" in chunk:
                 # If the speaker field contains a speaker ID (A, B, C, etc.), map it to the name
                 speaker_value = chunk["speaker"]

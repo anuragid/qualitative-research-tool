@@ -13,6 +13,7 @@ class VideoAnalysisState(TypedDict):
     video_id: str
     transcript: Dict[str, Any]  # Processed transcript with speaker labels
     speaker_labels: Dict[str, str]  # Mapping of speaker IDs to names
+    speaker_roles: Dict[str, str]  # Mapping of speaker IDs to roles (participant/interviewer)
 
     # Step 1: CHUNK - Break transcript into discrete pieces
     chunks: Optional[List[Dict[str, Any]]]

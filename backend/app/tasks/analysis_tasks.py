@@ -72,10 +72,14 @@ def analyze_video_task(self, video_id: str):
             SpeakerLabel.transcript_id == transcript.id
         ).all()
 
-        # Build speaker mapping (speaker ID -> assigned name or default)
+        # Build speaker mapping with both names and roles
         speaker_mapping = {}
+        speaker_roles = {}
         for label in speaker_labels:
             speaker_mapping[label.speaker_label] = label.assigned_name or label.speaker_label
+            # Store role information (participant/interviewer)
+            if label.role:
+                speaker_roles[label.speaker_label] = label.role.lower()
 
         # Get or create video analysis record
         video_analysis = self.db.query(VideoAnalysis).filter(
@@ -101,6 +105,7 @@ def analyze_video_task(self, video_id: str):
             "video_id": video_id,
             "transcript": transcript.processed_transcript,
             "speaker_labels": speaker_mapping,
+            "speaker_roles": speaker_roles,  # Add role information
             "chunks": None,
             "inferences": None,
             "patterns": None,
