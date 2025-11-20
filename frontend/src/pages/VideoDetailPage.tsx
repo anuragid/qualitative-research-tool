@@ -2,7 +2,15 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
 import { useTranscript, useSpeakerLabels, useStartTranscription, useLabelSpeaker } from "../hooks/useTranscriptions";
-import { useVideoAnalysis, useStartVideoAnalysis } from "../hooks/useAnalysis";
+import {
+  useVideoAnalysis,
+  useStartVideoAnalysis,
+  useStartChunkStep,
+  useStartInferStep,
+  useStartRelateStep,
+  useStartExplainStep,
+  useStartActivateStep
+} from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
 import { TranscriptViewer } from "../components/videos/TranscriptViewer";
 import { VideoTranscriptSync } from "../components/video/VideoTranscriptSync";
@@ -11,6 +19,7 @@ import { InferencesList } from "../components/analysis/InferencesList";
 import { PatternsList } from "../components/analysis/PatternsList";
 import { InsightsList } from "../components/analysis/InsightsList";
 import { PrinciplesList } from "../components/analysis/PrinciplesList";
+import { ContinueStepButton } from "../components/analysis/ContinueStepButton";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
@@ -46,10 +55,20 @@ export default function VideoDetailPage() {
   const startAnalysis = useStartVideoAnalysis();
   const labelSpeaker = useLabelSpeaker();
 
+  // Step-by-step analysis hooks
+  const startChunkStep = useStartChunkStep();
+  const startInferStep = useStartInferStep();
+  const startRelateStep = useStartRelateStep();
+  const startExplainStep = useStartExplainStep();
+  const startActivateStep = useStartActivateStep();
+
   // Speaker label editing state
   const [editingSpeaker, setEditingSpeaker] = React.useState<string | null>(null);
   const [speakerName, setSpeakerName] = React.useState("");
   const [speakerRole, setSpeakerRole] = React.useState("");
+
+  // Active tab state for step-by-step mode
+  const [activeStepTab, setActiveStepTab] = React.useState("chunks");
 
   const handleStartTranscription = () => {
     if (videoId) {
@@ -60,6 +79,41 @@ export default function VideoDetailPage() {
   const handleStartAnalysis = () => {
     if (videoId) {
       startAnalysis.mutate(videoId);
+    }
+  };
+
+  // Step-by-step analysis handlers
+  const handleStartChunkStep = () => {
+    if (videoId) {
+      startChunkStep.mutate(videoId);
+    }
+  };
+
+  const handleStartInferStep = () => {
+    if (videoId) {
+      setActiveStepTab("inferences");
+      startInferStep.mutate(videoId);
+    }
+  };
+
+  const handleStartRelateStep = () => {
+    if (videoId) {
+      setActiveStepTab("patterns");
+      startRelateStep.mutate(videoId);
+    }
+  };
+
+  const handleStartExplainStep = () => {
+    if (videoId) {
+      setActiveStepTab("insights");
+      startExplainStep.mutate(videoId);
+    }
+  };
+
+  const handleStartActivateStep = () => {
+    if (videoId) {
+      setActiveStepTab("principles");
+      startActivateStep.mutate(videoId);
     }
   };
 
@@ -124,6 +178,65 @@ export default function VideoDetailPage() {
   const canStartTranscription = video.status === "uploaded" && !transcript;
   const canStartAnalysis = video.status === "transcribed" || (transcript && transcript.status === "completed");
   const hasAnalysis = analysis && analysis.status === "completed";
+  const isStepByStepMode = analysis && analysis.status !== "completed";
+
+  // Step information for step-by-step mode
+  const getStepInfo = () => {
+    if (!analysis || !analysis.current_step) return null;
+
+    const stepMap: Record<string, { name: string; number: number; nextStep: string | null; handler: () => void }> = {
+      chunk: { name: "Chunk", number: 1, nextStep: "infer", handler: handleStartInferStep },
+      infer: { name: "Infer", number: 2, nextStep: "relate", handler: handleStartRelateStep },
+      relate: { name: "Relate", number: 3, nextStep: "explain", handler: handleStartExplainStep },
+      explain: { name: "Explain", number: 4, nextStep: "activate", handler: handleStartActivateStep },
+      activate: { name: "Activate", number: 5, nextStep: null, handler: () => {} },
+    };
+
+    return stepMap[analysis.current_step] || null;
+  };
+
+  const stepInfo = getStepInfo();
+
+  // Check if current step has data ready to continue
+  const canContinueCurrentStep = () => {
+    if (!analysis || !analysis.current_step) return false;
+
+    switch (analysis.current_step) {
+      case "chunk":
+        return !!analysis.chunks;
+      case "infer":
+        return !!analysis.inferences;
+      case "relate":
+        return !!analysis.patterns;
+      case "explain":
+        return !!analysis.insights;
+      case "activate":
+        return false; // No continue button for last step
+      default:
+        return false;
+    }
+  };
+
+  // Shared button props - calculate once, use everywhere
+  const isAnyStepPending =
+    startInferStep.isPending ||
+    startRelateStep.isPending ||
+    startExplainStep.isPending ||
+    startActivateStep.isPending;
+
+  const isCurrentStepProcessing = Boolean(
+    analysis?.current_step && analysis?.step_status?.[analysis.current_step] === "processing"
+  );
+
+  const getNextStepLabel = (step: string) => {
+    const labels: Record<string, string> = {
+      infer: "Continue to Infer",
+      relate: "Continue to Relate",
+      explain: "Continue to Explain",
+      activate: "Continue to Activate",
+    };
+    return labels[step] || "Continue to Next Step";
+  };
 
   return (
     <Layout>
@@ -214,16 +327,16 @@ export default function VideoDetailPage() {
                 </Button>
               )}
 
-              {canStartAnalysis && !hasAnalysis && (
+              {canStartAnalysis && !analysis && (
                 <Button
-                  onClick={handleStartAnalysis}
-                  disabled={startAnalysis.isPending || video.status === "analyzing"}
+                  onClick={handleStartChunkStep}
+                  disabled={startChunkStep.isPending}
                   variant="secondary"
                 >
-                  {startAnalysis.isPending || video.status === "analyzing" ? (
+                  {startChunkStep.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Analyzing...
+                      Starting Analysis...
                     </>
                   ) : (
                     <>
@@ -351,12 +464,17 @@ export default function VideoDetailPage() {
                 <FileText className="h-4 w-4 mr-2" />
                 Transcript
               </TabsTrigger>
-              <TabsTrigger value="analysis" disabled={!hasAnalysis}>
+              <TabsTrigger value="analysis" disabled={!analysis}>
                 <Lightbulb className="h-4 w-4 mr-2" />
                 Analysis
                 {hasAnalysis && (
                   <Badge variant="success" className="ml-2 text-xs">
-                    Ready
+                    Complete
+                  </Badge>
+                )}
+                {isStepByStepMode && (
+                  <Badge variant="default" className="ml-2 text-xs">
+                    In Progress
                   </Badge>
                 )}
               </TabsTrigger>
@@ -385,6 +503,7 @@ export default function VideoDetailPage() {
                   <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                 </div>
               ) : hasAnalysis ? (
+                // Complete mode: Show all steps in tabs
                 <Tabs defaultValue="chunks" className="w-full">
                   <TabsList>
                     <TabsTrigger value="chunks">
@@ -431,6 +550,289 @@ export default function VideoDetailPage() {
                     )}
                   </TabsContent>
                 </Tabs>
+              ) : isStepByStepMode && stepInfo ? (
+                // Step-by-step mode: Show progress and tabs with states
+                <div className="space-y-6">
+                  {/* Progress indicator */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                      <CardTitle>Analysis Progress</CardTitle>
+                      {stepInfo.nextStep && (
+                        <ContinueStepButton
+                          onClick={stepInfo.handler}
+                          nextStepLabel={getNextStepLabel(stepInfo.nextStep)}
+                          canContinue={canContinueCurrentStep()}
+                          isAnyStepPending={isAnyStepPending}
+                          isCurrentStepProcessing={isCurrentStepProcessing}
+                          size="sm"
+                        />
+                      )}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-600">Current Step:</span>
+                        <Badge variant="default">
+                          Step {stepInfo.number}: {stepInfo.name}
+                        </Badge>
+                        {analysis.current_step && analysis.step_status?.[analysis.current_step] === "processing" && (
+                          <Badge variant="outline" className="ml-2">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Processing
+                          </Badge>
+                        )}
+                      </div>
+                      <Progress value={(stepInfo.number / 5) * 100} />
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        {stepInfo.number} of 5 steps completed
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Step tabs with state indicators */}
+                  <Tabs value={activeStepTab} onValueChange={setActiveStepTab} className="w-full">
+                    <TabsList>
+                      <TabsTrigger
+                        value="chunks"
+                        disabled={!analysis.chunks}
+                      >
+                        {analysis.step_status?.chunk === "completed" && (
+                          <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                        )}
+                        {analysis.step_status?.chunk === "processing" && (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        )}
+                        1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="inferences"
+                        disabled={!analysis.inferences}
+                      >
+                        {analysis.step_status?.infer === "completed" && (
+                          <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                        )}
+                        {analysis.step_status?.infer === "processing" && (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        )}
+                        2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="patterns"
+                        disabled={!analysis.patterns}
+                      >
+                        {analysis.step_status?.relate === "completed" && (
+                          <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                        )}
+                        {analysis.step_status?.relate === "processing" && (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        )}
+                        3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="insights"
+                        disabled={!analysis.insights}
+                      >
+                        {analysis.step_status?.explain === "completed" && (
+                          <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                        )}
+                        {analysis.step_status?.explain === "processing" && (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        )}
+                        4. Insights {analysis.insights && `(${analysis.insights.length})`}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="principles"
+                        disabled={!analysis.design_principles}
+                      >
+                        {analysis.step_status?.activate === "completed" && (
+                          <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                        )}
+                        {analysis.step_status?.activate === "processing" && (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        )}
+                        5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="chunks">
+                      {analysis.step_status?.chunk === "processing" ? (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">Processing chunks...</p>
+                          </CardContent>
+                        </Card>
+                      ) : analysis.chunks ? (
+                        <>
+                          <ChunksList chunks={analysis.chunks} />
+                          {analysis.current_step === "chunk" && stepInfo.nextStep && (
+                            <Card className="mt-4">
+                              <CardContent className="py-6 text-center">
+                                <p className="text-gray-600 mb-4">
+                                  Review the {analysis.chunks.length} chunks above. When ready, continue to the next step.
+                                </p>
+                                <ContinueStepButton
+                                  onClick={stepInfo.handler}
+                                  nextStepLabel="Continue to Step 2: Infer"
+                                  canContinue={canContinueCurrentStep()}
+                                  isAnyStepPending={isAnyStepPending}
+                                  isCurrentStepProcessing={isCurrentStepProcessing}
+                                />
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
+                      ) : null}
+                    </TabsContent>
+
+                    <TabsContent value="inferences">
+                      {(startInferStep.isPending || analysis.step_status?.infer === "processing") ? (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">{startInferStep.isPending ? "Starting..." : "Generating inferences..."}</p>
+                          </CardContent>
+                        </Card>
+                      ) : analysis.inferences ? (
+                        <>
+                          <InferencesList
+                            inferences={analysis.inferences}
+                            chunks={analysis.chunks || []}
+                          />
+                          {analysis.current_step === "infer" && stepInfo.nextStep && (
+                            <Card className="mt-4">
+                              <CardContent className="py-6 text-center">
+                                <p className="text-gray-600 mb-4">
+                                  Review the {analysis.inferences.length} inferences above. When ready, continue to the next step.
+                                </p>
+                                <ContinueStepButton
+                                  onClick={stepInfo.handler}
+                                  nextStepLabel="Continue to Step 3: Relate"
+                                  canContinue={canContinueCurrentStep()}
+                                  isAnyStepPending={isAnyStepPending}
+                                  isCurrentStepProcessing={isCurrentStepProcessing}
+                                />
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
+                      ) : (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">Loading inferences...</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="patterns">
+                      {(startRelateStep.isPending || analysis.step_status?.relate === "processing") ? (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">{startRelateStep.isPending ? "Starting..." : "Identifying patterns..."}</p>
+                          </CardContent>
+                        </Card>
+                      ) : analysis.patterns ? (
+                        <>
+                          <PatternsList patterns={analysis.patterns} />
+                          {analysis.current_step === "relate" && stepInfo.nextStep && (
+                            <Card className="mt-4">
+                              <CardContent className="py-6 text-center">
+                                <p className="text-gray-600 mb-4">
+                                  Review the {analysis.patterns.length} patterns above. When ready, continue to the next step.
+                                </p>
+                                <ContinueStepButton
+                                  onClick={stepInfo.handler}
+                                  nextStepLabel="Continue to Step 4: Explain"
+                                  canContinue={canContinueCurrentStep()}
+                                  isAnyStepPending={isAnyStepPending}
+                                  isCurrentStepProcessing={isCurrentStepProcessing}
+                                />
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
+                      ) : (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">Loading patterns...</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="insights">
+                      {(startExplainStep.isPending || analysis.step_status?.explain === "processing") ? (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">{startExplainStep.isPending ? "Starting..." : "Generating insights..."}</p>
+                          </CardContent>
+                        </Card>
+                      ) : analysis.insights ? (
+                        <>
+                          <InsightsList insights={analysis.insights} />
+                          {analysis.current_step === "explain" && stepInfo.nextStep && (
+                            <Card className="mt-4">
+                              <CardContent className="py-6 text-center">
+                                <p className="text-gray-600 mb-4">
+                                  Review the {analysis.insights.length} insights above. When ready, continue to the next step.
+                                </p>
+                                <ContinueStepButton
+                                  onClick={stepInfo.handler}
+                                  nextStepLabel="Continue to Step 5: Activate"
+                                  canContinue={canContinueCurrentStep()}
+                                  isAnyStepPending={isAnyStepPending}
+                                  isCurrentStepProcessing={isCurrentStepProcessing}
+                                />
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
+                      ) : (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">Loading insights...</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="principles">
+                      {(startActivateStep.isPending || analysis.step_status?.activate === "processing") ? (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">{startActivateStep.isPending ? "Starting..." : "Generating design principles..."}</p>
+                          </CardContent>
+                        </Card>
+                      ) : analysis.design_principles ? (
+                        <>
+                          <PrinciplesList principles={analysis.design_principles} />
+                          <Card className="mt-4">
+                            <CardContent className="py-6 text-center">
+                              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                              <p className="text-gray-600">
+                                Analysis complete! All 5 steps have been processed.
+                              </p>
+                            </CardContent>
+                          </Card>
+                        </>
+                      ) : (
+                        <Card>
+                          <CardContent className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">Loading design principles...</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </div>
               ) : (
                 <Card>
                   <CardContent className="py-12 text-center">

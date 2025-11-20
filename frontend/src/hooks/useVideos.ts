@@ -6,6 +6,22 @@ export function useProjectVideos(projectId: string | null) {
     queryKey: ["projects", projectId, "videos"],
     queryFn: () => videosService.getByProject(projectId!),
     enabled: !!projectId,
+    refetchInterval: (query) => {
+      const videos = query.state.data;
+      // Poll if any video is transcribing or analyzing
+      if (
+        videos?.some(
+          (v) =>
+            v.status === "transcribing" ||
+            v.status === "analyzing" ||
+            (v.status === "transcribed" && !v.transcript) ||
+            (v.status === "completed" && !v.analysis)
+        )
+      ) {
+        return 2000; // Poll every 2 seconds
+      }
+      return false;
+    },
   });
 }
 
@@ -16,13 +32,22 @@ export function useVideo(id: string | null) {
     enabled: !!id,
     refetchInterval: (query) => {
       const video = query.state.data;
-      // Poll while transcribing or analyzing
-      if (
-        video &&
-        (video.status === "transcribing" || video.status === "analyzing")
-      ) {
-        return 3000; // Poll every 3 seconds
+      if (!video) return false;
+
+      // Poll while transcribing OR transcribed but transcript data not loaded yet
+      const needsTranscriptData =
+        video.status === "transcribing" ||
+        (video.status === "transcribed" && !video.transcript);
+
+      // Poll while analyzing OR completed but analysis data not loaded yet
+      const needsAnalysisData =
+        video.status === "analyzing" ||
+        (video.status === "completed" && !video.analysis);
+
+      if (needsTranscriptData || needsAnalysisData) {
+        return 2000; // Poll every 2 seconds for faster feedback
       }
+
       return false;
     },
   });

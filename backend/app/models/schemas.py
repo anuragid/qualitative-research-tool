@@ -135,6 +135,15 @@ class VideoAnalysisResponse(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
+    # Step-by-step tracking fields
+    current_step: Optional[str] = "chunk"
+    step_status: Optional[Dict[str, str]] = {}
+    chunk_completed_at: Optional[datetime] = None
+    infer_completed_at: Optional[datetime] = None
+    relate_completed_at: Optional[datetime] = None
+    explain_completed_at: Optional[datetime] = None
+    activate_completed_at: Optional[datetime] = None
+
 
 # ========== Project Analysis Schemas ==========
 

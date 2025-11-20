@@ -2,11 +2,36 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transcriptionsService } from "../services/transcriptions";
 import type { LabelSpeakerDto } from "../types";
 
-export function useTranscript(videoId: string | null) {
+export function useTranscript(videoId: string | null, shouldFetch: boolean = true) {
   return useQuery({
     queryKey: ["videos", videoId, "transcript"],
     queryFn: () => transcriptionsService.get(videoId!),
-    enabled: !!videoId,
+    enabled: !!videoId && shouldFetch,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404 - transcript doesn't exist yet
+      if (error?.response?.status === 404) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    refetchInterval: (query) => {
+      const transcript = query.state.data;
+      // Poll if:
+      // 1. We don't have transcript data yet, OR
+      // 2. Transcript is still processing, OR
+      // 3. Transcript exists but doesn't have processed content yet
+      if (
+        !transcript ||
+        transcript.status === "pending" ||
+        transcript.status === "processing" ||
+        !transcript.processed_transcript ||
+        !transcript.processed_transcript.utterances ||
+        transcript.processed_transcript.utterances.length === 0
+      ) {
+        return 2000; // Poll every 2 seconds
+      }
+      return false;
+    },
   });
 }
 

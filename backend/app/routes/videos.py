@@ -648,3 +648,216 @@ async def search_transcript_words(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to search transcript: {str(e)}"
         )
+
+
+# Step-by-step analysis endpoints
+@router.post("/{video_id}/analyze/chunk", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_chunk_step(
+    video_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger CHUNK step - break transcript into discrete pieces.
+    """
+    try:
+        # Check prerequisites
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if not video:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Video {video_id} not found"
+            )
+
+        transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
+        if not transcript or transcript.status != "completed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Video must have a completed transcript"
+            )
+
+        # Import here to avoid circular imports
+        from app.tasks.analysis_steps import analyze_chunk_step
+
+        # Start the task
+        task = analyze_chunk_step.delay(str(video_id))
+        logger.info(f"CHUNK step started for video {video_id}, task_id: {task.id}")
+
+        return {
+            "task_id": task.id,
+            "video_id": str(video_id),
+            "step": "chunk",
+            "status": "started"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting CHUNK step: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start CHUNK step: {str(e)}"
+        )
+
+
+@router.post("/{video_id}/analyze/infer", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_infer_step(
+    video_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger INFER step - interpret meaning from chunks.
+    """
+    try:
+        # Check prerequisites
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if not analysis or not analysis.chunks:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CHUNK step must be completed first"
+            )
+
+        # Import here to avoid circular imports
+        from app.tasks.analysis_steps import analyze_infer_step
+
+        # Start the task
+        task = analyze_infer_step.delay(str(video_id))
+        logger.info(f"INFER step started for video {video_id}, task_id: {task.id}")
+
+        return {
+            "task_id": task.id,
+            "video_id": str(video_id),
+            "step": "infer",
+            "status": "started"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting INFER step: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start INFER step: {str(e)}"
+        )
+
+
+@router.post("/{video_id}/analyze/relate", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_relate_step(
+    video_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger RELATE step - find patterns across inferences.
+    """
+    try:
+        # Check prerequisites
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if not analysis or not analysis.inferences:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="INFER step must be completed first"
+            )
+
+        # Import here to avoid circular imports
+        from app.tasks.analysis_steps import analyze_relate_step
+
+        # Start the task
+        task = analyze_relate_step.delay(str(video_id))
+        logger.info(f"RELATE step started for video {video_id}, task_id: {task.id}")
+
+        return {
+            "task_id": task.id,
+            "video_id": str(video_id),
+            "step": "relate",
+            "status": "started"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting RELATE step: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start RELATE step: {str(e)}"
+        )
+
+
+@router.post("/{video_id}/analyze/explain", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_explain_step(
+    video_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger EXPLAIN step - generate insights from patterns.
+    """
+    try:
+        # Check prerequisites
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if not analysis or not analysis.patterns:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="RELATE step must be completed first"
+            )
+
+        # Import here to avoid circular imports
+        from app.tasks.analysis_steps import analyze_explain_step
+
+        # Start the task
+        task = analyze_explain_step.delay(str(video_id))
+        logger.info(f"EXPLAIN step started for video {video_id}, task_id: {task.id}")
+
+        return {
+            "task_id": task.id,
+            "video_id": str(video_id),
+            "step": "explain",
+            "status": "started"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting EXPLAIN step: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start EXPLAIN step: {str(e)}"
+        )
+
+
+@router.post("/{video_id}/analyze/activate", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_activate_step(
+    video_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger ACTIVATE step - create design principles from insights.
+    """
+    try:
+        # Check prerequisites
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if not analysis or not analysis.insights:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="EXPLAIN step must be completed first"
+            )
+
+        # Import here to avoid circular imports
+        from app.tasks.analysis_steps import analyze_activate_step
+
+        # Start the task
+        task = analyze_activate_step.delay(str(video_id))
+        logger.info(f"ACTIVATE step started for video {video_id}, task_id: {task.id}")
+
+        return {
+            "task_id": task.id,
+            "video_id": str(video_id),
+            "step": "activate",
+            "status": "started"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting ACTIVATE step: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start ACTIVATE step: {str(e)}"
+        )

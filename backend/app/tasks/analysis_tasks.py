@@ -11,6 +11,7 @@ from app.database import SessionLocal
 from app.models.database_models import Video, Transcript, SpeakerLabel, VideoAnalysis, ProjectAnalysis, Project
 from app.agents.graph import video_analysis_graph, project_analysis_graph
 from app.agents.states import VideoAnalysisState, ProjectAnalysisState
+from app.services.project_state_service import ProjectStateService
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,9 @@ def analyze_video_task(self, video_id: str):
         # Explicitly flush and commit
         self.db.flush()
         self.db.commit()
+
+        # Update project state - mark as completed if all videos are analyzed
+        ProjectStateService.update_project_state_for_completion(str(video.project_id), self.db)
 
         # Refresh again to verify the commit
         self.db.refresh(video)

@@ -98,6 +98,17 @@ class VideoAnalysis(Base):
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
 
+    # Step-by-step tracking fields
+    current_step = Column(String(50), default="chunk")  # chunk, infer, relate, explain, activate
+    step_status = Column(JSONB, default={})  # {"chunk": "completed", "infer": "processing", ...}
+
+    # Individual step timestamps
+    chunk_completed_at = Column(DateTime(timezone=True))
+    infer_completed_at = Column(DateTime(timezone=True))
+    relate_completed_at = Column(DateTime(timezone=True))
+    explain_completed_at = Column(DateTime(timezone=True))
+    activate_completed_at = Column(DateTime(timezone=True))
+
     # Relationships
     video = relationship("Video", back_populates="video_analysis")
 

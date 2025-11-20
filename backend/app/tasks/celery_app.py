@@ -15,6 +15,7 @@ celery_app = Celery(
     include=[
         "app.tasks.transcription_tasks",
         "app.tasks.analysis_tasks",
+        "app.tasks.analysis_steps",
     ]
 )
 

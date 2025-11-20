@@ -58,9 +58,21 @@ class ProjectStateService:
                 return
 
             # Check if all videos have completed analysis
+            # We check video_analysis.status instead of video.status because:
+            # 1. video_analysis.status properly tracks analysis completion
+            # 2. It handles both standard and step-by-step analysis modes
+            # 3. video.status uses "analyzed" not "completed"
+            from app.models.database_models import VideoAnalysis
+
             videos = db.query(Video).filter(Video.project_id == project_id).all()
-            if videos and all(v.status == "completed" for v in videos):
-                if project.status == "processing":
+            if videos:
+                # Check if all videos have an analysis and all are completed
+                all_completed = all(
+                    v.video_analysis and v.video_analysis.status == "completed"
+                    for v in videos
+                )
+
+                if all_completed and project.status == "processing":
                     project.status = "completed"
                     db.commit()
                     logger.info(f"Project {project_id} marked as 'completed'")

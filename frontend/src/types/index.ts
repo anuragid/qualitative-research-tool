@@ -119,6 +119,13 @@ export interface VideoAnalysis {
   started_at: string | null;
   completed_at: string | null;
   error_message: string | null;
+  current_step: string | null;
+  step_status: Record<string, string> | null;
+  chunk_completed_at: string | null;
+  infer_completed_at: string | null;
+  relate_completed_at: string | null;
+  explain_completed_at: string | null;
+  activate_completed_at: string | null;
 }
 
 export type AnalysisStatus = "pending" | "running" | "completed" | "failed";

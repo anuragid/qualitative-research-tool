@@ -6,6 +6,14 @@ export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
     queryFn: projectsService.getAll,
+    refetchInterval: (query) => {
+      const projects = query.state.data;
+      // Poll if any project is in processing state
+      if (projects?.some((p) => p.status === "processing")) {
+        return 3000; // Poll every 3 seconds
+      }
+      return false;
+    },
   });
 }
 
@@ -14,6 +22,14 @@ export function useProject(id: string | null) {
     queryKey: ["projects", id],
     queryFn: () => projectsService.getById(id!),
     enabled: !!id,
+    refetchInterval: (query) => {
+      const project = query.state.data;
+      // Poll while project is processing
+      if (project?.status === "processing") {
+        return 3000; // Poll every 3 seconds
+      }
+      return false;
+    },
   });
 }
 
