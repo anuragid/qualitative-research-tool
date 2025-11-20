@@ -74,7 +74,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const isUploading = activeUploads > 0;
 
   // Use ref to avoid circular dependency
-  const processQueueRef = useRef<() => Promise<void>>();
+  const processQueueRef = useRef<(() => Promise<void>) | null>(null);
 
   const processIndividualUpload = useCallback(async (pendingUpload: FileUploadStatus) => {
     const uploadId = pendingUpload.id;
