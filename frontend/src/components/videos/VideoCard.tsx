@@ -59,11 +59,11 @@ export default function VideoCard({ video }: VideoCardProps) {
             Analyzing
           </Badge>
         );
-      case "completed":
+      case "analyzed":
         return (
           <Badge variant="success">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Completed
+            Analyzed
           </Badge>
         );
       case "error":
