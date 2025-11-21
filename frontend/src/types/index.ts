@@ -52,7 +52,7 @@ export type VideoStatus =
   | "transcribing"
   | "transcribed"
   | "analyzing"
-  | "completed"
+  | "analyzed"
   | "error";
 
 export interface UploadVideoResponse {

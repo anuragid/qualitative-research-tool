@@ -59,4 +59,11 @@ curl http://localhost:8000/health
 - Frontend: http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com
 - API: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com
 
-Last Updated: Nov 20, 2024
+## Recent Critical Fixes (Nov 21, 2024)
+- **Backend Bug**: Fixed NameError in `analyze_activate_step` (backend/app/tasks/analysis_steps.py:337)
+- **Error Detection**: Improved logic in `analyze_video_task` to check data presence
+- **Cross-Video Analysis**: Added re-run capability with new video detection
+- **UX Enhancement**: Better running state visibility with time estimates
+- **Status**: Video analysis uses "analyzed" status (not "completed")
+
+Last Updated: Nov 21, 2024

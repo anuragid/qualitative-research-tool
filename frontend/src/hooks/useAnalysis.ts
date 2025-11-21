@@ -202,7 +202,11 @@ export function useStartProjectAnalysis() {
     mutationFn: (projectId: string) =>
       analysisService.startProjectAnalysis(projectId),
     onSuccess: (_, projectId) => {
+      // Force immediate refetch to get the "running" status
       queryClient.invalidateQueries({
+        queryKey: ["projects", projectId, "analysis"],
+      });
+      queryClient.refetchQueries({
         queryKey: ["projects", projectId, "analysis"],
       });
     },

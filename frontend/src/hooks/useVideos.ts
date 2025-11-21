@@ -15,7 +15,7 @@ export function useProjectVideos(projectId: string | null) {
             v.status === "transcribing" ||
             v.status === "analyzing" ||
             (v.status === "transcribed" && !v.transcript) ||
-            (v.status === "completed" && !v.analysis)
+            (v.status === "analyzed" && !v.analysis)
         )
       ) {
         return 2000; // Poll every 2 seconds
@@ -39,10 +39,10 @@ export function useVideo(id: string | null) {
         video.status === "transcribing" ||
         (video.status === "transcribed" && !video.transcript);
 
-      // Poll while analyzing OR completed but analysis data not loaded yet
+      // Poll while analyzing OR analyzed but analysis data not loaded yet
       const needsAnalysisData =
         video.status === "analyzing" ||
-        (video.status === "completed" && !video.analysis);
+        (video.status === "analyzed" && !video.analysis);
 
       if (needsTranscriptData || needsAnalysisData) {
         return 2000; // Poll every 2 seconds for faster feedback

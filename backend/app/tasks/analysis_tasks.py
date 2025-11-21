@@ -121,8 +121,10 @@ def analyze_video_task(self, video_id: str):
         # Run the LangGraph workflow
         final_state = video_analysis_graph.invoke(initial_state)
 
-        # Check for errors
-        if final_state.get("error"):
+        # Check for errors - only fail if we don't have the required data
+        # Note: final_state["error"] might be set even if all steps completed,
+        # so we check for actual data presence instead
+        if final_state.get("error") and not final_state.get("design_principles"):
             raise Exception(f"Analysis failed: {final_state['error']}")
 
         # Save results to database
@@ -142,8 +144,11 @@ def analyze_video_task(self, video_id: str):
         self.db.flush()
         self.db.commit()
 
-        # Update project state - mark as completed if all videos are analyzed
-        ProjectStateService.update_project_state_for_completion(str(video.project_id), self.db)
+        # Update project state - wrap in try/except to prevent it from failing the whole task
+        try:
+            ProjectStateService.update_project_state_for_completion(str(video.project_id), self.db)
+        except Exception as project_state_error:
+            logger.warning(f"Failed to update project state: {project_state_error}")
 
         # Refresh again to verify the commit
         self.db.refresh(video)

@@ -1,11 +1,17 @@
 # Usability Issues and Required Fixes
 
+## Recently Completed (Nov 21, 2024)
+- ✅ **Cross-video analysis running state** - Added clear blue badge with spinner and time estimate
+- ✅ **Re-run analysis capability** - Detects new videos and shows amber re-run button with count
+- ✅ **Status polling** - Automatic status updates during cross-video analysis
+- ✅ **Button state management** - Re-run button properly disabled during processing
+
 ## Critical Issues (Must Fix)
 
 ### 1. System Status Visibility
 - [ ] Add operation progress indicators for all async operations
 - [ ] Add percentage progress for transcription and analysis
-- [ ] Show clear server processing status messages
+- [x] Show clear server processing status messages (Cross-video analysis - Nov 21)
 - [ ] Add activity indicators for all network requests
 - [ ] Display queue position in upload manager
 - [ ] Add "last updated" timestamps to all items

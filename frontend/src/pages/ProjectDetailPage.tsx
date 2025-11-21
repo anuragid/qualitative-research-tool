@@ -4,7 +4,7 @@ import { useProject } from "../hooks/useProjects";
 import { useProjectVideos } from "../hooks/useVideos";
 import { useProjectAnalysis, useStartProjectAnalysis, useMetaPatterns, useCrossInsights, useSystemPrinciples } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
-import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import VideoUploadDialog from "../components/videos/VideoUploadDialogSimple";
 import VideoCard from "../components/videos/VideoCard";
@@ -88,11 +88,47 @@ export default function ProjectDetailPage() {
 
     // Count videos that have completed individual analysis
     const analyzedVideos = videos.filter(video =>
-      video.status === 'completed' && video.analysis?.status === 'completed'
+      video.status === 'analyzed' && video.analysis?.status === 'completed'
     );
 
     return analyzedVideos.length >= 2;
   }, [videos]);
+
+  // Check if there are new videos not included in the current project analysis
+  const hasNewVideos = useMemo(() => {
+    if (!videos || !projectAnalysis || projectAnalysis.status !== 'completed') {
+      return false;
+    }
+
+    // Get currently analyzed video IDs
+    const analyzedVideos = videos.filter(video =>
+      video.status === 'analyzed' && video.analysis?.status === 'completed'
+    );
+
+    // Get video IDs included in the last project analysis
+    const analyzedVideoIds = new Set(projectAnalysis.video_ids || []);
+
+    // Check if there are any analyzed videos not in the project analysis
+    const newVideos = analyzedVideos.filter(v => !analyzedVideoIds.has(v.id));
+
+    return newVideos.length > 0;
+  }, [videos, projectAnalysis]);
+
+  // Count new videos
+  const newVideoCount = useMemo(() => {
+    if (!videos || !projectAnalysis || projectAnalysis.status !== 'completed') {
+      return 0;
+    }
+
+    const analyzedVideos = videos.filter(video =>
+      video.status === 'analyzed' && video.analysis?.status === 'completed'
+    );
+
+    const analyzedVideoIds = new Set(projectAnalysis.video_ids || []);
+    const newVideos = analyzedVideos.filter(v => !analyzedVideoIds.has(v.id));
+
+    return newVideos.length;
+  }, [videos, projectAnalysis]);
 
   const handleRunProjectAnalysis = async () => {
     if (!projectId) return;
@@ -275,15 +311,38 @@ export default function ProjectDetailPage() {
                   )}
                 </Button>
               ) : projectAnalysis.status === 'running' ? (
-                <Badge className="bg-blue-100 text-blue-800">
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  Running...
-                </Badge>
+                <div className="flex items-center gap-3">
+                  <Badge className="bg-blue-100 text-blue-800 border-blue-300 px-3 py-1.5">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <span className="font-medium">Cross-Video Analysis Running...</span>
+                  </Badge>
+                  <span className="text-sm text-gray-600">Usually takes 1-2 minutes</span>
+                </div>
               ) : projectAnalysis.status === 'completed' ? (
-                <Badge className="bg-green-100 text-green-800">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Completed
-                </Badge>
+                hasNewVideos ? (
+                  <Button
+                    onClick={handleRunProjectAnalysis}
+                    disabled={startProjectAnalysis.isPending || projectAnalysis.status === 'running'}
+                    className="bg-amber-600 hover:bg-amber-700"
+                  >
+                    {startProjectAnalysis.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        Re-run Analysis ({newVideoCount} new {newVideoCount === 1 ? 'video' : 'videos'})
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Badge className="bg-green-100 text-green-800">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Completed
+                  </Badge>
+                )
               ) : null}
             </div>
 
@@ -314,6 +373,12 @@ export default function ProjectDetailPage() {
                     <Badge variant="outline" className="ml-2">
                       {projectAnalysis.video_ids.length} videos analyzed
                     </Badge>
+                    {hasNewVideos && (
+                      <Badge className="ml-2 bg-amber-100 text-amber-800 border-amber-300">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        {newVideoCount} new {newVideoCount === 1 ? 'video' : 'videos'} available
+                      </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -388,7 +453,7 @@ export default function ProjectDetailPage() {
                       Ready for Cross-Video Analysis
                     </h3>
                     <p className="text-purple-700 mb-4">
-                      You have {videos?.filter(v => v.status === 'completed' && v.analysis?.status === 'completed').length} analyzed videos.
+                      You have {videos?.filter(v => v.status === 'analyzed' && v.analysis?.status === 'completed').length} analyzed videos.
                       Run project analysis to discover patterns and insights across all videos.
                     </p>
                     <Button

@@ -1,6 +1,6 @@
 """Pydantic schemas for request/response validation."""
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -75,6 +75,7 @@ class VideoResponse(VideoBase):
     uploaded_at: datetime
     status: str
     error_message: Optional[str] = None
+    analysis: Optional["VideoAnalysisResponse"] = Field(default=None, validation_alias="video_analysis")
 
 
 # ========== Transcript Schemas ==========

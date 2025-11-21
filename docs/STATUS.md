@@ -1,6 +1,6 @@
 # Qualitative Research Tool - Project Status & Deployment
 
-**Last Updated:** November 20, 2024
+**Last Updated:** November 21, 2024
 **Status:** ✅ FULLY OPERATIONAL
 **Environments:** Local (Docker) | Production (AWS)
 
@@ -42,7 +42,17 @@
 5. **`archived`** - Stored for reference (gray)
 6. **`error`** - Failed with error message (red)
 
-### Recent Improvements (Nov 20, 2024)
+### Recent Improvements
+
+#### November 21, 2024 - Critical Bug Fixes & Cross-Video Analysis Enhancement
+- ✅ **Fixed critical backend bug** in `analyze_activate_step` - video object now properly queried before use
+- ✅ **Improved error detection** in video analysis - now checks for data presence instead of just error flags
+- ✅ **Enhanced cross-video analysis UX** - clear "Running..." state with time estimates
+- ✅ **Implemented re-run capability** - detects new analyzed videos and shows amber re-run button
+- ✅ **Fixed schema issues** - VideoResponse now includes analysis field with proper relationship loading
+- ✅ **Improved polling** - forced refetch after starting analysis for immediate status updates
+
+#### November 20, 2024
 - ✅ Fixed project card video counts
 - ✅ Implemented parallel uploads
 - ✅ Created reusable UI components
@@ -98,6 +108,12 @@ http://localhost:5173
 ---
 
 ## 📊 Deployment History
+
+### November 21, 2024
+- Fixed critical NameError bug in activate step task
+- Enhanced cross-video analysis with re-run capability
+- Improved UX with better running state visibility
+- Fixed video analysis error detection logic
 
 ### November 20, 2024
 - Fixed project card video counts

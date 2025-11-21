@@ -333,13 +333,19 @@ def analyze_activate_step(self, video_id: str):
         analysis.status = "completed"
         analysis.completed_at = datetime.now(timezone.utc)
 
-        # Update video status to analyzed
-        video.status = "analyzed"
+        # Get video object and update status to analyzed
+        video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
+        if video:
+            video.status = "analyzed"
 
         self.db.commit()
 
         # Update project state - mark as completed if all videos are analyzed
-        ProjectStateService.update_project_state_for_completion(str(video.project_id), self.db)
+        if video:
+            try:
+                ProjectStateService.update_project_state_for_completion(str(video.project_id), self.db)
+            except Exception as project_state_error:
+                logger.warning(f"Failed to update project state: {project_state_error}")
 
         logger.info(f"ACTIVATE step completed for video {video_id}")
         return {

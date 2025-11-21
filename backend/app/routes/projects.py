@@ -78,7 +78,7 @@ async def list_projects(
     """
     try:
         projects = db.query(Project)\
-            .options(selectinload(Project.videos))\
+            .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
             .order_by(Project.created_at.desc())\
             .offset(skip)\
             .limit(limit)\
@@ -112,7 +112,7 @@ async def get_project(
     """
     try:
         project = db.query(Project)\
-            .options(selectinload(Project.videos))\
+            .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
             .filter(Project.id == project_id)\
             .first()
 
@@ -253,6 +253,7 @@ async def list_project_videos(
 
         # Get all videos for this project
         videos = db.query(Video)\
+            .options(selectinload(Video.video_analysis))\
             .filter(Video.project_id == project_id)\
             .order_by(Video.uploaded_at.desc())\
             .all()
