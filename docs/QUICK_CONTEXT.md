@@ -64,6 +64,8 @@ curl http://localhost:8000/health
 - **Error Detection**: Improved logic in `analyze_video_task` to check data presence
 - **Cross-Video Analysis**: Added re-run capability with new video detection
 - **UX Enhancement**: Better running state visibility with time estimates
-- **Status**: Video analysis uses "analyzed" status (not "completed")
+- **Status Consistency**: Video analysis uses "analyzed" status (not "completed")
+- **Frontend Fixes**: Fixed TypeScript errors in VideoCard.tsx and ProjectDetailPage.tsx
+- **Deployment**: All fixes successfully deployed to production (04:45 UTC)
 
 Last Updated: Nov 21, 2024
