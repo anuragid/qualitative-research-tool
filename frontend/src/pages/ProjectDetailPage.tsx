@@ -322,7 +322,7 @@ export default function ProjectDetailPage() {
                 hasNewVideos ? (
                   <Button
                     onClick={handleRunProjectAnalysis}
-                    disabled={startProjectAnalysis.isPending || projectAnalysis.status === 'running'}
+                    disabled={startProjectAnalysis.isPending}
                     className="bg-amber-600 hover:bg-amber-700"
                   >
                     {startProjectAnalysis.isPending ? (
