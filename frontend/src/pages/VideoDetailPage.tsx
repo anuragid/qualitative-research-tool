@@ -5,6 +5,7 @@ import { useTranscript, useSpeakerLabels, useStartTranscription, useLabelSpeaker
 import {
   useVideoAnalysis,
   useStartVideoAnalysis,
+  useStartFullAnalysis,
   useStartChunkStep,
   useStartInferStep,
   useStartRelateStep,
@@ -27,6 +28,12 @@ import { Input } from "../components/ui/Input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
 import { Progress } from "../components/ui/Progress";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/DropdownMenu";
+import {
   Loader2,
   ArrowLeft,
   Video as VideoIcon,
@@ -40,7 +47,9 @@ import {
   User,
   Edit2,
   Check,
-  X
+  X,
+  MoreVertical,
+  Zap
 } from "lucide-react";
 
 export default function VideoDetailPage() {
@@ -53,6 +62,7 @@ export default function VideoDetailPage() {
 
   const startTranscription = useStartTranscription();
   const startAnalysis = useStartVideoAnalysis();
+  const startFullAnalysis = useStartFullAnalysis();
   const labelSpeaker = useLabelSpeaker();
 
   // Step-by-step analysis hooks
@@ -79,6 +89,12 @@ export default function VideoDetailPage() {
   const handleStartAnalysis = () => {
     if (videoId) {
       startAnalysis.mutate(videoId);
+    }
+  };
+
+  const handleStartFullAnalysis = () => {
+    if (videoId) {
+      startFullAnalysis.mutate(videoId);
     }
   };
 
@@ -356,23 +372,47 @@ export default function VideoDetailPage() {
               )}
 
               {canStartAnalysis && !analysis && (
-                <Button
-                  onClick={handleStartChunkStep}
-                  disabled={startChunkStep.isPending}
-                  variant="secondary"
-                >
-                  {startChunkStep.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Starting Analysis...
-                    </>
-                  ) : (
-                    <>
-                      <Lightbulb className="h-4 w-4 mr-2" />
-                      Start Analysis
-                    </>
-                  )}
-                </Button>
+                <>
+                  <Button
+                    onClick={handleStartChunkStep}
+                    disabled={startChunkStep.isPending}
+                    variant="secondary"
+                  >
+                    {startChunkStep.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Starting Analysis...
+                      </>
+                    ) : (
+                      <>
+                        <Lightbulb className="h-4 w-4 mr-2" />
+                        Start Analysis
+                      </>
+                    )}
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 w-9 p-0"
+                        disabled={startChunkStep.isPending || startFullAnalysis.isPending}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                        <span className="sr-only">More options</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={handleStartFullAnalysis}
+                        disabled={startFullAnalysis.isPending}
+                      >
+                        <Zap className="mr-2 h-4 w-4" />
+                        Run Full Analysis
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
               )}
             </div>
 

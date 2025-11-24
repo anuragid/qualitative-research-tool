@@ -37,6 +37,18 @@ export function useStartVideoAnalysis() {
   });
 }
 
+export function useStartFullAnalysis() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (videoId: string) => analysisService.startVideoAnalysis(videoId),
+    onSuccess: (_, videoId) => {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
+    },
+  });
+}
+
 // Step-by-step analysis hooks
 export function useStartChunkStep() {
   const queryClient = useQueryClient();
