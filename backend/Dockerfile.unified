@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Production stage
 FROM --platform=linux/amd64 python:3.11-slim
@@ -32,7 +32,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY . .
@@ -40,8 +41,7 @@ COPY . .
 # Make scripts executable
 RUN chmod +x /app/scripts/*.sh
 
-# Update PATH to include local Python packages
-ENV PATH=/root/.local/bin:$PATH
+# Python packages are in standard locations, no PATH update needed
 
 # Create a marker file to indicate we're in Docker
 RUN touch /.dockerenv
