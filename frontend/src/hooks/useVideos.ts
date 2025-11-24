@@ -44,7 +44,14 @@ export function useVideo(id: string | null) {
         video.status === "analyzing" ||
         (video.status === "analyzed" && !video.analysis);
 
-      if (needsTranscriptData || needsAnalysisData) {
+      // IMPORTANT: Also check for speaker labels after transcription
+      // Even if transcript exists, we might not have speaker labels yet
+      const needsSpeakerData =
+        video.status === "transcribed" &&
+        video.transcript &&
+        (!video.transcript.speaker_labels || video.transcript.speaker_labels.length === 0);
+
+      if (needsTranscriptData || needsAnalysisData || needsSpeakerData) {
         return 2000; // Poll every 2 seconds for faster feedback
       }
 

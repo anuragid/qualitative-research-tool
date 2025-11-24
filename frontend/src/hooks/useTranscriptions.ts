@@ -16,6 +16,7 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
     },
     refetchInterval: (query) => {
       const transcript = query.state.data;
+
       // Poll if:
       // 1. We don't have transcript data yet, OR
       // 2. Transcript is still processing, OR
@@ -30,6 +31,25 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
       ) {
         return 2000; // Poll every 2 seconds
       }
+
+      // IMPORTANT: Continue polling briefly after completion to catch speaker detection
+      // AssemblyAI may add speaker labels slightly after the initial transcript
+      if (transcript.status === "completed") {
+        // Check if we have speakers yet
+        const hasSpeakers = transcript.speaker_labels && transcript.speaker_labels.length > 0;
+
+        if (!hasSpeakers) {
+          // No speakers detected yet, keep polling for up to ~30 seconds after completion
+          // This gives AssemblyAI time to complete speaker diarization
+          const completedAt = transcript.completed_at ? new Date(transcript.completed_at).getTime() : Date.now();
+          const timeSinceCompletion = Date.now() - completedAt;
+
+          if (timeSinceCompletion < 30000) { // Poll for up to 30 seconds
+            return 1500; // Poll every 1.5 seconds for speaker detection
+          }
+        }
+      }
+
       return false;
     },
   });
@@ -49,7 +69,9 @@ export function useStartTranscription() {
   return useMutation({
     mutationFn: (videoId: string) => transcriptionsService.start(videoId),
     onSuccess: (_, videoId) => {
+      // Invalidate both video and transcript queries to ensure polling starts
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "transcript"] });
     },
   });
 }
@@ -65,10 +87,22 @@ export function useLabelSpeaker() {
       transcriptId: string;
       data: LabelSpeakerDto;
     }) => transcriptionsService.labelSpeaker(transcriptId, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
+      // Invalidate speaker query
       queryClient.invalidateQueries({
         queryKey: ["transcripts", variables.transcriptId, "speakers"],
       });
+
+      // Also invalidate transcript and video queries to reflect the update
+      // The result typically contains the video_id we need
+      if (result && result.video_id) {
+        queryClient.invalidateQueries({
+          queryKey: ["videos", result.video_id, "transcript"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["videos", result.video_id],
+        });
+      }
     },
   });
 }

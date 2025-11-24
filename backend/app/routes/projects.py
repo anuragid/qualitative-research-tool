@@ -15,6 +15,7 @@ from app.models.schemas import (
     VideoResponse,
     ProjectAnalysisResponse,
 )
+from app.auth import get_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ router = APIRouter()
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     project_data: ProjectCreate,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -31,14 +33,16 @@ async def create_project(
 
     Args:
         project_data: Project creation data (name, description)
+        current_user_id: Authenticated user ID
         db: Database session
 
     Returns:
         Created project
     """
     try:
-        # Create new project
+        # Create new project with user_id
         project = Project(
+            user_id=current_user_id,
             name=project_data.name,
             description=project_data.description,
         )
@@ -63,21 +67,24 @@ async def create_project(
 async def list_projects(
     skip: int = 0,
     limit: int = 100,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
-    List all research projects.
+    List all research projects for the authenticated user.
 
     Args:
         skip: Number of projects to skip (for pagination)
         limit: Maximum number of projects to return
+        current_user_id: Authenticated user ID
         db: Database session
 
     Returns:
-        List of projects
+        List of projects for the current user
     """
     try:
         projects = db.query(Project)\
+            .filter(Project.user_id == current_user_id)\
             .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
             .order_by(Project.created_at.desc())\
             .offset(skip)\
@@ -98,13 +105,15 @@ async def list_projects(
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
-    Get a specific project by ID.
+    Get a specific project by ID (must be owned by the current user).
 
     Args:
         project_id: Project UUID
+        current_user_id: Authenticated user ID
         db: Database session
 
     Returns:
@@ -114,12 +123,13 @@ async def get_project(
         project = db.query(Project)\
             .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
             .filter(Project.id == project_id)\
+            .filter(Project.user_id == current_user_id)\
             .first()
 
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project {project_id} not found"
+                detail=f"Project {project_id} not found or you don't have access to it"
             )
 
         logger.info(f"Retrieved project: {project_id}")
@@ -139,26 +149,31 @@ async def get_project(
 async def update_project(
     project_id: UUID,
     project_data: ProjectUpdate,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
-    Update a project.
+    Update a project (must be owned by the current user).
 
     Args:
         project_id: Project UUID
         project_data: Update data
+        current_user_id: Authenticated user ID
         db: Database session
 
     Returns:
         Updated project
     """
     try:
-        project = db.query(Project).filter(Project.id == project_id).first()
+        project = db.query(Project)\
+            .filter(Project.id == project_id)\
+            .filter(Project.user_id == current_user_id)\
+            .first()
 
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project {project_id} not found"
+                detail=f"Project {project_id} not found or you don't have access to it"
             )
 
         # Update fields if provided
@@ -189,25 +204,30 @@ async def update_project(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
-    Delete a project and all associated data.
+    Delete a project and all associated data (must be owned by the current user).
 
     Args:
         project_id: Project UUID
+        current_user_id: Authenticated user ID
         db: Database session
 
     Returns:
         No content
     """
     try:
-        project = db.query(Project).filter(Project.id == project_id).first()
+        project = db.query(Project)\
+            .filter(Project.id == project_id)\
+            .filter(Project.user_id == current_user_id)\
+            .first()
 
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project {project_id} not found"
+                detail=f"Project {project_id} not found or you don't have access to it"
             )
 
         db.delete(project)

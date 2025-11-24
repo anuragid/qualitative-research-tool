@@ -346,18 +346,77 @@ export default function ProjectDetailPage() {
               ) : null}
             </div>
 
-            {projectAnalysis?.status === 'running' && (
+            {/* Show loading state immediately when mutation is pending OR when analysis is running */}
+            {(startProjectAnalysis.isPending || projectAnalysis?.status === 'running') && (
               <Card className="mb-4 border-blue-200 bg-blue-50">
                 <CardContent className="py-4">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                    <div>
-                      <p className="font-medium text-blue-900">
-                        Analyzing patterns across {projectAnalysis.video_ids.length} videos...
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                      <div className="flex-1">
+                        <p className="font-medium text-blue-900">
+                          {startProjectAnalysis.isPending
+                            ? "Starting cross-video analysis..."
+                            : `Analyzing patterns across ${projectAnalysis?.video_ids?.length || analyzedVideos.length} videos...`}
+                        </p>
+                        <p className="text-sm text-blue-700">
+                          This may take 2-5 minutes depending on the amount of data.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Progress bar with indeterminate state */}
+                    <div className="w-full bg-blue-100 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                    </div>
+
+                    {projectAnalysis?.status === 'running' && (
+                      <div className="text-xs text-blue-600 flex items-center gap-2">
+                        <span>Processing:</span>
+                        <span className="font-mono">CROSS_RELATE</span>
+                        <span>→</span>
+                        <span className="font-mono">CROSS_EXPLAIN</span>
+                        <span>→</span>
+                        <span className="font-mono">CROSS_ACTIVATE</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Error state for failed analysis */}
+            {projectAnalysis?.status === 'error' && (
+              <Card className="mb-4 border-red-200 bg-red-50">
+                <CardContent className="py-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-red-900 mb-1">
+                        Cross-video analysis failed
                       </p>
-                      <p className="text-sm text-blue-700">
-                        This may take a few minutes depending on the amount of data.
+                      <p className="text-sm text-red-700 mb-3">
+                        There was an error analyzing patterns across videos. This might be due to rate limits or processing issues.
                       </p>
+                      <Button
+                        onClick={handleRunProjectAnalysis}
+                        disabled={startProjectAnalysis.isPending}
+                        variant="outline"
+                        size="sm"
+                        className="border-red-300 text-red-700 hover:bg-red-100"
+                      >
+                        {startProjectAnalysis.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Retrying...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Retry Analysis
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -444,7 +503,8 @@ export default function ProjectDetailPage() {
               </Card>
             )}
 
-            {!projectAnalysis && (
+            {/* Only show initial card if not loading and no analysis exists */}
+            {!projectAnalysis && !startProjectAnalysis.isPending && (
               <Card className="border-purple-200 bg-purple-50">
                 <CardContent className="py-6">
                   <div className="text-center">
@@ -461,17 +521,10 @@ export default function ProjectDetailPage() {
                       disabled={startProjectAnalysis.isPending}
                       className="bg-purple-600 hover:bg-purple-700"
                     >
-                      {startProjectAnalysis.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Starting...
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="h-4 w-4" />
-                          Run Project Analysis
-                        </>
-                      )}
+                      <>
+                        <PlayCircle className="h-4 w-4" />
+                        Run Project Analysis
+                      </>
                     </Button>
                   </div>
                 </CardContent>
