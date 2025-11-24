@@ -184,11 +184,15 @@ export default function VideoDetailPage() {
   const getStepInfo = () => {
     if (!analysis || !analysis.current_step) return null;
 
+    // Check if current step has error - if yes, we'll retry current step instead of continuing
+    const currentStepStatus = analysis.step_status?.[analysis.current_step];
+    const hasError = currentStepStatus === "error";
+
     const stepMap: Record<string, { name: string; number: number; nextStep: string | null; handler: () => void }> = {
-      chunk: { name: "Chunk", number: 1, nextStep: "infer", handler: handleStartInferStep },
-      infer: { name: "Infer", number: 2, nextStep: "relate", handler: handleStartRelateStep },
-      relate: { name: "Relate", number: 3, nextStep: "explain", handler: handleStartExplainStep },
-      explain: { name: "Explain", number: 4, nextStep: "activate", handler: handleStartActivateStep },
+      chunk: { name: "Chunk", number: 1, nextStep: "infer", handler: hasError ? handleStartChunkStep : handleStartInferStep },
+      infer: { name: "Infer", number: 2, nextStep: "relate", handler: hasError ? handleStartInferStep : handleStartRelateStep },
+      relate: { name: "Relate", number: 3, nextStep: "explain", handler: hasError ? handleStartRelateStep : handleStartExplainStep },
+      explain: { name: "Explain", number: 4, nextStep: "activate", handler: hasError ? handleStartExplainStep : handleStartActivateStep },
       activate: { name: "Activate", number: 5, nextStep: null, handler: () => {} },
     };
 
@@ -197,10 +201,17 @@ export default function VideoDetailPage() {
 
   const stepInfo = getStepInfo();
 
-  // Check if current step has data ready to continue
+  // Check if current step has data ready to continue OR has error (for retry)
   const canContinueCurrentStep = () => {
     if (!analysis || !analysis.current_step) return false;
 
+    // Allow retry if current step has error status
+    const currentStepStatus = analysis.step_status?.[analysis.current_step];
+    if (currentStepStatus === "error") {
+      return true; // Enable button for retry
+    }
+
+    // Otherwise check if step has data
     switch (analysis.current_step) {
       case "chunk":
         return !!analysis.chunks;
@@ -229,13 +240,30 @@ export default function VideoDetailPage() {
   );
 
   const getNextStepLabel = (step: string) => {
-    const labels: Record<string, string> = {
+    // Check if current step has error - show "Retry CURRENT STEP" instead of "Continue to NEXT STEP"
+    const currentStepStatus = analysis?.step_status?.[analysis?.current_step || ""];
+    const hasError = currentStepStatus === "error";
+
+    // If error, show retry label for CURRENT step, otherwise show continue label for NEXT step
+    if (hasError) {
+      const retryLabels: Record<string, string> = {
+        chunk: "Retry Chunk Step",
+        infer: "Retry Infer Step",
+        relate: "Retry Relate Step",
+        explain: "Retry Explain Step",
+        activate: "Retry Activate Step",
+      };
+      return retryLabels[analysis?.current_step || ""] || "Retry Step";
+    }
+
+    // Normal flow: continue to next step
+    const continueLabels: Record<string, string> = {
       infer: "Continue to Infer",
       relate: "Continue to Relate",
       explain: "Continue to Explain",
       activate: "Continue to Activate",
     };
-    return labels[step] || "Continue to Next Step";
+    return continueLabels[step] || "Continue to Next Step";
   };
 
   return (
@@ -606,7 +634,7 @@ export default function VideoDetailPage() {
                       </TabsTrigger>
                       <TabsTrigger
                         value="inferences"
-                        disabled={!analysis.inferences}
+                        disabled={!analysis.inferences && analysis.step_status?.infer !== "error"}
                       >
                         {analysis.step_status?.infer === "completed" && (
                           <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
@@ -614,11 +642,14 @@ export default function VideoDetailPage() {
                         {analysis.step_status?.infer === "processing" && (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         )}
+                        {analysis.step_status?.infer === "error" && (
+                          <AlertCircle className="h-3 w-3 mr-1 text-red-500" />
+                        )}
                         2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
                       </TabsTrigger>
                       <TabsTrigger
                         value="patterns"
-                        disabled={!analysis.patterns}
+                        disabled={!analysis.patterns && analysis.step_status?.relate !== "error"}
                       >
                         {analysis.step_status?.relate === "completed" && (
                           <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
@@ -626,11 +657,14 @@ export default function VideoDetailPage() {
                         {analysis.step_status?.relate === "processing" && (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         )}
+                        {analysis.step_status?.relate === "error" && (
+                          <AlertCircle className="h-3 w-3 mr-1 text-red-500" />
+                        )}
                         3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
                       </TabsTrigger>
                       <TabsTrigger
                         value="insights"
-                        disabled={!analysis.insights}
+                        disabled={!analysis.insights && analysis.step_status?.explain !== "error"}
                       >
                         {analysis.step_status?.explain === "completed" && (
                           <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
@@ -638,17 +672,23 @@ export default function VideoDetailPage() {
                         {analysis.step_status?.explain === "processing" && (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         )}
+                        {analysis.step_status?.explain === "error" && (
+                          <AlertCircle className="h-3 w-3 mr-1 text-red-500" />
+                        )}
                         4. Insights {analysis.insights && `(${analysis.insights.length})`}
                       </TabsTrigger>
                       <TabsTrigger
                         value="principles"
-                        disabled={!analysis.design_principles}
+                        disabled={!analysis.design_principles && analysis.step_status?.activate !== "error"}
                       >
                         {analysis.step_status?.activate === "completed" && (
                           <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
                         )}
                         {analysis.step_status?.activate === "processing" && (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        )}
+                        {analysis.step_status?.activate === "error" && (
+                          <AlertCircle className="h-3 w-3 mr-1 text-red-500" />
                         )}
                         5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
                       </TabsTrigger>
