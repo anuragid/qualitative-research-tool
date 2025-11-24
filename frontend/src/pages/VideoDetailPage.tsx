@@ -27,6 +27,7 @@ import { Badge } from "../components/ui/Badge";
 import { Input } from "../components/ui/Input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
 import { Progress } from "../components/ui/Progress";
+import { SimpleTooltip } from "../components/ui/Tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +50,10 @@ import {
   Check,
   X,
   MoreVertical,
-  Zap
+  Zap,
+  Users,
+  Info,
+  AlertTriangle
 } from "lucide-react";
 
 export default function VideoDetailPage() {
@@ -171,6 +175,58 @@ export default function VideoDetailPage() {
     );
   };
 
+  // Validation functions for workflow prerequisites
+  const getUniqueSpeakers = () => {
+    if (!transcript?.processed_transcript?.utterances) return [];
+    return Array.from(
+      new Set(transcript.processed_transcript.utterances.map((u) => u.speaker))
+    );
+  };
+
+  const hasRoleAssignments = () => {
+    const uniqueSpeakers = getUniqueSpeakers();
+    if (uniqueSpeakers.length === 0) return false;
+
+    // Check if all speakers have roles assigned
+    return uniqueSpeakers.every(speaker => {
+      const label = speakerLabels?.find((l) => l.speaker_label === speaker);
+      return label?.role && (label.role === "Interviewer" || label.role === "Participant");
+    });
+  };
+
+  const hasInterviewerAndParticipant = () => {
+    if (!speakerLabels || speakerLabels.length === 0) return false;
+
+    const hasInterviewer = speakerLabels.some(label => label.role === "Interviewer");
+    const hasParticipant = speakerLabels.some(label => label.role === "Participant");
+
+    return hasInterviewer && hasParticipant;
+  };
+
+  const canStartAnalysis = () => {
+    const transcriptReady = video?.status === "transcribed" || (transcript && transcript.status === "completed");
+    const rolesAssigned = hasRoleAssignments();
+    const hasRequiredRoles = hasInterviewerAndParticipant();
+
+    return transcriptReady && rolesAssigned && hasRequiredRoles;
+  };
+
+  const getWorkflowBlockerMessage = () => {
+    if (!transcript || transcript.status !== "completed") {
+      return null;
+    }
+
+    if (!hasRoleAssignments()) {
+      return "Please assign roles to all speakers before starting analysis.";
+    }
+
+    if (!hasInterviewerAndParticipant()) {
+      return "You must have at least one Interviewer and one Participant assigned.";
+    }
+
+    return null;
+  };
+
   if (videoLoading) {
     return (
       <Layout>
@@ -192,7 +248,6 @@ export default function VideoDetailPage() {
   }
 
   const canStartTranscription = video.status === "uploaded" && !transcript;
-  const canStartAnalysis = video.status === "transcribed" || (transcript && transcript.status === "completed");
   const hasAnalysis = analysis && analysis.status === "completed";
   const isStepByStepMode = analysis && analysis.status !== "completed";
 
@@ -350,163 +405,6 @@ export default function VideoDetailPage() {
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              {canStartTranscription && (
-                <Button
-                  onClick={handleStartTranscription}
-                  disabled={startTranscription.isPending}
-                >
-                  {startTranscription.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Starting...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Transcription
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {canStartAnalysis && !analysis && (
-                <>
-                  <Button
-                    onClick={handleStartChunkStep}
-                    disabled={startChunkStep.isPending}
-                    variant="secondary"
-                  >
-                    {startChunkStep.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Starting Analysis...
-                      </>
-                    ) : (
-                      <>
-                        <Lightbulb className="h-4 w-4 mr-2" />
-                        Start Analysis
-                      </>
-                    )}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 w-9 p-0"
-                        disabled={startChunkStep.isPending || startFullAnalysis.isPending}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">More options</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={handleStartFullAnalysis}
-                        disabled={startFullAnalysis.isPending}
-                      >
-                        <Zap className="mr-2 h-4 w-4" />
-                        Run Full Analysis
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
-            </div>
-
-            {/* Speaker Labels - shown when transcript exists */}
-            {transcript && (
-              <div className="mt-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Speaker Labels</h3>
-                <div className="grid gap-3 max-w-2xl">
-                  {Array.from(
-                    new Set(transcript.processed_transcript?.utterances?.map((u) => u.speaker) || [])
-                  ).map((speaker) => {
-                    const label = speakerLabels?.find((l) => l.speaker_label === speaker);
-
-                    return (
-                      <div
-                        key={speaker}
-                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                      >
-                        <User className="h-4 w-4 text-gray-400" />
-
-                        {editingSpeaker === speaker ? (
-                          <div className="flex-1 flex gap-2">
-                            <Input
-                              type="text"
-                              placeholder="Name"
-                              value={speakerName}
-                              onChange={(e) => setSpeakerName(e.target.value)}
-                              className="flex-1"
-                            />
-                            <select
-                              value={speakerRole}
-                              onChange={(e) => setSpeakerRole(e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="">Select role...</option>
-                              <option value="Interviewer">Interviewer</option>
-                              <option value="Participant">Participant</option>
-                            </select>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                if (speakerName.trim()) {
-                                  handleLabelSpeaker(speaker, speakerName.trim(), speakerRole || undefined);
-                                  setEditingSpeaker(null);
-                                  setSpeakerName("");
-                                  setSpeakerRole("");
-                                }
-                              }}
-                              disabled={!speakerName.trim()}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingSpeaker(null);
-                                setSpeakerName("");
-                                setSpeakerRole("");
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex-1">
-                              <div className="font-medium">{label?.assigned_name || speaker}</div>
-                              {label?.role && (
-                                <div className="text-sm text-gray-500">
-                                  {label.role}
-                                </div>
-                              )}
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingSpeaker(speaker);
-                                setSpeakerName(label?.assigned_name || "");
-                                setSpeakerRole(label?.role || "");
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Progress indicator for ongoing tasks */}
             {(video.status === "transcribing" || video.status === "analyzing") && (
               <div className="mt-4 space-y-2">
@@ -523,6 +421,301 @@ export default function VideoDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* WORKFLOW PREREQUISITES SECTION */}
+        {transcript && !analysis && (
+          <Card className="border-2 border-blue-200 bg-blue-50/50">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-lg">Analysis Prerequisites</CardTitle>
+                <SimpleTooltip content="Complete these steps before starting the 5D analysis">
+                  <Info className="h-4 w-4 text-blue-600" />
+                </SimpleTooltip>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Step 1: Video Upload */}
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">1. Upload Video</h3>
+                    <Badge variant="success" className="text-xs">Complete</Badge>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">Your video has been uploaded successfully.</p>
+                </div>
+              </div>
+
+              {/* Step 2: Transcription */}
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">2. Complete Transcription</h3>
+                    <Badge variant="success" className="text-xs">Complete</Badge>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">Audio has been transcribed with speaker detection.</p>
+                </div>
+              </div>
+
+              {/* Step 3: Speaker Labels - CRITICAL */}
+              <div className="flex items-start gap-3">
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                  canStartAnalysis() ? "bg-green-100" : "bg-yellow-100"
+                }`}>
+                  {canStartAnalysis() ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">3. Assign Speaker Roles</h3>
+                    {canStartAnalysis() ? (
+                      <Badge variant="success" className="text-xs">Complete</Badge>
+                    ) : (
+                      <Badge variant="warning" className="text-xs">Required</Badge>
+                    )}
+                    <SimpleTooltip content="The analysis filters content based on speaker roles. Only participant responses are analyzed to extract insights.">
+                      <Info className="h-4 w-4 text-blue-600" />
+                    </SimpleTooltip>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    <strong>Critical:</strong> Identify who is the interviewer vs. participant in your video.
+                  </p>
+
+                  {/* Why this matters */}
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-blue-900">
+                        <p className="font-semibold mb-1">Why speaker roles matter:</p>
+                        <p>The 5D analysis focuses exclusively on <strong>participant responses</strong> to extract insights about user needs and behaviors. Interviewer questions provide context but are not analyzed. This ensures the analysis captures the participant's perspective, not the interviewer's.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Speaker labels interface */}
+                  <div className="mt-4 space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Detected Speakers ({getUniqueSpeakers().length})
+                    </h4>
+                    {getUniqueSpeakers().map((speaker) => {
+                      const label = speakerLabels?.find((l) => l.speaker_label === speaker);
+                      const hasRole = label?.role === "Interviewer" || label?.role === "Participant";
+
+                      return (
+                        <div
+                          key={speaker}
+                          className={`flex items-center gap-3 p-3 rounded-lg border-2 ${
+                            hasRole
+                              ? "bg-green-50 border-green-200"
+                              : "bg-yellow-50 border-yellow-300"
+                          }`}
+                        >
+                          <User className={`h-4 w-4 ${hasRole ? "text-green-600" : "text-yellow-600"}`} />
+
+                          {editingSpeaker === speaker ? (
+                            <div className="flex-1 flex gap-2">
+                              <Input
+                                type="text"
+                                placeholder="Name (optional)"
+                                value={speakerName}
+                                onChange={(e) => setSpeakerName(e.target.value)}
+                                className="flex-1"
+                              />
+                              <select
+                                value={speakerRole}
+                                onChange={(e) => setSpeakerRole(e.target.value)}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              >
+                                <option value="">Select role...</option>
+                                <option value="Interviewer">Interviewer</option>
+                                <option value="Participant">Participant</option>
+                              </select>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  // Allow saving even without name, as long as role is selected
+                                  if (speakerRole) {
+                                    handleLabelSpeaker(
+                                      speaker,
+                                      speakerName.trim() || speaker,
+                                      speakerRole || undefined
+                                    );
+                                    setEditingSpeaker(null);
+                                    setSpeakerName("");
+                                    setSpeakerRole("");
+                                  }
+                                }}
+                                disabled={!speakerRole}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingSpeaker(null);
+                                  setSpeakerName("");
+                                  setSpeakerRole("");
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">
+                                  {label?.assigned_name || speaker}
+                                </div>
+                                {label?.role ? (
+                                  <div className="text-sm font-semibold text-gray-700">
+                                    Role: {label.role}
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-yellow-700 font-semibold">
+                                    Role not assigned
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingSpeaker(speaker);
+                                  setSpeakerName(label?.assigned_name || "");
+                                  setSpeakerRole(label?.role || "");
+                                }}
+                              >
+                                <Edit2 className="h-4 w-4 mr-1" />
+                                {hasRole ? "Edit" : "Assign Role"}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Validation message */}
+                  {getWorkflowBlockerMessage() && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-yellow-800 font-semibold">
+                        {getWorkflowBlockerMessage()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 4: Start Analysis */}
+              <div className="flex items-start gap-3">
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                  canStartAnalysis() ? "bg-blue-100" : "bg-gray-100"
+                }`}>
+                  <Lightbulb className={`h-5 w-5 ${canStartAnalysis() ? "text-blue-600" : "text-gray-400"}`} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">4. Start 5D Analysis</h3>
+                    {!canStartAnalysis() && (
+                      <Badge variant="secondary" className="text-xs">Waiting</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Once all speakers have assigned roles, you can begin the analysis.
+                  </p>
+
+                  <div className="mt-4 flex gap-3">
+                    <SimpleTooltip
+                      content={canStartAnalysis()
+                        ? "Start step-by-step analysis (recommended)"
+                        : "Complete speaker role assignments first"
+                      }
+                    >
+                      <Button
+                        onClick={handleStartChunkStep}
+                        disabled={!canStartAnalysis() || startChunkStep.isPending}
+                        variant="default"
+                        size="lg"
+                      >
+                        {startChunkStep.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Starting Analysis...
+                          </>
+                        ) : (
+                          <>
+                            <Lightbulb className="h-4 w-4 mr-2" />
+                            Start Analysis
+                          </>
+                        )}
+                      </Button>
+                    </SimpleTooltip>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          className="h-10 w-10 p-0"
+                          disabled={!canStartAnalysis() || startChunkStep.isPending || startFullAnalysis.isPending}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                          <span className="sr-only">More options</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={handleStartFullAnalysis}
+                          disabled={startFullAnalysis.isPending}
+                        >
+                          <Zap className="mr-2 h-4 w-4" />
+                          Run Full Analysis (Advanced)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Original transcription button if no transcript yet */}
+        {canStartTranscription && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600 mb-4">
+                No transcript available. Start transcription to begin the analysis process.
+              </p>
+              <Button onClick={handleStartTranscription} disabled={startTranscription.isPending}>
+                {startTranscription.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Transcription
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Content Tabs */}
         {transcript && (
@@ -918,38 +1111,13 @@ export default function VideoDetailPage() {
                   <CardContent className="py-12 text-center">
                     <Lightbulb className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-600">
-                      No analysis available yet. Start the analysis to see results.
+                      No analysis available yet. Complete the prerequisites and start the analysis to see results.
                     </p>
                   </CardContent>
                 </Card>
               )}
             </TabsContent>
           </Tabs>
-        )}
-
-        {/* No Transcript State */}
-        {!transcript && video.status === "uploaded" && (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">
-                No transcript available. Start transcription to begin the analysis process.
-              </p>
-              <Button onClick={handleStartTranscription} disabled={startTranscription.isPending}>
-                {startTranscription.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Start Transcription
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
         )}
       </div>
     </Layout>
