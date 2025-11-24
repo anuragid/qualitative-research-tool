@@ -66,6 +66,7 @@ class ClaudeService:
                         "content": user_message,
                     }
                 ],
+                timeout=600.0,  # 10 minute timeout for long operations
             )
 
             # Extract text from response

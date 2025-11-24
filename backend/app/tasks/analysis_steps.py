@@ -140,10 +140,20 @@ def analyze_chunk_step(self, video_id: str):
         raise
 
 
-@celery_app.task(base=DatabaseTask, bind=True, name="analyze_infer_step")
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="analyze_infer_step",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3
+)
 def analyze_infer_step(self, video_id: str):
     """
     Step 2: INFER - Interpret meaning from each chunk.
+    Automatically retries up to 3 times with exponential backoff on failure.
     """
     try:
         logger.info(f"Starting INFER step for video {video_id}")
@@ -166,6 +176,11 @@ def analyze_infer_step(self, video_id: str):
             "video_id": video_id,
             "chunks": analysis.chunks
         })
+
+        # Check if result has error
+        if result.get("error") or result.get("inferences") is None:
+            error_msg = result.get("error", "Failed to generate inferences")
+            raise Exception(f"Inference generation failed: {error_msg}")
 
         # Save results
         analysis.inferences = result.get("inferences")
