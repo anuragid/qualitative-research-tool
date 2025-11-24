@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str
     ASSEMBLYAI_API_KEY: str
 
+    # Authentication (Clerk)
+    CLERK_SECRET_KEY: str = ""
+    CLERK_PUBLISHABLE_KEY: str = ""
+    CLERK_JWT_KEY: str = ""  # Public key for JWT verification
+
     # Claude Settings
     CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
     CLAUDE_MAX_TOKENS: int = 4096

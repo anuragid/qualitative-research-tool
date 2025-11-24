@@ -6,6 +6,22 @@ from datetime import datetime
 from uuid import UUID
 
 
+# ========== User Schemas ==========
+
+class UserResponse(BaseModel):
+    """Schema for user response."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    last_seen: Optional[datetime] = None
+
+
 # ========== Project Schemas ==========
 
 class ProjectBase(BaseModel):

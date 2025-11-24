@@ -71,9 +71,15 @@ async def health_check():
 
 
 # Import and include routers
-from app.routes import projects, videos, transcriptions, analysis
+from app.routes import projects, videos, transcriptions, analysis, users
 
 # Register routers with API prefix and tags
+app.include_router(
+    users.router,
+    prefix=f"{settings.API_V1_PREFIX}/users",
+    tags=["users"]
+)
+
 app.include_router(
     projects.router,
     prefix=f"{settings.API_V1_PREFIX}/projects",

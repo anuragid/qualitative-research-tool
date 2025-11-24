@@ -1,6 +1,6 @@
 """SQLAlchemy database models."""
 
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, ARRAY
+from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, ARRAY, Boolean, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -9,12 +9,32 @@ import uuid
 from app.database import Base
 
 
+class User(Base):
+    """User account linked to Clerk authentication with RBAC."""
+
+    __tablename__ = "users"
+
+    id = Column(String(255), primary_key=True)  # Clerk user ID (user_xxx format)
+    email = Column(String(255))  # Nullable since Clerk JWT may not include email
+    first_name = Column(String(255))
+    last_name = Column(String(255))
+    username = Column(String(255))
+    role = Column(String(50), nullable=False, default="user")  # admin, user, viewer
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_seen = Column(DateTime(timezone=True))
+
+    # Relationships
+    projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
+
+
 class Project(Base):
     """Research project containing multiple videos."""
 
     __tablename__ = "projects"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(Text)
     status = Column(String(50), default="planning")  # planning, ready, processing, completed, archived, error
@@ -23,6 +43,7 @@ class Project(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
+    user = relationship("User", back_populates="projects")
     videos = relationship("Video", back_populates="project", cascade="all, delete-orphan")
     project_analyses = relationship("ProjectAnalysis", back_populates="project", cascade="all, delete-orphan")
 
