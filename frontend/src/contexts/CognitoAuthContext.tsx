@@ -3,7 +3,8 @@
  * Provides authentication functionality throughout the app
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { Amplify } from 'aws-amplify';
 import { signIn, signOut, signUp, confirmSignUp, getCurrentUser, fetchAuthSession, type SignInOutput } from '@aws-amplify/auth';
 import { cognitoConfig } from '../config/cognito';

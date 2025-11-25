@@ -94,15 +94,8 @@ export function useLabelSpeaker() {
       });
 
       // Also invalidate transcript and video queries to reflect the update
-      // The result typically contains the video_id we need
-      if (result && result.video_id) {
-        queryClient.invalidateQueries({
-          queryKey: ["videos", result.video_id, "transcript"],
-        });
-        queryClient.invalidateQueries({
-          queryKey: ["videos", result.video_id],
-        });
-      }
+      // Note: result is SpeakerLabel[] which doesn't contain video_id
+      // TODO: If needed, we could extract video_id from the transcript context
     },
   });
 }

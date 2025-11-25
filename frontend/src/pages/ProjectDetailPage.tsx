@@ -357,7 +357,7 @@ export default function ProjectDetailPage() {
                         <p className="font-medium text-blue-900">
                           {startProjectAnalysis.isPending
                             ? "Starting cross-video analysis..."
-                            : `Analyzing patterns across ${projectAnalysis?.video_ids?.length || analyzedVideos.length} videos...`}
+                            : `Analyzing patterns across ${projectAnalysis?.video_ids?.length || 0} videos...`}
                         </p>
                         <p className="text-sm text-blue-700">
                           This may take 2-5 minutes depending on the amount of data.
@@ -386,7 +386,7 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Error state for failed analysis */}
-            {projectAnalysis?.status === 'error' && (
+            {projectAnalysis?.status === 'failed' && (
               <Card className="mb-4 border-red-200 bg-red-50">
                 <CardContent className="py-4">
                   <div className="flex items-start gap-3">
