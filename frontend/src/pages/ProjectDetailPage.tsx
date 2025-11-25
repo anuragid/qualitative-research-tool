@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useProject } from "../hooks/useProjects";
 import { useProjectVideos } from "../hooks/useVideos";
@@ -43,6 +43,24 @@ export default function ProjectDetailPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
+
+  // Nielsen #1: Visibility of system status - Track when analysis was triggered
+  // This persists loading state until we see the analysis complete or fail
+  const [analysisTriggered, setAnalysisTriggered] = useState(false);
+
+  // Clear triggered state when analysis completes, fails, or enters running state
+  useEffect(() => {
+    if (projectAnalysis?.status === 'completed' ||
+        projectAnalysis?.status === 'failed' ||
+        projectAnalysis?.status === 'running') {
+      setAnalysisTriggered(false);
+    }
+  }, [projectAnalysis?.status]);
+
+  // Computed: show loading when mutation pending OR triggered but not yet running/completed
+  const isAnalysisLoading = startProjectAnalysis.isPending ||
+    analysisTriggered ||
+    projectAnalysis?.status === 'running';
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -132,10 +150,13 @@ export default function ProjectDetailPage() {
 
   const handleRunProjectAnalysis = async () => {
     if (!projectId) return;
+    // Nielsen #1: Immediately show loading state for user feedback
+    setAnalysisTriggered(true);
     try {
       await startProjectAnalysis.mutateAsync(projectId);
     } catch (error) {
       console.error('Failed to start project analysis:', error);
+      setAnalysisTriggered(false); // Clear on error
     }
   };
 
@@ -346,8 +367,8 @@ export default function ProjectDetailPage() {
               ) : null}
             </div>
 
-            {/* Show loading state immediately when mutation is pending OR when analysis is running */}
-            {(startProjectAnalysis.isPending || projectAnalysis?.status === 'running') && (
+            {/* Show loading state immediately when analysis is triggered - Nielsen #1: Visibility */}
+            {isAnalysisLoading && (
               <Card className="mb-4 border-blue-200 bg-blue-50">
                 <CardContent className="py-4">
                   <div className="space-y-3">
@@ -355,7 +376,7 @@ export default function ProjectDetailPage() {
                       <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                       <div className="flex-1">
                         <p className="font-medium text-blue-900">
-                          {startProjectAnalysis.isPending
+                          {startProjectAnalysis.isPending || analysisTriggered
                             ? "Starting cross-video analysis..."
                             : `Analyzing patterns across ${projectAnalysis?.video_ids?.length || 0} videos...`}
                         </p>

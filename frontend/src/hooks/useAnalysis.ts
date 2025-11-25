@@ -196,11 +196,18 @@ export function useProjectAnalysis(projectId: string | null) {
     queryKey: ["projects", projectId, "analysis"],
     queryFn: () => analysisService.getProjectAnalysis(projectId!),
     enabled: !!projectId,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404 - analysis doesn't exist yet
+      if (error?.response?.status === 404) {
+        return false;
+      }
+      return failureCount < 3;
+    },
     refetchInterval: (query) => {
       const analysis = query.state.data;
-      // Poll while analysis is running
-      if (analysis && analysis.status === "running") {
-        return 3000; // Poll every 3 seconds
+      // Poll while analysis is running or pending
+      if (analysis && (analysis.status === "running" || analysis.status === "pending")) {
+        return 2000; // Poll every 2 seconds for faster updates
       }
       return false;
     },

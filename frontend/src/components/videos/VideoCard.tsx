@@ -8,6 +8,7 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle,
+  RefreshCw,
 } from "lucide-react";
 import type { Video } from "../../types";
 import {
@@ -21,6 +22,7 @@ import {
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { useDeleteVideo } from "../../hooks/useVideos";
+import { useStartVideoAnalysis } from "../../hooks/useAnalysis";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +39,13 @@ interface VideoCardProps {
 export default function VideoCard({ video }: VideoCardProps) {
   const navigate = useNavigate();
   const deleteVideo = useDeleteVideo();
+  const startAnalysis = useStartVideoAnalysis();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const handleRetryAnalysis = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    startAnalysis.mutate(video.id);
+  };
 
   const getStatusBadge = (status: Video["status"]) => {
     switch (status) {
@@ -154,12 +162,36 @@ export default function VideoCard({ video }: VideoCardProps) {
           </div>
         </CardContent>
 
-        <CardFooter className="flex items-center justify-between">
-          {getStatusBadge(video.status)}
-          {video.error_message && (
-            <p className="text-xs text-red-600 truncate flex-1 ml-2">
-              {video.error_message}
-            </p>
+        <CardFooter className="flex flex-col gap-2">
+          <div className="flex items-center justify-between w-full">
+            {getStatusBadge(video.status)}
+            {video.error_message && (
+              <p className="text-xs text-red-600 truncate flex-1 ml-2">
+                {video.error_message}
+              </p>
+            )}
+          </div>
+          {/* Retry button for failed analysis - Nielsen #9: Help users recover from errors */}
+          {video.status === "error" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-red-300 text-red-700 hover:bg-red-50"
+              onClick={handleRetryAnalysis}
+              disabled={startAnalysis.isPending}
+            >
+              {startAnalysis.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry Analysis
+                </>
+              )}
+            </Button>
           )}
         </CardFooter>
       </Card>
