@@ -15,7 +15,7 @@ from app.models.schemas import (
     VideoResponse,
     ProjectAnalysisResponse,
 )
-from app.auth import get_current_user_id
+from app.auth_bridge import get_current_user_id
 
 logger = logging.getLogger(__name__)
 

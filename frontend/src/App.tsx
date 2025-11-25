@@ -1,15 +1,26 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
 import { UploadProvider } from "./contexts/UploadContext";
+import { useAuth } from "./hooks/useAuth";
 import { useUserSync } from "./hooks/useUserSync";
 import ProjectsPage from "./pages/ProjectsPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import VideoDetailPage from "./pages/VideoDetailPage";
 import LandingPage from "./pages/LandingPage";
+import CognitoSignIn from "./components/auth/CognitoSignIn";
 
 function App() {
+  const { isSignedIn: isAuthenticated, isLoaded } = useAuth();
+
   // Sync user with backend when authenticated
   useUserSync();
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
@@ -18,14 +29,22 @@ function App() {
         <Route
           path="/"
           element={
-            <>
-              <SignedIn>
-                <Navigate to="/projects" replace />
-              </SignedIn>
-              <SignedOut>
-                <LandingPage />
-              </SignedOut>
-            </>
+            isAuthenticated ? (
+              <Navigate to="/projects" replace />
+            ) : (
+              <LandingPage />
+            )
+          }
+        />
+
+        <Route
+          path="/sign-in"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/projects" replace />
+            ) : (
+              <CognitoSignIn />
+            )
           }
         />
 
@@ -33,48 +52,39 @@ function App() {
         <Route
           path="/projects"
           element={
-            <>
-              <SignedIn>
-                <UploadProvider>
-                  <ProjectsPage />
-                </UploadProvider>
-              </SignedIn>
-              <SignedOut>
-                <RedirectToSignIn />
-              </SignedOut>
-            </>
+            isAuthenticated ? (
+              <UploadProvider>
+                <ProjectsPage />
+              </UploadProvider>
+            ) : (
+              <Navigate to="/sign-in" replace />
+            )
           }
         />
 
         <Route
           path="/projects/:projectId"
           element={
-            <>
-              <SignedIn>
-                <UploadProvider>
-                  <ProjectDetailPage />
-                </UploadProvider>
-              </SignedIn>
-              <SignedOut>
-                <RedirectToSignIn />
-              </SignedOut>
-            </>
+            isAuthenticated ? (
+              <UploadProvider>
+                <ProjectDetailPage />
+              </UploadProvider>
+            ) : (
+              <Navigate to="/sign-in" replace />
+            )
           }
         />
 
         <Route
           path="/videos/:videoId"
           element={
-            <>
-              <SignedIn>
-                <UploadProvider>
-                  <VideoDetailPage />
-                </UploadProvider>
-              </SignedIn>
-              <SignedOut>
-                <RedirectToSignIn />
-              </SignedOut>
-            </>
+            isAuthenticated ? (
+              <UploadProvider>
+                <VideoDetailPage />
+              </UploadProvider>
+            ) : (
+              <Navigate to="/sign-in" replace />
+            )
           }
         />
       </Routes>

@@ -45,6 +45,6 @@ python-dateutil==2.8.2
 typing-extensions==4.12.2
 
 # Authentication
-clerk-backend-api==4.0.0
-PyJWT==2.9.0
+# clerk-backend-api==4.0.0  # Commented out - migrating to Cognito
+PyJWT[crypto]==2.9.0  # Added crypto support for RS256
 cryptography==45.0.0

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from app.database import get_db
 from app.models import database_models
-from app.auth import get_current_user, get_current_user_id
+from app.auth_bridge import get_current_user, get_current_user_id
 from app.models.schemas import UserResponse
 
 router = APIRouter()

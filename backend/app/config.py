@@ -44,10 +44,18 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str
     ASSEMBLYAI_API_KEY: str
 
-    # Authentication (Clerk)
+    # Authentication (Clerk) - Deprecated, will be removed after migration
     CLERK_SECRET_KEY: str = ""
     CLERK_PUBLISHABLE_KEY: str = ""
     CLERK_JWT_KEY: str = ""  # Public key for JWT verification
+
+    # Authentication (AWS Cognito)
+    COGNITO_USER_POOL_ID: str = ""
+    COGNITO_APP_CLIENT_ID: str = ""
+    COGNITO_REGION: str = "us-east-1"
+
+    # Feature flag to switch between auth providers
+    USE_COGNITO_AUTH: bool = False  # Set to True to use Cognito instead of Clerk
 
     # Claude Settings
     CLAUDE_MODEL: str = "claude-sonnet-4-20250514"

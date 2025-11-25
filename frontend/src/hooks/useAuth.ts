@@ -1,29 +1,17 @@
-import { useUser, useAuth as useClerkAuth } from "@clerk/clerk-react";
-
 /**
- * Custom hook to access authentication state and user information
+ * Re-export auth hook from Cognito context
+ * This maintains the same interface for existing components
  */
-export function useAuth() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const { getToken } = useClerkAuth();
 
-  return {
-    isLoaded,
-    isSignedIn,
-    user,
-    userId: user?.id,
-    userEmail: user?.primaryEmailAddress?.emailAddress,
-    getToken,
-  };
-}
+// Re-export from Cognito context
+export { useAuth } from '../contexts/CognitoAuthContext';
 
-/**
- * Get the authentication token for API requests
- */
+// Helper function for getting auth token
 export async function getAuthToken(): Promise<string | null> {
   try {
-    const token = await window.Clerk?.session?.getToken();
-    return token || null;
+    const { fetchAuthSession } = await import('@aws-amplify/auth');
+    const session = await fetchAuthSession();
+    return session.tokens?.idToken?.toString() || null;
   } catch (error) {
     console.error("Failed to get auth token:", error);
     return null;
