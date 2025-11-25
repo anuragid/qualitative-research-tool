@@ -280,12 +280,6 @@ export default function CognitoSignIn() {
               </button>
             </div>
 
-            {/* Test credentials hint for development */}
-            <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
-              <p className="font-semibold">Test Account:</p>
-              <p>Email: testuser@example.com</p>
-              <p>Password: TestPassword123!</p>
-            </div>
           </form>
         </div>
       </div>
