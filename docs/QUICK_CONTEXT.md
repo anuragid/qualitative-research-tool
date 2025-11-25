@@ -16,6 +16,7 @@ Key: NEVER use 'docker-compose down -v', ALWAYS check before creating files
 ## Project Summary
 - **What**: AI-powered video interview analysis tool
 - **Stack**: FastAPI + React + PostgreSQL + Docker + AWS
+- **Auth**: AWS Cognito (JWT-based)
 - **Status**: Fully operational (Local + Production)
 - **GitHub**: https://github.com/anuragid/qualitative-research-tool
 
@@ -59,13 +60,15 @@ curl http://localhost:8000/health
 - Frontend: http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com
 - API: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com
 
+## Recent Updates (Nov 25, 2024)
+- **Auth Migration**: Migrated from Clerk to AWS Cognito
+- **CloudWatch Monitoring**: Metric filters and alarms for error tracking
+- **Documentation Cleanup**: Removed obsolete files, updated for Cognito
+- **Security Audit**: Verified no secrets exposed in git
+
 ## Recent Critical Fixes (Nov 21, 2024)
-- **Backend Bug**: Fixed NameError in `analyze_activate_step` (backend/app/tasks/analysis_steps.py:337)
-- **Error Detection**: Improved logic in `analyze_video_task` to check data presence
+- **Backend Bug**: Fixed NameError in `analyze_activate_step`
 - **Cross-Video Analysis**: Added re-run capability with new video detection
 - **UX Enhancement**: Better running state visibility with time estimates
-- **Status Consistency**: Video analysis uses "analyzed" status (not "completed")
-- **Frontend Fixes**: Fixed TypeScript errors in VideoCard.tsx and ProjectDetailPage.tsx
-- **Deployment**: All fixes successfully deployed to production (04:45 UTC)
 
-Last Updated: Nov 21, 2024
+Last Updated: Nov 25, 2024

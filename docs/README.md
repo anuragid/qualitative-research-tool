@@ -1,36 +1,40 @@
 # Documentation Index
 
+**Last Updated:** November 25, 2024
+**Authentication:** AWS Cognito
+
 ## Core Documentation
 
 ### Getting Started
 - [Main README](../README.md) - Setup, features, quick start
-- [Project Status](./STATUS.md) - Current operational status
-- [AWS Deployment Guide](./AWS_DEPLOYMENT_GUIDE.md) - Production deployment
+- [Project Status](./STATUS.md) - Current operational status, deployment history
+- [Quick Context](./QUICK_CONTEXT.md) - Rapid AI session starts
+
+### Deployment & Operations
+- [AWS Deployment Guide](./AWS_DEPLOYMENT_GUIDE.md) - Production deployment steps
+- [Data Management](./DATA_MANAGEMENT.md) - Backup and safety procedures
 
 ### Development
-- [Data Management](./DATA_MANAGEMENT.md) - Backup and safety procedures
-- [Usability Fixes](./USABILITY_FIXES_REQUIRED.md) - Ongoing improvements
 - [AI Agent Guide](./AI_AGENT_GUIDE.md) - Safe development practices
-- [Quick Context](./QUICK_CONTEXT.md) - Rapid session starts
-
-### Architecture & Design
+- [Usability Fixes](./USABILITY_FIXES_REQUIRED.md) - Ongoing improvements
 - [System Architecture](./ARCHITECTURE.md) - LangGraph system design
-- [Requirements](./REQUIREMENTS.md) - Original project specifications
 
 ### Reference
-- [Documentation Audit](./DOCUMENTATION_AUDIT_2024.md) - Documentation review
-- [Consolidation Summary](./DOCUMENTATION_CONSOLIDATION_SUMMARY.md) - Documentation changes
+- [Requirements](./REQUIREMENTS.md) - Original project specifications
 
 ## Archived Documentation
 
 Historical documents preserved in [archive/](./archive/) folder:
-- Original README versions
-- Previous status documents
+- Previous Clerk authentication guides (migrated to Cognito)
+- Earlier status documents
+- Initial setup guides
 - Deployment summaries
-- Setup guides
 
 ## Quick Links
 
-- **GitHub**: https://github.com/anuragid/qualitative-research-tool
-- **Production**: http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com
-- **API**: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com
+| Resource | URL |
+|----------|-----|
+| **GitHub** | https://github.com/anuragid/qualitative-research-tool |
+| **Frontend** | http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com |
+| **API** | http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com |
+| **Health Check** | http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com/health |

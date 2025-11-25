@@ -1,8 +1,9 @@
 # Qualitative Research Tool - Project Status & Deployment
 
-**Last Updated:** November 21, 2024
+**Last Updated:** November 25, 2024
 **Status:** ✅ FULLY OPERATIONAL
 **Environments:** Local (Docker) | Production (AWS)
+**Authentication:** AWS Cognito
 
 ## 🚀 Quick Access
 
@@ -25,6 +26,7 @@
 ## 📋 Current Features (All Working)
 
 ### Core Functionality
+- ✅ **Authentication** - AWS Cognito with JWT validation
 - ✅ **Project Management** - Full CRUD with state system
 - ✅ **Video Upload** - Parallel processing (5 concurrent)
 - ✅ **Transcription** - AssemblyAI integration
@@ -33,6 +35,7 @@
 - ✅ **Speaker Identification** - Label and track speakers
 - ✅ **Video-Transcript Sync** - Synchronized playback
 - ✅ **Archive System** - Archive/unarchive projects
+- ✅ **CloudWatch Monitoring** - Error tracking and alerting
 
 ### Project State System
 1. **`planning`** - New project, no videos (gray)
@@ -43,6 +46,12 @@
 6. **`error`** - Failed with error message (red)
 
 ### Recent Improvements
+
+#### November 25, 2024 - Auth Migration & Monitoring
+- ✅ **Migrated to AWS Cognito** - Full authentication system migration from Clerk
+- ✅ **CloudWatch Monitoring** - Metric filters and alarms for HTTP 500s, application errors, and worker errors
+- ✅ **Security Audit** - Verified credentials are properly gitignored
+- ✅ **Documentation Cleanup** - Removed obsolete Clerk docs, archived outdated files
 
 #### November 21, 2024 - Critical Bug Fixes & Cross-Video Analysis Enhancement
 - ✅ **Fixed critical backend bug** in `analyze_activate_step` - video object now properly queried before use
@@ -109,7 +118,16 @@ http://localhost:5173
 
 ## 📊 Deployment History
 
-### November 21, 2024 (Latest - 04:45 UTC)
+### November 25, 2024 (Latest - 14:34 UTC)
+- **Authentication**: Migrated from Clerk to AWS Cognito
+- **Backend**: Updated JWT validation, user sync, and auth_bridge for Cognito
+- **Frontend**: Deployed Cognito auth components and configuration
+- **Monitoring**: Set up CloudWatch metric filters and alarms
+- **Database**: Added RBAC role column via Alembic migration
+- **Documentation**: Major cleanup - removed obsolete files, updated for Cognito
+- **Production Status**: ✅ All services healthy and operational
+
+### November 21, 2024 (04:45 UTC)
 - **Deployment**: Successfully deployed all bug fixes to production
 - **Backend**: Fixed critical NameError bug in activate step task (commit bfef936)
 - **Frontend**: Fixed TypeScript errors in VideoCard and ProjectDetailPage
@@ -118,7 +136,6 @@ http://localhost:5173
 - **Cross-Video Analysis**: Enhanced with re-run capability and new video detection
 - **UX Improvements**: Better running state visibility with time estimates
 - **Error Detection**: Improved logic to check for data presence instead of just error flags
-- **Production Status**: ✅ All services healthy and operational
 
 ### November 20, 2024
 - Fixed project card video counts
@@ -289,13 +306,52 @@ See `.env.example` files in backend/ and frontend/ directories
 
 ---
 
+## 📈 Monitoring & Alerting
+
+### CloudWatch Alarms
+- `QualitativeResearch-API-HTTP500Errors` - Triggers on HTTP 500 errors
+- `QualitativeResearch-API-HighErrorRate` - Triggers on application errors
+- `QualitativeResearch-Worker-Errors` - Triggers on worker task errors
+
+### Log Groups
+- `/ecs/qualitative-research-api` - API server logs
+- `/ecs/qualitative-research-workers` - Celery worker logs
+
+### View Logs
+```bash
+# API logs (real-time)
+aws logs tail /ecs/qualitative-research-api --region us-east-2 --follow
+
+# Worker logs
+aws logs tail /ecs/qualitative-research-workers --region us-east-2 --follow
+
+# Filter for errors
+aws logs tail /ecs/qualitative-research-api --region us-east-2 --filter-pattern "ERROR"
+```
+
+---
+
+## 🔐 Authentication (AWS Cognito)
+
+### Configuration
+- **User Pool ID**: us-east-1_Jr0OTariE
+- **App Client ID**: 2oah1h1bdsushki851ftkale6h
+- **Region**: us-east-1
+
+### User Roles (RBAC)
+- **admin** - Full access to all features
+- **user** - Standard access (default)
+- **viewer** - Read-only access
+
+---
+
 ## 🎯 Next Steps
 
 ### Immediate Tasks
 - [ ] Complete remaining usability fixes
 - [ ] Add comprehensive testing
 - [ ] Create API documentation
-- [ ] Add monitoring dashboards
+- [x] Add monitoring dashboards (CloudWatch configured)
 
 ### Future Enhancements
 - [ ] Custom domain with HTTPS
