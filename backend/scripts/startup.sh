@@ -70,7 +70,8 @@ else
     echo "🌐 Starting API server..."
     if [ "$IS_PRODUCTION" = true ]; then
         # Production: no reload, use PORT env var (Railway sets this)
-        exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+        # --proxy-headers ensures correct scheme (https) behind Railway's reverse proxy
+        exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'
     else
         # Development: with reload
         exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
