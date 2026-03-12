@@ -81,7 +81,7 @@ async def health_check():
 # Clerk Frontend API proxy — used by Cloudflare Pages Function to avoid
 # the Cloudflare-to-Cloudflare CNAME conflict (Error 1000/525).
 # Flow: Browser → Pages Function (methodex.ai/__clerk) → Railway → Clerk
-_clerk_client = httpx.AsyncClient(base_url="https://frontend-api.clerk.services", timeout=15.0)
+_clerk_client = httpx.AsyncClient(base_url="https://frontend-api.clerk.dev", timeout=15.0)
 
 
 @app.api_route("/__clerk_fwd/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
