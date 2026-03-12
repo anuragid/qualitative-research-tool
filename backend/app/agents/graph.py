@@ -18,11 +18,31 @@ from app.agents.nodes import (
 logger = logging.getLogger(__name__)
 
 
+def _check_video_error(state: VideoAnalysisState) -> str:
+    """Route to END if there's an error in state, otherwise continue."""
+    if state.get("error"):
+        logger.error(f"Pipeline halting due to error: {state['error']}")
+        return "end"
+    return "continue"
+
+
+def _check_project_error(state: ProjectAnalysisState) -> str:
+    """Route to END if there's an error in state, otherwise continue."""
+    if state.get("error"):
+        logger.error(f"Pipeline halting due to error: {state['error']}")
+        return "end"
+    return "continue"
+
+
 def create_video_analysis_graph() -> StateGraph:
     """
     Create the video analysis workflow graph.
 
-    Flow: START -> chunk -> infer -> relate -> explain -> activate -> END
+    Flow: START -> chunk -> (error check) -> infer -> (error check) ->
+          relate -> (error check) -> explain -> (error check) -> activate -> END
+
+    Each node's output is checked for errors before proceeding.
+    If any node sets state["error"], the pipeline halts immediately.
 
     Returns:
         Compiled StateGraph for video analysis
@@ -39,12 +59,29 @@ def create_video_analysis_graph() -> StateGraph:
     workflow.add_node("explain", explain_node)
     workflow.add_node("activate", activate_node)
 
-    # Define linear flow
+    # Define flow with error checking after each node
     workflow.set_entry_point("chunk")
-    workflow.add_edge("chunk", "infer")
-    workflow.add_edge("infer", "relate")
-    workflow.add_edge("relate", "explain")
-    workflow.add_edge("explain", "activate")
+
+    workflow.add_conditional_edges(
+        "chunk",
+        _check_video_error,
+        {"continue": "infer", "end": END},
+    )
+    workflow.add_conditional_edges(
+        "infer",
+        _check_video_error,
+        {"continue": "relate", "end": END},
+    )
+    workflow.add_conditional_edges(
+        "relate",
+        _check_video_error,
+        {"continue": "explain", "end": END},
+    )
+    workflow.add_conditional_edges(
+        "explain",
+        _check_video_error,
+        {"continue": "activate", "end": END},
+    )
     workflow.add_edge("activate", END)
 
     # Compile graph
@@ -55,7 +92,11 @@ def create_project_analysis_graph() -> StateGraph:
     """
     Create the cross-video analysis workflow graph.
 
-    Flow: START -> cross_relate -> cross_explain -> cross_activate -> END
+    Flow: START -> cross_relate -> (error check) -> cross_explain ->
+          (error check) -> cross_activate -> END
+
+    Each node's output is checked for errors before proceeding.
+    If any node sets state["error"], the pipeline halts immediately.
 
     Returns:
         Compiled StateGraph for project analysis
@@ -70,10 +111,19 @@ def create_project_analysis_graph() -> StateGraph:
     workflow.add_node("cross_explain", cross_explain_node)
     workflow.add_node("cross_activate", cross_activate_node)
 
-    # Define linear flow
+    # Define flow with error checking after each node
     workflow.set_entry_point("cross_relate")
-    workflow.add_edge("cross_relate", "cross_explain")
-    workflow.add_edge("cross_explain", "cross_activate")
+
+    workflow.add_conditional_edges(
+        "cross_relate",
+        _check_project_error,
+        {"continue": "cross_explain", "end": END},
+    )
+    workflow.add_conditional_edges(
+        "cross_explain",
+        _check_project_error,
+        {"continue": "cross_activate", "end": END},
+    )
     workflow.add_edge("cross_activate", END)
 
     # Compile graph

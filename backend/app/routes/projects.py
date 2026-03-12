@@ -59,14 +59,14 @@ async def create_project(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create project: {str(e)}"
+            detail="Failed to create project"
         )
 
 
 @router.get("/", response_model=List[ProjectResponse])
 async def list_projects(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 50,
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
@@ -83,6 +83,10 @@ async def list_projects(
         List of projects for the current user
     """
     try:
+        # Cap limit to prevent excessive data retrieval
+        limit = min(limit, 100)
+        skip = max(skip, 0)
+
         projects = db.query(Project)\
             .filter(Project.user_id == current_user_id)\
             .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
@@ -98,7 +102,7 @@ async def list_projects(
         logger.error(f"Error listing projects: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list projects: {str(e)}"
+            detail="Failed to list projects"
         )
 
 
@@ -141,7 +145,7 @@ async def get_project(
         logger.error(f"Error getting project: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get project: {str(e)}"
+            detail="Failed to get project"
         )
 
 
@@ -197,7 +201,7 @@ async def update_project(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update project: {str(e)}"
+            detail="Failed to update project"
         )
 
 
@@ -243,7 +247,7 @@ async def delete_project(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete project: {str(e)}"
+            detail="Failed to delete project"
         )
 
 
@@ -264,8 +268,11 @@ async def list_project_videos(
         List of videos
     """
     try:
-        # Check if project exists
-        project = db.query(Project).filter(Project.id == project_id).first()
+        # Check if project exists and is owned by current user
+        project = db.query(Project).filter(
+            Project.id == project_id,
+            Project.user_id == current_user_id,
+        ).first()
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -288,7 +295,7 @@ async def list_project_videos(
         logger.error(f"Error listing project videos: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list project videos: {str(e)}"
+            detail="Failed to list project videos"
         )
 
 
@@ -312,8 +319,11 @@ async def trigger_project_analysis(
         Task information
     """
     try:
-        # Check if project exists
-        project = db.query(Project).filter(Project.id == project_id).first()
+        # Check if project exists and is owned by current user
+        project = db.query(Project).filter(
+            Project.id == project_id,
+            Project.user_id == current_user_id,
+        ).first()
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -373,7 +383,7 @@ async def trigger_project_analysis(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to trigger project analysis: {str(e)}"
+            detail="Failed to trigger project analysis"
         )
 
 
@@ -394,8 +404,11 @@ async def get_project_analysis(
         Project analysis results
     """
     try:
-        # Check if project exists
-        project = db.query(Project).filter(Project.id == project_id).first()
+        # Check if project exists and is owned by current user
+        project = db.query(Project).filter(
+            Project.id == project_id,
+            Project.user_id == current_user_id,
+        ).first()
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -423,5 +436,5 @@ async def get_project_analysis(
         logger.error(f"Error getting project analysis: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get project analysis: {str(e)}"
+            detail="Failed to get project analysis"
         )

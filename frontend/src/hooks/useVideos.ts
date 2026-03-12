@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { CancelToken } from "axios";
 import { videosService } from "../services/videos";
 
 export function useProjectVideos(projectId: string | null) {
@@ -73,7 +74,7 @@ export function useUploadVideo() {
       projectId: string;
       file: File;
       onProgress?: (progress: number, loaded: number, total: number) => void;
-      cancelToken?: any;
+      cancelToken?: CancelToken;
     }) => videosService.upload(projectId, file, onProgress, cancelToken),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
@@ -98,17 +99,7 @@ export function useDeleteVideo() {
 export function useVideoPlaybackUrl(videoId: string | null) {
   return useQuery({
     queryKey: ["videos", videoId, "playback-url"],
-    queryFn: async () => {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
-      const response = await fetch(
-        `${apiUrl}/api/videos/${videoId}/playback-url`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to get playback URL");
-      }
-      const data = await response.json();
-      return data.playback_url as string;
-    },
+    queryFn: () => videosService.getPlaybackUrl(videoId!),
     enabled: !!videoId,
     staleTime: 1000 * 60 * 50, // Refresh after 50 minutes (URL valid for 1 hour)
   });

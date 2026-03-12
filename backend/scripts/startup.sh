@@ -22,6 +22,9 @@ else
     IS_PRODUCTION=false
 fi
 
+# Determine service type early (needed for migration decision)
+SERVICE="${SERVICE_TYPE:-$1}"
+
 # Wait for database to be ready
 echo "⏳ Waiting for database..."
 max_retries=30
@@ -57,15 +60,72 @@ if [ $retries -eq $max_retries ]; then
     exit 1
 fi
 
-# Run migrations
-echo "🔄 Running database migrations..."
-alembic upgrade head
+# Only run migrations from the API service to avoid race conditions
+# When both API and worker start simultaneously, concurrent alembic runs can deadlock
+if [ "$SERVICE" != "worker" ]; then
+    echo "🔄 Running database migrations..."
+    alembic upgrade head
+else
+    echo "⏭️  Skipping migrations (worker service — API handles migrations)"
+fi
 
-# Start the application based on SERVICE_TYPE env var or command argument
-SERVICE="${SERVICE_TYPE:-$1}"
+# Wait for Redis to be ready (required for Celery broker)
+if [ "$SERVICE" = "worker" ]; then
+    echo "⏳ Waiting for Redis..."
+    REDIS_RETRIES=0
+    REDIS_MAX_RETRIES=30
+
+    # Parse Redis host from REDIS_URL
+    # Handles: redis://host:port, redis://user:pass@host:port, rediss://...
+    if [ ! -z "$REDIS_URL" ]; then
+        # Use Python for reliable URL parsing (handles all formats)
+        REDIS_PARSED=$(python -c "
+from urllib.parse import urlparse
+u = urlparse('$REDIS_URL')
+print(f'{u.hostname} {u.port or 6379}')
+" 2>/dev/null)
+        REDIS_HOST=$(echo $REDIS_PARSED | cut -d' ' -f1)
+        REDIS_PORT=$(echo $REDIS_PARSED | cut -d' ' -f2)
+        echo "   Using Redis host: $REDIS_HOST:$REDIS_PORT"
+    else
+        REDIS_HOST="redis"
+        REDIS_PORT=6379
+        echo "   Using default Redis host: $REDIS_HOST:$REDIS_PORT"
+    fi
+
+    while [ $REDIS_RETRIES -lt $REDIS_MAX_RETRIES ]; do
+        # Use a simple TCP connection test (works without redis-cli)
+        if python -c "import socket; s=socket.create_connection(('$REDIS_HOST', $REDIS_PORT), timeout=2); s.close()" 2>/dev/null; then
+            echo "✅ Redis is ready!"
+            break
+        fi
+
+        REDIS_RETRIES=$((REDIS_RETRIES + 1))
+        echo "   Retry $REDIS_RETRIES/$REDIS_MAX_RETRIES..."
+        sleep 2
+    done
+
+    if [ $REDIS_RETRIES -eq $REDIS_MAX_RETRIES ]; then
+        echo "❌ Redis connection failed after $REDIS_MAX_RETRIES attempts"
+        exit 1
+    fi
+fi
+
+# Start the application
 if [ "$SERVICE" = "worker" ]; then
     echo "🔨 Starting Celery worker..."
-    exec celery -A app.tasks.celery_app worker --loglevel=info
+    # --pool=solo: Use single-process pool (no fork). Halves memory usage on
+    #   Railway's constrained containers. Safe because prefetch_multiplier=1
+    #   already limits to one task at a time.
+    # --without-heartbeat: Disables worker heartbeat (unnecessary for single worker)
+    # --without-mingle: Skip synchronizing with other workers on startup
+    # --without-gossip: Disable worker-to-worker communication
+    exec celery -A app.tasks.celery_app worker \
+        --pool=solo \
+        --loglevel=info \
+        --without-heartbeat \
+        --without-mingle \
+        --without-gossip
 else
     echo "🌐 Starting API server..."
     if [ "$IS_PRODUCTION" = true ]; then

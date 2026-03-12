@@ -1,6 +1,5 @@
 """Separate Celery tasks for step-by-step analysis."""
 
-from celery import Task
 from sqlalchemy.orm import Session
 from uuid import UUID
 import logging
@@ -8,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 
 from app.tasks.celery_app import celery_app
-from app.database import SessionLocal
+from app.tasks.base import DatabaseTask
 from app.models.database_models import Video, VideoAnalysis, Transcript, SpeakerLabel
 from app.agents.nodes.chunk import chunk_node
 from app.agents.nodes.infer import infer_node
@@ -18,25 +17,6 @@ from app.agents.nodes.activate import activate_node
 from app.services.project_state_service import ProjectStateService
 
 logger = logging.getLogger(__name__)
-
-
-class DatabaseTask(Task):
-    """Base task with database session management."""
-
-    _db: Session = None
-
-    @property
-    def db(self) -> Session:
-        """Get or create database session."""
-        if self._db is None:
-            self._db = SessionLocal()
-        return self._db
-
-    def after_return(self, *args, **kwargs):
-        """Clean up database session after task completes."""
-        if self._db is not None:
-            self._db.close()
-            self._db = None
 
 
 def get_video_analysis_state(db: Session, video_id: UUID) -> Dict[str, Any]:
@@ -84,7 +64,38 @@ def get_video_analysis_state(db: Session, video_id: UUID) -> Dict[str, Any]:
     }
 
 
-@celery_app.task(base=DatabaseTask, bind=True, name="analyze_chunk_step")
+def _update_analysis_error(db: Session, video_id: str, step_name: str):
+    """Safely update analysis record to error state.
+
+    Uses a fresh query to avoid UnboundLocalError if the analysis variable
+    was never assigned in the calling scope.
+    """
+    try:
+        analysis = db.query(VideoAnalysis).filter(
+            VideoAnalysis.video_id == UUID(video_id)
+        ).first()
+        if analysis:
+            analysis.status = "error"
+            analysis.step_status = {**(analysis.step_status or {}), step_name: "error"}
+            db.commit()
+    except Exception as commit_error:
+        logger.error(f"Failed to update error status for {step_name}: {commit_error}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="analyze_chunk_step",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
 def analyze_chunk_step(self, video_id: str):
     """
     Step 1: CHUNK - Break transcript into discrete pieces.
@@ -99,7 +110,7 @@ def analyze_chunk_step(self, video_id: str):
         # Update status
         analysis.status = "processing"
         analysis.current_step = "chunk"
-        analysis.step_status = {**analysis.step_status, "chunk": "processing"}
+        analysis.step_status = {**(analysis.step_status or {}), "chunk": "processing"}
         analysis.started_at = datetime.now(timezone.utc)
         self.db.commit()
 
@@ -111,11 +122,15 @@ def analyze_chunk_step(self, video_id: str):
             "speaker_roles": state["speaker_roles"]
         })
 
+        # Check for errors in node result
+        if result.get("error") or result.get("chunks") is None:
+            error_msg = result.get("error", "Failed to generate chunks")
+            raise Exception(f"Chunk generation failed: {error_msg}")
+
         # Save results
         analysis.chunks = result.get("chunks")
         analysis.chunk_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**analysis.step_status, "chunk": "completed"}
-        # Keep current_step as "chunk" so user can review results
+        analysis.step_status = {**(analysis.step_status or {}), "chunk": "completed"}
         self.db.commit()
 
         logger.info(f"CHUNK step completed for video {video_id}")
@@ -127,16 +142,7 @@ def analyze_chunk_step(self, video_id: str):
 
     except Exception as e:
         logger.error(f"CHUNK step failed for video {video_id}: {e}")
-
-        # Update status to error
-        analysis = self.db.query(VideoAnalysis).filter(
-            VideoAnalysis.video_id == UUID(video_id)
-        ).first()
-        if analysis:
-            analysis.status = "error"
-            analysis.step_status = {**analysis.step_status, "chunk": "error"}
-            self.db.commit()
-
+        _update_analysis_error(self.db, video_id, "chunk")
         raise
 
 
@@ -168,7 +174,7 @@ def analyze_infer_step(self, video_id: str):
 
         # Update status
         analysis.current_step = "infer"
-        analysis.step_status = {**analysis.step_status, "infer": "processing"}
+        analysis.step_status = {**(analysis.step_status or {}), "infer": "processing"}
         self.db.commit()
 
         # Run infer node
@@ -185,8 +191,7 @@ def analyze_infer_step(self, video_id: str):
         # Save results
         analysis.inferences = result.get("inferences")
         analysis.infer_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**analysis.step_status, "infer": "completed"}
-        # Keep current_step as "infer" so user can review results
+        analysis.step_status = {**(analysis.step_status or {}), "infer": "completed"}
         self.db.commit()
 
         logger.info(f"INFER step completed for video {video_id}")
@@ -198,17 +203,20 @@ def analyze_infer_step(self, video_id: str):
 
     except Exception as e:
         logger.error(f"INFER step failed for video {video_id}: {e}")
-
-        # Update status to error
-        if analysis:
-            analysis.status = "error"
-            analysis.step_status = {**analysis.step_status, "infer": "error"}
-            self.db.commit()
-
+        _update_analysis_error(self.db, video_id, "infer")
         raise
 
 
-@celery_app.task(base=DatabaseTask, bind=True, name="analyze_relate_step")
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="analyze_relate_step",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
 def analyze_relate_step(self, video_id: str):
     """
     Step 3: RELATE - Find patterns across inferences.
@@ -226,7 +234,7 @@ def analyze_relate_step(self, video_id: str):
 
         # Update status
         analysis.current_step = "relate"
-        analysis.step_status = {**analysis.step_status, "relate": "processing"}
+        analysis.step_status = {**(analysis.step_status or {}), "relate": "processing"}
         self.db.commit()
 
         # Run relate node
@@ -235,11 +243,15 @@ def analyze_relate_step(self, video_id: str):
             "inferences": analysis.inferences
         })
 
+        # Check for errors in node result
+        if result.get("error") or result.get("patterns") is None:
+            error_msg = result.get("error", "Failed to identify patterns")
+            raise Exception(f"Pattern analysis failed: {error_msg}")
+
         # Save results
         analysis.patterns = result.get("patterns")
         analysis.relate_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**analysis.step_status, "relate": "completed"}
-        # Keep current_step as "relate" so user can review results
+        analysis.step_status = {**(analysis.step_status or {}), "relate": "completed"}
         self.db.commit()
 
         logger.info(f"RELATE step completed for video {video_id}")
@@ -251,17 +263,20 @@ def analyze_relate_step(self, video_id: str):
 
     except Exception as e:
         logger.error(f"RELATE step failed for video {video_id}: {e}")
-
-        # Update status to error
-        if analysis:
-            analysis.status = "error"
-            analysis.step_status = {**analysis.step_status, "relate": "error"}
-            self.db.commit()
-
+        _update_analysis_error(self.db, video_id, "relate")
         raise
 
 
-@celery_app.task(base=DatabaseTask, bind=True, name="analyze_explain_step")
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="analyze_explain_step",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
 def analyze_explain_step(self, video_id: str):
     """
     Step 4: EXPLAIN - Generate insights from patterns.
@@ -279,20 +294,25 @@ def analyze_explain_step(self, video_id: str):
 
         # Update status
         analysis.current_step = "explain"
-        analysis.step_status = {**analysis.step_status, "explain": "processing"}
+        analysis.step_status = {**(analysis.step_status or {}), "explain": "processing"}
         self.db.commit()
 
-        # Run explain node
+        # Run explain node - include chunks for evidence (explain_node uses them)
         result = explain_node({
             "video_id": video_id,
-            "patterns": analysis.patterns
+            "patterns": analysis.patterns,
+            "chunks": analysis.chunks,  # Provide chunks for evidence context
         })
+
+        # Check for errors in node result
+        if result.get("error") or result.get("insights") is None:
+            error_msg = result.get("error", "Failed to generate insights")
+            raise Exception(f"Insight generation failed: {error_msg}")
 
         # Save results
         analysis.insights = result.get("insights")
         analysis.explain_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**analysis.step_status, "explain": "completed"}
-        # Keep current_step as "explain" so user can review results
+        analysis.step_status = {**(analysis.step_status or {}), "explain": "completed"}
         self.db.commit()
 
         logger.info(f"EXPLAIN step completed for video {video_id}")
@@ -304,17 +324,20 @@ def analyze_explain_step(self, video_id: str):
 
     except Exception as e:
         logger.error(f"EXPLAIN step failed for video {video_id}: {e}")
-
-        # Update status to error
-        if analysis:
-            analysis.status = "error"
-            analysis.step_status = {**analysis.step_status, "explain": "error"}
-            self.db.commit()
-
+        _update_analysis_error(self.db, video_id, "explain")
         raise
 
 
-@celery_app.task(base=DatabaseTask, bind=True, name="analyze_activate_step")
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="analyze_activate_step",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
 def analyze_activate_step(self, video_id: str):
     """
     Step 5: ACTIVATE - Create design principles from insights.
@@ -332,7 +355,7 @@ def analyze_activate_step(self, video_id: str):
 
         # Update status
         analysis.current_step = "activate"
-        analysis.step_status = {**analysis.step_status, "activate": "processing"}
+        analysis.step_status = {**(analysis.step_status or {}), "activate": "processing"}
         self.db.commit()
 
         # Run activate node
@@ -341,10 +364,15 @@ def analyze_activate_step(self, video_id: str):
             "insights": analysis.insights
         })
 
+        # Check for errors in node result
+        if result.get("error") or result.get("design_principles") is None:
+            error_msg = result.get("error", "Failed to generate design principles")
+            raise Exception(f"Design principle generation failed: {error_msg}")
+
         # Save results
         analysis.design_principles = result.get("design_principles")
         analysis.activate_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**analysis.step_status, "activate": "completed"}
+        analysis.step_status = {**(analysis.step_status or {}), "activate": "completed"}
         analysis.status = "completed"
         analysis.completed_at = datetime.now(timezone.utc)
 
@@ -371,11 +399,5 @@ def analyze_activate_step(self, video_id: str):
 
     except Exception as e:
         logger.error(f"ACTIVATE step failed for video {video_id}: {e}")
-
-        # Update status to error
-        if analysis:
-            analysis.status = "error"
-            analysis.step_status = {**analysis.step_status, "activate": "error"}
-            self.db.commit()
-
+        _update_analysis_error(self.db, video_id, "activate")
         raise

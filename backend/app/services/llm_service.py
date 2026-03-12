@@ -6,6 +6,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
+    before_sleep_log,
 )
 import json
 import logging
@@ -69,8 +70,9 @@ class LLMService:
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=30),
+        wait=wait_exponential(multiplier=2, min=5, max=60),
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     def call_llm(
         self,
@@ -99,6 +101,7 @@ class LLMService:
 
         Raises:
             APIError: If API call fails after retries
+            ValueError: If response has no content
         """
         client = self._get_client(api_key)
         chosen_model = model or self.default_model
@@ -121,11 +124,38 @@ class LLMService:
 
             response = client.chat.completions.create(**kwargs)
 
+            # Guard against empty/missing response choices
+            if not response.choices:
+                raise ValueError(
+                    f"LLM returned empty choices (model={chosen_model}). "
+                    f"This may indicate the request was filtered or the model is unavailable."
+                )
+
             content = response.choices[0].message.content
+            if content is None:
+                # Some models return null content with a refusal or tool_calls
+                refusal = getattr(response.choices[0].message, "refusal", None)
+                if refusal:
+                    raise ValueError(f"LLM refused the request: {refusal}")
+                raise ValueError(
+                    f"LLM returned null content (model={chosen_model}). "
+                    f"Finish reason: {response.choices[0].finish_reason}"
+                )
+
             logger.info(
                 f"LLM API call successful (model={chosen_model}). "
-                f"Response length: {len(content)}"
+                f"Response length: {len(content)}, "
+                f"finish_reason: {response.choices[0].finish_reason}"
             )
+
+            # Warn if response was truncated (might mean incomplete JSON)
+            if response.choices[0].finish_reason == "length":
+                logger.warning(
+                    f"LLM response was truncated (finish_reason=length, "
+                    f"max_tokens={max_tokens or self.max_tokens}). "
+                    f"Output may be incomplete/malformed JSON."
+                )
+
             return content
 
         except RETRYABLE_EXCEPTIONS as e:
@@ -137,8 +167,9 @@ class LLMService:
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=30),
+        wait=wait_exponential(multiplier=2, min=5, max=60),
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     async def acall_llm(
         self,
@@ -167,6 +198,7 @@ class LLMService:
 
         Raises:
             APIError: If API call fails after retries
+            ValueError: If response has no content
         """
         client = self._get_async_client(api_key)
         chosen_model = model or self.default_model
@@ -189,11 +221,36 @@ class LLMService:
 
             response = await client.chat.completions.create(**kwargs)
 
+            # Guard against empty/missing response choices
+            if not response.choices:
+                raise ValueError(
+                    f"LLM returned empty choices (model={chosen_model}). "
+                    f"This may indicate the request was filtered or the model is unavailable."
+                )
+
             content = response.choices[0].message.content
+            if content is None:
+                refusal = getattr(response.choices[0].message, "refusal", None)
+                if refusal:
+                    raise ValueError(f"LLM refused the request: {refusal}")
+                raise ValueError(
+                    f"LLM returned null content (model={chosen_model}). "
+                    f"Finish reason: {response.choices[0].finish_reason}"
+                )
+
             logger.info(
                 f"LLM API call successful (model={chosen_model}). "
-                f"Response length: {len(content)}"
+                f"Response length: {len(content)}, "
+                f"finish_reason: {response.choices[0].finish_reason}"
             )
+
+            if response.choices[0].finish_reason == "length":
+                logger.warning(
+                    f"LLM response was truncated (finish_reason=length, "
+                    f"max_tokens={max_tokens or self.max_tokens}). "
+                    f"Output may be incomplete/malformed JSON."
+                )
+
             return content
 
         except RETRYABLE_EXCEPTIONS as e:
@@ -207,7 +264,11 @@ class LLMService:
         """
         Parse JSON from LLM response with fallback strategies.
 
-        Uses json-repair as a last resort for malformed JSON from weaker models.
+        Handles common LLM output quirks:
+        - Wrapped in markdown code blocks
+        - Preceded/followed by explanatory text
+        - Wrapped in {"result": [...]} when json_mode forces object wrapper
+        - Minor JSON syntax errors (trailing commas, etc.)
 
         Args:
             response: Raw response string from LLM
@@ -216,56 +277,120 @@ class LLMService:
             Parsed JSON object (dict or list)
 
         Raises:
-            ValueError: If JSON cannot be parsed
+            ValueError: If JSON cannot be parsed after all strategies
         """
+        if not response or not response.strip():
+            raise ValueError("Empty response from LLM")
+
+        response = response.strip()
+
         # Strategy 1: Try direct JSON parsing
         try:
-            return json.loads(response)
+            parsed = json.loads(response)
+            # Unwrap {"result": [...]} or {"data": [...]} patterns that
+            # json_mode sometimes forces when the model wants to return an array
+            if isinstance(parsed, dict) and len(parsed) == 1:
+                key = next(iter(parsed))
+                if isinstance(parsed[key], list):
+                    logger.debug(f"Unwrapped JSON object with single key '{key}' to array")
+                    return parsed[key]
+            return parsed
         except json.JSONDecodeError:
             pass
 
-        # Strategy 2: Extract JSON from code blocks
+        # Strategy 2: Extract JSON from markdown code blocks
+        # Use non-greedy match within code blocks
         json_match = re.search(r"```(?:json)?\s*(\[.*?\]|\{.*?\})\s*```", response, re.DOTALL)
         if json_match:
             try:
-                return json.loads(json_match.group(1))
+                parsed = json.loads(json_match.group(1))
+                return self._unwrap_single_key_object(parsed)
             except json.JSONDecodeError:
                 pass
 
-        # Strategy 3: Find JSON array or object in text
-        array_match = re.search(r"(\[.*\])", response, re.DOTALL)
-        if array_match:
-            try:
-                return json.loads(array_match.group(1))
-            except json.JSONDecodeError:
-                pass
+        # Strategy 3: Find outermost JSON array in text
+        # Use bracket matching instead of greedy regex for reliability
+        array_start = response.find("[")
+        if array_start != -1:
+            extracted = self._extract_balanced_json(response, array_start, "[", "]")
+            if extracted:
+                try:
+                    return json.loads(extracted)
+                except json.JSONDecodeError:
+                    pass
 
-        object_match = re.search(r"(\{.*\})", response, re.DOTALL)
-        if object_match:
-            try:
-                return json.loads(object_match.group(1))
-            except json.JSONDecodeError:
-                pass
+        # Strategy 4: Find outermost JSON object in text
+        object_start = response.find("{")
+        if object_start != -1:
+            extracted = self._extract_balanced_json(response, object_start, "{", "}")
+            if extracted:
+                try:
+                    parsed = json.loads(extracted)
+                    return self._unwrap_single_key_object(parsed)
+                except json.JSONDecodeError:
+                    pass
 
-        # Strategy 4: Use json-repair for malformed JSON from weaker models
+        # Strategy 5: Use json-repair for malformed JSON from weaker models
         try:
             from json_repair import repair_json
             repaired = repair_json(response, return_objects=True)
             if repaired:
                 logger.warning("Used json-repair to fix malformed JSON response")
-                return repaired
+                return self._unwrap_single_key_object(repaired) if isinstance(repaired, dict) else repaired
         except Exception as repair_error:
             logger.warning(f"json-repair also failed: {repair_error}")
 
-        # Strategy 5: Last resort - log and raise error
-        logger.error(f"Failed to parse JSON from response: {response[:500]}")
-        try:
-            with open("/tmp/llm_response_debug.txt", "w") as f:
-                f.write(response)
-            logger.error(f"Full response saved to /tmp/llm_response_debug.txt (length: {len(response)})")
-        except Exception:
-            pass
+        # Strategy 6: Last resort - log (truncated) and raise error
+        logger.error(f"Failed to parse JSON from response (length: {len(response)}): {response[:200]}...")
         raise ValueError("Could not parse JSON from LLM response")
+
+    @staticmethod
+    def _unwrap_single_key_object(parsed: Any) -> Any:
+        """Unwrap {"result": [...]} style wrappers that json_mode can produce."""
+        if isinstance(parsed, dict) and len(parsed) == 1:
+            key = next(iter(parsed))
+            if isinstance(parsed[key], list):
+                return parsed[key]
+        return parsed
+
+    @staticmethod
+    def _extract_balanced_json(text: str, start: int, open_char: str, close_char: str) -> Optional[str]:
+        """Extract a balanced JSON structure using bracket counting.
+
+        This is more reliable than greedy regex for nested structures,
+        and avoids matching across multiple separate JSON blocks.
+        """
+        depth = 0
+        in_string = False
+        escape_next = False
+
+        for i in range(start, len(text)):
+            char = text[i]
+
+            if escape_next:
+                escape_next = False
+                continue
+
+            if char == "\\":
+                if in_string:
+                    escape_next = True
+                continue
+
+            if char == '"':
+                in_string = not in_string
+                continue
+
+            if in_string:
+                continue
+
+            if char == open_char:
+                depth += 1
+            elif char == close_char:
+                depth -= 1
+                if depth == 0:
+                    return text[start:i + 1]
+
+        return None
 
     def call_with_json_response(
         self,
@@ -353,6 +478,9 @@ class LLMService:
         """
         Validate that parsed JSON has required structure.
 
+        Checks ALL items in an array (not just the first) and returns
+        True only if every item has the required fields.
+
         Args:
             data: Parsed JSON data
             required_fields: List of required field names
@@ -363,8 +491,10 @@ class LLMService:
         if isinstance(data, list):
             if not data:
                 return False
-            if isinstance(data[0], dict):
-                return all(field in data[0] for field in required_fields)
+            return all(
+                isinstance(item, dict) and all(field in item for field in required_fields)
+                for item in data
+            )
         elif isinstance(data, dict):
             return all(field in data for field in required_fields)
 

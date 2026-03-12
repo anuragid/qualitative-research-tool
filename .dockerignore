@@ -1,0 +1,61 @@
+# Frontend (not needed in backend Docker image)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+backend/venv/
+backend/.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Environment files with secrets
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+!backend/.env.example
+!backend/.env.*.example
+!frontend/.env.example
+
+# Local development
+*.log
+backups/
+.wrangler/
+.claude/
+
+# Video files
+*.mp4
+*.mov
+*.avi
+*.webm
+
+# Build artifacts
+code-review-reports/

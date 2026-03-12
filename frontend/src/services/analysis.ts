@@ -1,5 +1,5 @@
 import api from "./api";
-import type { VideoAnalysis, ProjectAnalysis, AnalysisTask } from "../types";
+import type { VideoAnalysis, ProjectAnalysis } from "../types";
 
 export const analysisService = {
   // Video Analysis
@@ -39,31 +39,6 @@ export const analysisService = {
     return response.data;
   },
 
-  getVideoChunks: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis`);
-    return response.data?.chunks || [];
-  },
-
-  getVideoInferences: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis`);
-    return response.data?.inferences || [];
-  },
-
-  getVideoPatterns: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis`);
-    return response.data?.patterns || [];
-  },
-
-  getVideoInsights: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis`);
-    return response.data?.insights || [];
-  },
-
-  getVideoPrinciples: async (videoId: string) => {
-    const response = await api.get(`/api/videos/${videoId}/analysis`);
-    return response.data?.design_principles || [];
-  },
-
   // Project Analysis (Cross-Video)
   startProjectAnalysis: async (
     projectId: string
@@ -92,13 +67,4 @@ export const analysisService = {
     return response.data?.cross_video_principles || [];
   },
 
-  // Task monitoring
-  getTaskStatus: async (taskId: string): Promise<AnalysisTask> => {
-    const response = await api.get(`/api/tasks/${taskId}/status`);
-    return response.data;
-  },
-
-  cancelTask: async (taskId: string): Promise<void> => {
-    await api.post(`/api/tasks/${taskId}/cancel`);
-  },
 };

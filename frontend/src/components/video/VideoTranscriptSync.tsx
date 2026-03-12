@@ -145,8 +145,9 @@ export function VideoTranscriptSync({ videoUrl, videoId }: VideoTranscriptSyncPr
    */
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in search box
-      if ((e.target as HTMLElement).tagName === "INPUT") return;
+      // Don't trigger if user is typing in any form field
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
       if (!videoRef.current) return;
 

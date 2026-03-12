@@ -1,12 +1,10 @@
 """Celery tasks for video transcription using AssemblyAI."""
 
-from celery import Task
-from sqlalchemy.orm import Session
 from uuid import UUID
 import logging
 
 from app.tasks.celery_app import celery_app
-from app.database import SessionLocal
+from app.tasks.base import DatabaseTask
 from app.models.database_models import Video, Transcript, SpeakerLabel
 from app.services.assemblyai_service import assemblyai_service
 from app.services.s3_service import s3_service
@@ -14,26 +12,16 @@ from app.services.s3_service import s3_service
 logger = logging.getLogger(__name__)
 
 
-class DatabaseTask(Task):
-    """Base task with database session management."""
-
-    _db: Session = None
-
-    @property
-    def db(self) -> Session:
-        """Get or create database session."""
-        if self._db is None:
-            self._db = SessionLocal()
-        return self._db
-
-    def after_return(self, *args, **kwargs):
-        """Clean up database session after task completes."""
-        if self._db is not None:
-            self._db.close()
-            self._db = None
-
-
-@celery_app.task(base=DatabaseTask, bind=True, name="transcribe_video")
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="transcribe_video",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=2,
+)
 def transcribe_video_task(self, video_id: str):
     """
     Transcribe a video using AssemblyAI with speaker diarization.
@@ -151,11 +139,12 @@ def transcribe_video_task(self, video_id: str):
 
             if video:
                 video.status = "error"
+                video.error_message = str(e)
             if transcript:
                 transcript.status = "error"
 
             self.db.commit()
-        except:
-            pass
+        except Exception as cleanup_error:
+            logger.error(f"Failed to update error status for video {video_id}: {cleanup_error}")
 
         raise

@@ -8,7 +8,7 @@ import logging
 
 from app.database import get_db
 from app.auth_bridge import get_current_user_id
-from app.models.database_models import Transcript, SpeakerLabel, Video
+from app.models.database_models import Transcript, SpeakerLabel, Video, Project
 from app.models.schemas import (
     TranscriptResponse,
     SpeakerLabelCreate,
@@ -21,6 +21,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _get_transcript_with_ownership(
+    transcript_id: UUID,
+    current_user_id: str,
+    db: Session,
+) -> Transcript:
+    """
+    Fetch a transcript and verify ownership through Video -> Project relationship.
+
+    Raises HTTPException 404 if the transcript doesn't exist or the user doesn't own it.
+    """
+    transcript = (
+        db.query(Transcript)
+        .join(Video, Transcript.video_id == Video.id)
+        .join(Project, Video.project_id == Project.id)
+        .filter(Transcript.id == transcript_id, Project.user_id == current_user_id)
+        .first()
+    )
+    if not transcript:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Transcript {transcript_id} not found",
+        )
+    return transcript
+
+
 @router.get("/{transcript_id}", response_model=TranscriptResponse)
 async def get_transcript(
     transcript_id: UUID,
@@ -28,24 +53,10 @@ async def get_transcript(
     db: Session = Depends(get_db)
 ):
     """
-    Get a specific transcript by ID.
-
-    Args:
-        transcript_id: Transcript UUID
-        db: Database session
-
-    Returns:
-        Transcript details including raw and processed transcript data
+    Get a specific transcript by ID (must be owned by the current user).
     """
     try:
-        transcript = db.query(Transcript).filter(Transcript.id == transcript_id).first()
-
-        if not transcript:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Transcript {transcript_id} not found"
-            )
-
+        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
         logger.info(f"Retrieved transcript: {transcript_id}")
         return transcript
 
@@ -55,7 +66,7 @@ async def get_transcript(
         logger.error(f"Error getting transcript: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get transcript: {str(e)}"
+            detail="Failed to get transcript"
         )
 
 
@@ -66,23 +77,10 @@ async def get_speaker_labels(
     db: Session = Depends(get_db)
 ):
     """
-    Get all speaker labels for a transcript.
-
-    Args:
-        transcript_id: Transcript UUID
-        db: Database session
-
-    Returns:
-        List of speaker labels
+    Get all speaker labels for a transcript (must be owned by the current user).
     """
     try:
-        # Check if transcript exists
-        transcript = db.query(Transcript).filter(Transcript.id == transcript_id).first()
-        if not transcript:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Transcript {transcript_id} not found"
-            )
+        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
         # Get all speaker labels
         speaker_labels = db.query(SpeakerLabel)\
@@ -99,7 +97,7 @@ async def get_speaker_labels(
         logger.error(f"Error getting speaker labels: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get speaker labels: {str(e)}"
+            detail="Failed to get speaker labels"
         )
 
 
@@ -111,27 +109,10 @@ async def save_speaker_labels(
     db: Session = Depends(get_db)
 ):
     """
-    Save or update speaker labels for a transcript.
-
-    This allows users to assign human-readable names and roles to speakers
-    identified by AssemblyAI (e.g., "Speaker A" -> "John Doe", role: "Interviewer").
-
-    Args:
-        transcript_id: Transcript UUID
-        speaker_labels: List of speaker label assignments
-        db: Database session
-
-    Returns:
-        List of saved speaker labels
+    Save or update speaker labels for a transcript (must be owned by the current user).
     """
     try:
-        # Check if transcript exists
-        transcript = db.query(Transcript).filter(Transcript.id == transcript_id).first()
-        if not transcript:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Transcript {transcript_id} not found"
-            )
+        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
         # Check if transcript is completed
         if transcript.status != "completed":
@@ -183,7 +164,7 @@ async def save_speaker_labels(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save speaker labels: {str(e)}"
+            detail="Failed to save speaker labels"
         )
 
 
@@ -196,25 +177,10 @@ async def update_speaker_label(
     db: Session = Depends(get_db)
 ):
     """
-    Update a specific speaker label.
-
-    Args:
-        transcript_id: Transcript UUID
-        speaker_label_id: Speaker label UUID
-        update_data: Updated speaker label data
-        db: Database session
-
-    Returns:
-        Updated speaker label
+    Update a specific speaker label (must be owned by the current user).
     """
     try:
-        # Check if transcript exists
-        transcript = db.query(Transcript).filter(Transcript.id == transcript_id).first()
-        if not transcript:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Transcript {transcript_id} not found"
-            )
+        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
         # Get speaker label
         speaker_label = db.query(SpeakerLabel).filter(
@@ -247,7 +213,7 @@ async def update_speaker_label(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update speaker label: {str(e)}"
+            detail="Failed to update speaker label"
         )
 
 
@@ -259,17 +225,11 @@ async def delete_speaker_label(
     db: Session = Depends(get_db)
 ):
     """
-    Delete a speaker label.
-
-    Args:
-        transcript_id: Transcript UUID
-        speaker_label_id: Speaker label UUID
-        db: Database session
-
-    Returns:
-        No content
+    Delete a speaker label (must be owned by the current user).
     """
     try:
+        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
+
         # Get speaker label
         speaker_label = db.query(SpeakerLabel).filter(
             SpeakerLabel.id == speaker_label_id,
@@ -295,5 +255,5 @@ async def delete_speaker_label(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete speaker label: {str(e)}"
+            detail="Failed to delete speaker label"
         )

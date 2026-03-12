@@ -7,9 +7,10 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
     queryKey: ["videos", videoId, "transcript"],
     queryFn: () => transcriptionsService.get(videoId!),
     enabled: !!videoId && shouldFetch,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: unknown) => {
       // Don't retry on 404 - transcript doesn't exist yet
-      if (error?.response?.status === 404) {
+      const status = (error as { status?: number })?.status;
+      if (status === 404) {
         return false;
       }
       return failureCount < 3;

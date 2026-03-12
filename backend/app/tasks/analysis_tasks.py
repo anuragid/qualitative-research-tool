@@ -1,38 +1,17 @@
 """Celery tasks for video and project analysis using LangGraph."""
 
-from celery import Task
-from sqlalchemy.orm import Session
 from uuid import UUID
 from datetime import datetime
 import logging
 
 from app.tasks.celery_app import celery_app
-from app.database import SessionLocal
+from app.tasks.base import DatabaseTask
 from app.models.database_models import Video, Transcript, SpeakerLabel, VideoAnalysis, ProjectAnalysis, Project
 from app.agents.graph import video_analysis_graph, project_analysis_graph
 from app.agents.states import VideoAnalysisState, ProjectAnalysisState
 from app.services.project_state_service import ProjectStateService
 
 logger = logging.getLogger(__name__)
-
-
-class DatabaseTask(Task):
-    """Base task with database session management."""
-
-    _db: Session = None
-
-    @property
-    def db(self) -> Session:
-        """Get or create database session."""
-        if self._db is None:
-            self._db = SessionLocal()
-        return self._db
-
-    def after_return(self, *args, **kwargs):
-        """Clean up database session after task completes."""
-        if self._db is not None:
-            self._db.close()
-            self._db = None
 
 
 @celery_app.task(base=DatabaseTask, bind=True, name="analyze_video")
@@ -121,11 +100,13 @@ def analyze_video_task(self, video_id: str):
         # Run the LangGraph workflow
         final_state = video_analysis_graph.invoke(initial_state)
 
-        # Check for errors - only fail if we don't have the required data
-        # Note: final_state["error"] might be set even if all steps completed,
-        # so we check for actual data presence instead
-        if final_state.get("error") and not final_state.get("design_principles"):
-            raise Exception(f"Analysis failed: {final_state['error']}")
+        # Check for errors - the graph now halts on any node error via
+        # conditional routing, so if error is set the pipeline stopped early
+        if final_state.get("error"):
+            failed_step = final_state.get("current_step", "unknown")
+            raise Exception(
+                f"Analysis failed at step '{failed_step}': {final_state['error']}"
+            )
 
         # Save results to database
         video_analysis.chunks = final_state.get("chunks")
@@ -320,7 +301,7 @@ def analyze_project_task(self, project_id: str):
                 project_analysis.completed_at = datetime.utcnow()
 
             self.db.commit()
-        except:
-            pass
+        except Exception as cleanup_error:
+            logger.error(f"Failed to update error status for project {project_id}: {cleanup_error}")
 
         raise

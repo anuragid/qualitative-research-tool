@@ -1,7 +1,7 @@
 """Pydantic schemas for request/response validation."""
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from uuid import UUID
 
@@ -26,8 +26,8 @@ class UserResponse(BaseModel):
 
 class UserSettingsUpdate(BaseModel):
     """Schema for updating user LLM settings."""
-    preferred_model: Optional[str] = None
-    api_key: Optional[str] = None  # Raw key, will be encrypted before storage
+    preferred_model: Optional[str] = Field(default=None, max_length=255)
+    api_key: Optional[str] = Field(default=None, max_length=500)  # Raw key, will be encrypted before storage
 
 
 class UserSettingsResponse(BaseModel):
@@ -39,11 +39,21 @@ class UserSettingsResponse(BaseModel):
 
 # ========== Project Schemas ==========
 
+_VALID_PROJECT_STATUSES = {"planning", "ready", "processing", "completed", "archived", "error"}
+
+
 class ProjectBase(BaseModel):
     """Base project schema."""
-    name: str
-    description: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
     status: Optional[str] = "planning"
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_PROJECT_STATUSES:
+            raise ValueError(f"Invalid status. Must be one of: {', '.join(sorted(_VALID_PROJECT_STATUSES))}")
+        return v
 
 
 class ProjectCreate(ProjectBase):
@@ -53,9 +63,16 @@ class ProjectCreate(ProjectBase):
 
 class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
     status: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_PROJECT_STATUSES:
+            raise ValueError(f"Invalid status. Must be one of: {', '.join(sorted(_VALID_PROJECT_STATUSES))}")
+        return v
 
 
 class ProjectResponse(ProjectBase):
@@ -128,15 +145,15 @@ class TranscriptResponse(BaseModel):
 
 class SpeakerLabelCreate(BaseModel):
     """Schema for creating speaker label."""
-    speaker_label: str
-    assigned_name: Optional[str] = None
-    role: Optional[str] = None
+    speaker_label: str = Field(..., min_length=1, max_length=50)
+    assigned_name: Optional[str] = Field(default=None, max_length=255)
+    role: Optional[str] = Field(default=None, max_length=100)
 
 
 class SpeakerLabelUpdate(BaseModel):
     """Schema for updating speaker label."""
-    assigned_name: Optional[str] = None
-    role: Optional[str] = None
+    assigned_name: Optional[str] = Field(default=None, max_length=255)
+    role: Optional[str] = Field(default=None, max_length=100)
 
 
 class SpeakerLabelResponse(BaseModel):

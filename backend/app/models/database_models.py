@@ -15,7 +15,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String(255), primary_key=True)  # Clerk user ID (user_xxx format)
-    email = Column(String(255))  # Nullable since Clerk JWT may not include email
+    email = Column(String(255), index=True)  # Indexed for lookup
     first_name = Column(String(255))
     last_name = Column(String(255))
     username = Column(String(255))
@@ -40,10 +40,10 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
-    status = Column(String(50), default="planning")  # planning, ready, processing, completed, archived, error
+    status = Column(String(50), default="planning", index=True)  # planning, ready, processing, completed, archived, error
     error_message = Column(Text)  # For error state details
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -60,14 +60,14 @@ class Video(Base):
     __tablename__ = "videos"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     filename = Column(String(255), nullable=False)
     s3_key = Column(Text, nullable=False)
     s3_url = Column(Text, nullable=False)
     file_size_bytes = Column(Integer)
     duration_seconds = Column(Integer)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
-    status = Column(String(50), default="uploaded")  # uploaded, transcribing, transcribed, analyzing, analyzed, error
+    status = Column(String(50), default="uploaded", index=True)  # uploaded, transcribing, transcribed, analyzing, analyzed, error
     error_message = Column(Text)
 
     # Relationships
@@ -82,7 +82,7 @@ class Transcript(Base):
     __tablename__ = "transcripts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
     assemblyai_id = Column(String(255), unique=True)
     raw_transcript = Column(JSONB)  # Full response from AssemblyAI
     processed_transcript = Column(JSONB)  # Cleaned/formatted transcript
@@ -100,7 +100,7 @@ class SpeakerLabel(Base):
     __tablename__ = "speaker_labels"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    transcript_id = Column(UUID(as_uuid=True), ForeignKey("transcripts.id", ondelete="CASCADE"), nullable=False)
+    transcript_id = Column(UUID(as_uuid=True), ForeignKey("transcripts.id", ondelete="CASCADE"), nullable=False, index=True)
     speaker_label = Column(String(50), nullable=False)  # "Speaker A", "Speaker B", etc.
     assigned_name = Column(String(255))  # User-assigned name
     role = Column(String(100))  # User-assigned role (e.g., "Interviewer", "Participant")
@@ -115,7 +115,7 @@ class VideoAnalysis(Base):
     __tablename__ = "video_analyses"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
     chunks = Column(JSONB)  # Step 1: List of chunks
     inferences = Column(JSONB)  # Step 2: List of inferences per chunk
     patterns = Column(JSONB)  # Step 3: List of patterns
@@ -127,7 +127,7 @@ class VideoAnalysis(Base):
 
     # Step-by-step tracking fields
     current_step = Column(String(50), default="chunk")  # chunk, infer, relate, explain, activate
-    step_status = Column(JSONB, default={})  # {"chunk": "completed", "infer": "processing", ...}
+    step_status = Column(JSONB, default=dict)  # {"chunk": "completed", "infer": "processing", ...}
 
     # Individual step timestamps
     chunk_completed_at = Column(DateTime(timezone=True))
@@ -146,7 +146,7 @@ class ProjectAnalysis(Base):
     __tablename__ = "project_analyses"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     video_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False)  # List of video UUIDs included
     cross_video_patterns = Column(JSONB)  # Meta-patterns across videos
     cross_video_insights = Column(JSONB)  # Cross-video insights

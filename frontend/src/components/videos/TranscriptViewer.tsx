@@ -99,13 +99,20 @@ export function TranscriptViewer({
     }
   }, [wordLevelData]);
 
-  // Get words for a specific utterance
-  const getWordsForUtterance = useCallback((utteranceStart: number, utteranceEnd: number) => {
+  // Get words for a specific utterance, returning both words and their global indexes
+  const getWordsForUtterance = useCallback((utteranceStart: number, utteranceEnd: number): { word: Word; globalIndex: number }[] => {
     if (!wordLevelData?.words) return [];
 
-    return wordLevelData.words.filter(
-      (word) => word.start >= utteranceStart && word.end <= utteranceEnd
-    );
+    const results: { word: Word; globalIndex: number }[] = [];
+    for (let i = 0; i < wordLevelData.words.length; i++) {
+      const word = wordLevelData.words[i];
+      if (word.start >= utteranceStart && word.end <= utteranceEnd) {
+        results.push({ word, globalIndex: i });
+      }
+      // Early exit: if we've passed the utterance end, stop searching
+      if (word.start > utteranceEnd) break;
+    }
+    return results;
   }, [wordLevelData]);
 
   // Get all word indexes that match the search
@@ -308,11 +315,10 @@ export function TranscriptViewer({
                   <div className="text-gray-900 leading-relaxed">
                     {wordLevelData ? (
                       // Render words with highlighting
-                      getWordsForUtterance(utterance.start, utterance.end).map((word, wordIdx) => {
-                        const globalWordIndex = wordLevelData.words.indexOf(word);
-                        const isCurrentWord = globalWordIndex === currentWordIndex;
-                        const isSearchMatch = searchMatchIndexes.has(globalWordIndex);
-                        const isCurrentMatch = globalWordIndex === currentMatchWordIndex;
+                      getWordsForUtterance(utterance.start, utterance.end).map(({ word, globalIndex }) => {
+                        const isCurrentWord = globalIndex === currentWordIndex;
+                        const isSearchMatch = searchMatchIndexes.has(globalIndex);
+                        const isCurrentMatch = globalIndex === currentMatchWordIndex;
 
                         // Determine highlight style
                         let className = 'cursor-pointer px-0.5 rounded transition-all duration-100 ';
@@ -332,9 +338,9 @@ export function TranscriptViewer({
 
                         return (
                           <span
-                            key={wordIdx}
-                            id={`word-${globalWordIndex}`}
-                            onClick={() => handleWordClick(globalWordIndex)}
+                            key={globalIndex}
+                            id={`word-${globalIndex}`}
+                            onClick={() => handleWordClick(globalIndex)}
                             className={className}
                             title={`Click to jump to ${(word.start / 1000).toFixed(1)}s`}
                           >

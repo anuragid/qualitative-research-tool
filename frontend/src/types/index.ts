@@ -65,7 +65,7 @@ export interface Transcript {
   id: string;
   video_id: string;
   assemblyai_id: string;
-  raw_transcript: any;
+  raw_transcript: Record<string, unknown>;
   processed_transcript: ProcessedTranscript;
   status: "pending" | "processing" | "completed" | "error";
   created_at: string;

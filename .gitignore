@@ -115,4 +115,13 @@ backend/.env.aws-production
 !**/.env*.example
 backend/.env.cognito
 frontend/.env.production.local
-.env.production.template
+
+# Wrangler (Cloudflare local dev state)
+.wrangler/
+
+# Database backups (contain production data)
+backups/
+*.sql
+
+# Claude worktrees
+.claude/

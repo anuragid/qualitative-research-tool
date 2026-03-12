@@ -16,9 +16,9 @@ export default function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        <nav className="container mx-auto flex h-16 items-center justify-between px-4" aria-label="Main navigation">
           <Link to="/projects" className="flex items-center gap-2">
-            <FolderKanban className="h-6 w-6" />
+            <FolderKanban className="h-6 w-6" aria-hidden="true" />
             <span className="text-xl font-bold">Qualitative Research Tool</span>
           </Link>
 
@@ -34,14 +34,14 @@ export default function Layout({ children }: LayoutProps) {
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Model Settings"
+                aria-label="Model Settings"
               >
-                <Settings className="h-5 w-5" />
+                <Settings className="h-5 w-5" aria-hidden="true" />
               </button>
               <UserButton />
             </Show>
           </div>
-        </div>
+        </nav>
       </header>
 
       <ModelSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />

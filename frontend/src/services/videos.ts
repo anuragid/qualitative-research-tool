@@ -1,4 +1,5 @@
 import api from "./api";
+import type { CancelToken } from "axios";
 import type { Video } from "../types";
 
 export const videosService = {
@@ -19,7 +20,7 @@ export const videosService = {
     projectId: string,
     file: File,
     onProgress?: (progress: number, loaded: number, total: number) => void,
-    cancelToken?: any
+    cancelToken?: CancelToken
   ): Promise<Video> => {
     const formData = new FormData();
     formData.append("file", file);
@@ -55,5 +56,11 @@ export const videosService = {
   getDownloadUrl: async (id: string): Promise<string> => {
     const response = await api.get(`/api/videos/${id}/download/`);
     return response.data.download_url;
+  },
+
+  // Get playback URL (returns pre-signed URL for streaming)
+  getPlaybackUrl: async (id: string): Promise<string> => {
+    const response = await api.get(`/api/videos/${id}/playback-url`);
+    return response.data.playback_url;
   },
 };

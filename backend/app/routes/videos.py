@@ -19,6 +19,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _get_video_with_ownership(
+    video_id: UUID,
+    current_user_id: str,
+    db: Session,
+) -> Video:
+    """
+    Fetch a video and verify ownership through the project relationship.
+
+    Raises HTTPException 404 if the video doesn't exist or the user doesn't own it.
+    """
+    video = (
+        db.query(Video)
+        .join(Project, Video.project_id == Project.id)
+        .filter(Video.id == video_id, Project.user_id == current_user_id)
+        .first()
+    )
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Video {video_id} not found",
+        )
+    return video
+
+
 @router.post("/{project_id}/upload", response_model=VideoUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_video(
     project_id: UUID,
@@ -38,8 +62,11 @@ async def upload_video(
         Created video record with S3 details
     """
     try:
-        # Check if project exists
-        project = db.query(Project).filter(Project.id == project_id).first()
+        # Check if project exists and is owned by current user
+        project = db.query(Project).filter(
+            Project.id == project_id,
+            Project.user_id == current_user_id,
+        ).first()
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -54,6 +81,16 @@ async def upload_video(
                 detail=f"Invalid file type. Allowed types: {', '.join(settings.ALLOWED_VIDEO_EXTENSIONS)}"
             )
 
+        # Validate MIME content type matches extension
+        _ALLOWED_CONTENT_TYPES = {
+            "video/mp4", "video/quicktime", "video/webm", "video/x-msvideo",
+        }
+        if file.content_type and file.content_type not in _ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid content type: {file.content_type}"
+            )
+
         # Validate file size (check content length if available)
         if file.size and file.size > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(
@@ -64,18 +101,21 @@ async def upload_video(
         # Get file size
         file_size = file.size if file.size else 0
 
+        # Sanitize filename - strip path components to prevent path traversal
+        safe_filename = Path(file.filename).name
+
         # Upload to S3
-        logger.info(f"Uploading video: {file.filename} for project {project_id}")
+        logger.info(f"Uploading video for project {project_id}")
         s3_key, s3_url = s3_service.upload_video(
             file=file.file,
-            filename=file.filename,
+            filename=safe_filename,
             project_id=str(project_id)
         )
 
         # Create video record in database
         video = Video(
             project_id=project_id,
-            filename=file.filename,
+            filename=safe_filename,
             s3_key=s3_key,
             s3_url=s3_url,
             file_size_bytes=file_size,
@@ -96,7 +136,7 @@ async def upload_video(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload video: {str(e)}"
+            detail="Failed to upload video"
         )
 
 
@@ -107,24 +147,10 @@ async def get_video(
     db: Session = Depends(get_db)
 ):
     """
-    Get a specific video by ID.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        Video details
+    Get a specific video by ID (must be owned by the current user).
     """
     try:
-        video = db.query(Video).filter(Video.id == video_id).first()
-
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
-
+        video = _get_video_with_ownership(video_id, current_user_id, db)
         logger.info(f"Retrieved video: {video_id}")
         return video
 
@@ -134,7 +160,7 @@ async def get_video(
         logger.error(f"Error getting video: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get video: {str(e)}"
+            detail="Failed to get video"
         )
 
 
@@ -145,30 +171,16 @@ async def delete_video(
     db: Session = Depends(get_db)
 ):
     """
-    Delete a video and its S3 file.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        No content
+    Delete a video and its S3 file (must be owned by the current user).
     """
     try:
-        video = db.query(Video).filter(Video.id == video_id).first()
-
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         # Delete from S3
         try:
             s3_service.delete_video(video.s3_key)
         except Exception as e:
             logger.warning(f"Failed to delete S3 object: {e}")
-            # Continue with database deletion even if S3 deletion fails
 
         # Delete from database (cascade will handle related records)
         db.delete(video)
@@ -184,7 +196,7 @@ async def delete_video(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete video: {str(e)}"
+            detail="Failed to delete video"
         )
 
 
@@ -195,22 +207,10 @@ async def get_video_playback_url(
     db: Session = Depends(get_db)
 ):
     """
-    Generate a fresh presigned URL for video playback.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        Presigned URL for video playback
+    Generate a fresh presigned URL for video playback (must be owned by the current user).
     """
     try:
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         # Generate fresh presigned URL (valid for 1 hour)
         playback_url = s3_service.get_presigned_url(
@@ -227,7 +227,7 @@ async def get_video_playback_url(
         logger.error(f"Error generating playback URL: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate playback URL: {str(e)}"
+            detail="Failed to generate playback URL"
         )
 
 
@@ -238,22 +238,10 @@ async def get_video_transcript(
     db: Session = Depends(get_db)
 ):
     """
-    Get the transcript for a specific video.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        Transcript details
+    Get the transcript for a specific video (must be owned by the current user).
     """
     try:
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript)\
             .filter(Transcript.video_id == video_id)\
@@ -274,7 +262,7 @@ async def get_video_transcript(
         logger.error(f"Error getting transcript: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get transcript: {str(e)}"
+            detail="Failed to get transcript"
         )
 
 
@@ -285,26 +273,10 @@ async def start_transcription(
     db: Session = Depends(get_db)
 ):
     """
-    Start transcription process for a video using AssemblyAI.
-
-    This endpoint will be fully implemented in Phase 5 with Celery tasks.
-    For now, it creates a transcript record and returns a placeholder.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        Task information
+    Start transcription process for a video (must be owned by the current user).
     """
     try:
-        # Check if video exists
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         # Check if transcript already exists
         existing_transcript = db.query(Transcript)\
@@ -350,7 +322,7 @@ async def start_transcription(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start transcription: {str(e)}"
+            detail="Failed to start transcription"
         )
 
 
@@ -361,26 +333,10 @@ async def trigger_video_analysis(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger the 5-step analysis process for a video.
-
-    This endpoint will be fully implemented in Phase 5 with Celery tasks.
-    For now, it creates an analysis record and returns a placeholder.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        Task information
+    Trigger the 5-step analysis process for a video (must be owned by the current user).
     """
     try:
-        # Check if video exists
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         # Check if transcript is completed
         transcript = db.query(Transcript)\
@@ -405,7 +361,6 @@ async def trigger_video_analysis(
             )
             db.add(video_analysis)
         else:
-            # Reset status to rerun analysis
             video_analysis.status = "pending"
 
         # Update video status
@@ -433,7 +388,7 @@ async def trigger_video_analysis(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to trigger video analysis: {str(e)}"
+            detail="Failed to trigger video analysis"
         )
 
 
@@ -444,25 +399,11 @@ async def get_video_analysis(
     db: Session = Depends(get_db)
 ):
     """
-    Get analysis results for a video.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        Video analysis results
+    Get analysis results for a video (must be owned by the current user).
     """
     try:
-        # Check if video exists
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
-        # Get video analysis
         video_analysis = db.query(VideoAnalysis)\
             .filter(VideoAnalysis.video_id == video_id)\
             .first()
@@ -482,7 +423,7 @@ async def get_video_analysis(
         logger.error(f"Error getting video analysis: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get video analysis: {str(e)}"
+            detail="Failed to get video analysis"
         )
 
 
@@ -493,37 +434,10 @@ async def get_word_level_transcript(
     db: Session = Depends(get_db)
 ):
     """
-    Returns word-level transcript with speaker names mapped.
-
-    This endpoint provides word-level timing data for video-transcript synchronization,
-    with speaker labels mapped to their assigned names for display.
-
-    Args:
-        video_id: Video UUID
-        db: Database session
-
-    Returns:
-        {
-            "words": [
-                {
-                    "text": "Hello",
-                    "start": 250,      # milliseconds
-                    "end": 650,
-                    "speaker": "John",  # Mapped from speaker_labels
-                    "confidence": 0.95
-                }
-            ],
-            "duration": 125000  # total video duration in ms
-        }
+    Returns word-level transcript with speaker names mapped (must be owned by the current user).
     """
     try:
-        # Get video and transcript
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript)\
             .filter(Transcript.video_id == video_id)\
@@ -575,7 +489,7 @@ async def get_word_level_transcript(
         logger.error(f"Error getting word-level transcript: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get word-level transcript: {str(e)}"
+            detail="Failed to get word-level transcript"
         )
 
 
@@ -587,40 +501,12 @@ async def search_transcript_words(
     db: Session = Depends(get_db)
 ):
     """
-    Search for specific words using AssemblyAI Word Search API.
-
-    This endpoint allows searching the transcript for specific words and returns
-    timestamps where those words appear, enabling quick navigation to relevant sections.
-
-    Example: /api/videos/{id}/transcript/search?query=design,prototype,user
-
-    Args:
-        video_id: Video UUID
-        query: Comma-separated words to search for
-        db: Database session
-
-    Returns:
-        {
-            "total_count": 42,
-            "matches": [
-                {
-                    "text": "design",
-                    "count": 15,
-                    "timestamps": [[1200, 1450], [5600, 5890], ...],
-                    "indexes": [12, 89, 234, ...]
-                }
-            ]
-        }
+    Search for specific words using AssemblyAI Word Search API (must be owned by the current user).
     """
     try:
         import httpx
 
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript)\
             .filter(Transcript.video_id == video_id)\
@@ -648,7 +534,7 @@ async def search_transcript_words(
             )
 
         result = response.json()
-        logger.info(f"Word search completed for video {video_id}, query: {query}")
+        logger.info(f"Word search completed for video {video_id}")
         return result
 
     except HTTPException:
@@ -657,7 +543,7 @@ async def search_transcript_words(
         logger.error(f"Error searching transcript: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to search transcript: {str(e)}"
+            detail="Failed to search transcript"
         )
 
 
@@ -669,16 +555,10 @@ async def trigger_chunk_step(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger CHUNK step - break transcript into discrete pieces.
+    Trigger CHUNK step (must be owned by the current user).
     """
     try:
-        # Check prerequisites
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Video {video_id} not found"
-            )
+        video = _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
         if not transcript or transcript.status != "completed":
@@ -687,10 +567,7 @@ async def trigger_chunk_step(
                 detail="Video must have a completed transcript"
             )
 
-        # Import here to avoid circular imports
         from app.tasks.analysis_steps import analyze_chunk_step
-
-        # Start the task
         task = analyze_chunk_step.delay(str(video_id))
         logger.info(f"CHUNK step started for video {video_id}, task_id: {task.id}")
 
@@ -707,7 +584,7 @@ async def trigger_chunk_step(
         logger.error(f"Error starting CHUNK step: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start CHUNK step: {str(e)}"
+            detail="Failed to start CHUNK step"
         )
 
 
@@ -718,10 +595,11 @@ async def trigger_infer_step(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger INFER step - interpret meaning from chunks.
+    Trigger INFER step (must be owned by the current user).
     """
     try:
-        # Check prerequisites
+        video = _get_video_with_ownership(video_id, current_user_id, db)
+
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.chunks:
             raise HTTPException(
@@ -729,10 +607,7 @@ async def trigger_infer_step(
                 detail="CHUNK step must be completed first"
             )
 
-        # Import here to avoid circular imports
         from app.tasks.analysis_steps import analyze_infer_step
-
-        # Start the task
         task = analyze_infer_step.delay(str(video_id))
         logger.info(f"INFER step started for video {video_id}, task_id: {task.id}")
 
@@ -749,7 +624,7 @@ async def trigger_infer_step(
         logger.error(f"Error starting INFER step: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start INFER step: {str(e)}"
+            detail="Failed to start INFER step"
         )
 
 
@@ -760,10 +635,11 @@ async def trigger_relate_step(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger RELATE step - find patterns across inferences.
+    Trigger RELATE step (must be owned by the current user).
     """
     try:
-        # Check prerequisites
+        video = _get_video_with_ownership(video_id, current_user_id, db)
+
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.inferences:
             raise HTTPException(
@@ -771,10 +647,7 @@ async def trigger_relate_step(
                 detail="INFER step must be completed first"
             )
 
-        # Import here to avoid circular imports
         from app.tasks.analysis_steps import analyze_relate_step
-
-        # Start the task
         task = analyze_relate_step.delay(str(video_id))
         logger.info(f"RELATE step started for video {video_id}, task_id: {task.id}")
 
@@ -791,7 +664,7 @@ async def trigger_relate_step(
         logger.error(f"Error starting RELATE step: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start RELATE step: {str(e)}"
+            detail="Failed to start RELATE step"
         )
 
 
@@ -802,10 +675,11 @@ async def trigger_explain_step(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger EXPLAIN step - generate insights from patterns.
+    Trigger EXPLAIN step (must be owned by the current user).
     """
     try:
-        # Check prerequisites
+        video = _get_video_with_ownership(video_id, current_user_id, db)
+
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.patterns:
             raise HTTPException(
@@ -813,10 +687,7 @@ async def trigger_explain_step(
                 detail="RELATE step must be completed first"
             )
 
-        # Import here to avoid circular imports
         from app.tasks.analysis_steps import analyze_explain_step
-
-        # Start the task
         task = analyze_explain_step.delay(str(video_id))
         logger.info(f"EXPLAIN step started for video {video_id}, task_id: {task.id}")
 
@@ -833,7 +704,7 @@ async def trigger_explain_step(
         logger.error(f"Error starting EXPLAIN step: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start EXPLAIN step: {str(e)}"
+            detail="Failed to start EXPLAIN step"
         )
 
 
@@ -844,10 +715,11 @@ async def trigger_activate_step(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger ACTIVATE step - create design principles from insights.
+    Trigger ACTIVATE step (must be owned by the current user).
     """
     try:
-        # Check prerequisites
+        video = _get_video_with_ownership(video_id, current_user_id, db)
+
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.insights:
             raise HTTPException(
@@ -855,10 +727,7 @@ async def trigger_activate_step(
                 detail="EXPLAIN step must be completed first"
             )
 
-        # Import here to avoid circular imports
         from app.tasks.analysis_steps import analyze_activate_step
-
-        # Start the task
         task = analyze_activate_step.delay(str(video_id))
         logger.info(f"ACTIVATE step started for video {video_id}, task_id: {task.id}")
 
@@ -875,5 +744,5 @@ async def trigger_activate_step(
         logger.error(f"Error starting ACTIVATE step: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start ACTIVATE step: {str(e)}"
+            detail="Failed to start ACTIVATE step"
         )

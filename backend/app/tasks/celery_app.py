@@ -36,10 +36,19 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=7200,  # 2 hours max per task
     task_soft_time_limit=6900,  # Soft limit at 1h55m
+    task_acks_late=True,  # Acknowledge tasks after execution (survives worker crash)
+    task_reject_on_worker_lost=True,  # Re-queue tasks if worker dies mid-execution
 
     # Worker settings
     worker_prefetch_multiplier=1,  # One task at a time
-    worker_max_tasks_per_child=100,  # Restart worker after 100 tasks
+    worker_max_tasks_per_child=None,  # Disabled — solo pool doesn't fork children
+    worker_cancel_long_running_tasks_on_connection_loss=True,
+
+    # Broker connection resilience
+    broker_connection_retry_on_startup=True,  # Retry Redis connection on startup
+    broker_connection_retry=True,  # Retry on connection loss during operation
+    broker_connection_max_retries=10,  # Max retries before giving up
+    broker_connection_timeout=30,  # Timeout per connection attempt
 
     # Logging
     worker_hijack_root_logger=False,

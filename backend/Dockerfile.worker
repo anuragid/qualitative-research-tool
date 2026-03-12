@@ -36,8 +36,12 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuse
 
 ENV PYTHONUNBUFFERED=1
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD celery -A app.tasks.celery_app inspect ping || exit 1
+# Lightweight health check: verify celery process is alive.
+# The old `celery inspect ping` spawned a full Celery client every 30s,
+# adding ~100MB memory and timing out during long tasks, causing Railway
+# to kill the container in a crash loop.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD pgrep -f "celery.*worker" > /dev/null || exit 1
 
 USER appuser
 

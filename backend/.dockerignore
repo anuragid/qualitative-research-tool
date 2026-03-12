@@ -34,9 +34,14 @@ docs/
 
 # Local development
 .env
-.env.local
+.env.*
+!.env.example
+!.env.*.example
 *.log
 
-# Test files
-test_video.mp4
-patricia_and_mozart.mp4
+# Video/test files
+*.mp4
+*.mov
+*.avi
+*.webm
+test_*.py

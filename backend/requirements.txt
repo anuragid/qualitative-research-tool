@@ -8,11 +8,9 @@ sqlalchemy==2.0.23
 alembic==1.12.1
 psycopg2-binary==2.9.9
 
-# AI & LangChain
+# AI & LangGraph
 openai
 json-repair
-langchain
-langchain-core
 langgraph
 
 # AssemblyAI
@@ -41,7 +39,6 @@ tenacity==8.2.3
 python-dotenv==1.0.0
 
 # Utilities
-python-dateutil==2.8.2
 typing-extensions==4.12.2
 
 # Authentication (Clerk JWT verification)

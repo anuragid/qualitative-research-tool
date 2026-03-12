@@ -38,11 +38,11 @@ services:
   # Backend API
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.railway
+      context: .
+      dockerfile: backend/Dockerfile.railway
     container_name: qualitative-research-api
     env_file:
-      - ./backend/.env.docker-local
+      - ./backend/.env
     ports:
       - "8000:8000"
     depends_on:
@@ -64,15 +64,17 @@ services:
       - /app/.pytest_cache
     environment:
       - SERVICE_TYPE=api
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/qualitative_research
+      - REDIS_URL=redis://redis:6379/0
 
   # Celery Worker
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.railway
+      context: .
+      dockerfile: backend/Dockerfile.railway
     container_name: qualitative-research-worker
     env_file:
-      - ./backend/.env.docker-local
+      - ./backend/.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,6 +88,8 @@ services:
       - /app/.pytest_cache
     environment:
       - SERVICE_TYPE=worker
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/qualitative_research
+      - REDIS_URL=redis://redis:6379/0
     command: ["worker"]
 
 networks:

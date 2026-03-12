@@ -281,7 +281,7 @@ async def get_optional_user(
             "permissions": user_data.get("permissions", []),
             "raw_payload": user_data,
         }
-    except:
+    except Exception:
         return None
 
 
