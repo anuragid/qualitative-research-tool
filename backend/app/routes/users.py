@@ -10,6 +10,7 @@ from app.models import database_models
 from app.auth_bridge import get_current_user
 from app.models.schemas import UserResponse, UserSettingsUpdate, UserSettingsResponse
 from app.services.encryption_service import encryption_service
+from app.services.clerk_service import fetch_clerk_user
 
 router = APIRouter()
 
@@ -24,6 +25,19 @@ async def get_current_user_profile(
     Creates the user in the database if they don't exist yet.
     """
     user_id = current_user["id"]
+    email = current_user.get("email")
+    first_name = current_user.get("first_name")
+    last_name = current_user.get("last_name")
+    username = current_user.get("username")
+
+    # If JWT doesn't have profile data, fetch from Clerk API
+    if not email:
+        clerk_data = await fetch_clerk_user(user_id)
+        if clerk_data:
+            email = clerk_data.get("email") or email
+            first_name = clerk_data.get("first_name") or first_name
+            last_name = clerk_data.get("last_name") or last_name
+            username = clerk_data.get("username") or username
 
     # Check if user exists in database
     db_user = db.query(database_models.User).filter(
@@ -34,10 +48,10 @@ async def get_current_user_profile(
         # Create user if they don't exist (first-time sign in)
         db_user = database_models.User(
             id=user_id,
-            email=current_user.get("email"),
-            first_name=current_user.get("first_name"),
-            last_name=current_user.get("last_name"),
-            username=current_user.get("username"),
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
             role=current_user.get("role", "user"),
             last_seen=datetime.utcnow()
         )
@@ -48,6 +62,15 @@ async def get_current_user_profile(
         # Update last_seen and role
         db_user.last_seen = datetime.utcnow()
         db_user.role = current_user.get("role", db_user.role)
+        # Update profile fields if we got fresh data from Clerk API
+        if email and not db_user.email:
+            db_user.email = email
+        if first_name and not db_user.first_name:
+            db_user.first_name = first_name
+        if last_name and not db_user.last_name:
+            db_user.last_name = last_name
+        if username and not db_user.username:
+            db_user.username = username
         db.commit()
 
     return db_user
@@ -63,6 +86,19 @@ async def sync_user(
     This endpoint should be called after successful authentication.
     """
     user_id = current_user["id"]
+    email = current_user.get("email")
+    first_name = current_user.get("first_name")
+    last_name = current_user.get("last_name")
+    username = current_user.get("username")
+
+    # If JWT doesn't have profile data, fetch from Clerk API
+    if not email:
+        clerk_data = await fetch_clerk_user(user_id)
+        if clerk_data:
+            email = clerk_data.get("email") or email
+            first_name = clerk_data.get("first_name") or first_name
+            last_name = clerk_data.get("last_name") or last_name
+            username = clerk_data.get("username") or username
 
     # Check if user exists
     db_user = db.query(database_models.User).filter(
@@ -73,21 +109,24 @@ async def sync_user(
         # Create new user with role
         db_user = database_models.User(
             id=user_id,
-            email=current_user.get("email"),
-            first_name=current_user.get("first_name"),
-            last_name=current_user.get("last_name"),
-            username=current_user.get("username"),
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
             role=current_user.get("role", "user"),  # Default to 'user' role
             last_seen=datetime.utcnow()
         )
         db.add(db_user)
     else:
         # Update existing user (including role if it changed in Clerk)
-        if current_user.get("email"):
-            db_user.email = current_user.get("email")
-        db_user.first_name = current_user.get("first_name", db_user.first_name)
-        db_user.last_name = current_user.get("last_name", db_user.last_name)
-        db_user.username = current_user.get("username", db_user.username)
+        if email:
+            db_user.email = email
+        if first_name:
+            db_user.first_name = first_name
+        if last_name:
+            db_user.last_name = last_name
+        if username:
+            db_user.username = username
         db_user.role = current_user.get("role", db_user.role)  # Update role if changed
         db_user.last_seen = datetime.utcnow()
         db_user.updated_at = datetime.utcnow()
