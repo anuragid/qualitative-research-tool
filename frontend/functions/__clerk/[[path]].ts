@@ -1,11 +1,10 @@
-// Cloudflare Pages Function that proxies Clerk Frontend API requests
-// through the Railway backend, avoiding the Cloudflare-to-Cloudflare
-// conflict (Error 1000/525) that occurs when both the user's domain
-// and Clerk use Cloudflare infrastructure.
-//
-// Flow: Browser → this function (methodex.ai/__clerk) → Railway → Clerk
+// Cloudflare Pages Function that proxies Clerk Frontend API requests.
+// Uses frontend-api.clerk.dev as the target (documented proxy endpoint).
+// If the direct request fails (Cloudflare-to-Cloudflare conflict), falls
+// back to routing through the Railway backend.
 
 interface Env {
+  CLERK_SECRET_KEY: string;
   CLERK_BACKEND_URL: string; // e.g. https://api-production-df43.up.railway.app
 }
 
@@ -13,37 +12,60 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env, params } = context;
 
   const path = Array.isArray(params.path) ? params.path.join("/") : params.path;
-  const backendBase = env.CLERK_BACKEND_URL || "https://api-production-df43.up.railway.app";
-  const targetUrl = new URL(`${backendBase}/__clerk_fwd/${path}`);
-
-  // Preserve query string
   const url = new URL(request.url);
-  targetUrl.search = url.search;
 
-  const headers = new Headers(request.headers);
-  headers.set("Clerk-Proxy-Url", `${url.origin}/__clerk`);
-  headers.set(
+  const clerkHeaders = new Headers(request.headers);
+  clerkHeaders.set("Clerk-Proxy-Url", `${url.origin}/__clerk`);
+  clerkHeaders.set("Clerk-Secret-Key", env.CLERK_SECRET_KEY);
+  clerkHeaders.set(
     "X-Forwarded-For",
     request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || ""
   );
-  // Remove the host header so it doesn't conflict with the target
-  headers.delete("host");
+  clerkHeaders.delete("host");
 
-  const proxyRequest = new Request(targetUrl.toString(), {
+  const body = request.method !== "GET" && request.method !== "HEAD" ? request.body : null;
+
+  // Try direct to Clerk first (frontend-api.clerk.dev has valid TLS)
+  try {
+    const directUrl = new URL(`https://frontend-api.clerk.dev/${path}`);
+    directUrl.search = url.search;
+
+    const resp = await fetch(directUrl.toString(), {
+      method: request.method,
+      headers: clerkHeaders,
+      body,
+    });
+
+    if (resp.ok || resp.status < 500) {
+      const responseHeaders = new Headers(resp.headers);
+      responseHeaders.delete("transfer-encoding");
+      return new Response(resp.body, {
+        status: resp.status,
+        statusText: resp.statusText,
+        headers: responseHeaders,
+      });
+    }
+  } catch {
+    // Direct failed — fall through to Railway proxy
+  }
+
+  // Fallback: proxy through Railway backend (not on Cloudflare)
+  const backendBase = env.CLERK_BACKEND_URL || "https://api-production-df43.up.railway.app";
+  const fallbackUrl = new URL(`${backendBase}/__clerk_fwd/${path}`);
+  fallbackUrl.search = url.search;
+
+  const fallbackResp = await fetch(fallbackUrl.toString(), {
     method: request.method,
-    headers,
-    body: request.method !== "GET" && request.method !== "HEAD" ? request.body : null,
+    headers: clerkHeaders,
+    body,
   });
 
-  const response = await fetch(proxyRequest);
-
-  // Forward the response, preserving Set-Cookie and other headers
-  const responseHeaders = new Headers(response.headers);
+  const responseHeaders = new Headers(fallbackResp.headers);
   responseHeaders.delete("transfer-encoding");
 
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
+  return new Response(fallbackResp.body, {
+    status: fallbackResp.status,
+    statusText: fallbackResp.statusText,
     headers: responseHeaders,
   });
 };
