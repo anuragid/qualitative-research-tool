@@ -1,8 +1,9 @@
 """FastAPI main application."""
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+import httpx
 import logging
 
 from app.config import settings
@@ -77,8 +78,31 @@ async def health_check():
     }
 
 
+# Clerk Frontend API proxy — used by Cloudflare Pages Function to avoid
+# the Cloudflare-to-Cloudflare CNAME conflict (Error 1000/525).
+# Flow: Browser → Pages Function (methodex.ai/__clerk) → Railway → Clerk
+_clerk_client = httpx.AsyncClient(base_url="https://frontend-api.clerk.services", timeout=15.0)
+
+
+@app.api_route("/__clerk_fwd/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def clerk_proxy(path: str, request: Request):
+    headers = dict(request.headers)
+    headers.pop("host", None)
+    headers["Clerk-Secret-Key"] = settings.CLERK_SECRET_KEY or ""
+
+    body = await request.body()
+    resp = await _clerk_client.request(
+        method=request.method,
+        url=f"/{path}",
+        headers=headers,
+        params=dict(request.query_params),
+        content=body if body else None,
+    )
+    return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+
+
 # Import and include routers
-from app.routes import projects, videos, transcriptions, analysis, users
+from app.routes import projects, videos, transcriptions, users
 
 # Register routers with API prefix and tags
 app.include_router(
@@ -105,8 +129,3 @@ app.include_router(
     tags=["transcripts"]
 )
 
-app.include_router(
-    analysis.router,
-    prefix=f"{settings.API_V1_PREFIX}/analysis",
-    tags=["analysis"]
-)

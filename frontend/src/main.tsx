@@ -23,7 +23,7 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} proxyUrl={import.meta.env.VITE_CLERK_PROXY_URL} afterSignOutUrl="/">
       <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>
