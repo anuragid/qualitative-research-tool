@@ -1,28 +1,33 @@
 import axios from "axios";
-import { fetchAuthSession } from '@aws-amplify/auth';
+
+declare global {
+  interface Window {
+    Clerk?: {
+      session?: {
+        getToken: () => Promise<string | null>;
+      };
+    };
+  }
+}
 
 // Create axios instance with base configuration
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8001",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
   headers: {
     "Content-Type": "application/json",
   },
   timeout: 30000, // 30 seconds
 });
 
-// Request interceptor
+// Request interceptor — inject Clerk auth token
 api.interceptors.request.use(
   async (config) => {
-    // Add Cognito authentication token to all requests
     try {
-      // Get token from AWS Cognito
-      const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
+      const token = await window.Clerk?.session?.getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      // User might not be authenticated
       console.log("No auth token available");
     }
     return config;

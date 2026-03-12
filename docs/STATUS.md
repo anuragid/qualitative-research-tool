@@ -1,366 +1,118 @@
-# Qualitative Research Tool - Project Status & Deployment
+# Qualitative Research Tool - Project Status
 
-**Last Updated:** November 25, 2024
-**Status:** ✅ FULLY OPERATIONAL
-**Environments:** Local (Docker) | Production (AWS)
-**Authentication:** AWS Cognito
+**Last Updated:** March 3, 2026
+**Status:** OFFLINE - AWS decommissioned, self-hosted migration pending
+**Environments:** Local (Docker) only
 
-## 🚀 Quick Access
+---
 
-### Production URLs
-- **Frontend**: http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com
-- **API**: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com
-- **Health Check**: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com/health
+## Current State
+
+### AWS Decommissioned (March 3, 2026)
+All AWS infrastructure has been permanently deleted. The app **cannot run in its current state** because it depends on AWS services (S3 for video storage, Cognito for auth) that no longer exist.
+
+**What was deleted:** ECS, ALB, ElastiCache, RDS, S3 (4 buckets), ECR, Cognito, DynamoDB (6 tables), EC2, VPCs, IAM roles, CloudWatch logs/alarms.
+
+**What was preserved locally:**
+- 11 unique research videos (3.2 GB) → `../../videos-backup/`
+- v1/v2 analysis JSON data (3.3 MB) → `../../analysis-backup/`
+- Full codebase (this repo)
+
+### Production URLs — DEAD
+- ~~Frontend: http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com~~
+- ~~API: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com~~
 
 ### Local Development
 - **Frontend**: http://localhost:5173
 - **API**: http://localhost:8000
 - **Database**: localhost:5432 (postgres/postgres)
-
-### Repository
-- **GitHub**: https://github.com/anuragid/qualitative-research-tool
-- **Branch**: main
+- **Note**: Will NOT fully work until AWS dependencies are replaced (see below)
 
 ---
 
-## 📋 Current Features (All Working)
+## What Needs to Change Before Running
 
-### Core Functionality
-- ✅ **Authentication** - AWS Cognito with JWT validation
-- ✅ **Project Management** - Full CRUD with state system
-- ✅ **Video Upload** - Parallel processing (5 concurrent)
-- ✅ **Transcription** - AssemblyAI integration
-- ✅ **AI Analysis** - 5-step Claude analysis pipeline
-- ✅ **Cross-Video Analysis** - Pattern detection across videos
-- ✅ **Speaker Identification** - Label and track speakers
-- ✅ **Video-Transcript Sync** - Synchronized playback
-- ✅ **Archive System** - Archive/unarchive projects
-- ✅ **CloudWatch Monitoring** - Error tracking and alerting
+### Must Replace (app won't start without these)
+1. **S3 video storage** → MinIO (S3-compatible) or local filesystem
+2. **Cognito authentication** → Self-signed JWT with local user table
+3. **Frontend AWS Amplify auth** → Local auth context and login form
 
-### Project State System
-1. **`planning`** - New project, no videos (gray)
-2. **`ready`** - Has videos, ready for analysis (blue)
-3. **`processing`** - Analysis running (yellow)
-4. **`completed`** - All processing done (green)
-5. **`archived`** - Stored for reference (gray)
-6. **`error`** - Failed with error message (red)
+### Already Works Locally (no changes needed)
+- PostgreSQL (docker-compose)
+- Redis (docker-compose)
+- FastAPI API server
+- Celery workers
+- Claude AI analysis pipeline (LangGraph)
+- AssemblyAI transcription
 
-### Recent Improvements
-
-#### November 25, 2024 - Auth Migration & Monitoring
-- ✅ **Migrated to AWS Cognito** - Full authentication system migration from Clerk
-- ✅ **CloudWatch Monitoring** - Metric filters and alarms for HTTP 500s, application errors, and worker errors
-- ✅ **Security Audit** - Verified credentials are properly gitignored
-- ✅ **Documentation Cleanup** - Removed obsolete Clerk docs, archived outdated files
-
-#### November 21, 2024 - Critical Bug Fixes & Cross-Video Analysis Enhancement
-- ✅ **Fixed critical backend bug** in `analyze_activate_step` - video object now properly queried before use
-- ✅ **Improved error detection** in video analysis - now checks for data presence instead of just error flags
-- ✅ **Enhanced cross-video analysis UX** - clear "Running..." state with time estimates
-- ✅ **Implemented re-run capability** - detects new analyzed videos and shows amber re-run button
-- ✅ **Fixed schema issues** - VideoResponse now includes analysis field with proper relationship loading
-- ✅ **Improved polling** - forced refetch after starting analysis for immediate status updates
-
-#### November 20, 2024
-- ✅ Fixed project card video counts
-- ✅ Implemented parallel uploads
-- ✅ Created reusable UI components
-- ✅ Improved error handling with solutions
-- ✅ Added data backup/restore scripts
-- ✅ Applied Nielsen's usability heuristics
+### Known Local Setup Issues
+- Frontend `.env` points to port 8001, API runs on 8000
+- No auth bypass for local development
+- Dockerfile forces `linux/amd64` (slow on Apple Silicon)
+- Docker-compose uses Postgres 15 (production was 17)
 
 ---
 
-## 🏗️ Architecture
+## Core Features
 
-### Unified Local-AWS Architecture
-Both environments use identical containerized architecture:
+- **Project Management** - Full CRUD with state system
+- **Video Upload** - Parallel processing (5 concurrent)
+- **Transcription** - AssemblyAI integration
+- **AI Analysis** - 5-step Claude analysis pipeline (chunk → infer → relate → explain → activate)
+- **Cross-Video Analysis** - Pattern detection across videos
+- **Speaker Identification** - Label and track speakers
+- **Video-Transcript Sync** - Synchronized playback
+
+---
+
+## Architecture
 
 ```
 Frontend (React/Vite)
     ↓
-API Gateway (FastAPI)
+API (FastAPI)
     ↓
 ├── PostgreSQL Database
-├── Redis Cache/Queue
-└── S3 Video Storage
+├── Redis Cache/Queue (Celery broker)
+├── Video Storage (NEEDS REPLACEMENT - was S3)
+└── Auth (NEEDS REPLACEMENT - was Cognito)
     ↑
-Celery Workers
+Celery Workers (AI analysis pipeline)
 ```
 
-### Local Development Setup
+---
+
+## Local Development
+
 ```bash
-# Start everything
-./scripts/start-local.sh
+# Start services (Postgres, Redis, API, Worker)
+docker compose up --build
+
+# Start frontend separately
 cd frontend && npm run dev
 
-# Access at
-http://localhost:5173
-```
-
-### AWS Production Infrastructure
-
-#### Resources
-- **ECS Cluster**: qualitative-research-prod
-- **Services**: API (2 tasks), Workers (1 task)
-- **Database**: RDS PostgreSQL
-- **Cache**: ElastiCache Redis
-- **Storage**: S3 buckets
-- **Load Balancer**: ALB
-
-#### Deployment
-```bash
-# Automated deployment with validation
-./scripts/deploy-to-aws.sh
+# Access at http://localhost:5173
 ```
 
 ---
 
-## 📊 Deployment History
+## Next Steps (TBD)
 
-### November 25, 2024 (Latest - 14:34 UTC)
-- **Authentication**: Migrated from Clerk to AWS Cognito
-- **Backend**: Updated JWT validation, user sync, and auth_bridge for Cognito
-- **Frontend**: Deployed Cognito auth components and configuration
-- **Monitoring**: Set up CloudWatch metric filters and alarms
-- **Database**: Added RBAC role column via Alembic migration
-- **Documentation**: Major cleanup - removed obsolete files, updated for Cognito
-- **Production Status**: ✅ All services healthy and operational
-
-### November 21, 2024 (04:45 UTC)
-- **Deployment**: Successfully deployed all bug fixes to production
-- **Backend**: Fixed critical NameError bug in activate step task (commit bfef936)
-- **Frontend**: Fixed TypeScript errors in VideoCard and ProjectDetailPage
-  - Changed video status from "completed" to "analyzed" (commit a402e29)
-  - Removed redundant status comparison in re-run button logic (commit d35b843)
-- **Cross-Video Analysis**: Enhanced with re-run capability and new video detection
-- **UX Improvements**: Better running state visibility with time estimates
-- **Error Detection**: Improved logic to check for data presence instead of just error flags
-
-### November 20, 2024
-- Fixed project card video counts
-- Deployed usability improvements
-- Added data safety measures
-
-### November 8, 2024
-- Deployed project state system
-- Fixed ECS task definitions (revision 8)
-- Added status badges and error handling
-
-### November 6, 2024
-- Initial AWS deployment
-- Fixed all deployment issues
-- Implemented unified architecture
-- Secured database credentials
+- [ ] Decide on hosting approach (VPS, home server, etc.)
+- [ ] Replace S3 with MinIO or local storage
+- [ ] Replace Cognito with local JWT auth
+- [ ] Update frontend to remove AWS Amplify dependency
+- [ ] Verify full stack runs locally end-to-end
+- [ ] Deploy to chosen hosting platform
 
 ---
 
-## 🔧 Quick Commands
+## Project History
 
-### Local Development
-```bash
-# Start services
-./scripts/start-local.sh
-
-# Stop services
-docker-compose stop
-
-# View logs
-docker-compose logs -f api
-docker-compose logs -f worker
-
-# Backup database
-./scripts/backup-db.sh
-
-# Restore database
-./scripts/restore-db.sh <backup-file>
-```
-
-### AWS Management
-```bash
-# Check status
-aws ecs describe-services \
-  --cluster qualitative-research-prod \
-  --services api workers \
-  --region us-east-2
-
-# View logs
-aws logs tail /ecs/qualitative-research-api \
-  --region us-east-2 --follow
-
-# Update services
-aws ecs update-service \
-  --cluster qualitative-research-prod \
-  --service api \
-  --force-new-deployment \
-  --region us-east-2
-
-# Scale services
-aws ecs update-service \
-  --cluster qualitative-research-prod \
-  --service api \
-  --desired-count 3 \
-  --region us-east-2
-```
-
----
-
-## 💾 Data Management
-
-### Database
-- **Local**: PostgreSQL in Docker container
-- **Production**: AWS RDS PostgreSQL
-- **Backup**: Use `./scripts/backup-db.sh` regularly
-- **⚠️ WARNING**: Never use `docker-compose down -v` (deletes data!)
-
-### Video Storage
-- **S3 Bucket**: qualitative-research-videos-ad
-- **Shared**: Both local and AWS use same bucket
-- **Access**: Via presigned URLs
-
-### Current Data
-- **Production**: 5 projects with videos
-- **Local**: Test data only (after recent reset)
-
----
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-#### Frontend Can't Connect to Backend
-1. Check backend: `curl http://localhost:8000/health`
-2. Check CORS in container environment
-3. Verify frontend .env settings
-4. Hard refresh browser (Cmd+Shift+R)
-
-#### Database Connection Issues
-1. Check container: `docker ps | grep qualitative-research-db`
-2. Test connection: `docker exec qualitative-research-db pg_isready`
-3. Verify DATABASE_URL configuration
-
-#### Video Upload Fails
-1. Check AWS credentials in backend
-2. View logs: `docker logs qualitative-research-api --tail 50`
-3. Verify S3 bucket permissions
-
----
-
-## 💰 AWS Cost Estimate
-
-Monthly costs (estimated):
-- ECS Fargate: ~$65-90
-- RDS PostgreSQL: ~$15
-- ElastiCache Redis: ~$12
-- Load Balancer: ~$21
-- S3 & Transfer: ~$10
-- **Total: ~$125-160/month**
-
-### Cost Optimization
-```bash
-# Stop services when not needed
-aws ecs update-service \
-  --cluster qualitative-research-prod \
-  --service api \
-  --desired-count 0 \
-  --region us-east-2
-```
-
----
-
-## 📝 Development Workflow
-
-### Best Practice
-```
-LOCAL (develop) → TEST (verify) → COMMIT (git) → DEPLOY (AWS)
-```
-
-### Daily Workflow
-1. Start local environment
-2. Make and test changes
-3. Commit to git
-4. Deploy to AWS using script
-5. Verify production
-
-### Important Rules
-- ✅ Always test locally first
-- ✅ Keep data separate (local vs production)
-- ✅ Use backup scripts regularly
-- ❌ Never edit directly on AWS
-- ❌ Never use `docker-compose down -v`
-- ❌ Never commit .env files
-
----
-
-## 📚 Documentation
-
-### Active Documents
-- **STATUS.md** - This file (project status)
-- **README.md** - Setup and usage
-- **DATA_MANAGEMENT.md** - Backup procedures
-- **USABILITY_FIXES_REQUIRED.md** - Task list
-- **AWS_DEPLOYMENT_GUIDE.md** - Deployment steps
-
-### Environment Variables
-See `.env.example` files in backend/ and frontend/ directories
-
----
-
-## 📈 Monitoring & Alerting
-
-### CloudWatch Alarms
-- `QualitativeResearch-API-HTTP500Errors` - Triggers on HTTP 500 errors
-- `QualitativeResearch-API-HighErrorRate` - Triggers on application errors
-- `QualitativeResearch-Worker-Errors` - Triggers on worker task errors
-
-### Log Groups
-- `/ecs/qualitative-research-api` - API server logs
-- `/ecs/qualitative-research-workers` - Celery worker logs
-
-### View Logs
-```bash
-# API logs (real-time)
-aws logs tail /ecs/qualitative-research-api --region us-east-2 --follow
-
-# Worker logs
-aws logs tail /ecs/qualitative-research-workers --region us-east-2 --follow
-
-# Filter for errors
-aws logs tail /ecs/qualitative-research-api --region us-east-2 --filter-pattern "ERROR"
-```
-
----
-
-## 🔐 Authentication (AWS Cognito)
-
-### Configuration
-- **User Pool ID**: us-east-1_Jr0OTariE
-- **App Client ID**: 2oah1h1bdsushki851ftkale6h
-- **Region**: us-east-1
-
-### User Roles (RBAC)
-- **admin** - Full access to all features
-- **user** - Standard access (default)
-- **viewer** - Read-only access
-
----
-
-## 🎯 Next Steps
-
-### Immediate Tasks
-- [ ] Complete remaining usability fixes
-- [ ] Add comprehensive testing
-- [ ] Create API documentation
-- [x] Add monitoring dashboards (CloudWatch configured)
-
-### Future Enhancements
-- [ ] Custom domain with HTTPS
-- [ ] Auto-scaling configuration
-- [ ] CI/CD pipeline
-- [ ] Performance optimization
-- [ ] Cost reduction strategies
-
----
-
-**For Support**: Check GitHub issues or documentation
-**AWS Account**: 723913710517 (us-east-2)
+| Date | Event |
+|------|-------|
+| Aug 2025 | v1 (agentic-analysis-synthesis) - Streamlit on EC2 |
+| Nov 2025 | v2 (aas-v2) - Brief App Runner attempt |
+| Nov 2025 | v3 (qualitative-research-tool) - Full stack on AWS |
+| Jan 2026 | RDS database deleted (app broken since then) |
+| Mar 2026 | All AWS infrastructure decommissioned |

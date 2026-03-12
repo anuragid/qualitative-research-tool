@@ -5,70 +5,49 @@
 I'm working on a Qualitative Research Tool at:
 /Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool/
 
-Read these 3 files first:
-1. STATUS.md - current state
-2. README.md - project overview
-3. AI_AGENT_GUIDE.md - how to work safely
-
-Key: NEVER use 'docker-compose down -v', ALWAYS check before creating files
+Read STATUS.md first - AWS has been decommissioned, app needs migration.
 ```
 
 ## Project Summary
 - **What**: AI-powered video interview analysis tool
-- **Stack**: FastAPI + React + PostgreSQL + Docker + AWS
-- **Auth**: AWS Cognito (JWT-based)
-- **Status**: Fully operational (Local + Production)
-- **GitHub**: https://github.com/anuragid/qualitative-research-tool
+- **Stack**: FastAPI + React + PostgreSQL + Docker
+- **Status**: OFFLINE — AWS decommissioned March 2026, self-hosted migration pending
+- **Auth**: NEEDS REPLACEMENT (was AWS Cognito)
+- **Video Storage**: NEEDS REPLACEMENT (was S3)
+
+## IMPORTANT: AWS Is Gone
+- ALL AWS services have been deleted (S3, Cognito, ECS, RDS, everything)
+- The app will NOT work until S3 and Cognito are replaced
+- Do NOT reference any AWS URLs, endpoints, or credentials — they no longer exist
+- Local Docker setup (Postgres + Redis) still works
+
+## What Was Preserved
+- 11 unique research videos (3.2 GB) → `../../videos-backup/`
+- v1/v2 analysis data → `../../analysis-backup/`
+- Full codebase (this repo)
 
 ## Critical Commands
 ```bash
 # SAFE
-docker-compose down          ✅
-docker-compose stop          ✅
-./scripts/backup-db.sh       ✅
+docker compose down            OK
+docker compose stop            OK
 
 # DANGEROUS
-docker-compose down -v       ❌ DELETES DATABASE
-docker volume prune          ❌ DELETES DATA
+docker compose down -v         DELETES DATABASE
+docker volume prune            DELETES DATA
 ```
 
 ## Before ANY Change
 1. Check if it exists: `grep -r "feature_name"`
-2. Test locally first: `./scripts/start-local.sh`
-3. Backup if major: `./scripts/backup-db.sh`
-4. Never commit .env files
+2. Test locally first
+3. Never commit .env files
 
-## Current Tasks
-See: USABILITY_FIXES_REQUIRED.md
+## Files That Need AWS Replacement
+- `backend/app/services/s3_service.py` → local storage or MinIO
+- `backend/app/cognito_auth.py` → local JWT auth
+- `frontend/src/contexts/CognitoAuthContext.tsx` → local auth context
+- `frontend/src/components/auth/CognitoSignIn.tsx` → local login form
+- `frontend/src/services/api.ts` → remove AWS Amplify
+- `frontend/package.json` → remove aws-amplify packages
 
-## Help Commands
-```bash
-# Find files
-find . -name "*.py" | grep -v venv
-find . -name "*.tsx" | grep -v node_modules
-
-# Check what exists
-ls backend/app/routes/
-ls frontend/src/components/
-
-# Test changes
-cd frontend && npm run build
-curl http://localhost:8000/health
-```
-
-## Production
-- Frontend: http://qualitative-research-frontend.s3-website.us-east-2.amazonaws.com
-- API: http://qualitative-research-alb-1350830328.us-east-2.elb.amazonaws.com
-
-## Recent Updates (Nov 25, 2024)
-- **Auth Migration**: Migrated from Clerk to AWS Cognito
-- **CloudWatch Monitoring**: Metric filters and alarms for error tracking
-- **Documentation Cleanup**: Removed obsolete files, updated for Cognito
-- **Security Audit**: Verified no secrets exposed in git
-
-## Recent Critical Fixes (Nov 21, 2024)
-- **Backend Bug**: Fixed NameError in `analyze_activate_step`
-- **Cross-Video Analysis**: Added re-run capability with new video detection
-- **UX Enhancement**: Better running state visibility with time estimates
-
-Last Updated: Nov 25, 2024
+Last Updated: March 3, 2026
