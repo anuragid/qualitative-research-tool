@@ -32,7 +32,7 @@ export default function ProjectDetailPage() {
   const { data: videos, isLoading: videosLoading } = useProjectVideos(
     projectId || null
   );
-  const { data: projectAnalysis, isLoading: projectAnalysisLoading } = useProjectAnalysis(projectId || null);
+  const { data: projectAnalysis } = useProjectAnalysis(projectId || null);
   const { data: metaPatterns } = useMetaPatterns(projectId || null);
   const { data: crossInsights } = useCrossInsights(projectId || null);
   const { data: systemPrinciples } = useSystemPrinciples(projectId || null);
@@ -154,8 +154,7 @@ export default function ProjectDetailPage() {
     setAnalysisTriggered(true);
     try {
       await startProjectAnalysis.mutateAsync(projectId);
-    } catch (error) {
-      console.error('Failed to start project analysis:', error);
+    } catch {
       setAnalysisTriggered(false); // Clear on error
     }
   };

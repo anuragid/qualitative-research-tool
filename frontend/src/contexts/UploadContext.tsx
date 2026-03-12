@@ -165,7 +165,6 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // Check if the upload was cancelled
       if (axios.isCancel(error)) {
         const cancelMessage = error.message || 'User cancelled upload';
-        console.log(`Upload cancelled for ${pendingUpload.file.name}: ${cancelMessage}`);
 
         // Check if this was a pause or a cancel
         const isPaused = cancelMessage.includes('paused');
@@ -184,8 +183,6 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           showNotification('info', `Upload cancelled: ${pendingUpload.file.name}`);
         }
       } else {
-        console.error(`Upload failed for ${pendingUpload.file.name}:`, error);
-
         let errorMessage = 'Upload failed';
         let errorType: 'network' | 'timeout' | 'server' | 'validation' | 'unknown' = 'unknown';
 
@@ -498,14 +495,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Simple notification helper (we'll replace with a proper toast library)
-function showNotification(type: 'success' | 'error' | 'info', message: string) {
-  // For now, just log - we'll add a proper toast system next
-  if (type === 'success') {
-    console.log(`✅ ${message}`);
-  } else if (type === 'info') {
-    console.log(`ℹ️ ${message}`);
-  } else {
-    console.error(`❌ ${message}`);
-  }
+// Placeholder for a proper toast/notification system
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function showNotification(_type: 'success' | 'error' | 'info', _message: string) {
+  // TODO: Replace with a proper toast library (e.g., sonner, react-hot-toast)
 }

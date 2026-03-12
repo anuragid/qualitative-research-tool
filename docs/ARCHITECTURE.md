@@ -150,14 +150,14 @@ Nodes are pure functions that take state, do work, return updates.
 ```python
 # backend/app/agents/nodes/chunk.py
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from ..states import VideoAnalysisState
 from ..prompts import CHUNK_SYSTEM_PROMPT
+from ...services.llm_service import get_llm
 import json
 from datetime import datetime
 
-llm = ChatAnthropic(model="claude-sonnet-4-20250514")
+llm = get_llm()  # Returns a LiteLLM-based model configured via OpenRouter
 
 async def chunk_node(state: VideoAnalysisState) -> Dict:
     """

@@ -1,6 +1,6 @@
 """LLM service using OpenRouter API (OpenAI SDK compatible) with retry logic and JSON parsing."""
 
-from openai import AsyncOpenAI, OpenAI, APIError, APIConnectionError, RateLimitError
+from openai import OpenAI, APIError, APIConnectionError, RateLimitError
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -11,7 +11,7 @@ from tenacity import (
 import json
 import logging
 import re
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 from app.config import settings
 
@@ -31,7 +31,7 @@ class LLMService:
     """Service for interacting with LLMs via OpenRouter (OpenAI-compatible API)."""
 
     def __init__(self):
-        """Initialize OpenRouter clients (sync and async)."""
+        """Initialize OpenRouter client (sync, for Celery workers)."""
         self.api_key = settings.OPENROUTER_API_KEY
         self.base_url = settings.OPENROUTER_BASE_URL
         self.default_model = settings.DEFAULT_MODEL
@@ -44,12 +44,6 @@ class LLMService:
             api_key=self.api_key,
         )
 
-        # Async client (for use in async endpoints)
-        self.async_client = AsyncOpenAI(
-            base_url=self.base_url,
-            api_key=self.api_key,
-        )
-
     def _get_client(self, api_key: Optional[str] = None) -> OpenAI:
         """Get a sync client, optionally with a BYOK API key."""
         if api_key and api_key != self.api_key:
@@ -58,15 +52,6 @@ class LLMService:
                 api_key=api_key,
             )
         return self.client
-
-    def _get_async_client(self, api_key: Optional[str] = None) -> AsyncOpenAI:
-        """Get an async client, optionally with a BYOK API key."""
-        if api_key and api_key != self.api_key:
-            return AsyncOpenAI(
-                base_url=self.base_url,
-                api_key=api_key,
-            )
-        return self.async_client
 
     @retry(
         stop=stop_after_attempt(3),
@@ -149,101 +134,6 @@ class LLMService:
             )
 
             # Warn if response was truncated (might mean incomplete JSON)
-            if response.choices[0].finish_reason == "length":
-                logger.warning(
-                    f"LLM response was truncated (finish_reason=length, "
-                    f"max_tokens={max_tokens or self.max_tokens}). "
-                    f"Output may be incomplete/malformed JSON."
-                )
-
-            return content
-
-        except RETRYABLE_EXCEPTIONS as e:
-            logger.error(f"LLM API error (model={chosen_model}): {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected LLM error (model={chosen_model}): {e}")
-            raise
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=5, max=60),
-        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    )
-    async def acall_llm(
-        self,
-        system_prompt: str,
-        user_message: str,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        model: Optional[str] = None,
-        api_key: Optional[str] = None,
-        json_mode: bool = False,
-    ) -> str:
-        """
-        Call LLM via OpenRouter with retry logic (asynchronous).
-
-        Args:
-            system_prompt: System prompt/instructions
-            user_message: User message content
-            max_tokens: Override default max_tokens
-            temperature: Override default temperature
-            model: Override default model
-            api_key: Override default API key (for BYOK)
-            json_mode: If True, request JSON output format
-
-        Returns:
-            Raw response text from LLM
-
-        Raises:
-            APIError: If API call fails after retries
-            ValueError: If response has no content
-        """
-        client = self._get_async_client(api_key)
-        chosen_model = model or self.default_model
-
-        try:
-            kwargs = {
-                "model": chosen_model,
-                "max_tokens": max_tokens or self.max_tokens,
-                "temperature": temperature if temperature is not None else self.temperature,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                "extra_headers": OPENROUTER_HEADERS,
-                "timeout": 600.0,
-            }
-
-            if json_mode:
-                kwargs["response_format"] = {"type": "json_object"}
-
-            response = await client.chat.completions.create(**kwargs)
-
-            # Guard against empty/missing response choices
-            if not response.choices:
-                raise ValueError(
-                    f"LLM returned empty choices (model={chosen_model}). "
-                    f"This may indicate the request was filtered or the model is unavailable."
-                )
-
-            content = response.choices[0].message.content
-            if content is None:
-                refusal = getattr(response.choices[0].message, "refusal", None)
-                if refusal:
-                    raise ValueError(f"LLM refused the request: {refusal}")
-                raise ValueError(
-                    f"LLM returned null content (model={chosen_model}). "
-                    f"Finish reason: {response.choices[0].finish_reason}"
-                )
-
-            logger.info(
-                f"LLM API call successful (model={chosen_model}). "
-                f"Response length: {len(content)}, "
-                f"finish_reason: {response.choices[0].finish_reason}"
-            )
-
             if response.choices[0].finish_reason == "length":
                 logger.warning(
                     f"LLM response was truncated (finish_reason=length, "
@@ -430,119 +320,6 @@ class LLMService:
         )
 
         return self.parse_json_response(response)
-
-    async def acall_with_json_response(
-        self,
-        system_prompt: str,
-        user_message: str,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        model: Optional[str] = None,
-        api_key: Optional[str] = None,
-    ) -> Any:
-        """
-        Call LLM and parse JSON response (asynchronous).
-
-        Args:
-            system_prompt: System prompt (should instruct to return JSON)
-            user_message: User message content
-            max_tokens: Override default max_tokens
-            temperature: Override default temperature
-            model: Override default model
-            api_key: Override default API key (for BYOK)
-
-        Returns:
-            Parsed JSON object
-
-        Raises:
-            ValueError: If response is not valid JSON
-            APIError: If API call fails
-        """
-        response = await self.acall_llm(
-            system_prompt=system_prompt,
-            user_message=user_message,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            model=model,
-            api_key=api_key,
-            json_mode=True,
-        )
-
-        return self.parse_json_response(response)
-
-    def validate_json_structure(
-        self,
-        data: Any,
-        required_fields: List[str],
-    ) -> bool:
-        """
-        Validate that parsed JSON has required structure.
-
-        Checks ALL items in an array (not just the first) and returns
-        True only if every item has the required fields.
-
-        Args:
-            data: Parsed JSON data
-            required_fields: List of required field names
-
-        Returns:
-            True if valid, False otherwise
-        """
-        if isinstance(data, list):
-            if not data:
-                return False
-            return all(
-                isinstance(item, dict) and all(field in item for field in required_fields)
-                for item in data
-            )
-        elif isinstance(data, dict):
-            return all(field in data for field in required_fields)
-
-        return False
-
-    async def astream_llm(
-        self,
-        system_prompt: str,
-        user_message: str,
-        max_tokens: Optional[int] = None,
-        model: Optional[str] = None,
-        api_key: Optional[str] = None,
-    ):
-        """
-        Stream response from LLM via OpenRouter.
-
-        Args:
-            system_prompt: System prompt
-            user_message: User message
-            max_tokens: Override default max_tokens
-            model: Override default model
-            api_key: Override default API key (for BYOK)
-
-        Yields:
-            Text chunks as they arrive
-        """
-        client = self._get_async_client(api_key)
-        chosen_model = model or self.default_model
-
-        try:
-            stream = await client.chat.completions.create(
-                model=chosen_model,
-                max_tokens=max_tokens or self.max_tokens,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                extra_headers=OPENROUTER_HEADERS,
-                stream=True,
-            )
-
-            async for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-
-        except RETRYABLE_EXCEPTIONS as e:
-            logger.error(f"LLM streaming error (model={chosen_model}): {e}")
-            raise
 
 
 # Global service instance

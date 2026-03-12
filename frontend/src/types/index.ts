@@ -55,11 +55,6 @@ export type VideoStatus =
   | "analyzed"
   | "error";
 
-export interface UploadVideoResponse {
-  video: Video;
-  upload_url: string;
-}
-
 // Transcript types
 export interface Transcript {
   id: string;
@@ -231,31 +226,6 @@ export interface SystemPrinciple {
   scope: "universal" | "segmented";
   priority: "critical" | "high" | "medium";
 }
-
-// Task types
-export interface AnalysisTask {
-  id: string;
-  video_id: string | null;
-  project_id: string | null;
-  task_type: TaskType;
-  status: "pending" | "running" | "completed" | "failed";
-  progress: number;
-  celery_task_id: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  error_message: string | null;
-}
-
-export type TaskType =
-  | "transcription"
-  | "chunk"
-  | "infer"
-  | "relate"
-  | "explain"
-  | "activate"
-  | "cross_relate"
-  | "cross_explain"
-  | "cross_activate";
 
 // Video-Transcript Sync types
 export interface Word {

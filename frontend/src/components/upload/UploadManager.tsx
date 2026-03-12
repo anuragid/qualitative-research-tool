@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useUploadContext } from '../../contexts/UploadContext';
 import {
-  Upload,
   Trash2,
   ChevronDown,
   ChevronUp,
-  CheckCircle,
   AlertCircle,
   Loader2,
   RotateCw,
@@ -16,7 +14,6 @@ import {
   PauseCircle,
   XCircle,
   AlertTriangle,
-  Wifi,
   WifiOff,
   Server,
   FileX,
@@ -26,6 +23,7 @@ import {
   CircleDot
 } from 'lucide-react';
 import { Progress } from '../ui/Progress';
+import { formatFileSize } from '../../lib/utils';
 
 export function UploadManager() {
   const {
@@ -58,14 +56,6 @@ export function UploadManager() {
   const pausedCount = uploads.filter(u => u.status === 'paused').length;
   const cancelledCount = uploads.filter(u => u.status === 'cancelled').length;
   const activeCount = uploadingCount + processingCount;
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
-  };
 
   const formatSpeed = (bytesPerSecond: number): string => {
     if (bytesPerSecond === 0) return "0 MB/s";

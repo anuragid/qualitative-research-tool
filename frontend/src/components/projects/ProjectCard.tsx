@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { formatDate } from "../../lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/Card";
 import { Badge } from "../ui/Badge";
@@ -88,11 +88,6 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         id: project.id,
         data: { status: "archived" },
       },
-      {
-        onError: (error) => {
-          console.error("Error archiving project:", error);
-        },
-      }
     );
   };
 
@@ -105,11 +100,6 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         id: project.id,
         data: { status: newStatus },
       },
-      {
-        onError: (error) => {
-          console.error("Error unarchiving project:", error);
-        },
-      }
     );
   };
 

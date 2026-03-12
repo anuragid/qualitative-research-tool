@@ -52,12 +52,6 @@ export const videosService = {
     await api.delete(`/api/videos/${id}/`);
   },
 
-  // Download video (returns pre-signed URL)
-  getDownloadUrl: async (id: string): Promise<string> => {
-    const response = await api.get(`/api/videos/${id}/download/`);
-    return response.data.download_url;
-  },
-
   // Get playback URL (returns pre-signed URL for streaming)
   getPlaybackUrl: async (id: string): Promise<string> => {
     const response = await api.get(`/api/videos/${id}/playback-url`);

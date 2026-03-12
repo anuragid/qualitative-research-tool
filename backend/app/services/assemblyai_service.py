@@ -1,7 +1,7 @@
 """AssemblyAI service for transcription with speaker diarization."""
 
 import assemblyai as aai
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import logging
 import time
 
@@ -163,29 +163,6 @@ class AssemblyAIService:
 
             time.sleep(poll_interval)
 
-    def delete_transcript(self, transcript_id: str) -> bool:
-        """
-        Delete transcript from AssemblyAI (optional cleanup).
-
-        Args:
-            transcript_id: AssemblyAI transcript ID
-
-        Returns:
-            True if successful
-
-        Raises:
-            Exception: If deletion fails
-        """
-        try:
-            transcript = aai.Transcript.get_by_id(transcript_id)
-            transcript.delete()
-            logger.info(f"Deleted transcript: {transcript_id}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error deleting transcript: {e}")
-            raise Exception(f"Failed to delete transcript: {str(e)}")
-
     @staticmethod
     def _process_words(words) -> list:
         """Process word-level timestamps."""
@@ -229,14 +206,6 @@ class AssemblyAIService:
 
         return processed
 
-    @staticmethod
-    def _format_timestamp(milliseconds: int) -> str:
-        """Format milliseconds as HH:MM:SS."""
-        seconds = milliseconds / 1000
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
 # Global service instance

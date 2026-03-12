@@ -1,6 +1,6 @@
 """SQLAlchemy database models."""
 
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, ARRAY, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, ARRAY
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func

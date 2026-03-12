@@ -8,7 +8,7 @@ R2 does not support ACLs or bucket policies via the S3 API.
 import boto3
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 import logging
 from pathlib import Path
 import uuid
@@ -120,70 +120,6 @@ class S3Service:
             logger.error(f"Error generating presigned URL: {e}")
             raise Exception(f"Failed to generate presigned URL: {str(e)}")
 
-    def generate_presigned_upload_url(
-        self,
-        s3_key: str,
-        content_type: str = "video/mp4",
-        expiration: int = 3600
-    ) -> str:
-        """
-        Generate a presigned URL for uploading a video (PUT).
-
-        Args:
-            s3_key: S3 object key
-            content_type: MIME type of the file
-            expiration: URL expiration time in seconds (default 1 hour)
-
-        Returns:
-            Presigned URL string for PUT upload
-
-        Raises:
-            Exception: If URL generation fails
-        """
-        try:
-            url = self.s3_client.generate_presigned_url(
-                "put_object",
-                Params={
-                    "Bucket": self.bucket_name,
-                    "Key": s3_key,
-                    "ContentType": content_type,
-                },
-                ExpiresIn=expiration
-            )
-            logger.info(f"Generated presigned upload URL for: {s3_key}")
-            return url
-
-        except ClientError as e:
-            logger.error(f"Error generating presigned upload URL: {e}")
-            raise Exception(f"Failed to generate presigned upload URL: {str(e)}")
-
-    def download_video(self, s3_key: str, local_path: str) -> str:
-        """
-        Download video from R2 to local file.
-
-        Args:
-            s3_key: S3 object key
-            local_path: Local file path to save to
-
-        Returns:
-            Local file path
-
-        Raises:
-            Exception: If download fails
-        """
-        try:
-            self.s3_client.download_file(
-                self.bucket_name,
-                s3_key,
-                local_path
-            )
-            logger.info(f"Downloaded video from R2: {s3_key} -> {local_path}")
-            return local_path
-
-        except ClientError as e:
-            logger.error(f"Error downloading from R2: {e}")
-            raise Exception(f"Failed to download video from R2: {str(e)}")
-
     def delete_video(self, s3_key: str) -> bool:
         """
         Delete video from R2.
@@ -208,25 +144,6 @@ class S3Service:
         except ClientError as e:
             logger.error(f"Error deleting from R2: {e}")
             raise Exception(f"Failed to delete video from R2: {str(e)}")
-
-    def check_video_exists(self, s3_key: str) -> bool:
-        """
-        Check if video exists in R2.
-
-        Args:
-            s3_key: S3 object key
-
-        Returns:
-            True if exists, False otherwise
-        """
-        try:
-            self.s3_client.head_object(
-                Bucket=self.bucket_name,
-                Key=s3_key
-            )
-            return True
-        except ClientError:
-            return False
 
     @staticmethod
     def _get_content_type(file_extension: str) -> str:

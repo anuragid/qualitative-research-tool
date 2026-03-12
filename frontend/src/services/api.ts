@@ -27,8 +27,8 @@ api.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (error) {
-      console.log("No auth token available");
+    } catch {
+      // Auth token unavailable -- proceed without auth
     }
     return config;
   },
@@ -50,8 +50,7 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
 
       if (status === 401) {
-        // Handle unauthorized
-        console.error("Unauthorized access");
+        // Unauthorized -- token may be expired
       } else if (status === 404) {
         // Don't log 404s for analysis endpoints - these are expected when no analysis exists
         const isAnalysisEndpoint = url.includes('/analysis') ||
@@ -60,7 +59,7 @@ api.interceptors.response.use(
                                    url.includes('/cross-insights') ||
                                    url.includes('/system-principles');
         if (!isAnalysisEndpoint) {
-          console.error("Resource not found");
+          // 404 for non-analysis endpoints
         }
         // Silently handle 404s for analysis endpoints
         if (isAnalysisEndpoint) {
@@ -72,7 +71,7 @@ api.interceptors.response.use(
           });
         }
       } else if (status === 500) {
-        console.error("Server error");
+        // Server error
       }
 
       // Return error with more context

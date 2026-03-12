@@ -17,8 +17,8 @@ export function useUserSync() {
         try {
           await api.post("/api/users/sync");
           syncedUserIdRef.current = user.id;
-        } catch (error) {
-          console.error("Failed to sync user:", error);
+        } catch {
+          // User sync failed -- will retry on next render cycle
         }
       }
     };

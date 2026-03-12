@@ -1,7 +1,7 @@
 """Pydantic schemas for request/response validation."""
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, List, Dict, Any, Literal
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -196,11 +196,6 @@ class VideoAnalysisResponse(BaseModel):
 
 # ========== Project Analysis Schemas ==========
 
-class ProjectAnalysisCreate(BaseModel):
-    """Schema for creating project analysis."""
-    video_ids: List[UUID]
-
-
 class ProjectAnalysisResponse(BaseModel):
     """Schema for project analysis response."""
     model_config = ConfigDict(from_attributes=True)
@@ -215,25 +210,6 @@ class ProjectAnalysisResponse(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-
-# ========== Task Status Schemas ==========
-
-class TaskStatus(BaseModel):
-    """Schema for task status."""
-    task_id: str
-    status: str  # pending, processing, completed, error
-    progress: Optional[int] = None  # 0-100
-    message: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
-
-
-# ========== Error Response Schema ==========
-
-class ErrorResponse(BaseModel):
-    """Schema for error responses."""
-    error: str
-    detail: Optional[str] = None
-    status_code: int
 
 
 # Rebuild models to resolve forward references

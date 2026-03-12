@@ -1,13 +1,13 @@
-# Environment variables
+# Code review reports (internal audit artifacts)
+code-review-reports/
+
+# Environment variables (specific paths for clarity; catch-all below covers the rest)
 .env
 .env.local
 .env.*.local
 .env.production
 backend/.env
 backend/.env.production
-backend/.env.docker-local
-backend/.env.docker-local.backup
-backend/.env.aws-production
 frontend/.env
 frontend/.env.production
 frontend/.env.development
@@ -104,17 +104,10 @@ backend/*.txt
 *.mov
 *.avi
 
-# Docker environment files with secrets
-backend/.env.docker-local
-backend/.env.docker-local.backup
-backend/.env.aws-production
-
 # Catch-all for any new env files
 **/.env*
 !**/.env.example
 !**/.env*.example
-backend/.env.cognito
-frontend/.env.production.local
 
 # Wrangler (Cloudflare local dev state)
 .wrangler/

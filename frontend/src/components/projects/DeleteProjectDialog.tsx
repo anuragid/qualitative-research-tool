@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDeleteProject } from '../../hooks/useProjects';
 import {
@@ -39,9 +38,8 @@ export function DeleteProjectDialog({
           navigate('/projects');
         }
       },
-      onError: (error) => {
-        console.error('Error deleting project:', error);
-        // Optionally show an error message to the user
+      onError: () => {
+        // Error is handled by the mutation's error state
       },
     });
   };

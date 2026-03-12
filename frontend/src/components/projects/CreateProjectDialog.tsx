@@ -36,8 +36,8 @@ export default function CreateProjectDialog() {
       setName("");
       setDescription("");
       setOpen(false);
-    } catch (error) {
-      console.error("Failed to create project:", error);
+    } catch {
+      // Error is handled by the mutation's error state
     }
   };
 

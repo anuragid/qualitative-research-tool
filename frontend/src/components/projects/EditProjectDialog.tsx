@@ -61,8 +61,8 @@ export function EditProjectDialog({
         onSuccess: () => {
           onOpenChange(false);
         },
-        onError: (error) => {
-          console.error('Error updating project:', error);
+        onError: () => {
+          // Error is handled by the mutation's error state
         },
       }
     );

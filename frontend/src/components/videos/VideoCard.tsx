@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { formatFileSize, formatDuration, formatDate } from "../../lib/utils";
 import {
   FileVideo,
   Clock,
@@ -84,38 +85,12 @@ export default function VideoCard({ video }: VideoCardProps) {
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-  };
-
-  const formatDuration = (seconds: number | null): string => {
-    if (!seconds) return "Unknown";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  };
-
   const handleDelete = async () => {
     try {
       await deleteVideo.mutateAsync(video.id);
       setShowDeleteDialog(false);
-    } catch (error) {
-      console.error("Failed to delete video:", error);
+    } catch {
+      // Error is handled by the mutation's error state
     }
   };
 
@@ -156,7 +131,7 @@ export default function VideoCard({ video }: VideoCardProps) {
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
-              <span>{formatDuration(video.duration_seconds)}</span>
+              <span>{video.duration_seconds ? formatDuration(video.duration_seconds) : "Unknown"}</span>
             </div>
             <div>{formatFileSize(video.file_size_bytes)}</div>
           </div>

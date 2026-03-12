@@ -4,7 +4,6 @@ import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
 import { useTranscript, useSpeakerLabels, useStartTranscription, useLabelSpeaker } from "../hooks/useTranscriptions";
 import {
   useVideoAnalysis,
-  useStartVideoAnalysis,
   useStartFullAnalysis,
   useStartChunkStep,
   useStartInferStep,
@@ -14,7 +13,7 @@ import {
 } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
 import { TranscriptViewer } from "../components/videos/TranscriptViewer";
-import { VideoTranscriptSync } from "../components/video/VideoTranscriptSync";
+import { formatFileSize } from "../lib/utils";
 import { ChunksList } from "../components/analysis/ChunksList";
 import { InferencesList } from "../components/analysis/InferencesList";
 import { PatternsList } from "../components/analysis/PatternsList";
@@ -59,13 +58,12 @@ import {
 export default function VideoDetailPage() {
   const { videoId } = useParams<{ videoId: string }>();
   const { data: video, isLoading: videoLoading } = useVideo(videoId || null);
-  const { data: playbackUrl, isLoading: playbackUrlLoading } = useVideoPlaybackUrl(videoId || null);
+  const { data: playbackUrl } = useVideoPlaybackUrl(videoId || null);
   const { data: transcript, isLoading: transcriptLoading } = useTranscript(videoId || null);
   const { data: speakerLabels } = useSpeakerLabels(transcript?.id || null);
   const { data: analysis, isLoading: analysisLoading } = useVideoAnalysis(videoId || null);
 
   const startTranscription = useStartTranscription();
-  const startAnalysis = useStartVideoAnalysis();
   const startFullAnalysis = useStartFullAnalysis();
   const labelSpeaker = useLabelSpeaker();
 
@@ -87,12 +85,6 @@ export default function VideoDetailPage() {
   const handleStartTranscription = () => {
     if (videoId) {
       startTranscription.mutate(videoId);
-    }
-  };
-
-  const handleStartAnalysis = () => {
-    if (videoId) {
-      startAnalysis.mutate(videoId);
     }
   };
 
@@ -146,21 +138,13 @@ export default function VideoDetailPage() {
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
-  };
-
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       uploaded: { variant: "secondary" as const, label: "Uploaded", icon: CheckCircle },
       transcribing: { variant: "warning" as const, label: "Transcribing...", icon: Loader2 },
       transcribed: { variant: "success" as const, label: "Transcribed", icon: CheckCircle },
       analyzing: { variant: "warning" as const, label: "Analyzing...", icon: Loader2 },
-      completed: { variant: "success" as const, label: "Completed", icon: CheckCircle },
+      analyzed: { variant: "success" as const, label: "Analyzed", icon: CheckCircle },
       error: { variant: "destructive" as const, label: "Error", icon: AlertCircle },
     };
 

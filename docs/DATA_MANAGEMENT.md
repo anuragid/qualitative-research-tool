@@ -51,7 +51,7 @@ ls -la ./backups/
 
 ### Video Files
 - **Local Path**: `/tmp/qualitative-research-videos/`
-- **S3 Bucket**: (if configured in production)
+- **Production**: Cloudflare R2 bucket (S3-compatible)
 - **Contains**: Actual video files
 
 ## 🔍 Check Data Status
@@ -96,7 +96,7 @@ If you accidentally deleted data:
    ./scripts/restore-db.sh [latest_backup]
    ```
 
-4. **Check S3/cloud storage** for video files (if configured)
+4. **Check Cloudflare R2** for video files (production storage)
 
 ## 📋 Best Practices
 
