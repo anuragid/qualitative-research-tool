@@ -1,5 +1,6 @@
 [build]
 dockerfilePath = "backend/Dockerfile.railway"
+dockerContext = "backend"
 
 [deploy]
 healthcheckPath = "/health"
