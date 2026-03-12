@@ -116,3 +116,9 @@ backend/.env.aws-production
 backend/.env.cognito
 frontend/.env.production.local
 .env.production.template
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
