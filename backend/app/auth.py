@@ -1,4 +1,4 @@
-"""Production-ready Clerk authentication with RBAC for FastAPI."""
+"""Clerk authentication with RBAC for FastAPI."""
 
 from typing import Optional, Dict, Any, List
 from enum import Enum
@@ -6,7 +6,7 @@ from fastapi import HTTPException, Security, status, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 import httpx
-from functools import lru_cache, wraps
+from functools import lru_cache
 import json
 import logging
 import base64
@@ -399,3 +399,18 @@ def has_permission(user: Dict[str, Any], permission: Permission) -> bool:
             pass
     """
     return permission.value in user.get("permissions", [])
+
+
+def has_role(user: Dict[str, Any], role: UserRole) -> bool:
+    """
+    Check if a user has a specific role.
+
+    Args:
+        user: User dictionary from get_current_user
+        role: The role to check
+
+    Returns:
+        True if user has the role or is admin, False otherwise
+    """
+    user_role = user.get("role", UserRole.USER.value)
+    return user_role == role.value or user_role == UserRole.ADMIN.value

@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.agents.states import ProjectAnalysisState
 from app.agents.prompts import CROSS_ACTIVATE_SYSTEM_PROMPT
-from app.services.claude_service import claude_service
+from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +47,8 @@ CROSS-VIDEO INSIGHTS:
 
 Create design principles that provide strategic direction for the entire system."""
 
-        # Call Claude with retry logic
-        system_principles = claude_service.call_with_json_response(
+        # Call LLM with retry logic
+        system_principles = llm_service.call_with_json_response(
             system_prompt=CROSS_ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
@@ -56,7 +56,7 @@ Create design principles that provide strategic direction for the entire system.
 
         # Validate response
         if not isinstance(system_principles, list):
-            raise ValueError("Expected list of system principles from Claude")
+            raise ValueError("Expected list of system principles from LLM")
 
         logger.info(f"[CROSS_ACTIVATE] Generated {len(system_principles)} system-level design principles")
         logger.info(f"[CROSS_ACTIVATE] Project {state['project_id']} cross-video analysis complete!")

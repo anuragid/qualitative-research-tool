@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.agents.states import VideoAnalysisState
 from app.agents.prompts import ACTIVATE_SYSTEM_PROMPT
-from app.services.claude_service import claude_service
+from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ INSIGHTS:
 
 For each insight, create one or more design principles that provide strategic direction."""
 
-        # Call Claude with retry logic
-        design_principles = claude_service.call_with_json_response(
+        # Call LLM with retry logic
+        design_principles = llm_service.call_with_json_response(
             system_prompt=ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
@@ -55,7 +55,7 @@ For each insight, create one or more design principles that provide strategic di
 
         # Validate response
         if not isinstance(design_principles, list):
-            raise ValueError("Expected list of design principles from Claude")
+            raise ValueError("Expected list of design principles from LLM")
 
         logger.info(f"[ACTIVATE] Generated {len(design_principles)} design principles")
         logger.info(f"[ACTIVATE] Video {state['video_id']} analysis complete!")

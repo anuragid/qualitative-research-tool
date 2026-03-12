@@ -34,33 +34,28 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str
 
-    # AWS
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
-    AWS_REGION: str = "us-east-1"
-    AWS_BUCKET_NAME: str
+    # Cloudflare R2 Storage (S3-compatible)
+    R2_ACCESS_KEY_ID: str
+    R2_SECRET_ACCESS_KEY: str
+    R2_ENDPOINT_URL: str  # e.g. https://<account_id>.r2.cloudflarestorage.com
+    R2_BUCKET_NAME: str
 
-    # AI APIs
-    ANTHROPIC_API_KEY: str
+    # AI APIs - OpenRouter (OpenAI-compatible)
+    OPENROUTER_API_KEY: str
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    DEFAULT_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
     ASSEMBLYAI_API_KEY: str
 
-    # Authentication (Clerk) - Deprecated, will be removed after migration
+    # Authentication (Clerk)
     CLERK_SECRET_KEY: str = ""
     CLERK_PUBLISHABLE_KEY: str = ""
-    CLERK_JWT_KEY: str = ""  # Public key for JWT verification
 
-    # Authentication (AWS Cognito)
-    COGNITO_USER_POOL_ID: str = ""
-    COGNITO_APP_CLIENT_ID: str = ""
-    COGNITO_REGION: str = "us-east-1"
+    # Encryption for BYOK API keys (required in production)
+    ENCRYPTION_KEY: str = ""
 
-    # Feature flag to switch between auth providers
-    USE_COGNITO_AUTH: bool = False  # Set to True to use Cognito instead of Clerk
-
-    # Claude Settings
-    CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
-    CLAUDE_MAX_TOKENS: int = 4096
-    CLAUDE_TEMPERATURE: float = 0.7
+    # LLM Settings
+    LLM_MAX_TOKENS: int = 4096
+    LLM_TEMPERATURE: float = 0.7
 
     # File Upload Settings
     MAX_FILE_SIZE_MB: int = 500

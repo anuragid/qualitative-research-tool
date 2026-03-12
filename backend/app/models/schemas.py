@@ -17,9 +17,24 @@ class UserResponse(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     username: Optional[str] = None
+    preferred_model: Optional[str] = None
+    has_api_key: bool = False  # Computed from User.has_api_key property
     created_at: datetime
     updated_at: datetime
     last_seen: Optional[datetime] = None
+
+
+class UserSettingsUpdate(BaseModel):
+    """Schema for updating user LLM settings."""
+    preferred_model: Optional[str] = None
+    api_key: Optional[str] = None  # Raw key, will be encrypted before storage
+
+
+class UserSettingsResponse(BaseModel):
+    """Schema for user settings response."""
+    preferred_model: Optional[str] = None
+    has_api_key: bool = False
+    available_models: List[Dict[str, str]] = []
 
 
 # ========== Project Schemas ==========

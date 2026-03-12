@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.agents.states import VideoAnalysisState
 from app.agents.prompts import RELATE_SYSTEM_PROMPT
-from app.services.claude_service import claude_service
+from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ INFERENCES:
 
 Group related inferences into patterns and explain what each pattern represents."""
 
-        # Call Claude with retry logic
-        patterns = claude_service.call_with_json_response(
+        # Call LLM with retry logic
+        patterns = llm_service.call_with_json_response(
             system_prompt=RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for many inferences
@@ -55,7 +55,7 @@ Group related inferences into patterns and explain what each pattern represents.
 
         # Validate response
         if not isinstance(patterns, list):
-            raise ValueError("Expected list of patterns from Claude")
+            raise ValueError("Expected list of patterns from LLM")
 
         logger.info(f"[RELATE] Identified {len(patterns)} patterns")
 

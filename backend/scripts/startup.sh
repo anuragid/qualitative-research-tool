@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Unified startup script for both local and AWS environments
+# Unified startup script for both local and Railway environments
 set -e
 
 echo "🚀 Starting Qualitative Research Tool..."
@@ -14,12 +14,12 @@ else
     IS_DOCKER=false
 fi
 
-if [ ! -z "$ECS_CONTAINER_METADATA_URI" ]; then
-    echo "☁️  Running in AWS ECS"
-    IS_ECS=true
+if [ ! -z "$RAILWAY_ENVIRONMENT" ]; then
+    echo "🚂 Running on Railway ($RAILWAY_ENVIRONMENT)"
+    IS_PRODUCTION=true
 else
     echo "🏠 Running locally"
-    IS_ECS=false
+    IS_PRODUCTION=false
 fi
 
 # Wait for database to be ready
@@ -61,17 +61,18 @@ fi
 echo "🔄 Running database migrations..."
 alembic upgrade head
 
-# Start the application based on the command passed
-if [ "$1" = "worker" ]; then
+# Start the application based on SERVICE_TYPE env var or command argument
+SERVICE="${SERVICE_TYPE:-$1}"
+if [ "$SERVICE" = "worker" ]; then
     echo "🔨 Starting Celery worker..."
     exec celery -A app.tasks.celery_app worker --loglevel=info
 else
     echo "🌐 Starting API server..."
-    if [ "$IS_ECS" = true ]; then
-        # Production: no reload
-        exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    if [ "$IS_PRODUCTION" = true ]; then
+        # Production: no reload, use PORT env var (Railway sets this)
+        exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
     else
         # Development: with reload
-        exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
     fi
 fi

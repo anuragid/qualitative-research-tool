@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.agents.states import VideoAnalysisState
 from app.agents.prompts import EXPLAIN_SYSTEM_PROMPT
-from app.services.claude_service import claude_service
+from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,8 @@ ORIGINAL CHUNKS (for evidence):
 
 Generate non-consensus insights that challenge assumptions and reveal fundamental truths. Write each insight as a short, punchy headline."""
 
-        # Call Claude with retry logic
-        insights = claude_service.call_with_json_response(
+        # Call LLM with retry logic
+        insights = llm_service.call_with_json_response(
             system_prompt=EXPLAIN_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for many patterns
@@ -63,7 +63,7 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
 
         # Validate response
         if not isinstance(insights, list):
-            raise ValueError("Expected list of insights from Claude")
+            raise ValueError("Expected list of insights from LLM")
 
         logger.info(f"[EXPLAIN] Generated {len(insights)} insights")
 

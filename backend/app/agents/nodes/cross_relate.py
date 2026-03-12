@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.agents.states import ProjectAnalysisState
 from app.agents.prompts import CROSS_RELATE_SYSTEM_PROMPT
-from app.services.claude_service import claude_service
+from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +47,8 @@ VIDEO PATTERNS:
 
 Find patterns that transcend individual videos and reveal system-level themes."""
 
-        # Call Claude with retry logic
-        cross_patterns = claude_service.call_with_json_response(
+        # Call LLM with retry logic
+        cross_patterns = llm_service.call_with_json_response(
             system_prompt=CROSS_RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
@@ -56,7 +56,7 @@ Find patterns that transcend individual videos and reveal system-level themes.""
 
         # Validate response
         if not isinstance(cross_patterns, list):
-            raise ValueError("Expected list of meta-patterns from Claude")
+            raise ValueError("Expected list of meta-patterns from LLM")
 
         logger.info(f"[CROSS_RELATE] Identified {len(cross_patterns)} meta-patterns across videos")
 

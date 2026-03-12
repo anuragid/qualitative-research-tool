@@ -1,6 +1,12 @@
-"""AWS S3 service for video upload and management."""
+"""Cloudflare R2 storage service for video upload and management.
+
+R2 is S3-compatible, so we use boto3 with a custom endpoint URL.
+R2 encrypts all data at rest by default (no SSE-KMS needed).
+R2 does not support ACLs or bucket policies via the S3 API.
+"""
 
 import boto3
+from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 from typing import BinaryIO, Optional
 import logging
@@ -13,17 +19,22 @@ logger = logging.getLogger(__name__)
 
 
 class S3Service:
-    """Service for interacting with AWS S3."""
+    """Service for interacting with Cloudflare R2 (S3-compatible)."""
 
     def __init__(self):
-        """Initialize S3 client."""
+        """Initialize R2-compatible S3 client."""
         self.s3_client = boto3.client(
             "s3",
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region_name=settings.AWS_REGION,
+            endpoint_url=settings.R2_ENDPOINT_URL,
+            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+            region_name="auto",
+            config=BotoConfig(
+                signature_version="s3v4",
+                retries={"max_attempts": 3, "mode": "standard"},
+            ),
         )
-        self.bucket_name = settings.AWS_BUCKET_NAME
+        self.bucket_name = settings.R2_BUCKET_NAME
 
     def upload_video(
         self,
@@ -32,7 +43,7 @@ class S3Service:
         project_id: str,
     ) -> tuple[str, str]:
         """
-        Upload video file to S3.
+        Upload video file to R2.
 
         Args:
             file: File object to upload
@@ -51,7 +62,7 @@ class S3Service:
             unique_filename = f"{uuid.uuid4()}{file_extension}"
             s3_key = f"projects/{project_id}/videos/{unique_filename}"
 
-            # Upload file
+            # Upload file (no ACL or SSE params -- R2 doesn't support them)
             self.s3_client.upload_fileobj(
                 file,
                 self.bucket_name,
@@ -65,15 +76,15 @@ class S3Service:
                 }
             )
 
-            # Generate URL
-            s3_url = f"https://{self.bucket_name}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
+            # Generate a reference URL (not directly accessible; use presigned URLs)
+            s3_url = f"{settings.R2_ENDPOINT_URL}/{self.bucket_name}/{s3_key}"
 
-            logger.info(f"Uploaded video to S3: {s3_key}")
+            logger.info(f"Uploaded video to R2: {s3_key}")
             return s3_key, s3_url
 
         except ClientError as e:
-            logger.error(f"Error uploading to S3: {e}")
-            raise Exception(f"Failed to upload video to S3: {str(e)}")
+            logger.error(f"Error uploading to R2: {e}")
+            raise Exception(f"Failed to upload video to R2: {str(e)}")
 
     def get_presigned_url(
         self,
@@ -109,9 +120,46 @@ class S3Service:
             logger.error(f"Error generating presigned URL: {e}")
             raise Exception(f"Failed to generate presigned URL: {str(e)}")
 
+    def generate_presigned_upload_url(
+        self,
+        s3_key: str,
+        content_type: str = "video/mp4",
+        expiration: int = 3600
+    ) -> str:
+        """
+        Generate a presigned URL for uploading a video (PUT).
+
+        Args:
+            s3_key: S3 object key
+            content_type: MIME type of the file
+            expiration: URL expiration time in seconds (default 1 hour)
+
+        Returns:
+            Presigned URL string for PUT upload
+
+        Raises:
+            Exception: If URL generation fails
+        """
+        try:
+            url = self.s3_client.generate_presigned_url(
+                "put_object",
+                Params={
+                    "Bucket": self.bucket_name,
+                    "Key": s3_key,
+                    "ContentType": content_type,
+                },
+                ExpiresIn=expiration
+            )
+            logger.info(f"Generated presigned upload URL for: {s3_key}")
+            return url
+
+        except ClientError as e:
+            logger.error(f"Error generating presigned upload URL: {e}")
+            raise Exception(f"Failed to generate presigned upload URL: {str(e)}")
+
     def download_video(self, s3_key: str, local_path: str) -> str:
         """
-        Download video from S3 to local file.
+        Download video from R2 to local file.
 
         Args:
             s3_key: S3 object key
@@ -129,16 +177,16 @@ class S3Service:
                 s3_key,
                 local_path
             )
-            logger.info(f"Downloaded video from S3: {s3_key} -> {local_path}")
+            logger.info(f"Downloaded video from R2: {s3_key} -> {local_path}")
             return local_path
 
         except ClientError as e:
-            logger.error(f"Error downloading from S3: {e}")
-            raise Exception(f"Failed to download video from S3: {str(e)}")
+            logger.error(f"Error downloading from R2: {e}")
+            raise Exception(f"Failed to download video from R2: {str(e)}")
 
     def delete_video(self, s3_key: str) -> bool:
         """
-        Delete video from S3.
+        Delete video from R2.
 
         Args:
             s3_key: S3 object key
@@ -154,16 +202,16 @@ class S3Service:
                 Bucket=self.bucket_name,
                 Key=s3_key
             )
-            logger.info(f"Deleted video from S3: {s3_key}")
+            logger.info(f"Deleted video from R2: {s3_key}")
             return True
 
         except ClientError as e:
-            logger.error(f"Error deleting from S3: {e}")
-            raise Exception(f"Failed to delete video from S3: {str(e)}")
+            logger.error(f"Error deleting from R2: {e}")
+            raise Exception(f"Failed to delete video from R2: {str(e)}")
 
     def check_video_exists(self, s3_key: str) -> bool:
         """
-        Check if video exists in S3.
+        Check if video exists in R2.
 
         Args:
             s3_key: S3 object key

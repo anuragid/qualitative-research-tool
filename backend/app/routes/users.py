@@ -8,7 +8,8 @@ from datetime import datetime
 from app.database import get_db
 from app.models import database_models
 from app.auth_bridge import get_current_user, get_current_user_id
-from app.models.schemas import UserResponse
+from app.models.schemas import UserResponse, UserSettingsUpdate, UserSettingsResponse
+from app.services.encryption_service import encryption_service
 
 router = APIRouter()
 
@@ -104,3 +105,81 @@ async def sync_user(
             "username": db_user.username
         }
     }
+
+
+@router.get("/settings", response_model=UserSettingsResponse)
+async def get_user_settings(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get the current user's LLM settings."""
+    user_id = current_user["id"]
+    db_user = db.query(database_models.User).filter(
+        database_models.User.id == user_id
+    ).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return UserSettingsResponse(
+        preferred_model=db_user.preferred_model,
+        has_api_key=bool(db_user.encrypted_api_key),
+        available_models=[
+            {"id": "meta-llama/llama-3.3-70b-instruct:free", "name": "Llama 3.3 70B (Free)", "tier": "free"},
+            {"id": "google/gemma-3-27b-it:free", "name": "Gemma 3 27B (Free)", "tier": "free"},
+            {"id": "mistralai/mistral-small-3.1-24b-instruct:free", "name": "Mistral Small 3.1 (Free)", "tier": "free"},
+            {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "tier": "premium"},
+            {"id": "openai/gpt-4o", "name": "GPT-4o", "tier": "premium"},
+            {"id": "google/gemini-2.5-pro-preview", "name": "Gemini 2.5 Pro", "tier": "premium"},
+        ]
+    )
+
+
+@router.put("/settings", response_model=UserSettingsResponse)
+async def update_user_settings(
+    settings: UserSettingsUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the current user's LLM settings (model preference and/or API key)."""
+    user_id = current_user["id"]
+    db_user = db.query(database_models.User).filter(
+        database_models.User.id == user_id
+    ).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if settings.preferred_model is not None:
+        db_user.preferred_model = settings.preferred_model
+
+    if settings.api_key is not None:
+        db_user.encrypted_api_key = encryption_service.encrypt(settings.api_key)
+
+    db.commit()
+
+    return UserSettingsResponse(
+        preferred_model=db_user.preferred_model,
+        has_api_key=bool(db_user.encrypted_api_key),
+    )
+
+
+@router.delete("/settings/api-key")
+async def delete_api_key(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove the user's stored API key."""
+    user_id = current_user["id"]
+    db_user = db.query(database_models.User).filter(
+        database_models.User.id == user_id
+    ).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.encrypted_api_key = None
+    db_user.preferred_model = None
+    db.commit()
+
+    return {"message": "API key removed"}

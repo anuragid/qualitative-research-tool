@@ -1,10 +1,5 @@
-version: '3.8'
-
-# This Docker Compose setup mirrors AWS architecture exactly
-# Everything runs in containers just like in production
-
 services:
-  # PostgreSQL - Mimics AWS RDS
+  # PostgreSQL - local dev (mirrors Railway Postgres)
   postgres:
     image: postgres:15-alpine
     container_name: qualitative-research-db
@@ -24,7 +19,7 @@ services:
     networks:
       - qualitative-network
 
-  # Redis - Mimics AWS ElastiCache
+  # Redis - local dev (mirrors Railway Redis)
   redis:
     image: redis:7-alpine
     container_name: qualitative-research-redis
@@ -40,13 +35,11 @@ services:
     networks:
       - qualitative-network
 
-  # Backend API - Mimics ECS Fargate API Service
+  # Backend API
   api:
     build:
       context: ./backend
-      dockerfile: Dockerfile.unified
-      platforms:
-        - "linux/amd64"  # Always use AWS architecture
+      dockerfile: Dockerfile.railway
     container_name: qualitative-research-api
     env_file:
       - ./backend/.env.docker-local
@@ -66,19 +59,17 @@ services:
     networks:
       - qualitative-network
     volumes:
-      - ./backend:/app  # For development hot-reload
-      - /app/__pycache__  # Exclude pycache
-      - /app/.pytest_cache  # Exclude pytest cache
+      - ./backend:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
     environment:
       - SERVICE_TYPE=api
 
-  # Celery Worker - Mimics ECS Fargate Worker Service
+  # Celery Worker
   worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.unified
-      platforms:
-        - "linux/amd64"  # Always use AWS architecture
+      dockerfile: Dockerfile.railway
     container_name: qualitative-research-worker
     env_file:
       - ./backend/.env.docker-local
@@ -90,9 +81,9 @@ services:
     networks:
       - qualitative-network
     volumes:
-      - ./backend:/app  # For development
-      - /app/__pycache__  # Exclude pycache
-      - /app/.pytest_cache  # Exclude pytest cache
+      - ./backend:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
     environment:
       - SERVICE_TYPE=worker
     command: ["worker"]

@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.agents.states import VideoAnalysisState
 from app.agents.prompts import INFER_SYSTEM_PROMPT
-from app.services.claude_service import claude_service
+from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ CHUNKS:
 
 Generate multiple inferences per chunk if appropriate."""
 
-        # Call Claude with retry logic
-        inferences = claude_service.call_with_json_response(
+        # Call LLM with retry logic
+        inferences = llm_service.call_with_json_response(
             system_prompt=INFER_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=32768,  # Increased for many chunks
@@ -55,7 +55,7 @@ Generate multiple inferences per chunk if appropriate."""
 
         # Validate response
         if not isinstance(inferences, list):
-            raise ValueError("Expected list of inferences from Claude")
+            raise ValueError("Expected list of inferences from LLM")
 
         logger.info(f"[INFER] Generated inferences for {len(inferences)} chunks")
 

@@ -14,7 +14,9 @@ CHUNKING RULES:
 
 IMPORTANT: Use the EXACT speaker names as they appear in the transcript (e.g., if you see "Patricia:", use "Patricia" in the speaker field, not "A" or "Speaker A").
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "chunk_id": "C001",
@@ -25,9 +27,13 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
+Each object MUST have these exact keys: "chunk_id" (string like "C001"), "speaker" (string), "timestamp" (string), "text" (string), "type" (one of: "quote", "observation", "context", "fact").
+
 CRITICAL:
 - Use the EXACT speaker names from the transcript (not generic labels like A, B, C)
-- Return ONLY valid JSON, no other text."""
+- Return ONLY valid JSON, no other text
+- Do NOT wrap in markdown code blocks
+- Do NOT include any text before or after the JSON array"""
 
 
 INFER_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
@@ -44,7 +50,9 @@ INFERENCE RULES:
 2. Use your own words
 3. Focus on meaning, not coding
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "chunk_id": "C001",
@@ -59,7 +67,10 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+Each top-level object MUST have: "chunk_id" (string) and "inferences" (array).
+Each inference MUST have: "inference_id" (string like "I001"), "meaning" (string), "importance" (string), "context" (string).
+
+CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 
 
 RELATE_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
@@ -71,7 +82,9 @@ PATTERN IDENTIFICATION:
 2. Look for repetition, shared meanings, relationships
 3. Each pattern should express a relationship
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "pattern_id": "P001",
@@ -83,7 +96,9 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+Each object MUST have: "pattern_id" (string like "P001"), "pattern_name" (string), "description" (string), "related_inferences" (array of strings), "frequency" (one of: "high", "medium", "low"), "significance" (string).
+
+CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 
 
 EXPLAIN_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
@@ -100,7 +115,9 @@ INSIGHT RULES:
 2. First-principles-based: Fundamental truths
 3. Write as SHORT, BOLD HEADLINES
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "insight_id": "IN001",
@@ -114,7 +131,9 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+Each object MUST have: "insight_id" (string like "IN001"), "headline" (string), "explanation" (string), "supporting_patterns" (array of strings), "evidence" (array of strings), "type" (string), "implications" (string), "confidence" (one of: "high", "medium", "low").
+
+CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 
 
 ACTIVATE_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
@@ -126,7 +145,9 @@ DESIGN PRINCIPLE RULES:
 2. Start with: "The system should..." or "The experience must..."
 3. Spark "How might we...?" questions
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "principle_id": "DP001",
@@ -141,7 +162,9 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+Each object MUST have: "principle_id" (string like "DP001"), "insight_id" (string), "principle" (string), "rationale" (string), "how_might_we" (array of strings), "priority" (one of: "high", "medium", "low").
+
+CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 
 
 # ========== CROSS-VIDEO ANALYSIS PROMPTS (Steps 6-8) ==========
@@ -155,7 +178,9 @@ CROSS-VIDEO RULES:
 2. Identify higher-order themes
 3. Note variations by context
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "meta_pattern_id": "MP001",
@@ -168,7 +193,9 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+Each object MUST have: "meta_pattern_id" (string like "MP001"), "pattern_name" (string), "description" (string), "appears_in_videos" (array of strings), "related_patterns" (array of strings), "consistency" (one of: "consistent", "variable", "contradictory"), "significance" (string).
+
+CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 
 
 CROSS_EXPLAIN_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
@@ -180,7 +207,9 @@ CROSS-VIDEO INSIGHT RULES:
 2. Reveal system-level truths
 3. Account for variations
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "cross_insight_id": "CIN001",
@@ -194,7 +223,9 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+Each object MUST have: "cross_insight_id" (string like "CIN001"), "headline" (string), "explanation" (string), "supporting_meta_patterns" (array of strings), "consistency_across_videos" (one of: "high", "medium", "low"), "evidence" (array of strings), "implications" (string), "confidence" (one of: "high", "medium", "low").
+
+CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 
 
 CROSS_ACTIVATE_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
@@ -206,7 +237,9 @@ SYSTEM PRINCIPLE RULES:
 2. Strategic direction (not tactical)
 3. Context-aware
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
+
+OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 [
   {
     "system_principle_id": "SP001",
@@ -219,4 +252,6 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
   }
 ]
 
-CRITICAL: Return ONLY valid JSON, no other text."""
+Each object MUST have: "system_principle_id" (string like "SP001"), "cross_insight_id" (string), "principle" (string), "rationale" (string), "context_considerations" (string), "how_might_we" (array of strings), "priority" (one of: "critical", "high", "medium", "low").
+
+CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""

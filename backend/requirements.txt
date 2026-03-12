@@ -1,7 +1,7 @@
 # FastAPI & ASGI Server
 fastapi==0.104.1
 uvicorn==0.24.0
-python-multipart==0.0.6
+python-multipart>=0.0.7
 
 # Database
 sqlalchemy==2.0.23
@@ -9,16 +9,16 @@ alembic==1.12.1
 psycopg2-binary==2.9.9
 
 # AI & LangChain
-anthropic
+openai
+json-repair
 langchain
-langchain-anthropic
 langchain-core
 langgraph
 
 # AssemblyAI
 assemblyai==0.17.0
 
-# AWS
+# S3-compatible storage (Cloudflare R2)
 boto3==1.34.10
 botocore==1.34.10
 
@@ -44,7 +44,6 @@ python-dotenv==1.0.0
 python-dateutil==2.8.2
 typing-extensions==4.12.2
 
-# Authentication
-# clerk-backend-api==4.0.0  # Commented out - migrating to Cognito
-PyJWT[crypto]==2.9.0  # Added crypto support for RS256
+# Authentication (Clerk JWT verification)
+PyJWT[crypto]==2.9.0
 cryptography==45.0.0

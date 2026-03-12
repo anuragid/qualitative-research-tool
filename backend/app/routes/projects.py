@@ -250,6 +250,7 @@ async def delete_project(
 @router.get("/{project_id}/videos", response_model=List[VideoResponse])
 async def list_project_videos(
     project_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -294,6 +295,7 @@ async def list_project_videos(
 @router.post("/{project_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_project_analysis(
     project_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -378,6 +380,7 @@ async def trigger_project_analysis(
 @router.get("/{project_id}/analysis", response_model=ProjectAnalysisResponse)
 async def get_project_analysis(
     project_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """

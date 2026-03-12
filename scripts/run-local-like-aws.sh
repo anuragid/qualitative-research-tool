@@ -18,7 +18,7 @@ fi
 # Ensure we have the API keys from main .env
 if [ -f backend/.env ]; then
     echo "📋 Loading API keys from backend/.env..."
-    export $(cat backend/.env | grep -E '^(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|ANTHROPIC_API_KEY|ASSEMBLYAI_API_KEY)=' | xargs)
+    export $(cat backend/.env | grep -E '^(R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|R2_ENDPOINT_URL|R2_BUCKET_NAME|ANTHROPIC_API_KEY|ASSEMBLYAI_API_KEY)=' | xargs)
 fi
 
 # Stop any existing containers

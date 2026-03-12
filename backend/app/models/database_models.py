@@ -20,9 +20,15 @@ class User(Base):
     last_name = Column(String(255))
     username = Column(String(255))
     role = Column(String(50), nullable=False, default="user")  # admin, user, viewer
+    preferred_model = Column(String(255))  # OpenRouter model ID for BYOK
+    encrypted_api_key = Column(Text)  # Fernet-encrypted OpenRouter API key
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_seen = Column(DateTime(timezone=True))
+
+    @property
+    def has_api_key(self) -> bool:
+        return bool(self.encrypted_api_key)
 
     # Relationships
     projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")

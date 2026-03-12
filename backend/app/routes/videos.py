@@ -12,6 +12,7 @@ from app.models.database_models import Project, Video, Transcript, VideoAnalysis
 from app.models.schemas import VideoUploadResponse, VideoResponse, VideoAnalysisResponse, TranscriptResponse
 from app.services.s3_service import s3_service
 from app.config import settings
+from app.auth_bridge import get_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ router = APIRouter()
 async def upload_video(
     project_id: UUID,
     file: UploadFile = File(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -101,6 +103,7 @@ async def upload_video(
 @router.get("/{video_id}", response_model=VideoResponse)
 async def get_video(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -138,6 +141,7 @@ async def get_video(
 @router.delete("/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_video(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -187,6 +191,7 @@ async def delete_video(
 @router.get("/{video_id}/playback-url")
 async def get_video_playback_url(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -229,6 +234,7 @@ async def get_video_playback_url(
 @router.get("/{video_id}/transcript", response_model=TranscriptResponse)
 async def get_video_transcript(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -275,6 +281,7 @@ async def get_video_transcript(
 @router.post("/{video_id}/transcribe", status_code=status.HTTP_202_ACCEPTED)
 async def start_transcription(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -350,6 +357,7 @@ async def start_transcription(
 @router.post("/{video_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_video_analysis(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -432,6 +440,7 @@ async def trigger_video_analysis(
 @router.get("/{video_id}/analysis", response_model=VideoAnalysisResponse)
 async def get_video_analysis(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -480,6 +489,7 @@ async def get_video_analysis(
 @router.get("/{video_id}/transcript/words")
 async def get_word_level_transcript(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -573,6 +583,7 @@ async def get_word_level_transcript(
 async def search_transcript_words(
     video_id: UUID,
     query: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -654,6 +665,7 @@ async def search_transcript_words(
 @router.post("/{video_id}/analyze/chunk", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_chunk_step(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -702,6 +714,7 @@ async def trigger_chunk_step(
 @router.post("/{video_id}/analyze/infer", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_infer_step(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -743,6 +756,7 @@ async def trigger_infer_step(
 @router.post("/{video_id}/analyze/relate", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_relate_step(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -784,6 +798,7 @@ async def trigger_relate_step(
 @router.post("/{video_id}/analyze/explain", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_explain_step(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -825,6 +840,7 @@ async def trigger_explain_step(
 @router.post("/{video_id}/analyze/activate", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_activate_step(
     video_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """

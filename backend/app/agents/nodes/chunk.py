@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 from app.agents.states import VideoAnalysisState
 from app.agents.prompts import CHUNK_SYSTEM_PROMPT
-from app.services.claude_service import claude_service
+from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +84,8 @@ Remember:
 - Include relevant context in each chunk to maintain meaning (e.g., what question the participant is responding to)
 - Use the actual speaker names (not A, B, C) as shown in the transcript"""
 
-        # Call Claude with retry logic
-        chunks = claude_service.call_with_json_response(
+        # Call LLM with retry logic
+        chunks = llm_service.call_with_json_response(
             system_prompt=CHUNK_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for long transcripts
@@ -93,7 +93,7 @@ Remember:
 
         # Validate response
         if not isinstance(chunks, list):
-            raise ValueError("Expected list of chunks from Claude")
+            raise ValueError("Expected list of chunks from LLM")
 
         # Debug: Log chunk types
         chunk_types = {}

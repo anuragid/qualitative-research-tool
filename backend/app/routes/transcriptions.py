@@ -7,6 +7,7 @@ from uuid import UUID
 import logging
 
 from app.database import get_db
+from app.auth_bridge import get_current_user_id
 from app.models.database_models import Transcript, SpeakerLabel, Video
 from app.models.schemas import (
     TranscriptResponse,
@@ -23,6 +24,7 @@ router = APIRouter()
 @router.get("/{transcript_id}", response_model=TranscriptResponse)
 async def get_transcript(
     transcript_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -60,6 +62,7 @@ async def get_transcript(
 @router.get("/{transcript_id}/speakers", response_model=List[SpeakerLabelResponse])
 async def get_speaker_labels(
     transcript_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -104,6 +107,7 @@ async def get_speaker_labels(
 async def save_speaker_labels(
     transcript_id: UUID,
     speaker_labels: List[SpeakerLabelCreate],
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -188,6 +192,7 @@ async def update_speaker_label(
     transcript_id: UUID,
     speaker_label_id: UUID,
     update_data: SpeakerLabelUpdate,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -250,6 +255,7 @@ async def update_speaker_label(
 async def delete_speaker_label(
     transcript_id: UUID,
     speaker_label_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """

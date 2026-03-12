@@ -2,13 +2,13 @@
 
 from app.services.s3_service import s3_service, S3Service
 from app.services.assemblyai_service import assemblyai_service, AssemblyAIService
-from app.services.claude_service import claude_service, ClaudeService
+from app.services.llm_service import llm_service, LLMService
 
 __all__ = [
     "s3_service",
     "S3Service",
     "assemblyai_service",
     "AssemblyAIService",
-    "claude_service",
-    "ClaudeService",
+    "llm_service",
+    "LLMService",
 ]
