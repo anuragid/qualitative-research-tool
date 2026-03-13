@@ -14,7 +14,7 @@ export default function ProjectsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Projects</h1>
-            <p className="text-gray-500 mt-1">
+            <p className="text-muted-foreground mt-1">
               Manage your research projects and interview videos
             </p>
           </div>
@@ -24,14 +24,14 @@ export default function ProjectsPage() {
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+            <p className="text-destructive">
               Failed to load projects. Please try again.
             </p>
           </div>
@@ -40,7 +40,7 @@ export default function ProjectsPage() {
         {/* Projects Grid */}
         {projects && projects.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               No projects yet. Create your first project to get started!
             </p>
           </div>

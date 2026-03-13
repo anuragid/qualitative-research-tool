@@ -48,21 +48,21 @@ export function DeleteProjectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
+          <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
             Delete Project
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-sm text-gray-500">
+        <div className="space-y-3 text-sm text-muted-foreground">
           <p>
             Are you sure you want to delete the project{' '}
             <span className="font-semibold">"{project.name}"</span>?
           </p>
-          <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm">
-            <p className="font-semibold text-red-800 mb-1">
+          <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3 text-sm">
+            <p className="font-semibold text-destructive mb-1">
               This action cannot be undone and will permanently delete:
             </p>
-            <ul className="list-disc list-inside text-red-700 space-y-1">
+            <ul className="list-disc list-inside text-destructive/80 space-y-1">
               <li>The project and all its settings</li>
               {project.videoCount && project.videoCount > 0 && (
                 <>

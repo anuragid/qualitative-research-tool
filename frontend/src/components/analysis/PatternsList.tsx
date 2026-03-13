@@ -9,16 +9,16 @@ interface PatternsListProps {
 }
 
 const relationshipTypeColors = {
-  convergent: "bg-green-100 text-green-800",
-  divergent: "bg-purple-100 text-purple-800",
-  tension: "bg-red-100 text-red-800",
-  causal: "bg-blue-100 text-blue-800",
+  convergent: "bg-success/10 text-success",
+  divergent: "bg-chart-3/10 text-chart-3",
+  tension: "bg-destructive/10 text-destructive",
+  causal: "bg-info/10 text-info",
 };
 
 const frequencyColors = {
-  high: "bg-orange-100 text-orange-800",
-  medium: "bg-yellow-100 text-yellow-800",
-  low: "bg-gray-100 text-gray-800",
+  high: "bg-chart-2/10 text-chart-2",
+  medium: "bg-warning/10 text-warning",
+  low: "bg-muted text-muted-foreground",
 };
 
 export function PatternsList({ patterns }: PatternsListProps) {
@@ -42,9 +42,9 @@ export function PatternsList({ patterns }: PatternsListProps) {
           <AccordionItem key={pattern.pattern_id} value={pattern.pattern_id}>
             <Card>
               <CardContent className="p-0">
-                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-gray-50">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted">
                   <div className="flex items-start gap-3 text-left flex-1">
-                    <Network className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <Network className="h-5 w-5 text-chart-3 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-semibold">{pattern.pattern_name}</span>
@@ -55,7 +55,7 @@ export function PatternsList({ patterns }: PatternsListProps) {
                           {pattern.frequency} frequency
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                      <p className="text-sm text-muted-foreground line-clamp-2">
                         {pattern.description}
                       </p>
                     </div>
@@ -65,21 +65,21 @@ export function PatternsList({ patterns }: PatternsListProps) {
                 <AccordionContent className="px-4 pb-4">
                   <div className="space-y-4 pl-8">
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Description
                       </div>
-                      <p className="text-gray-900">{pattern.description}</p>
+                      <p className="text-foreground">{pattern.description}</p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Significance
                       </div>
-                      <p className="text-gray-900">{pattern.significance}</p>
+                      <p className="text-foreground">{pattern.significance}</p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Related Inferences ({pattern.related_inferences.length})
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -91,7 +91,7 @@ export function PatternsList({ patterns }: PatternsListProps) {
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-400 font-mono">
+                    <div className="text-xs text-muted-foreground/60 font-mono">
                       ID: {pattern.pattern_id}
                     </div>
                   </div>

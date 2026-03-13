@@ -10,7 +10,7 @@ import LandingPage from "./pages/LandingPage";
 
 function SignInPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-muted flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <SignIn routing="hash" />
       </div>
@@ -27,7 +27,7 @@ function App() {
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen" role="status" aria-label="Loading application">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         <span className="sr-only">Loading...</span>
       </div>
     );

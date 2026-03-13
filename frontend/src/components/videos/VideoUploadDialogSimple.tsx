@@ -112,15 +112,15 @@ export default function VideoUploadDialog({
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 isDragging
-                  ? "border-gray-900 bg-gray-50"
-                  : "border-gray-300 hover:border-gray-400"
+                  ? "border-primary bg-muted"
+                  : "border-border hover:border-border/80"
               }`}
             >
-              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-sm text-gray-600 mb-2">
+              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground mb-2">
                 Drag and drop video files here, or click to browse
               </p>
-              <p className="text-xs text-gray-500 mb-4">
+              <p className="text-xs text-muted-foreground mb-4">
                 You can select multiple files at once
               </p>
               <input
@@ -145,23 +145,23 @@ export default function VideoUploadDialog({
                 {selectedFiles.map((file, index) => (
                   <div
                     key={`${file.name}-${index}`}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white"
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card"
                   >
-                    <FileVideo className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                    <FileVideo className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
                         {file.name}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {formatFileSize(file.size)}
                       </p>
                     </div>
                     <button
                       onClick={() => removeFile(index)}
-                      className="p-1 hover:bg-gray-100 rounded"
+                      className="p-1 hover:bg-accent rounded"
                       title="Remove file"
                     >
-                      <X className="h-4 w-4 text-gray-400" />
+                      <X className="h-4 w-4 text-muted-foreground" />
                     </button>
                   </div>
                 ))}
@@ -174,11 +174,11 @@ export default function VideoUploadDialog({
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
                   isDragging
-                    ? "border-gray-900 bg-gray-50"
-                    : "border-gray-300 hover:border-gray-400"
+                    ? "border-primary bg-muted"
+                    : "border-border hover:border-border/80"
                 }`}
               >
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-xs text-muted-foreground mb-2">
                   Drag more files here or
                 </p>
                 <input

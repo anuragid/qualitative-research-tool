@@ -9,14 +9,14 @@ interface SystemPrinciplesListProps {
 }
 
 const priorityColors = {
-  critical: "bg-red-100 text-red-800 border-red-300",
-  high: "bg-orange-100 text-orange-800 border-orange-300",
-  medium: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  critical: "bg-destructive/10 text-destructive border-destructive/30",
+  high: "bg-chart-2/10 text-chart-2 border-chart-2/30",
+  medium: "bg-warning/10 text-warning border-warning/30",
 };
 
 const scopeColors = {
-  universal: "bg-purple-100 text-purple-800",
-  segmented: "bg-blue-100 text-blue-800",
+  universal: "bg-chart-3/10 text-chart-3",
+  segmented: "bg-info/10 text-info",
 };
 
 export function SystemPrinciplesList({ systemPrinciples }: SystemPrinciplesListProps) {
@@ -40,15 +40,15 @@ export function SystemPrinciplesList({ systemPrinciples }: SystemPrinciplesListP
           <AccordionItem key={principle.system_principle_id} value={principle.system_principle_id}>
             <Card className={`border-l-4 ${
               principle.priority === "critical"
-                ? "border-l-red-400"
+                ? "border-l-destructive"
                 : principle.priority === "high"
-                ? "border-l-orange-400"
-                : "border-l-yellow-400"
+                ? "border-l-chart-2"
+                : "border-l-warning"
             }`}>
               <CardContent className="p-0">
-                <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-gray-50">
+                <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted">
                   <div className="flex items-start gap-3 text-left flex-1">
-                    <Compass className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <Compass className="h-5 w-5 text-chart-3 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <Badge className={priorityColors[principle.priority]}>
@@ -68,49 +68,49 @@ export function SystemPrinciplesList({ systemPrinciples }: SystemPrinciplesListP
                 <AccordionContent className="px-4 pb-4">
                   <div className="space-y-4 pl-8">
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Principle
                       </div>
-                      <p className="text-gray-900 text-base font-medium leading-relaxed">
+                      <p className="text-foreground text-base font-medium leading-relaxed">
                         {principle.principle}
                       </p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Rationale
                       </div>
-                      <p className="text-gray-700 leading-relaxed">
+                      <p className="text-muted-foreground leading-relaxed">
                         {principle.rationale}
                       </p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Context Considerations
                       </div>
-                      <p className="text-gray-700 leading-relaxed">
+                      <p className="text-muted-foreground leading-relaxed">
                         {principle.context_considerations}
                       </p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-2">
                         <Lightbulb className="h-4 w-4" />
                         Strategic How Might We... ({principle.how_might_we.length})
                       </div>
                       <ul className="space-y-3">
                         {principle.how_might_we.map((hmw, idx) => (
-                          <li key={idx} className="flex gap-2 p-3 bg-purple-50 rounded-lg border border-purple-100">
-                            <span className="text-purple-600 font-semibold">{idx + 1}.</span>
-                            <span className="text-gray-900">{hmw}</span>
+                          <li key={idx} className="flex gap-2 p-3 bg-chart-3/10 rounded-lg border border-chart-3/20">
+                            <span className="text-chart-3 font-semibold">{idx + 1}.</span>
+                            <span className="text-foreground">{hmw}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Related Cross-Video Insight
                       </div>
                       <Badge variant="outline" className="font-mono text-xs">
@@ -118,7 +118,7 @@ export function SystemPrinciplesList({ systemPrinciples }: SystemPrinciplesListP
                       </Badge>
                     </div>
 
-                    <div className="text-xs text-gray-400 font-mono">
+                    <div className="text-xs text-muted-foreground/60 font-mono">
                       ID: {principle.system_principle_id}
                     </div>
                   </div>

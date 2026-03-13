@@ -9,9 +9,9 @@ interface MetaPatternsListProps {
 }
 
 const consistencyColors = {
-  consistent: "bg-green-100 text-green-800",
-  varying: "bg-yellow-100 text-yellow-800",
-  contradictory: "bg-red-100 text-red-800",
+  consistent: "bg-success/10 text-success",
+  varying: "bg-warning/10 text-warning",
+  contradictory: "bg-destructive/10 text-destructive",
 };
 
 export function MetaPatternsList({ metaPatterns }: MetaPatternsListProps) {
@@ -35,20 +35,20 @@ export function MetaPatternsList({ metaPatterns }: MetaPatternsListProps) {
           <AccordionItem key={metaPattern.meta_pattern_id} value={metaPattern.meta_pattern_id}>
             <Card>
               <CardContent className="p-0">
-                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-gray-50">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted">
                   <div className="flex items-start gap-3 text-left flex-1">
-                    <Network className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <Network className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-semibold">{metaPattern.pattern_name}</span>
                         <Badge className={consistencyColors[metaPattern.consistency]}>
                           {metaPattern.consistency}
                         </Badge>
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                        <Badge variant="outline" className="bg-info/10 text-info">
                           {metaPattern.appears_in_videos.length} videos
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                      <p className="text-sm text-muted-foreground line-clamp-2">
                         {metaPattern.description}
                       </p>
                     </div>
@@ -58,28 +58,28 @@ export function MetaPatternsList({ metaPatterns }: MetaPatternsListProps) {
                 <AccordionContent className="px-4 pb-4">
                   <div className="space-y-4 pl-8">
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Description
                       </div>
-                      <p className="text-gray-900">{metaPattern.description}</p>
+                      <p className="text-foreground">{metaPattern.description}</p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Significance
                       </div>
-                      <p className="text-gray-900">{metaPattern.significance}</p>
+                      <p className="text-foreground">{metaPattern.significance}</p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Context Sensitivity
                       </div>
-                      <p className="text-gray-900">{metaPattern.context_sensitivity}</p>
+                      <p className="text-foreground">{metaPattern.context_sensitivity}</p>
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Appears In Videos ({metaPattern.appears_in_videos.length})
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -92,7 +92,7 @@ export function MetaPatternsList({ metaPatterns }: MetaPatternsListProps) {
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Related Patterns ({metaPattern.related_patterns.length})
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -104,7 +104,7 @@ export function MetaPatternsList({ metaPatterns }: MetaPatternsListProps) {
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-400 font-mono">
+                    <div className="text-xs text-muted-foreground/60 font-mono">
                       ID: {metaPattern.meta_pattern_id}
                     </div>
                   </div>

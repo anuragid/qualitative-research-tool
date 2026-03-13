@@ -34,9 +34,9 @@ export function InferencesList({ inferences, chunks }: InferencesListProps) {
             <AccordionItem key={inference.chunk_id} value={inference.chunk_id}>
               <Card>
                 <CardContent className="p-0">
-                  <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-gray-50">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted">
                     <div className="flex items-start gap-3 text-left flex-1">
-                      <Lightbulb className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <Lightbulb className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium">
@@ -48,7 +48,7 @@ export function InferencesList({ inferences, chunks }: InferencesListProps) {
                           </Badge>
                         </div>
                         {chunk && (
-                          <p className="text-sm text-gray-600 line-clamp-2">
+                          <p className="text-sm text-muted-foreground line-clamp-2">
                             {chunk.text}
                           </p>
                         )}
@@ -61,30 +61,30 @@ export function InferencesList({ inferences, chunks }: InferencesListProps) {
                       {inference.inferences.map((item) => (
                         <div
                           key={item.inference_id}
-                          className="border-l-2 border-amber-200 pl-4 py-2"
+                          className="border-l-2 border-warning/40 pl-4 py-2"
                         >
                           <div className="mb-2">
-                            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                               Meaning
                             </div>
-                            <p className="text-gray-900">{item.meaning}</p>
+                            <p className="text-foreground">{item.meaning}</p>
                           </div>
 
                           <div className="mb-2">
-                            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                               Importance
                             </div>
-                            <p className="text-gray-700">{item.importance}</p>
+                            <p className="text-muted-foreground">{item.importance}</p>
                           </div>
 
                           <div>
-                            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                               Context
                             </div>
-                            <p className="text-gray-700">{item.context}</p>
+                            <p className="text-muted-foreground">{item.context}</p>
                           </div>
 
-                          <div className="mt-2 text-xs text-gray-400 font-mono">
+                          <div className="mt-2 text-xs text-muted-foreground/60 font-mono">
                             ID: {item.inference_id}
                           </div>
                         </div>

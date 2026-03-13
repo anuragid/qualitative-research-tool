@@ -103,7 +103,7 @@ export default function VideoCard({ video }: VideoCardProps) {
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <FileVideo className="h-10 w-10 text-gray-600 flex-shrink-0 mt-1" />
+              <FileVideo className="h-10 w-10 text-muted-foreground flex-shrink-0 mt-1" />
               <div className="flex-1 min-w-0">
                 <CardTitle className="text-lg truncate">
                   {video.filename}
@@ -128,7 +128,7 @@ export default function VideoCard({ video }: VideoCardProps) {
         </CardHeader>
 
         <CardContent>
-          <div className="flex items-center gap-4 text-sm text-gray-600">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               <span>{video.duration_seconds ? formatDuration(video.duration_seconds) : "Unknown"}</span>
@@ -141,7 +141,7 @@ export default function VideoCard({ video }: VideoCardProps) {
           <div className="flex items-center justify-between w-full">
             {getStatusBadge(video.status)}
             {video.error_message && (
-              <p className="text-xs text-red-600 truncate flex-1 ml-2">
+              <p className="text-xs text-destructive truncate flex-1 ml-2">
                 {video.error_message}
               </p>
             )}
@@ -151,7 +151,7 @@ export default function VideoCard({ video }: VideoCardProps) {
             <Button
               variant="outline"
               size="sm"
-              className="w-full border-red-300 text-red-700 hover:bg-red-50"
+              className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
               onClick={handleRetryAnalysis}
               disabled={startAnalysis.isPending}
             >

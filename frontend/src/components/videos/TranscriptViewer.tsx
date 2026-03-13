@@ -222,13 +222,13 @@ export function TranscriptViewer({
     <div className="space-y-6">
       {/* Transcript Section */}
       <Card className="relative">
-        <CardHeader className="sticky top-0 z-10 bg-white border-b">
+        <CardHeader className="sticky top-0 z-10 bg-card border-b">
           <div className="flex items-center justify-between">
             <CardTitle>Transcript</CardTitle>
 
             {/* Search Bar with integrated Navigation */}
             <div className="relative w-80">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="transcript-search-input"
                 type="text"
@@ -243,20 +243,20 @@ export function TranscriptViewer({
                 <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   {/* No results found state - only show after search completes */}
                   {debouncedSearchQuery && !searchLoading && sortedMatchIndexes.length === 0 && (
-                    <span className="text-xs text-gray-500 px-2">No results</span>
+                    <span className="text-xs text-muted-foreground px-2">No results</span>
                   )}
 
                   {/* Navigation controls when matches found */}
                   {sortedMatchIndexes.length > 0 && (
                     <div className="flex items-center gap-0.5 px-1">
-                      <span className="text-xs font-medium text-gray-600">
+                      <span className="text-xs font-medium text-muted-foreground">
                         {currentMatchIndex + 1} of {sortedMatchIndexes.length}
                       </span>
                       <div className="flex items-center ml-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-5 w-5 p-0 hover:bg-gray-100"
+                          className="h-5 w-5 p-0 hover:bg-accent"
                           onClick={navigateToPrevious}
                           title="Previous match (Shift+Enter)"
                         >
@@ -265,7 +265,7 @@ export function TranscriptViewer({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-5 w-5 p-0 hover:bg-gray-100"
+                          className="h-5 w-5 p-0 hover:bg-accent"
                           onClick={navigateToNext}
                           title="Next match (Enter)"
                         >
@@ -279,7 +279,7 @@ export function TranscriptViewer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 hover:bg-gray-100"
+                    className="h-6 w-6 p-0 hover:bg-accent"
                     onClick={clearSearch}
                   >
                     <X className="h-3 w-3" />
@@ -294,9 +294,9 @@ export function TranscriptViewer({
             {transcript.processed_transcript?.utterances?.map((utterance, index) => (
               <div
                 key={index}
-                className="flex gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex gap-4 p-4 bg-muted rounded-lg hover:bg-accent transition-colors"
               >
-                <div className="flex-shrink-0 w-24 text-sm text-gray-500 flex items-start gap-2">
+                <div className="flex-shrink-0 w-24 text-sm text-muted-foreground flex items-start gap-2">
                   <Clock className="h-4 w-4 mt-0.5" />
                   {formatTimestamp(utterance.start / 1000)}
                 </div>
@@ -307,12 +307,12 @@ export function TranscriptViewer({
                       {getSpeakerLabel(utterance.speaker)}
                     </Badge>
                     {getSpeakerRole(utterance.speaker) && (
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-muted-foreground">
                         {getSpeakerRole(utterance.speaker)}
                       </span>
                     )}
                   </div>
-                  <div className="text-gray-900 leading-relaxed">
+                  <div className="text-foreground leading-relaxed">
                     {wordLevelData ? (
                       // Render words with highlighting
                       getWordsForUtterance(utterance.start, utterance.end).map(({ word, globalIndex }) => {
@@ -323,17 +323,17 @@ export function TranscriptViewer({
                         // Determine highlight style
                         let className = 'cursor-pointer px-0.5 rounded transition-all duration-100 ';
                         if (isCurrentMatch) {
-                          // Current search match - orange/darker highlight
-                          className += 'bg-orange-400 text-white font-semibold shadow-sm';
+                          // Current search match - active highlight
+                          className += 'bg-warning text-warning-foreground font-semibold shadow-sm';
                         } else if (isSearchMatch) {
-                          // Regular search match - yellow highlight
-                          className += 'bg-yellow-200 hover:bg-yellow-300';
+                          // Regular search match - subtle highlight
+                          className += 'bg-warning/30 hover:bg-warning/40';
                         } else if (isCurrentWord) {
                           // Currently playing word (video sync)
-                          className += 'bg-blue-500 text-white font-semibold shadow-sm';
+                          className += 'bg-primary text-primary-foreground font-semibold shadow-sm';
                         } else {
                           // Normal word
-                          className += 'hover:bg-gray-200';
+                          className += 'hover:bg-accent';
                         }
 
                         return (
@@ -354,7 +354,7 @@ export function TranscriptViewer({
                     )}
                   </div>
                   {utterance.confidence < 0.8 && (
-                    <div className="mt-1 text-xs text-amber-600">
+                    <div className="mt-1 text-xs text-warning">
                       Low confidence: {Math.round(utterance.confidence * 100)}%
                     </div>
                   )}

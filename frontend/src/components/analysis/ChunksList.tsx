@@ -8,10 +8,10 @@ interface ChunksListProps {
 }
 
 const chunkTypeColors = {
-  quote: "bg-blue-100 text-blue-800",
-  observation: "bg-green-100 text-green-800",
-  context: "bg-purple-100 text-purple-800",
-  fact: "bg-orange-100 text-orange-800",
+  quote: "bg-chart-1/10 text-chart-1",
+  observation: "bg-chart-4/10 text-chart-4",
+  context: "bg-chart-3/10 text-chart-3",
+  fact: "bg-chart-2/10 text-chart-2",
 };
 
 const chunkTypeIcons = {
@@ -42,7 +42,7 @@ export function ChunksList({ chunks }: ChunksListProps) {
           <Card key={chunk.chunk_id}>
             <CardContent className="pt-4">
               <div className="flex gap-4">
-                <div className="flex-shrink-0 w-20 text-sm text-gray-500 flex items-start gap-1">
+                <div className="flex-shrink-0 w-20 text-sm text-muted-foreground flex items-start gap-1">
                   <Clock className="h-3 w-3 mt-0.5" />
                   <span className="text-xs">{chunk.timestamp}</span>
                 </div>
@@ -57,9 +57,9 @@ export function ChunksList({ chunks }: ChunksListProps) {
                     </Badge>
                   </div>
 
-                  <p className="text-gray-900 leading-relaxed">{chunk.text}</p>
+                  <p className="text-foreground leading-relaxed">{chunk.text}</p>
 
-                  <div className="mt-2 text-xs text-gray-400 font-mono">
+                  <div className="mt-2 text-xs text-muted-foreground/60 font-mono">
                     ID: {chunk.chunk_id}
                   </div>
                 </div>

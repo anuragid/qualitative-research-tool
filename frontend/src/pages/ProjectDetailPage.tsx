@@ -163,7 +163,7 @@ export default function ProjectDetailPage() {
     return (
       <Layout>
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       </Layout>
     );
@@ -173,11 +173,11 @@ export default function ProjectDetailPage() {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             Project Not Found
           </h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             The project you're looking for doesn't exist or has been removed.
           </p>
         </div>
@@ -193,7 +193,7 @@ export default function ProjectDetailPage() {
           <div>
             <h1 className="text-3xl font-bold">{project.name}</h1>
             {project.description && (
-              <p className="text-gray-500 mt-1">{project.description}</p>
+              <p className="text-muted-foreground mt-1">{project.description}</p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -220,7 +220,7 @@ export default function ProjectDetailPage() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setShowDeleteDialog(true)}
-                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete Project
@@ -233,31 +233,31 @@ export default function ProjectDetailPage() {
         {/* Videos Section */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <VideoIcon className="h-5 w-5 text-gray-700" />
+            <VideoIcon className="h-5 w-5 text-foreground/80" />
             <h2 className="text-xl font-semibold">Videos</h2>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               ({videos?.length || 0})
             </span>
           </div>
 
           {videosLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : videos && videos.length > 0 ? (
             <div
               className={`relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg transition-all ${
-                isDragging ? 'bg-blue-50 border-2 border-dashed border-blue-400' : ''
+                isDragging ? 'bg-primary/10 border-2 border-dashed border-primary/60' : ''
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
               {isDragging && (
-                <div className="absolute inset-0 flex items-center justify-center bg-blue-50 bg-opacity-90 rounded-lg z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-primary/10 bg-opacity-90 rounded-lg z-10">
                   <div className="text-center">
-                    <Upload className="h-12 w-12 text-blue-600 mx-auto mb-2" />
-                    <p className="text-blue-700 font-medium">Drop videos here to upload</p>
+                    <Upload className="h-12 w-12 text-primary mx-auto mb-2" />
+                    <p className="text-primary font-medium">Drop videos here to upload</p>
                   </div>
                 </div>
               )}
@@ -267,8 +267,8 @@ export default function ProjectDetailPage() {
             </div>
           ) : (
             <div
-              className={`bg-gray-50 border-2 border-dashed rounded-lg p-12 text-center transition-all ${
-                isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
+              className={`bg-muted border-2 border-dashed rounded-lg p-12 text-center transition-all ${
+                isDragging ? 'border-primary/60 bg-primary/10' : 'border-border'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -276,21 +276,21 @@ export default function ProjectDetailPage() {
             >
               {isDragging ? (
                 <>
-                  <Upload className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-bounce" />
-                  <h3 className="text-lg font-medium text-blue-900 mb-2">
+                  <Upload className="h-12 w-12 text-primary mx-auto mb-4 animate-bounce" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">
                     Drop videos here
                   </h3>
-                  <p className="text-blue-700">
+                  <p className="text-primary">
                     Release to upload your video files
                   </p>
                 </>
               ) : (
                 <>
-                  <VideoIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  <VideoIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">
                     No videos yet
                   </h3>
-                  <p className="text-gray-600 mb-4">
+                  <p className="text-muted-foreground mb-4">
                     Drag and drop video files here, or click to upload
                   </p>
                   <Button onClick={() => setUploadDialogOpen(true)}>
@@ -308,7 +308,7 @@ export default function ProjectDetailPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Network className="h-5 w-5 text-purple-700" />
+                <Network className="h-5 w-5 text-chart-3" />
                 <h2 className="text-xl font-semibold">Cross-Video Analysis</h2>
               </div>
 
@@ -316,7 +316,7 @@ export default function ProjectDetailPage() {
                 <Button
                   onClick={handleRunProjectAnalysis}
                   disabled={startProjectAnalysis.isPending}
-                  className="bg-purple-600 hover:bg-purple-700"
+                  className="bg-chart-3 hover:bg-chart-3/90 text-primary-foreground"
                 >
                   {startProjectAnalysis.isPending ? (
                     <>
@@ -332,18 +332,18 @@ export default function ProjectDetailPage() {
                 </Button>
               ) : projectAnalysis.status === 'running' ? (
                 <div className="flex items-center gap-3">
-                  <Badge className="bg-blue-100 text-blue-800 border-blue-300 px-3 py-1.5">
+                  <Badge className="bg-info/20 text-info border-info/40 px-3 py-1.5">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     <span className="font-medium">Cross-Video Analysis Running...</span>
                   </Badge>
-                  <span className="text-sm text-gray-600">Usually takes 1-2 minutes</span>
+                  <span className="text-sm text-muted-foreground">Usually takes 1-2 minutes</span>
                 </div>
               ) : projectAnalysis.status === 'completed' ? (
                 hasNewVideos ? (
                   <Button
                     onClick={handleRunProjectAnalysis}
                     disabled={startProjectAnalysis.isPending}
-                    className="bg-amber-600 hover:bg-amber-700"
+                    className="bg-warning hover:bg-warning/90 text-warning-foreground"
                   >
                     {startProjectAnalysis.isPending ? (
                       <>
@@ -358,7 +358,7 @@ export default function ProjectDetailPage() {
                     )}
                   </Button>
                 ) : (
-                  <Badge className="bg-green-100 text-green-800">
+                  <Badge className="bg-success/20 text-success">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Completed
                   </Badge>
@@ -368,30 +368,30 @@ export default function ProjectDetailPage() {
 
             {/* Show loading state immediately when analysis is triggered - Nielsen #1: Visibility */}
             {isAnalysisLoading && (
-              <Card className="mb-4 border-blue-200 bg-blue-50">
+              <Card className="mb-4 border-info/30 bg-info/10">
                 <CardContent className="py-4">
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                      <Loader2 className="h-5 w-5 animate-spin text-info" />
                       <div className="flex-1">
-                        <p className="font-medium text-blue-900">
+                        <p className="font-medium text-foreground">
                           {startProjectAnalysis.isPending || analysisTriggered
                             ? "Starting cross-video analysis..."
                             : `Analyzing patterns across ${projectAnalysis?.video_ids?.length || 0} videos...`}
                         </p>
-                        <p className="text-sm text-blue-700">
+                        <p className="text-sm text-info">
                           This may take 2-5 minutes depending on the amount of data.
                         </p>
                       </div>
                     </div>
 
                     {/* Progress bar with indeterminate state */}
-                    <div className="w-full bg-blue-100 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                    <div className="w-full bg-info/20 rounded-full h-2">
+                      <div className="bg-info h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
                     </div>
 
                     {projectAnalysis?.status === 'running' && (
-                      <div className="text-xs text-blue-600 flex items-center gap-2">
+                      <div className="text-xs text-info flex items-center gap-2">
                         <span>Processing:</span>
                         <span className="font-mono">CROSS_RELATE</span>
                         <span>→</span>
@@ -407,15 +407,15 @@ export default function ProjectDetailPage() {
 
             {/* Error state for failed analysis */}
             {projectAnalysis?.status === 'failed' && (
-              <Card className="mb-4 border-red-200 bg-red-50">
+              <Card className="mb-4 border-destructive/30 bg-destructive/10">
                 <CardContent className="py-4">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-medium text-red-900 mb-1">
+                      <p className="font-medium text-destructive mb-1">
                         Cross-video analysis failed
                       </p>
-                      <p className="text-sm text-red-700 mb-3">
+                      <p className="text-sm text-destructive/80 mb-3">
                         There was an error analyzing patterns across videos. This might be due to rate limits or processing issues.
                       </p>
                       <Button
@@ -423,7 +423,7 @@ export default function ProjectDetailPage() {
                         disabled={startProjectAnalysis.isPending}
                         variant="outline"
                         size="sm"
-                        className="border-red-300 text-red-700 hover:bg-red-100"
+                        className="border-destructive/40 text-destructive hover:bg-destructive/10"
                       >
                         {startProjectAnalysis.isPending ? (
                           <>
@@ -447,13 +447,13 @@ export default function ProjectDetailPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Network className="h-5 w-5 text-purple-600" />
+                    <Network className="h-5 w-5 text-chart-3" />
                     Project Analysis Results
                     <Badge variant="outline" className="ml-2">
                       {projectAnalysis.video_ids.length} videos analyzed
                     </Badge>
                     {hasNewVideos && (
-                      <Badge className="ml-2 bg-amber-100 text-amber-800 border-amber-300">
+                      <Badge className="ml-2 bg-warning/20 text-warning border-warning/40">
                         <AlertCircle className="h-3 w-3 mr-1" />
                         {newVideoCount} new {newVideoCount === 1 ? 'video' : 'videos'} available
                       </Badge>
@@ -493,7 +493,7 @@ export default function ProjectDetailPage() {
                       {metaPatterns && metaPatterns.length > 0 ? (
                         <MetaPatternsList metaPatterns={metaPatterns} />
                       ) : (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-muted-foreground">
                           No meta-patterns found
                         </div>
                       )}
@@ -503,7 +503,7 @@ export default function ProjectDetailPage() {
                       {crossInsights && crossInsights.length > 0 ? (
                         <CrossInsightsList crossInsights={crossInsights} />
                       ) : (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-muted-foreground">
                           No cross-insights found
                         </div>
                       )}
@@ -513,7 +513,7 @@ export default function ProjectDetailPage() {
                       {systemPrinciples && systemPrinciples.length > 0 ? (
                         <SystemPrinciplesList systemPrinciples={systemPrinciples} />
                       ) : (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-muted-foreground">
                           No system principles found
                         </div>
                       )}
@@ -525,21 +525,21 @@ export default function ProjectDetailPage() {
 
             {/* Only show initial card if not loading and no analysis exists */}
             {!projectAnalysis && !startProjectAnalysis.isPending && (
-              <Card className="border-purple-200 bg-purple-50">
+              <Card className="border-chart-3/30 bg-chart-3/10">
                 <CardContent className="py-6">
                   <div className="text-center">
-                    <Network className="h-12 w-12 text-purple-600 mx-auto mb-3" />
-                    <h3 className="font-semibold text-purple-900 mb-2">
+                    <Network className="h-12 w-12 text-chart-3 mx-auto mb-3" />
+                    <h3 className="font-semibold text-foreground mb-2">
                       Ready for Cross-Video Analysis
                     </h3>
-                    <p className="text-purple-700 mb-4">
+                    <p className="text-muted-foreground mb-4">
                       You have {videos?.filter(v => v.status === 'analyzed' && v.analysis?.status === 'completed').length} analyzed videos.
                       Run project analysis to discover patterns and insights across all videos.
                     </p>
                     <Button
                       onClick={handleRunProjectAnalysis}
                       disabled={startProjectAnalysis.isPending}
-                      className="bg-purple-600 hover:bg-purple-700"
+                      className="bg-chart-3 hover:bg-chart-3/90 text-primary-foreground"
                     >
                       <>
                         <PlayCircle className="h-4 w-4" />

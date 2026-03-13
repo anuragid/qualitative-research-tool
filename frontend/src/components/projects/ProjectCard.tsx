@@ -32,17 +32,17 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   const getStatusBadgeVariant = (status: ProjectStatus) => {
     switch (status) {
       case "planning":
-        return "secondary";  // Gray
+        return "secondary";
       case "ready":
-        return "default";    // Green
+        return "default";
       case "processing":
-        return "default";    // Blue (we'll add custom class)
+        return "default";
       case "completed":
-        return "default";    // Purple (we'll add custom class)
+        return "default";
       case "archived":
-        return "outline";    // Muted/outline
+        return "outline";
       case "error":
-        return "destructive"; // Red
+        return "destructive";
       default:
         return "secondary";
     }
@@ -52,18 +52,17 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   const getStatusBadgeClass = (status: ProjectStatus) => {
     switch (status) {
       case "processing":
-        return "bg-blue-500 hover:bg-blue-600 text-white";
+        return "bg-info text-info-foreground hover:bg-info/90";
       case "completed":
-        return "bg-purple-500 hover:bg-purple-600 text-white";
+        return "bg-chart-3 text-primary-foreground hover:bg-chart-3/90";
       case "error":
-        return "bg-red-500 hover:bg-red-600 text-white";
+        return "bg-destructive text-destructive-foreground hover:bg-destructive/90";
       default:
         return "";
     }
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Prevent navigation if clicking on the dropdown menu
     if ((e.target as HTMLElement).closest('[data-dropdown-menu]')) {
       e.preventDefault();
       return;
@@ -93,7 +92,6 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 
   const handleUnarchiveClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    // When unarchiving, set status to "ready" if has videos, otherwise "planning"
     const newStatus = videoCount > 0 ? "ready" : "planning";
     updateProject(
       {
@@ -128,7 +126,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 hover:bg-gray-100"
+                      className="h-8 w-8 p-0 hover:bg-accent"
                     >
                       <MoreVertical className="h-4 w-4" />
                       <span className="sr-only">Open menu</span>
@@ -153,7 +151,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={handleDeleteClick}
-                      className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
@@ -165,21 +163,21 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
             {project.description || "No description"}
           </p>
 
           {/* Show error message if project is in error state */}
           {project.status === "error" && project.error_message && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-2 mb-3">
-              <p className="text-xs text-red-700 flex items-start gap-1">
+            <div className="bg-destructive/10 border border-destructive/30 rounded-md p-2 mb-3">
+              <p className="text-xs text-destructive flex items-start gap-1">
                 <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                 <span className="line-clamp-2">{project.error_message}</span>
               </p>
             </div>
           )}
 
-          <div className="flex items-center gap-4 text-sm text-gray-500">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <Video className="h-4 w-4" />
               <span>{videoCount} video{videoCount !== 1 ? "s" : ""}</span>
