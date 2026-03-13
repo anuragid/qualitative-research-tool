@@ -1,5 +1,4 @@
 import type { Chunk } from "../../types";
-import { Card, CardContent } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import { Clock } from "lucide-react";
 
@@ -7,30 +6,42 @@ interface ChunksListProps {
   chunks: Chunk[];
 }
 
-const chunkTypeColors = {
-  quote: "bg-chart-1/10 text-chart-1",
-  observation: "bg-chart-4/10 text-chart-4",
-  context: "bg-chart-3/10 text-chart-3",
-  fact: "bg-chart-2/10 text-chart-2",
+const chunkTypeStyles: Record<string, { border: string; badge: string }> = {
+  quote: {
+    border: "border-l-brand-forest",
+    badge: "bg-brand-forest/10 text-brand-forest border-0",
+  },
+  fact: {
+    border: "border-l-brand-mustard",
+    badge: "bg-brand-mustard/10 text-brand-mustard border-0",
+  },
+  context: {
+    border: "border-l-brand-maroon",
+    badge: "bg-brand-maroon/10 text-brand-maroon border-0",
+  },
+  observation: {
+    border: "border-l-brand-olive",
+    badge: "bg-brand-olive/10 text-brand-olive border-0",
+  },
 };
 
-const chunkTypeIcons = {
+const chunkTypeIcons: Record<string, string> = {
   quote: "\"",
-  observation: "👁️",
-  context: "🔍",
-  fact: "📊",
+  observation: "O",
+  context: "C",
+  fact: "F",
 };
 
 export function ChunksList({ chunks }: ChunksListProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">
+        <h3 className="text-h4 text-foreground">
           Chunks ({chunks.length})
         </h3>
         <div className="flex gap-2 text-sm">
-          {Object.entries(chunkTypeColors).map(([type, color]) => (
-            <Badge key={type} className={color}>
+          {Object.entries(chunkTypeStyles).map(([type, style]) => (
+            <Badge key={type} className={style.badge}>
               {type}
             </Badge>
           ))}
@@ -38,35 +49,39 @@ export function ChunksList({ chunks }: ChunksListProps) {
       </div>
 
       <div className="space-y-3">
-        {chunks.map((chunk) => (
-          <Card key={chunk.chunk_id}>
-            <CardContent className="pt-4">
+        {chunks.map((chunk) => {
+          const style = chunkTypeStyles[chunk.type] || chunkTypeStyles.observation;
+          return (
+            <div
+              key={chunk.chunk_id}
+              className={`bg-card rounded-2xl p-5 border-l-4 ${style.border}`}
+            >
               <div className="flex gap-4">
-                <div className="flex-shrink-0 w-20 text-sm text-muted-foreground flex items-start gap-1">
+                <div className="flex-shrink-0 w-20 text-label text-base-40 flex items-start gap-1">
                   <Clock className="h-3 w-3 mt-0.5" />
-                  <span className="text-xs">{chunk.timestamp}</span>
+                  <span>{chunk.timestamp}</span>
                 </div>
 
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge className={chunkTypeColors[chunk.type]}>
+                    <Badge className={style.badge}>
                       {chunkTypeIcons[chunk.type]} {chunk.type}
                     </Badge>
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="text-base-55 border-base-09">
                       {chunk.speaker}
                     </Badge>
                   </div>
 
-                  <p className="text-foreground leading-relaxed">{chunk.text}</p>
+                  <p className="text-base-85 leading-relaxed">{chunk.text}</p>
 
-                  <div className="mt-2 text-xs text-muted-foreground/60 font-mono">
+                  <div className="mt-2 text-label text-base-25 font-mono">
                     ID: {chunk.chunk_id}
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
