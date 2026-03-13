@@ -58,6 +58,7 @@ env/
 .coverage
 htmlcov/
 .tox/
+frontend/coverage/
 
 # Database
 *.db
@@ -102,6 +103,7 @@ backend/test_video.mp4
 backend/patricia_and_mozart.mp4
 backend/*.mp4
 backend/*.txt
+!backend/requirements*.txt
 *.mp4
 *.mov
 *.avi
@@ -120,6 +122,12 @@ backups/
 
 # Claude worktrees
 .claude/
+
+# Agent/MCP tooling artifacts
+.agent/
+.agents/
+.mcp.json
+skills-lock.json
 
 # Brand inspiration (local reference only)
 ../brand-inspiration/
