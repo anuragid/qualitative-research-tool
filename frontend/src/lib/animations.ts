@@ -1,36 +1,34 @@
-import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-// Register plugins
-gsap.registerPlugin(useGSAP, ScrollTrigger);
+import { useGSAP } from "@gsap/react";
+import { gsap } from "gsap";
+
+// Register GSAP plugins
+gsap.registerPlugin(useGSAP);
 
 // Re-export for convenience
-export { gsap, useGSAP, ScrollTrigger };
+export { gsap, useGSAP };
 
-// Default easing presets
+// Design system easing presets (match CSS cubic-bezier(0.4, 0, 0.2, 1))
 export const ease = {
-  smooth: 'power2.out',
-  smoothInOut: 'power2.inOut',
-  snappy: 'power3.out',
-  bounce: 'back.out(1.4)',
-  gentle: 'power1.out',
+  standard: "power2.out", // closest GSAP match to our CSS ease
+  gentle: "power1.out",   // for stagger ease
+  enter: "power2.out",    // entrance animations
 } as const;
 
-// Duration presets (in seconds)
+// Duration presets matching design tokens
 export const duration = {
-  fast: 0.15,
-  normal: 0.3,
-  slow: 0.6,
-  page: 0.5,
+  micro: 0.15,   // matches --duration-micro
+  normal: 0.2,   // matches --duration-normal
+  slow: 0.5,     // matches --duration-slow
+  entrance: 0.4, // card/page entrance animations
 } as const;
 
-// Reusable animation configs
+// Reusable animation presets
 export const animations = {
   fadeInUp: {
-    y: 30,
+    y: 20,
     opacity: 0,
-    duration: duration.slow,
-    ease: ease.smooth,
+    duration: duration.entrance,
+    ease: ease.standard,
   },
   fadeIn: {
     opacity: 0,
@@ -41,7 +39,7 @@ export const animations = {
     scale: 0.95,
     opacity: 0,
     duration: duration.normal,
-    ease: ease.smooth,
+    ease: ease.standard,
   },
   stagger: {
     each: 0.08,
@@ -49,18 +47,8 @@ export const animations = {
   },
 } as const;
 
-// Counter animation helper
-export function animateCounter(
-  setter: (value: number) => void,
-  target: number,
-  durationSec = 2,
-  easeFn: string = ease.smooth
-) {
-  const counter = { value: 0 };
-  return gsap.to(counter, {
-    value: target,
-    duration: durationSec,
-    ease: easeFn,
-    onUpdate: () => setter(Math.round(counter.value)),
-  });
-}
+// Check for reduced motion preference
+export const prefersReducedMotion = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+};
