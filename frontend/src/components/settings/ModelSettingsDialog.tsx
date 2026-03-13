@@ -9,7 +9,6 @@ import {
 } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { Label } from "../ui/Label";
 import { useSettings } from "../../hooks/useSettings";
 
 interface ModelSettingsDialogProps {
@@ -71,15 +70,15 @@ export function ModelSettingsDialog({
         <div className="space-y-4 py-4">
           {/* Free models */}
           <div>
-            <Label className="text-sm font-medium">Free Models</Label>
+            <span className="text-section text-base-55">Free Models</span>
             <div className="mt-2 space-y-2">
               {freeModels.map((model) => (
                 <label
                   key={model.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                     currentModel === model.id || (!currentModel && model === freeModels[0])
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-border/80"
+                      ? "border-accent-blue bg-accent-blue-bg"
+                      : "border-border hover:bg-base-04"
                   }`}
                 >
                   <input
@@ -88,11 +87,11 @@ export function ModelSettingsDialog({
                     value={model.id}
                     checked={currentModel === model.id || (!currentModel && model === freeModels[0])}
                     onChange={() => setSelectedModel(model.id)}
-                    className="h-4 w-4"
+                    className="h-4 w-4 accent-accent-blue"
                   />
                   <div>
                     <div className="font-medium text-sm">{model.name}</div>
-                    <div className="text-xs text-muted-foreground">Free tier</div>
+                    <div className="text-xs text-base-55">Free tier</div>
                   </div>
                 </label>
               ))}
@@ -101,17 +100,17 @@ export function ModelSettingsDialog({
 
           {/* Premium models */}
           <div>
-            <Label className="text-sm font-medium">
-              Premium Models (requires API key)
-            </Label>
+            <span className="text-section text-base-55">
+              Premium Models
+            </span>
             <div className="mt-2 space-y-2">
               {premiumModels.map((model) => (
                 <label
                   key={model.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                     currentModel === model.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-border/80"
+                      ? "border-accent-blue bg-accent-blue-bg"
+                      : "border-border hover:bg-base-04"
                   } ${!settings?.has_api_key && !apiKey ? "opacity-50" : ""}`}
                 >
                   <input
@@ -121,11 +120,11 @@ export function ModelSettingsDialog({
                     checked={currentModel === model.id}
                     onChange={() => setSelectedModel(model.id)}
                     disabled={!settings?.has_api_key && !apiKey}
-                    className="h-4 w-4"
+                    className="h-4 w-4 accent-accent-blue"
                   />
                   <div>
                     <div className="font-medium text-sm">{model.name}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-base-55">
                       Premium - BYOK required
                     </div>
                   </div>
@@ -136,16 +135,16 @@ export function ModelSettingsDialog({
 
           {/* API Key */}
           <div>
-            <Label htmlFor="api-key" className="text-sm font-medium">
-              OpenRouter API Key
-            </Label>
+            <span className="text-section text-base-55">
+              API Key
+            </span>
             {settings?.has_api_key ? (
               <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                <div className="flex-1 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
                   API key configured
                 </div>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={handleRemoveKey}
                   disabled={isDeletingKey}
@@ -163,13 +162,13 @@ export function ModelSettingsDialog({
                 className="mt-2"
               />
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-base-55">
               Get your key at{" "}
               <a
                 href="https://openrouter.ai/keys"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary underline"
+                className="text-accent-blue underline"
               >
                 openrouter.ai/keys
               </a>
@@ -178,7 +177,7 @@ export function ModelSettingsDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isUpdating}>

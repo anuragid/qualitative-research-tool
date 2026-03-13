@@ -53,12 +53,12 @@ export function DeleteProjectDialog({
             Delete Project
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="space-y-3 text-sm text-base-55">
           <p>
             Are you sure you want to delete the project{' '}
-            <span className="font-semibold">"{project.name}"</span>?
+            <span className="font-semibold text-foreground">"{project.name}"</span>?
           </p>
-          <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3 text-sm">
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-sm">
             <p className="font-semibold text-destructive mb-1">
               This action cannot be undone and will permanently delete:
             </p>
@@ -77,7 +77,7 @@ export function DeleteProjectDialog({
         <DialogFooter className="gap-2">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             onClick={() => onOpenChange(false)}
             disabled={isPending}
           >

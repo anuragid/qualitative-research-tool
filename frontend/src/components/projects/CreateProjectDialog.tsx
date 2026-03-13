@@ -11,6 +11,7 @@ import {
 } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { Label } from "../ui/Label";
 import { Textarea } from "../ui/Textarea";
 import { Plus } from "lucide-react";
 
@@ -59,11 +60,11 @@ export default function CreateProjectDialog() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                Project Name *
-              </label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">
+                Project Name <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="name"
                 value={name}
@@ -73,10 +74,8 @@ export default function CreateProjectDialog() {
               />
             </div>
 
-            <div className="grid gap-2">
-              <label htmlFor="description" className="text-sm font-medium">
-                Description
-              </label>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
                 value={description}
@@ -90,7 +89,7 @@ export default function CreateProjectDialog() {
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => setOpen(false)}
             >
               Cancel

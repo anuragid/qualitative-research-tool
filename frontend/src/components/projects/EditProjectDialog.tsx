@@ -78,7 +78,7 @@ export function EditProjectDialog({
               Make changes to your project details below.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">
                 Project Name <span className="text-destructive">*</span>
@@ -107,7 +107,7 @@ export function EditProjectDialog({
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={isPending}
             >
