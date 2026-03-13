@@ -3,9 +3,10 @@ import { Input } from "./Input";
 import { Label } from "./Label";
 
 const meta = {
-  title: "UI/Input",
+  title: "Primitives/Input",
   component: Input,
   tags: ["autodocs"],
+  parameters: { layout: "centered" },
 } satisfies Meta<typeof Input>;
 
 export default meta;
@@ -17,9 +18,9 @@ export const Default: Story = {
 
 export const WithLabel: Story = {
   render: () => (
-    <div className="grid w-full max-w-sm items-center gap-1.5">
+    <div className="grid w-full max-w-sm items-center gap-1">
       <Label htmlFor="email">Email</Label>
-      <Input type="email" id="email" placeholder="Email" />
+      <Input type="email" id="email" placeholder="you@example.com" />
     </div>
   ),
 };
@@ -30,9 +31,20 @@ export const Disabled: Story = {
 
 export const File: Story = {
   render: () => (
-    <div className="grid w-full max-w-sm items-center gap-1.5">
+    <div className="grid w-full max-w-sm items-center gap-1">
       <Label htmlFor="video">Upload Video</Label>
       <Input id="video" type="file" />
+    </div>
+  ),
+};
+
+export const FocusState: Story = {
+  name: "Focus State (click to see)",
+  render: () => (
+    <div className="grid w-full max-w-sm items-center gap-1">
+      <Label htmlFor="focus-demo">Project Name</Label>
+      <Input id="focus-demo" placeholder="Click to see accent focus ring" />
+      <p className="text-sm text-base-40">Focus shows accent-blue border + ring</p>
     </div>
   ),
 };

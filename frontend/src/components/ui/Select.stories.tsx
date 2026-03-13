@@ -3,9 +3,10 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent,
   SelectGroup, SelectLabel, SelectItem,
 } from "./Select";
+import { Label } from "./Label";
 
 const meta = {
-  title: "UI/Select",
+  title: "Primitives/Select",
   component: Select,
   tags: ["autodocs"],
   parameters: { layout: "centered" },
@@ -34,5 +35,23 @@ export const Default: Story = {
         </SelectGroup>
       </SelectContent>
     </Select>
+  ),
+};
+
+export const WithLabel: Story = {
+  render: () => (
+    <div className="grid w-full max-w-sm items-center gap-1">
+      <Label htmlFor="model-select">AI Model</Label>
+      <Select>
+        <SelectTrigger className="w-[220px]">
+          <SelectValue placeholder="Choose model..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="gemma">Gemma 2 9B</SelectItem>
+          <SelectItem value="llama">Llama 3.1 8B</SelectItem>
+          <SelectItem value="claude">Claude Sonnet</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
   ),
 };

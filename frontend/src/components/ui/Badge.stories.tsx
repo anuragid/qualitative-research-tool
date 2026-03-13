@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Badge } from "./Badge";
 
 const meta = {
-  title: "UI/Badge",
+  title: "Primitives/Badge",
   component: Badge,
   tags: ["autodocs"],
   argTypes: {
@@ -11,6 +11,7 @@ const meta = {
       options: ["default", "secondary", "destructive", "outline", "success", "warning"],
     },
   },
+  parameters: { layout: "centered" },
 } satisfies Meta<typeof Badge>;
 
 export default meta;
@@ -32,6 +33,20 @@ export const AllVariants: Story = {
       <Badge variant="outline">Outline</Badge>
       <Badge variant="success">Completed</Badge>
       <Badge variant="warning">Processing</Badge>
+    </div>
+  ),
+};
+
+export const ProjectStatuses: Story = {
+  name: "Project Status Badges",
+  render: () => (
+    <div className="flex flex-wrap gap-2">
+      <Badge variant="secondary">Planning</Badge>
+      <Badge variant="secondary">Ready</Badge>
+      <Badge variant="warning">Processing</Badge>
+      <Badge variant="success">Completed</Badge>
+      <Badge variant="outline">Archived</Badge>
+      <Badge variant="destructive">Error</Badge>
     </div>
   ),
 };
