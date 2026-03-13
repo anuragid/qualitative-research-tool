@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { Transcript, SpeakerLabel, Word } from "../../types";
 import { useWordLevelTranscript } from "../../hooks/useWordLevelTranscript";
 import { useTranscriptSearch } from "../../hooks/useTranscriptSearch";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -15,6 +14,16 @@ interface TranscriptViewerProps {
   onLabelSpeaker?: (speakerLabel: string, name: string, role?: string) => void;
   videoId: string;
 }
+
+// Brand palette colors for speaker labels — cycles through these
+const speakerColors = [
+  { bg: "bg-brand-forest/15", text: "text-brand-forest", border: "border-brand-forest/30" },
+  { bg: "bg-brand-maroon/15", text: "text-brand-maroon", border: "border-brand-maroon/30" },
+  { bg: "bg-brand-mustard/15", text: "text-brand-mustard", border: "border-brand-mustard/30" },
+  { bg: "bg-accent-blue-bg", text: "text-accent-blue", border: "border-accent-blue-border/30" },
+  { bg: "bg-brand-olive/15", text: "text-brand-olive", border: "border-brand-olive/30" },
+  { bg: "bg-brand-crimson/15", text: "text-brand-crimson", border: "border-brand-crimson/30" },
+];
 
 export function TranscriptViewer({
   transcript,
@@ -35,6 +44,20 @@ export function TranscriptViewer({
 
   // Search for words in transcript
   const { data: searchResults, isLoading: searchLoading } = useTranscriptSearch(videoId, debouncedSearchQuery);
+
+  // Build a speaker-to-color map based on order of appearance
+  const speakerColorMap = useMemo(() => {
+    const map = new Map<string, typeof speakerColors[0]>();
+    if (!transcript.processed_transcript?.utterances) return map;
+    const seen = new Set<string>();
+    for (const utterance of transcript.processed_transcript.utterances) {
+      if (!seen.has(utterance.speaker)) {
+        seen.add(utterance.speaker);
+        map.set(utterance.speaker, speakerColors[(seen.size - 1) % speakerColors.length]);
+      }
+    }
+    return map;
+  }, [transcript.processed_transcript?.utterances]);
 
   const getSpeakerLabel = (speaker: string) => {
     const label = speakerLabels.find((l) => l.speaker_label === speaker);
@@ -219,151 +242,159 @@ export function TranscriptViewer({
   }, [searchQuery, navigateToNext, navigateToPrevious, clearSearch]);
 
   return (
-    <div className="space-y-6">
-      {/* Transcript Section */}
-      <Card className="relative">
-        <CardHeader className="sticky top-0 z-10 bg-card border-b">
-          <div className="flex items-center justify-between">
-            <CardTitle>Transcript</CardTitle>
+    <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+      {/* Search Bar — frosted glass style header */}
+      <div className="sticky top-0 z-10 frosted-glass border-b border-base-09 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-h4 text-foreground">Transcript</h3>
 
-            {/* Search Bar with integrated Navigation */}
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="transcript-search-input"
-                type="text"
-                placeholder="Search transcript..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-9 ${searchQuery ? (sortedMatchIndexes.length > 0 ? 'pr-28' : 'pr-20') : 'pr-3'}`}
-              />
+          {/* Search bar */}
+          <div className="relative w-80">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-40" />
+            <Input
+              id="transcript-search-input"
+              type="text"
+              placeholder="Search transcript..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`w-full pl-9 ${searchQuery ? (sortedMatchIndexes.length > 0 ? 'pr-28' : 'pr-20') : 'pr-3'}`}
+            />
 
-              {/* Search Results & Navigation inside the input */}
-              {searchQuery && (
-                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  {/* No results found state - only show after search completes */}
-                  {debouncedSearchQuery && !searchLoading && sortedMatchIndexes.length === 0 && (
-                    <span className="text-xs text-muted-foreground px-2">No results</span>
-                  )}
+            {/* Search Results & Navigation inside the input */}
+            {searchQuery && (
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {/* No results found state */}
+                {debouncedSearchQuery && !searchLoading && sortedMatchIndexes.length === 0 && (
+                  <span className="text-label text-base-40 px-2">No results</span>
+                )}
 
-                  {/* Navigation controls when matches found */}
-                  {sortedMatchIndexes.length > 0 && (
-                    <div className="flex items-center gap-0.5 px-1">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {currentMatchIndex + 1} of {sortedMatchIndexes.length}
-                      </span>
-                      <div className="flex items-center ml-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 w-5 p-0 hover:bg-accent"
-                          onClick={navigateToPrevious}
-                          title="Previous match (Shift+Enter)"
-                        >
-                          <ChevronUp className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 w-5 p-0 hover:bg-accent"
-                          onClick={navigateToNext}
-                          title="Next match (Enter)"
-                        >
-                          <ChevronDown className="h-3 w-3" />
-                        </Button>
-                      </div>
+                {/* Navigation controls when matches found */}
+                {sortedMatchIndexes.length > 0 && (
+                  <div className="flex items-center gap-0.5 px-1">
+                    <span className="text-label font-medium text-base-55">
+                      {currentMatchIndex + 1} of {sortedMatchIndexes.length}
+                    </span>
+                    <div className="flex items-center ml-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 hover:bg-base-04 rounded-md"
+                        onClick={navigateToPrevious}
+                        title="Previous match (Shift+Enter)"
+                      >
+                        <ChevronUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 hover:bg-base-04 rounded-md"
+                        onClick={navigateToNext}
+                        title="Next match (Enter)"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
                     </div>
-                  )}
-
-                  {/* Clear button */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-accent"
-                    onClick={clearSearch}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4" ref={transcriptContainerRef}>
-            {transcript.processed_transcript?.utterances?.map((utterance, index) => (
-              <div
-                key={index}
-                className="flex gap-4 p-4 bg-muted rounded-lg hover:bg-accent transition-colors"
-              >
-                <div className="flex-shrink-0 w-24 text-sm text-muted-foreground flex items-start gap-2">
-                  <Clock className="h-4 w-4 mt-0.5" />
-                  {formatTimestamp(utterance.start / 1000)}
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="secondary">
-                      {getSpeakerLabel(utterance.speaker)}
-                    </Badge>
-                    {getSpeakerRole(utterance.speaker) && (
-                      <span className="text-sm text-muted-foreground">
-                        {getSpeakerRole(utterance.speaker)}
-                      </span>
-                    )}
                   </div>
-                  <div className="text-foreground leading-relaxed">
-                    {wordLevelData ? (
-                      // Render words with highlighting
-                      getWordsForUtterance(utterance.start, utterance.end).map(({ word, globalIndex }) => {
-                        const isCurrentWord = globalIndex === currentWordIndex;
-                        const isSearchMatch = searchMatchIndexes.has(globalIndex);
-                        const isCurrentMatch = globalIndex === currentMatchWordIndex;
+                )}
 
-                        // Determine highlight style
-                        let className = 'cursor-pointer px-0.5 rounded transition-all duration-100 ';
-                        if (isCurrentMatch) {
-                          // Current search match - active highlight
-                          className += 'bg-warning text-warning-foreground font-semibold shadow-sm';
-                        } else if (isSearchMatch) {
-                          // Regular search match - subtle highlight
-                          className += 'bg-warning/30 hover:bg-warning/40';
-                        } else if (isCurrentWord) {
-                          // Currently playing word (video sync)
-                          className += 'bg-primary text-primary-foreground font-semibold shadow-sm';
-                        } else {
-                          // Normal word
-                          className += 'hover:bg-accent';
-                        }
-
-                        return (
-                          <span
-                            key={globalIndex}
-                            id={`word-${globalIndex}`}
-                            onClick={() => handleWordClick(globalIndex)}
-                            className={className}
-                            title={`Click to jump to ${(word.start / 1000).toFixed(1)}s`}
-                          >
-                            {word.text}{" "}
-                          </span>
-                        );
-                      })
-                    ) : (
-                      // Fallback to plain text if word-level data isn't available
-                      utterance.text
-                    )}
-                  </div>
-                  {utterance.confidence < 0.8 && (
-                    <div className="mt-1 text-xs text-warning">
-                      Low confidence: {Math.round(utterance.confidence * 100)}%
-                    </div>
-                  )}
-                </div>
+                {/* Clear button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-base-04 rounded-md"
+                  onClick={clearSearch}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
-            ))}
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Transcript Content */}
+      <div className="p-6 space-y-5" ref={transcriptContainerRef}>
+        {transcript.processed_transcript?.utterances?.map((utterance, index) => {
+          const colorSet = speakerColorMap.get(utterance.speaker) || speakerColors[0];
+
+          return (
+            <div
+              key={index}
+              className="flex gap-5 p-4 rounded-xl hover:bg-base-04 transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
+            >
+              {/* Timestamp */}
+              <div className="flex-shrink-0 w-20 text-label text-base-40 flex items-start gap-1.5 pt-1">
+                <Clock className="h-3 w-3 mt-0.5" />
+                {formatTimestamp(utterance.start / 1000)}
+              </div>
+
+              <div className="flex-1">
+                {/* Speaker label with role */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className={`${colorSet.bg} ${colorSet.text} border-0`}>
+                    {getSpeakerLabel(utterance.speaker)}
+                  </Badge>
+                  {getSpeakerRole(utterance.speaker) && (
+                    <span className="text-label text-base-40">
+                      {getSpeakerRole(utterance.speaker)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Word-level transcript text */}
+                <div className="text-base-85 leading-relaxed">
+                  {wordLevelData ? (
+                    // Render words with highlighting
+                    getWordsForUtterance(utterance.start, utterance.end).map(({ word, globalIndex }) => {
+                      const isCurrentWord = globalIndex === currentWordIndex;
+                      const isSearchMatch = searchMatchIndexes.has(globalIndex);
+                      const isCurrentMatch = globalIndex === currentMatchWordIndex;
+
+                      // Determine highlight style using design tokens
+                      let className = 'cursor-pointer px-0.5 rounded transition-all duration-100 ';
+                      if (isCurrentMatch) {
+                        // Current search match — active highlight (pale gold, prominent)
+                        className += 'bg-brand-pale-gold font-semibold shadow-sm';
+                      } else if (isSearchMatch) {
+                        // Regular search match — subtle gold highlight
+                        className += 'bg-brand-pale-gold/40 hover:bg-brand-pale-gold/60';
+                      } else if (isCurrentWord) {
+                        // Currently playing word (video sync) — accent blue bg
+                        className += 'bg-accent-blue-bg font-semibold shadow-sm';
+                      } else {
+                        // Normal word
+                        className += 'hover:bg-base-04';
+                      }
+
+                      return (
+                        <span
+                          key={globalIndex}
+                          id={`word-${globalIndex}`}
+                          onClick={() => handleWordClick(globalIndex)}
+                          className={className}
+                          title={`Click to jump to ${(word.start / 1000).toFixed(1)}s`}
+                        >
+                          {word.text}{" "}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    // Fallback to plain text if word-level data isn't available
+                    utterance.text
+                  )}
+                </div>
+
+                {/* Low confidence warning */}
+                {utterance.confidence < 0.8 && (
+                  <div className="mt-1 text-label text-brand-mustard">
+                    Low confidence: {Math.round(utterance.confidence * 100)}%
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

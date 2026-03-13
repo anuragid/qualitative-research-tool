@@ -27,6 +27,7 @@ export function ContinueStepButton({
       size={size}
       disabled={isDisabled}
       variant={isLoading ? "secondary" : "default"}
+      className="rounded-full"
     >
       {isAnyStepPending ? (
         <>
