@@ -213,8 +213,8 @@ export default function VideoDetailPage() {
   if (videoLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="min-h-screen bg-surface-page flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-base-40" />
         </div>
       </Layout>
     );
@@ -223,8 +223,8 @@ export default function VideoDetailPage() {
   if (!video) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Video not found</p>
+        <div className="min-h-screen bg-surface-page text-center py-12">
+          <p className="text-base-55">Video not found</p>
         </div>
       </Layout>
     );
@@ -322,368 +322,363 @@ export default function VideoDetailPage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link to={`/projects/${video.project_id}`}>
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Project
-            </Button>
-          </Link>
-        </div>
+      <div className="min-h-screen bg-surface-page">
+        <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+          {/* Breadcrumb / Back Navigation */}
+          <div className="flex items-center gap-3">
+            <Link to={`/projects/${video.project_id}`}>
+              <Button variant="ghost" size="sm" className="text-base-55 hover:text-base-85 gap-2 rounded-full">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Project
+              </Button>
+            </Link>
+          </div>
 
-        {/* Video Info Card */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <VideoIcon className="h-6 w-6 text-muted-foreground" />
-                <div>
-                  <CardTitle className="text-2xl">{video.filename}</CardTitle>
-                  <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
-                    <span>{formatFileSize(video.file_size_bytes)}</span>
-                    {video.duration_seconds && (
-                      <>
-                        <span>•</span>
-                        <span>{Math.floor(video.duration_seconds / 60)}:{(video.duration_seconds % 60).toString().padStart(2, '0')}</span>
-                      </>
-                    )}
-                    <span>•</span>
-                    <span>{new Date(video.uploaded_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
+          {/* Page Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-h2 text-foreground">{video.filename}</h1>
+              <div className="flex items-center gap-3 mt-2 text-sm text-base-55">
+                <span>{formatFileSize(video.file_size_bytes)}</span>
+                {video.duration_seconds && (
+                  <>
+                    <span className="text-base-25">|</span>
+                    <span>{Math.floor(video.duration_seconds / 60)}:{(video.duration_seconds % 60).toString().padStart(2, '0')}</span>
+                  </>
+                )}
+                <span className="text-base-25">|</span>
+                <span>{new Date(video.uploaded_at).toLocaleDateString()}</span>
               </div>
-              {getStatusBadge(video.status)}
             </div>
-          </CardHeader>
-          <CardContent>
-            {/* Error message */}
-            {video.error_message && (
-              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-destructive">Error</p>
-                  <p className="text-sm text-destructive/80">{video.error_message}</p>
+            {getStatusBadge(video.status)}
+          </div>
+
+          {/* Error message */}
+          {video.error_message && (
+            <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-2xl flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-destructive">Error</p>
+                <p className="text-sm text-destructive/80">{video.error_message}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Video Player — elevated white card */}
+          {playbackUrl && (
+            <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+              <video
+                id="main-video-player"
+                key={playbackUrl}
+                controls
+                className="w-full bg-black"
+                style={{ maxHeight: "600px" }}
+                preload="metadata"
+              >
+                <source src={playbackUrl} type="video/mp4" />
+                <source src={playbackUrl} type="video/quicktime" />
+                <source src={playbackUrl} type="video/x-msvideo" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
+
+          {/* Progress indicator for ongoing tasks */}
+          {(video.status === "transcribing" || video.status === "analyzing") && (
+            <div className="bg-card rounded-2xl shadow-card p-6 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-base-55">
+                <Clock className="h-4 w-4" />
+                <span>
+                  {video.status === "transcribing"
+                    ? "Transcription in progress..."
+                    : "Running 5D analysis..."}
+                </span>
+              </div>
+              <Progress value={undefined} className="h-2" />
+            </div>
+          )}
+
+          {/* WORKFLOW PREREQUISITES SECTION */}
+          {transcript && !analysis && (
+            <div className="bg-card rounded-2xl shadow-card border border-accent-blue-border/30 overflow-hidden">
+              <div className="p-6 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-accent-blue" />
+                  <h2 className="text-h4 text-foreground">Analysis Prerequisites</h2>
+                  <SimpleTooltip content="Complete these steps before starting the 5D analysis">
+                    <Info className="h-4 w-4 text-accent-blue" />
+                  </SimpleTooltip>
                 </div>
               </div>
-            )}
-
-            {/* Video Player */}
-            {playbackUrl && (
-              <div className="mb-6">
-                <video
-                  id="main-video-player"
-                  key={playbackUrl}
-                  controls
-                  className="w-full rounded-lg bg-black"
-                  style={{ maxHeight: "600px" }}
-                  preload="metadata"
-                >
-                  <source src={playbackUrl} type="video/mp4" />
-                  <source src={playbackUrl} type="video/quicktime" />
-                  <source src={playbackUrl} type="video/x-msvideo" />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            )}
-
-            {/* Progress indicator for ongoing tasks */}
-            {(video.status === "transcribing" || video.status === "analyzing") && (
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>
-                    {video.status === "transcribing"
-                      ? "Transcription in progress..."
-                      : "Running 5D analysis..."}
-                  </span>
-                </div>
-                <Progress value={undefined} className="h-2" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* WORKFLOW PREREQUISITES SECTION */}
-        {transcript && !analysis && (
-          <Card className="border-2 border-info/30 bg-info/5">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-info" />
-                <CardTitle className="text-lg">Analysis Prerequisites</CardTitle>
-                <SimpleTooltip content="Complete these steps before starting the 5D analysis">
-                  <Info className="h-4 w-4 text-info" />
-                </SimpleTooltip>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Step 1: Video Upload */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
-                  <CheckCircle className="h-5 w-5 text-success" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-foreground">1. Upload Video</h3>
-                    <Badge variant="success" className="text-xs">Complete</Badge>
+              <div className="p-6 space-y-6">
+                {/* Step 1: Video Upload */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-forest/20 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-brand-forest" />
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">Your video has been uploaded successfully.</p>
-                </div>
-              </div>
-
-              {/* Step 2: Transcription */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
-                  <CheckCircle className="h-5 w-5 text-success" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-foreground">2. Complete Transcription</h3>
-                    <Badge variant="success" className="text-xs">Complete</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">Audio has been transcribed with speaker detection.</p>
-                </div>
-              </div>
-
-              {/* Step 3: Speaker Labels - CRITICAL */}
-              <div className="flex items-start gap-3">
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  canStartAnalysis() ? "bg-success/20" : "bg-warning/20"
-                }`}>
-                  {canStartAnalysis() ? (
-                    <CheckCircle className="h-5 w-5 text-success" />
-                  ) : (
-                    <AlertTriangle className="h-5 w-5 text-warning" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-foreground">3. Assign Speaker Roles</h3>
-                    {canStartAnalysis() ? (
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-base-85">1. Upload Video</h3>
                       <Badge variant="success" className="text-xs">Complete</Badge>
-                    ) : (
-                      <Badge variant="warning" className="text-xs">Required</Badge>
-                    )}
-                    <SimpleTooltip content="The analysis filters content based on speaker roles. Only participant responses are analyzed to extract insights.">
-                      <Info className="h-4 w-4 text-info" />
-                    </SimpleTooltip>
+                    </div>
+                    <p className="text-sm text-base-55 mt-1">Your video has been uploaded successfully.</p>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    <strong>Critical:</strong> Identify who is the interviewer vs. participant in your video.
-                  </p>
+                </div>
 
-                  {/* Why this matters */}
-                  <div className="mt-3 p-3 bg-info/10 border border-info/30 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <Info className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-foreground">
-                        <p className="font-semibold mb-1">Why speaker roles matter:</p>
-                        <p>The 5D analysis focuses exclusively on <strong>participant responses</strong> to extract insights about user needs and behaviors. Interviewer questions provide context but are not analyzed. This ensures the analysis captures the participant's perspective, not the interviewer's.</p>
+                {/* Step 2: Transcription */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-forest/20 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-brand-forest" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-base-85">2. Complete Transcription</h3>
+                      <Badge variant="success" className="text-xs">Complete</Badge>
+                    </div>
+                    <p className="text-sm text-base-55 mt-1">Audio has been transcribed with speaker detection.</p>
+                  </div>
+                </div>
+
+                {/* Step 3: Speaker Labels - CRITICAL */}
+                <div className="flex items-start gap-3">
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                    canStartAnalysis() ? "bg-brand-forest/20" : "bg-brand-mustard/20"
+                  }`}>
+                    {canStartAnalysis() ? (
+                      <CheckCircle className="h-5 w-5 text-brand-forest" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5 text-brand-mustard" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-base-85">3. Assign Speaker Roles</h3>
+                      {canStartAnalysis() ? (
+                        <Badge variant="success" className="text-xs">Complete</Badge>
+                      ) : (
+                        <Badge variant="warning" className="text-xs">Required</Badge>
+                      )}
+                      <SimpleTooltip content="The analysis filters content based on speaker roles. Only participant responses are analyzed to extract insights.">
+                        <Info className="h-4 w-4 text-accent-blue" />
+                      </SimpleTooltip>
+                    </div>
+                    <p className="text-sm text-base-55 mt-1">
+                      <strong>Critical:</strong> Identify who is the interviewer vs. participant in your video.
+                    </p>
+
+                    {/* Why this matters */}
+                    <div className="mt-3 p-4 bg-brand-pale-blue/30 border border-accent-blue-border/20 rounded-xl">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-4 w-4 text-accent-blue flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-base-85">
+                          <p className="font-semibold mb-1">Why speaker roles matter:</p>
+                          <p className="text-base-62">The 5D analysis focuses exclusively on <strong>participant responses</strong> to extract insights about user needs and behaviors. Interviewer questions provide context but are not analyzed. This ensures the analysis captures the participant's perspective, not the interviewer's.</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Speaker labels interface */}
-                  <div className="mt-4 space-y-3">
-                    <h4 className="text-sm font-semibold text-foreground/80 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Detected Speakers ({getUniqueSpeakers().length})
-                    </h4>
-                    {getUniqueSpeakers().map((speaker) => {
-                      const label = speakerLabels?.find((l) => l.speaker_label === speaker);
-                      const hasRole = label?.role === "Interviewer" || label?.role === "Participant";
+                    {/* Speaker labels interface */}
+                    <div className="mt-4 space-y-3">
+                      <h4 className="text-sm font-semibold text-base-62 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Detected Speakers ({getUniqueSpeakers().length})
+                      </h4>
+                      {getUniqueSpeakers().map((speaker) => {
+                        const label = speakerLabels?.find((l) => l.speaker_label === speaker);
+                        const hasRole = label?.role === "Interviewer" || label?.role === "Participant";
 
-                      return (
-                        <div
-                          key={speaker}
-                          className={`flex items-center gap-3 p-3 rounded-lg border-2 ${
-                            hasRole
-                              ? "bg-success/10 border-success/30"
-                              : "bg-warning/10 border-warning/40"
-                          }`}
-                        >
-                          <User className={`h-4 w-4 ${hasRole ? "text-success" : "text-warning"}`} />
+                        return (
+                          <div
+                            key={speaker}
+                            className={`flex items-center gap-3 p-3 rounded-xl border-2 ${
+                              hasRole
+                                ? "bg-brand-pale-green/30 border-brand-forest/30"
+                                : "bg-brand-pale-gold/30 border-brand-mustard/40"
+                            }`}
+                          >
+                            <User className={`h-4 w-4 ${hasRole ? "text-brand-forest" : "text-brand-mustard"}`} />
 
-                          {editingSpeaker === speaker ? (
-                            <div className="flex-1 flex gap-2">
-                              <Input
-                                type="text"
-                                placeholder="Name (optional)"
-                                value={speakerName}
-                                onChange={(e) => setSpeakerName(e.target.value)}
-                                className="flex-1"
-                              />
-                              <select
-                                value={speakerRole}
-                                onChange={(e) => setSpeakerRole(e.target.value)}
-                                className="flex-1 px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-card"
-                              >
-                                <option value="">Select role...</option>
-                                <option value="Interviewer">Interviewer</option>
-                                <option value="Participant">Participant</option>
-                              </select>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  // Allow saving even without name, as long as role is selected
-                                  if (speakerRole) {
-                                    handleLabelSpeaker(
-                                      speaker,
-                                      speakerName.trim() || speaker,
-                                      speakerRole || undefined
-                                    );
+                            {editingSpeaker === speaker ? (
+                              <div className="flex-1 flex gap-2">
+                                <Input
+                                  type="text"
+                                  placeholder="Name (optional)"
+                                  value={speakerName}
+                                  onChange={(e) => setSpeakerName(e.target.value)}
+                                  className="flex-1"
+                                />
+                                <select
+                                  value={speakerRole}
+                                  onChange={(e) => setSpeakerRole(e.target.value)}
+                                  className="flex-1 px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-card"
+                                >
+                                  <option value="">Select role...</option>
+                                  <option value="Interviewer">Interviewer</option>
+                                  <option value="Participant">Participant</option>
+                                </select>
+                                <Button
+                                  size="sm"
+                                  className="rounded-full"
+                                  onClick={() => {
+                                    // Allow saving even without name, as long as role is selected
+                                    if (speakerRole) {
+                                      handleLabelSpeaker(
+                                        speaker,
+                                        speakerName.trim() || speaker,
+                                        speakerRole || undefined
+                                      );
+                                      setEditingSpeaker(null);
+                                      setSpeakerName("");
+                                      setSpeakerRole("");
+                                    }
+                                  }}
+                                  disabled={!speakerRole}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-full"
+                                  onClick={() => {
                                     setEditingSpeaker(null);
                                     setSpeakerName("");
                                     setSpeakerRole("");
-                                  }
-                                }}
-                                disabled={!speakerRole}
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEditingSpeaker(null);
-                                  setSpeakerName("");
-                                  setSpeakerRole("");
-                                }}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="flex-1">
-                                <div className="font-medium text-foreground">
-                                  {label?.assigned_name || speaker}
-                                </div>
-                                {label?.role ? (
-                                  <div className="text-sm font-semibold text-foreground/80">
-                                    Role: {label.role}
-                                  </div>
-                                ) : (
-                                  <div className="text-sm text-warning font-semibold">
-                                    Role not assigned
-                                  </div>
-                                )}
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEditingSpeaker(speaker);
-                                  setSpeakerName(label?.assigned_name || "");
-                                  setSpeakerRole(label?.role || "");
-                                }}
-                              >
-                                <Edit2 className="h-4 w-4 mr-1" />
-                                {hasRole ? "Edit" : "Assign Role"}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Validation message */}
-                  {getWorkflowBlockerMessage() && (
-                    <div className="mt-3 p-3 bg-warning/10 border border-warning/40 rounded-lg flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-warning font-semibold">
-                        {getWorkflowBlockerMessage()}
-                      </p>
+                            ) : (
+                              <>
+                                <div className="flex-1">
+                                  <div className="font-medium text-base-85">
+                                    {label?.assigned_name || speaker}
+                                  </div>
+                                  {label?.role ? (
+                                    <div className="text-sm font-semibold text-base-62">
+                                      Role: {label.role}
+                                    </div>
+                                  ) : (
+                                    <div className="text-sm text-brand-mustard font-semibold">
+                                      Role not assigned
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-full"
+                                  onClick={() => {
+                                    setEditingSpeaker(speaker);
+                                    setSpeakerName(label?.assigned_name || "");
+                                    setSpeakerRole(label?.role || "");
+                                  }}
+                                >
+                                  <Edit2 className="h-4 w-4 mr-1" />
+                                  {hasRole ? "Edit" : "Assign Role"}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Step 4: Start Analysis */}
-              <div className="flex items-start gap-3">
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  canStartAnalysis() ? "bg-primary/20" : "bg-muted"
-                }`}>
-                  <Lightbulb className={`h-5 w-5 ${canStartAnalysis() ? "text-primary" : "text-muted-foreground"}`} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-foreground">4. Start 5D Analysis</h3>
-                    {!canStartAnalysis() && (
-                      <Badge variant="secondary" className="text-xs">Waiting</Badge>
+                    {/* Validation message */}
+                    {getWorkflowBlockerMessage() && (
+                      <div className="mt-3 p-3 bg-brand-pale-gold/30 border border-brand-mustard/40 rounded-xl flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-brand-mustard flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-brand-mustard font-semibold">
+                          {getWorkflowBlockerMessage()}
+                        </p>
+                      </div>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Once all speakers have assigned roles, you can begin the analysis.
-                  </p>
+                </div>
 
-                  <div className="mt-4 flex gap-3">
-                    <SimpleTooltip
-                      content={canStartAnalysis()
-                        ? "Start step-by-step analysis (recommended)"
-                        : "Complete speaker role assignments first"
-                      }
-                    >
-                      <Button
-                        onClick={handleStartChunkStep}
-                        disabled={!canStartAnalysis() || startChunkStep.isPending}
-                        variant="default"
-                        size="lg"
+                {/* Step 4: Start Analysis */}
+                <div className="flex items-start gap-3">
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                    canStartAnalysis() ? "bg-accent-blue-bg" : "bg-base-04"
+                  }`}>
+                    <Lightbulb className={`h-5 w-5 ${canStartAnalysis() ? "text-accent-blue" : "text-base-40"}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-base-85">4. Start 5D Analysis</h3>
+                      {!canStartAnalysis() && (
+                        <Badge variant="secondary" className="text-xs">Waiting</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-base-55 mt-1">
+                      Once all speakers have assigned roles, you can begin the analysis.
+                    </p>
+
+                    <div className="mt-4 flex gap-3">
+                      <SimpleTooltip
+                        content={canStartAnalysis()
+                          ? "Start step-by-step analysis (recommended)"
+                          : "Complete speaker role assignments first"
+                        }
                       >
-                        {startChunkStep.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Starting Analysis...
-                          </>
-                        ) : (
-                          <>
-                            <Lightbulb className="h-4 w-4 mr-2" />
-                            Start Analysis
-                          </>
-                        )}
-                      </Button>
-                    </SimpleTooltip>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
                         <Button
-                          variant="outline"
+                          onClick={handleStartChunkStep}
+                          disabled={!canStartAnalysis() || startChunkStep.isPending}
                           size="lg"
-                          className="h-10 w-10 p-0"
-                          disabled={!canStartAnalysis() || startChunkStep.isPending || startFullAnalysis.isPending}
+                          className="rounded-full"
                         >
-                          <MoreVertical className="h-4 w-4" />
-                          <span className="sr-only">More options</span>
+                          {startChunkStep.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Starting Analysis...
+                            </>
+                          ) : (
+                            <>
+                              <Lightbulb className="h-4 w-4 mr-2" />
+                              Start Analysis
+                            </>
+                          )}
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={handleStartFullAnalysis}
-                          disabled={startFullAnalysis.isPending}
-                        >
-                          <Zap className="mr-2 h-4 w-4" />
-                          Run Full Analysis (Advanced)
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      </SimpleTooltip>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            className="h-10 w-10 p-0 rounded-full"
+                            disabled={!canStartAnalysis() || startChunkStep.isPending || startFullAnalysis.isPending}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">More options</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={handleStartFullAnalysis}
+                            disabled={startFullAnalysis.isPending}
+                          >
+                            <Zap className="mr-2 h-4 w-4" />
+                            Run Full Analysis (Advanced)
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
 
-        {/* Original transcription button if no transcript yet */}
-        {canStartTranscription && (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FileText className="h-12 w-12 text-muted-foreground/60 mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">
+          {/* Original transcription button if no transcript yet */}
+          {canStartTranscription && (
+            <div className="bg-card rounded-2xl shadow-card p-12 text-center">
+              <FileText className="h-12 w-12 text-base-25 mx-auto mb-4" />
+              <p className="text-base-55 mb-4">
                 No transcript available. Start transcription to begin the analysis process.
               </p>
-              <Button onClick={handleStartTranscription} disabled={startTranscription.isPending}>
+              <Button onClick={handleStartTranscription} disabled={startTranscription.isPending} className="rounded-full">
                 {startTranscription.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -696,235 +691,231 @@ export default function VideoDetailPage() {
                   </>
                 )}
               </Button>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
 
-        {/* Main Content Tabs */}
-        {transcript && (
-          <Tabs defaultValue="transcript" className="w-full">
-            <TabsList>
-              <TabsTrigger value="transcript">
-                <FileText className="h-4 w-4 mr-2" />
-                Transcript
-              </TabsTrigger>
-              <TabsTrigger value="analysis" disabled={!analysis}>
-                <Lightbulb className="h-4 w-4 mr-2" />
-                Analysis
-                {hasAnalysis && (
-                  <Badge variant="success" className="ml-2 text-xs">
-                    Complete
-                  </Badge>
-                )}
-                {isStepByStepMode && (
-                  <Badge variant="default" className="ml-2 text-xs">
-                    In Progress
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
+          {/* Main Content Tabs — Transcript & Analysis */}
+          {transcript && (
+            <Tabs defaultValue="transcript" className="w-full">
+              <TabsList>
+                <TabsTrigger value="transcript">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Transcript
+                </TabsTrigger>
+                <TabsTrigger value="analysis" disabled={!analysis}>
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  Analysis
+                  {hasAnalysis && (
+                    <Badge variant="success" className="ml-2 text-xs">
+                      Complete
+                    </Badge>
+                  )}
+                  {isStepByStepMode && (
+                    <Badge variant="default" className="ml-2 text-xs">
+                      In Progress
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Transcript Tab */}
-            <TabsContent value="transcript" className="space-y-6">
-              {transcriptLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : transcript ? (
-                <TranscriptViewer
-                  transcript={transcript}
-                  speakerLabels={speakerLabels}
-                  onLabelSpeaker={handleLabelSpeaker}
-                  videoId={videoId!}
-                />
-              ) : null}
-            </TabsContent>
+              {/* Transcript Tab */}
+              <TabsContent value="transcript" className="mt-6">
+                {transcriptLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-base-40" />
+                  </div>
+                ) : transcript ? (
+                  <TranscriptViewer
+                    transcript={transcript}
+                    speakerLabels={speakerLabels}
+                    onLabelSpeaker={handleLabelSpeaker}
+                    videoId={videoId!}
+                  />
+                ) : null}
+              </TabsContent>
 
-            {/* Analysis Tab */}
-            <TabsContent value="analysis" className="space-y-6">
-              {analysisLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : hasAnalysis ? (
-                // Complete mode: Show all steps in tabs
-                <Tabs defaultValue="chunks" className="w-full">
-                  <TabsList>
-                    <TabsTrigger value="chunks">
-                      1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
-                    </TabsTrigger>
-                    <TabsTrigger value="inferences">
-                      2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
-                    </TabsTrigger>
-                    <TabsTrigger value="patterns">
-                      3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
-                    </TabsTrigger>
-                    <TabsTrigger value="insights">
-                      4. Insights {analysis.insights && `(${analysis.insights.length})`}
-                    </TabsTrigger>
-                    <TabsTrigger value="principles">
-                      5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="chunks">
-                    {analysis.chunks && <ChunksList chunks={analysis.chunks} />}
-                  </TabsContent>
-
-                  <TabsContent value="inferences">
-                    {analysis.inferences && (
-                      <InferencesList
-                        inferences={analysis.inferences}
-                        chunks={analysis.chunks || []}
-                      />
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="patterns">
-                    {analysis.patterns && <PatternsList patterns={analysis.patterns} />}
-                  </TabsContent>
-
-                  <TabsContent value="insights">
-                    {analysis.insights && <InsightsList insights={analysis.insights} />}
-                  </TabsContent>
-
-                  <TabsContent value="principles">
-                    {analysis.design_principles && (
-                      <PrinciplesList principles={analysis.design_principles} />
-                    )}
-                  </TabsContent>
-                </Tabs>
-              ) : isStepByStepMode && stepInfo ? (
-                // Step-by-step mode: Show progress and tabs with states
-                <div className="space-y-6">
-                  {/* Progress indicator */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                      <CardTitle>Analysis Progress</CardTitle>
-                      {stepInfo.nextStep && (
-                        <ContinueStepButton
-                          onClick={stepInfo.handler}
-                          nextStepLabel={getNextStepLabel(stepInfo.nextStep)}
-                          canContinue={canContinueCurrentStep()}
-                          isAnyStepPending={isAnyStepPending}
-                          isCurrentStepProcessing={isCurrentStepProcessing}
-                          size="sm"
-                        />
-                      )}
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Current Step:</span>
-                        <Badge variant="default">
-                          Step {stepInfo.number}: {stepInfo.name}
-                        </Badge>
-                        {analysis.current_step && analysis.step_status?.[analysis.current_step] === "processing" && (
-                          <Badge variant="outline" className="ml-2">
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Processing
-                          </Badge>
-                        )}
-                      </div>
-                      <Progress value={(stepInfo.number / 5) * 100} />
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <CheckCircle className="h-4 w-4 text-success" />
-                        {stepInfo.number} of 5 steps completed
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Step tabs with state indicators */}
-                  <Tabs value={activeStepTab} onValueChange={setActiveStepTab} className="w-full">
+              {/* Analysis Tab */}
+              <TabsContent value="analysis" className="mt-6 space-y-6">
+                {analysisLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-base-40" />
+                  </div>
+                ) : hasAnalysis ? (
+                  // Complete mode: Show all steps in tabbed accordion sections
+                  <Tabs defaultValue="chunks" className="w-full">
                     <TabsList>
-                      <TabsTrigger
-                        value="chunks"
-                        disabled={!analysis.chunks}
-                      >
-                        {analysis.step_status?.chunk === "completed" && (
-                          <CheckCircle className="h-3 w-3 mr-1 text-success" />
-                        )}
-                        {analysis.step_status?.chunk === "processing" && (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        )}
+                      <TabsTrigger value="chunks">
                         1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="inferences"
-                        disabled={!analysis.inferences && analysis.step_status?.infer !== "error"}
-                      >
-                        {analysis.step_status?.infer === "completed" && (
-                          <CheckCircle className="h-3 w-3 mr-1 text-success" />
-                        )}
-                        {analysis.step_status?.infer === "processing" && (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        )}
-                        {analysis.step_status?.infer === "error" && (
-                          <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
-                        )}
+                      <TabsTrigger value="inferences">
                         2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="patterns"
-                        disabled={!analysis.patterns && analysis.step_status?.relate !== "error"}
-                      >
-                        {analysis.step_status?.relate === "completed" && (
-                          <CheckCircle className="h-3 w-3 mr-1 text-success" />
-                        )}
-                        {analysis.step_status?.relate === "processing" && (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        )}
-                        {analysis.step_status?.relate === "error" && (
-                          <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
-                        )}
+                      <TabsTrigger value="patterns">
                         3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="insights"
-                        disabled={!analysis.insights && analysis.step_status?.explain !== "error"}
-                      >
-                        {analysis.step_status?.explain === "completed" && (
-                          <CheckCircle className="h-3 w-3 mr-1 text-success" />
-                        )}
-                        {analysis.step_status?.explain === "processing" && (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        )}
-                        {analysis.step_status?.explain === "error" && (
-                          <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
-                        )}
+                      <TabsTrigger value="insights">
                         4. Insights {analysis.insights && `(${analysis.insights.length})`}
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="principles"
-                        disabled={!analysis.design_principles && analysis.step_status?.activate !== "error"}
-                      >
-                        {analysis.step_status?.activate === "completed" && (
-                          <CheckCircle className="h-3 w-3 mr-1 text-success" />
-                        )}
-                        {analysis.step_status?.activate === "processing" && (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        )}
-                        {analysis.step_status?.activate === "error" && (
-                          <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
-                        )}
+                      <TabsTrigger value="principles">
                         5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
                       </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="chunks">
-                      {analysis.step_status?.chunk === "processing" ? (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">Processing chunks...</p>
-                          </CardContent>
-                        </Card>
-                      ) : analysis.chunks ? (
-                        <>
-                          <ChunksList chunks={analysis.chunks} />
-                          {analysis.current_step === "chunk" && stepInfo.nextStep && (
-                            <Card className="mt-4">
-                              <CardContent className="py-6 text-center">
-                                <p className="text-muted-foreground mb-4">
+                    <TabsContent value="chunks" className="mt-6">
+                      {analysis.chunks && <ChunksList chunks={analysis.chunks} />}
+                    </TabsContent>
+
+                    <TabsContent value="inferences" className="mt-6">
+                      {analysis.inferences && (
+                        <InferencesList
+                          inferences={analysis.inferences}
+                          chunks={analysis.chunks || []}
+                        />
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="patterns" className="mt-6">
+                      {analysis.patterns && <PatternsList patterns={analysis.patterns} />}
+                    </TabsContent>
+
+                    <TabsContent value="insights" className="mt-6">
+                      {analysis.insights && <InsightsList insights={analysis.insights} />}
+                    </TabsContent>
+
+                    <TabsContent value="principles" className="mt-6">
+                      {analysis.design_principles && (
+                        <PrinciplesList principles={analysis.design_principles} />
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                ) : isStepByStepMode && stepInfo ? (
+                  // Step-by-step mode: Show progress and tabs with states
+                  <div className="space-y-6">
+                    {/* Progress indicator */}
+                    <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+                      <div className="p-5 flex items-center justify-between border-b border-border">
+                        <h3 className="text-h4 text-foreground">Analysis Progress</h3>
+                        {stepInfo.nextStep && (
+                          <ContinueStepButton
+                            onClick={stepInfo.handler}
+                            nextStepLabel={getNextStepLabel(stepInfo.nextStep)}
+                            canContinue={canContinueCurrentStep()}
+                            isAnyStepPending={isAnyStepPending}
+                            isCurrentStepProcessing={isCurrentStepProcessing}
+                            size="sm"
+                          />
+                        )}
+                      </div>
+                      <div className="p-5 space-y-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-base-55">Current Step:</span>
+                          <Badge variant="default">
+                            Step {stepInfo.number}: {stepInfo.name}
+                          </Badge>
+                          {analysis.current_step && analysis.step_status?.[analysis.current_step] === "processing" && (
+                            <Badge variant="outline" className="ml-2">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Processing
+                            </Badge>
+                          )}
+                        </div>
+                        <Progress value={(stepInfo.number / 5) * 100} />
+                        <div className="flex items-center gap-2 text-xs text-base-40">
+                          <CheckCircle className="h-4 w-4 text-brand-forest" />
+                          {stepInfo.number} of 5 steps completed
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step tabs with state indicators */}
+                    <Tabs value={activeStepTab} onValueChange={setActiveStepTab} className="w-full">
+                      <TabsList>
+                        <TabsTrigger
+                          value="chunks"
+                          disabled={!analysis.chunks}
+                        >
+                          {analysis.step_status?.chunk === "completed" && (
+                            <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
+                          )}
+                          {analysis.step_status?.chunk === "processing" && (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          )}
+                          1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="inferences"
+                          disabled={!analysis.inferences && analysis.step_status?.infer !== "error"}
+                        >
+                          {analysis.step_status?.infer === "completed" && (
+                            <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
+                          )}
+                          {analysis.step_status?.infer === "processing" && (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          )}
+                          {analysis.step_status?.infer === "error" && (
+                            <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
+                          )}
+                          2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="patterns"
+                          disabled={!analysis.patterns && analysis.step_status?.relate !== "error"}
+                        >
+                          {analysis.step_status?.relate === "completed" && (
+                            <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
+                          )}
+                          {analysis.step_status?.relate === "processing" && (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          )}
+                          {analysis.step_status?.relate === "error" && (
+                            <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
+                          )}
+                          3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="insights"
+                          disabled={!analysis.insights && analysis.step_status?.explain !== "error"}
+                        >
+                          {analysis.step_status?.explain === "completed" && (
+                            <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
+                          )}
+                          {analysis.step_status?.explain === "processing" && (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          )}
+                          {analysis.step_status?.explain === "error" && (
+                            <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
+                          )}
+                          4. Insights {analysis.insights && `(${analysis.insights.length})`}
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="principles"
+                          disabled={!analysis.design_principles && analysis.step_status?.activate !== "error"}
+                        >
+                          {analysis.step_status?.activate === "completed" && (
+                            <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
+                          )}
+                          {analysis.step_status?.activate === "processing" && (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          )}
+                          {analysis.step_status?.activate === "error" && (
+                            <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
+                          )}
+                          5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="chunks" className="mt-6">
+                        {analysis.step_status?.chunk === "processing" ? (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">Processing chunks...</p>
+                          </div>
+                        ) : analysis.chunks ? (
+                          <>
+                            <ChunksList chunks={analysis.chunks} />
+                            {analysis.current_step === "chunk" && stepInfo.nextStep && (
+                              <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
+                                <p className="text-base-55 mb-4">
                                   Review the {analysis.chunks.length} chunks above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -934,31 +925,27 @@ export default function VideoDetailPage() {
                                   isAnyStepPending={isAnyStepPending}
                                   isCurrentStepProcessing={isCurrentStepProcessing}
                                 />
-                              </CardContent>
-                            </Card>
-                          )}
-                        </>
-                      ) : null}
-                    </TabsContent>
+                              </div>
+                            )}
+                          </>
+                        ) : null}
+                      </TabsContent>
 
-                    <TabsContent value="inferences">
-                      {(startInferStep.isPending || analysis.step_status?.infer === "processing") ? (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">{startInferStep.isPending ? "Starting..." : "Generating inferences..."}</p>
-                          </CardContent>
-                        </Card>
-                      ) : analysis.inferences ? (
-                        <>
-                          <InferencesList
-                            inferences={analysis.inferences}
-                            chunks={analysis.chunks || []}
-                          />
-                          {analysis.current_step === "infer" && stepInfo.nextStep && (
-                            <Card className="mt-4">
-                              <CardContent className="py-6 text-center">
-                                <p className="text-muted-foreground mb-4">
+                      <TabsContent value="inferences" className="mt-6">
+                        {(startInferStep.isPending || analysis.step_status?.infer === "processing") ? (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">{startInferStep.isPending ? "Starting..." : "Generating inferences..."}</p>
+                          </div>
+                        ) : analysis.inferences ? (
+                          <>
+                            <InferencesList
+                              inferences={analysis.inferences}
+                              chunks={analysis.chunks || []}
+                            />
+                            {analysis.current_step === "infer" && stepInfo.nextStep && (
+                              <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
+                                <p className="text-base-55 mb-4">
                                   Review the {analysis.inferences.length} inferences above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -968,35 +955,29 @@ export default function VideoDetailPage() {
                                   isAnyStepPending={isAnyStepPending}
                                   isCurrentStepProcessing={isCurrentStepProcessing}
                                 />
-                              </CardContent>
-                            </Card>
-                          )}
-                        </>
-                      ) : (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">Loading inferences...</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">Loading inferences...</p>
+                          </div>
+                        )}
+                      </TabsContent>
 
-                    <TabsContent value="patterns">
-                      {(startRelateStep.isPending || analysis.step_status?.relate === "processing") ? (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">{startRelateStep.isPending ? "Starting..." : "Identifying patterns..."}</p>
-                          </CardContent>
-                        </Card>
-                      ) : analysis.patterns ? (
-                        <>
-                          <PatternsList patterns={analysis.patterns} />
-                          {analysis.current_step === "relate" && stepInfo.nextStep && (
-                            <Card className="mt-4">
-                              <CardContent className="py-6 text-center">
-                                <p className="text-muted-foreground mb-4">
+                      <TabsContent value="patterns" className="mt-6">
+                        {(startRelateStep.isPending || analysis.step_status?.relate === "processing") ? (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">{startRelateStep.isPending ? "Starting..." : "Identifying patterns..."}</p>
+                          </div>
+                        ) : analysis.patterns ? (
+                          <>
+                            <PatternsList patterns={analysis.patterns} />
+                            {analysis.current_step === "relate" && stepInfo.nextStep && (
+                              <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
+                                <p className="text-base-55 mb-4">
                                   Review the {analysis.patterns.length} patterns above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -1006,35 +987,29 @@ export default function VideoDetailPage() {
                                   isAnyStepPending={isAnyStepPending}
                                   isCurrentStepProcessing={isCurrentStepProcessing}
                                 />
-                              </CardContent>
-                            </Card>
-                          )}
-                        </>
-                      ) : (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">Loading patterns...</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">Loading patterns...</p>
+                          </div>
+                        )}
+                      </TabsContent>
 
-                    <TabsContent value="insights">
-                      {(startExplainStep.isPending || analysis.step_status?.explain === "processing") ? (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">{startExplainStep.isPending ? "Starting..." : "Generating insights..."}</p>
-                          </CardContent>
-                        </Card>
-                      ) : analysis.insights ? (
-                        <>
-                          <InsightsList insights={analysis.insights} />
-                          {analysis.current_step === "explain" && stepInfo.nextStep && (
-                            <Card className="mt-4">
-                              <CardContent className="py-6 text-center">
-                                <p className="text-muted-foreground mb-4">
+                      <TabsContent value="insights" className="mt-6">
+                        {(startExplainStep.isPending || analysis.step_status?.explain === "processing") ? (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">{startExplainStep.isPending ? "Starting..." : "Generating insights..."}</p>
+                          </div>
+                        ) : analysis.insights ? (
+                          <>
+                            <InsightsList insights={analysis.insights} />
+                            {analysis.current_step === "explain" && stepInfo.nextStep && (
+                              <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
+                                <p className="text-base-55 mb-4">
                                   Review the {analysis.insights.length} insights above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -1044,64 +1019,54 @@ export default function VideoDetailPage() {
                                   isAnyStepPending={isAnyStepPending}
                                   isCurrentStepProcessing={isCurrentStepProcessing}
                                 />
-                              </CardContent>
-                            </Card>
-                          )}
-                        </>
-                      ) : (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">Loading insights...</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">Loading insights...</p>
+                          </div>
+                        )}
+                      </TabsContent>
 
-                    <TabsContent value="principles">
-                      {(startActivateStep.isPending || analysis.step_status?.activate === "processing") ? (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">{startActivateStep.isPending ? "Starting..." : "Generating design principles..."}</p>
-                          </CardContent>
-                        </Card>
-                      ) : analysis.design_principles ? (
-                        <>
-                          <PrinciplesList principles={analysis.design_principles} />
-                          <Card className="mt-4">
-                            <CardContent className="py-6 text-center">
-                              <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
-                              <p className="text-muted-foreground">
+                      <TabsContent value="principles" className="mt-6">
+                        {(startActivateStep.isPending || analysis.step_status?.activate === "processing") ? (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">{startActivateStep.isPending ? "Starting..." : "Generating design principles..."}</p>
+                          </div>
+                        ) : analysis.design_principles ? (
+                          <>
+                            <PrinciplesList principles={analysis.design_principles} />
+                            <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
+                              <CheckCircle className="h-12 w-12 text-brand-forest mx-auto mb-4" />
+                              <p className="text-base-55">
                                 Analysis complete! All 5 steps have been processed.
                               </p>
-                            </CardContent>
-                          </Card>
-                        </>
-                      ) : (
-                        <Card>
-                          <CardContent className="py-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">Loading design principles...</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <Lightbulb className="h-12 w-12 text-muted-foreground/60 mx-auto mb-4" />
-                    <p className="text-muted-foreground">
+                            </div>
+                          </>
+                        ) : (
+                          <div className="bg-card rounded-2xl p-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
+                            <p className="text-base-55">Loading design principles...</p>
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                ) : (
+                  <div className="bg-card rounded-2xl shadow-card p-12 text-center">
+                    <Lightbulb className="h-12 w-12 text-base-25 mx-auto mb-4" />
+                    <p className="text-base-55">
                       No analysis available yet. Complete the prerequisites and start the analysis to see results.
                     </p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </div>
       </div>
     </Layout>
   );
