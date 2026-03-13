@@ -18,6 +18,32 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_LOCALHOST_ORIGINS = "http://localhost:5173,http://localhost:3000"
+
+
+def _validate_production_config() -> None:
+    """Log warnings if critical env vars look wrong for production."""
+    if settings.APP_ENV != "production":
+        return
+
+    if not settings.CLERK_SECRET_KEY.startswith("sk_live_"):
+        logger.warning(
+            "SECURITY: CLERK_SECRET_KEY does not start with 'sk_live_' — "
+            "Clerk auth may not work correctly in production."
+        )
+
+    if not settings.ENCRYPTION_KEY:
+        logger.warning(
+            "SECURITY: ENCRYPTION_KEY is not set — "
+            "BYOK API keys cannot be encrypted. Set a Fernet key."
+        )
+
+    if settings.ALLOWED_ORIGINS == _DEFAULT_LOCALHOST_ORIGINS:
+        logger.warning(
+            "SECURITY: ALLOWED_ORIGINS is still set to default localhost values. "
+            "Update it to your production frontend domain."
+        )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,6 +52,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME}")
     logger.info(f"Environment: {settings.APP_ENV}")
     logger.info(f"Debug mode: {settings.DEBUG}")
+
+    _validate_production_config()
 
     if settings.APP_ENV == "development":
         logger.warning(
@@ -56,6 +84,18 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
     openapi_url="/openapi.json" if settings.DEBUG else None,
 )
+
+
+# Security headers middleware — runs before CORS so headers are set on every response.
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
 
 # Configure CORS - restrict methods and headers
 app.add_middleware(
@@ -89,11 +129,17 @@ async def health_check():
 # Clerk Frontend API proxy — used by Cloudflare Pages Function to avoid
 # the Cloudflare-to-Cloudflare CNAME conflict (Error 1000/525).
 # Flow: Browser → Pages Function (methodex.ai/__clerk) → Railway → Clerk
+# Origin-validated: only requests from ALLOWED_ORIGINS are accepted.
 _clerk_client = httpx.AsyncClient(base_url="https://frontend-api.clerk.dev", timeout=15.0)
 
 
 @app.api_route("/__clerk_fwd/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def clerk_proxy(path: str, request: Request):
+    # Validate that the request originates from an allowed origin
+    origin = request.headers.get("origin", "")
+    if origin not in settings.allowed_origins_list:
+        return Response(content=b"Forbidden", status_code=403)
+
     headers = dict(request.headers)
     headers.pop("host", None)
     headers["Clerk-Secret-Key"] = settings.CLERK_SECRET_KEY or ""

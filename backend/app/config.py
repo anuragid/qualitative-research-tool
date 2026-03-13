@@ -15,9 +15,9 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    # Application
-    APP_ENV: str = "development"
-    DEBUG: bool = True
+    # Application — defaults are safe for production; override in .env for local dev
+    APP_ENV: str = "production"
+    DEBUG: bool = False
     PROJECT_NAME: str = "Qualitative Research Tool"
     API_V1_PREFIX: str = "/api"
 
