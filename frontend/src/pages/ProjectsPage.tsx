@@ -15,10 +15,10 @@ export default function ProjectsPage() {
     () => {
       if (prefersReducedMotion() || !projects || projects.length === 0) return;
 
-      gsap.from("[data-animate='folder-card']", {
-        ...animations.fadeInUp,
-        stagger: animations.stagger,
-      });
+      gsap.fromTo("[data-animate='folder-card']",
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: animations.fadeInUp.duration, ease: animations.fadeInUp.ease, stagger: animations.stagger }
+      );
     },
     { scope: gridRef, dependencies: [projects] }
   );

@@ -21,74 +21,58 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // GSAP scroll-reveal animations
+  // GSAP animations — hero entrance only uses opacity.
+  // Scroll-triggered sections use y-movement only (no opacity: 0 initial state)
+  // to prevent invisible content when ScrollTrigger hasn't fired yet.
   useGSAP(
     () => {
       if (prefersReducedMotion()) return;
 
-      // Hero entrance
-      gsap.from("[data-animate='hero']", {
-        y: 30,
-        opacity: 0,
-        duration: duration.slow,
-        ease: ease.standard,
-        stagger: 0.12,
-      });
+      // Hero entrance — only above-the-fold content uses opacity animation
+      gsap.fromTo("[data-animate='hero']",
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: duration.slow, ease: ease.standard, stagger: 0.12 }
+      );
 
-      // Feature cards staggered entrance on scroll
-      gsap.from("[data-animate='feature-card']", {
-        scrollTrigger: {
-          trigger: "[data-section='features']",
-          start: "top 80%",
-          once: true,
-        },
-        y: 40,
-        opacity: 0,
-        duration: duration.entrance,
-        ease: ease.standard,
-        stagger: 0.1,
-      });
+      // Feature cards — subtle slide-up on scroll (always visible, just moves)
+      gsap.fromTo("[data-animate='feature-card']",
+        { y: 30 },
+        {
+          y: 0,
+          scrollTrigger: { trigger: "[data-section='features']", start: "top 80%", once: true },
+          duration: duration.entrance, ease: ease.standard, stagger: 0.1,
+        }
+      );
 
-      // How-it-works steps staggered entrance
-      gsap.from("[data-animate='step']", {
-        scrollTrigger: {
-          trigger: "[data-section='how-it-works']",
-          start: "top 80%",
-          once: true,
-        },
-        y: 30,
-        opacity: 0,
-        duration: duration.entrance,
-        ease: ease.standard,
-        stagger: 0.08,
-      });
+      // How-it-works steps
+      gsap.fromTo("[data-animate='step']",
+        { y: 20 },
+        {
+          y: 0,
+          scrollTrigger: { trigger: "[data-section='how-it-works']", start: "top 80%", once: true },
+          duration: duration.entrance, ease: ease.standard, stagger: 0.08,
+        }
+      );
 
       // Security section
-      gsap.from("[data-animate='security']", {
-        scrollTrigger: {
-          trigger: "[data-section='security']",
-          start: "top 85%",
-          once: true,
-        },
-        y: 20,
-        opacity: 0,
-        duration: duration.entrance,
-        ease: ease.standard,
-      });
+      gsap.fromTo("[data-animate='security']",
+        { y: 15 },
+        {
+          y: 0,
+          scrollTrigger: { trigger: "[data-section='security']", start: "top 85%", once: true },
+          duration: duration.entrance, ease: ease.standard,
+        }
+      );
 
       // CTA section
-      gsap.from("[data-animate='cta']", {
-        scrollTrigger: {
-          trigger: "[data-section='cta']",
-          start: "top 85%",
-          once: true,
-        },
-        y: 20,
-        opacity: 0,
-        duration: duration.entrance,
-        ease: ease.standard,
-        stagger: 0.1,
-      });
+      gsap.fromTo("[data-animate='cta']",
+        { y: 15 },
+        {
+          y: 0,
+          scrollTrigger: { trigger: "[data-section='cta']", start: "top 85%", once: true },
+          duration: duration.entrance, ease: ease.standard, stagger: 0.1,
+        }
+      );
     },
     { scope: containerRef }
   );

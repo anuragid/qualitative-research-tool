@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { MemoryRouter } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 
 const meta = {
@@ -8,11 +7,9 @@ const meta = {
   tags: ["autodocs"],
   decorators: [
     (Story) => (
-      <MemoryRouter initialEntries={["/projects"]}>
-        <div className="h-screen bg-surface-page">
-          <Story />
-        </div>
-      </MemoryRouter>
+      <div className="h-screen w-full bg-surface-page relative">
+        <Story />
+      </div>
     ),
   ],
   argTypes: {

@@ -1,9 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { MemoryRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FolderCard from "./FolderCard";
-
-const queryClient = new QueryClient();
 
 const mockProject = {
   id: "1",
@@ -22,15 +18,11 @@ const meta: Meta<typeof FolderCard> = {
   component: FolderCard,
   decorators: [
     (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <div className="p-8 bg-surface-page">
-            <div className="grid grid-cols-3 gap-5 max-w-4xl">
-              <Story />
-            </div>
-          </div>
-        </MemoryRouter>
-      </QueryClientProvider>
+      <div className="p-8 bg-surface-page">
+        <div className="grid grid-cols-3 gap-5 max-w-4xl">
+          <Story />
+        </div>
+      </div>
     ),
   ],
 };
