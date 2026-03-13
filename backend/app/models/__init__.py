@@ -2,25 +2,24 @@
 
 from app.models.database_models import (
     Project,
-    Video,
-    Transcript,
-    SpeakerLabel,
-    VideoAnalysis,
     ProjectAnalysis,
+    SpeakerLabel,
+    Transcript,
+    Video,
+    VideoAnalysis,
 )
-
 from app.models.schemas import (
-    ProjectCreate,
-    ProjectUpdate,
-    ProjectResponse,
-    VideoUploadResponse,
-    VideoResponse,
-    TranscriptResponse,
-    SpeakerLabelCreate,
-    SpeakerLabelUpdate,
-    SpeakerLabelResponse,
-    VideoAnalysisResponse,
     ProjectAnalysisResponse,
+    ProjectCreate,
+    ProjectResponse,
+    ProjectUpdate,
+    SpeakerLabelCreate,
+    SpeakerLabelResponse,
+    SpeakerLabelUpdate,
+    TranscriptResponse,
+    VideoAnalysisResponse,
+    VideoResponse,
+    VideoUploadResponse,
 )
 
 __all__ = [

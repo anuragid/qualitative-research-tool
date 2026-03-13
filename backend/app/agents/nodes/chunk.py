@@ -1,10 +1,10 @@
 """CHUNK node - Break transcript into discrete pieces."""
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
-from app.agents.states import VideoAnalysisState
 from app.agents.prompts import CHUNK_SYSTEM_PROMPT
+from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
@@ -140,10 +140,10 @@ Remember:
         }
 
     except Exception as e:
-        logger.error(f"[CHUNK] Error in chunk_node: {e}")
+        logger.error(f"[CHUNK] Error in chunk_node for video {state['video_id']}: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "chunks": None,
             "current_step": "chunk",
-            "error": str(e),
+            "error": f"{type(e).__name__}: {e}",
         }

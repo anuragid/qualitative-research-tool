@@ -1,20 +1,16 @@
 """Transcription and speaker labeling API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+import logging
 from typing import List
 from uuid import UUID
-import logging
 
-from app.database import get_db
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
 from app.auth_bridge import get_current_user_id
-from app.models.database_models import Transcript, SpeakerLabel, Video, Project
-from app.models.schemas import (
-    TranscriptResponse,
-    SpeakerLabelCreate,
-    SpeakerLabelUpdate,
-    SpeakerLabelResponse
-)
+from app.database import get_db
+from app.models.database_models import Project, SpeakerLabel, Transcript, Video
+from app.models.schemas import SpeakerLabelCreate, SpeakerLabelResponse, SpeakerLabelUpdate, TranscriptResponse
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +76,7 @@ async def get_speaker_labels(
     Get all speaker labels for a transcript (must be owned by the current user).
     """
     try:
-        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
+        _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
         # Get all speaker labels
         speaker_labels = db.query(SpeakerLabel)\
@@ -180,7 +176,7 @@ async def update_speaker_label(
     Update a specific speaker label (must be owned by the current user).
     """
     try:
-        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
+        _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
         # Get speaker label
         speaker_label = db.query(SpeakerLabel).filter(
@@ -228,7 +224,7 @@ async def delete_speaker_label(
     Delete a speaker label (must be owned by the current user).
     """
     try:
-        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
+        _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
         # Get speaker label
         speaker_label = db.query(SpeakerLabel).filter(

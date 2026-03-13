@@ -1,11 +1,11 @@
 """CROSS_RELATE node - Find meta-patterns across multiple videos."""
 
-import logging
 import json
-from typing import Dict, Any
+import logging
+from typing import Any, Dict
 
-from app.agents.states import ProjectAnalysisState
 from app.agents.prompts import CROSS_RELATE_SYSTEM_PROMPT
+from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
@@ -68,10 +68,10 @@ Find patterns that transcend individual videos and reveal system-level themes.""
         }
 
     except Exception as e:
-        logger.error(f"[CROSS_RELATE] Error in cross_relate_node: {e}")
+        logger.error(f"[CROSS_RELATE] Error in cross_relate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "cross_video_patterns": None,
             "current_step": "cross_relate",
-            "error": str(e),
+            "error": f"{type(e).__name__}: {e}",
         }

@@ -1,6 +1,8 @@
 """Clerk Backend API service for fetching user data."""
-import httpx
 import logging
+
+import httpx
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)

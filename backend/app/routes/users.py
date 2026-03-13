@@ -1,16 +1,17 @@
 """User routes for syncing with Clerk."""
 
+from datetime import datetime
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Dict, Any
-from datetime import datetime
 
+from app.auth_bridge import get_current_user
 from app.database import get_db
 from app.models import database_models
-from app.auth_bridge import get_current_user
-from app.models.schemas import UserResponse, UserSettingsUpdate, UserSettingsResponse
-from app.services.encryption_service import encryption_service
+from app.models.schemas import UserResponse, UserSettingsResponse, UserSettingsUpdate
 from app.services.clerk_service import fetch_clerk_user
+from app.services.encryption_service import encryption_service
 
 router = APIRouter()
 

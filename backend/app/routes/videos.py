@@ -1,17 +1,18 @@
 """Video management and analysis API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
-from sqlalchemy.orm import Session
-from uuid import UUID
-from pathlib import Path
 import logging
+from pathlib import Path
+from uuid import UUID
 
-from app.database import get_db
-from app.models.database_models import Project, Video, Transcript, VideoAnalysis
-from app.models.schemas import VideoUploadResponse, VideoResponse, VideoAnalysisResponse, TranscriptResponse
-from app.services.s3_service import s3_service
-from app.config import settings
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
 from app.auth_bridge import get_current_user_id
+from app.config import settings
+from app.database import get_db
+from app.models.database_models import Project, Transcript, Video, VideoAnalysis
+from app.models.schemas import TranscriptResponse, VideoAnalysisResponse, VideoResponse, VideoUploadResponse
+from app.services.s3_service import s3_service
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +241,7 @@ async def get_video_transcript(
     Get the transcript for a specific video (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript)\
             .filter(Transcript.video_id == video_id)\
@@ -298,8 +299,9 @@ async def start_transcription(
         else:
             existing_transcript.status = "pending"
 
-        # Update video status
+        # Update video status (clear previous error if retrying)
         video.status = "transcribing"
+        video.error_message = None
         db.commit()
 
         # Trigger Celery task
@@ -401,7 +403,7 @@ async def get_video_analysis(
     Get analysis results for a video (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         video_analysis = db.query(VideoAnalysis)\
             .filter(VideoAnalysis.video_id == video_id)\
@@ -436,7 +438,7 @@ async def get_word_level_transcript(
     Returns word-level transcript with speaker names mapped (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript)\
             .filter(Transcript.video_id == video_id)\
@@ -505,7 +507,7 @@ async def search_transcript_words(
     try:
         import httpx
 
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript)\
             .filter(Transcript.video_id == video_id)\
@@ -557,7 +559,7 @@ async def trigger_chunk_step(
     Trigger CHUNK step (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
         if not transcript or transcript.status != "completed":
@@ -597,7 +599,7 @@ async def trigger_infer_step(
     Trigger INFER step (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.chunks:
@@ -637,7 +639,7 @@ async def trigger_relate_step(
     Trigger RELATE step (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.inferences:
@@ -677,7 +679,7 @@ async def trigger_explain_step(
     Trigger EXPLAIN step (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.patterns:
@@ -717,7 +719,7 @@ async def trigger_activate_step(
     Trigger ACTIVATE step (must be owned by the current user).
     """
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        _get_video_with_ownership(video_id, current_user_id, db)
 
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.insights:

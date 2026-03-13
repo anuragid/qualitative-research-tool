@@ -1,8 +1,9 @@
 """Base Celery task class with database session management."""
 
+import logging
+
 from celery import Task
 from sqlalchemy.orm import Session
-import logging
 
 from app.database import SessionLocal
 

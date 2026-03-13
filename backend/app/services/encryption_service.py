@@ -1,7 +1,8 @@
 """Encryption service for BYOK API keys using Fernet symmetric encryption."""
 
-import os
 import logging
+import os
+
 from cryptography.fernet import Fernet, InvalidToken
 
 logger = logging.getLogger(__name__)

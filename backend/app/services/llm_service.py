@@ -1,17 +1,19 @@
 """LLM service using OpenRouter API (OpenAI SDK compatible) with retry logic and JSON parsing."""
 
-from openai import OpenAI, APIError, APIConnectionError, RateLimitError
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
-)
 import json
 import logging
 import re
-from typing import Any, Optional
+from typing import Any, List, Optional
+
+from openai import APIConnectionError, APIError, OpenAI, RateLimitError
+from tenacity import (
+    RetryError,
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.config import settings
 
@@ -25,6 +27,15 @@ OPENROUTER_HEADERS = {
     "HTTP-Referer": "https://qualitative-research.app",
     "X-Title": "Qualitative Research Tool",
 }
+
+# Fallback models to try when the primary model is rate-limited or unavailable.
+# Ordered by preference: paid-but-cheap first (reliable), then free backups.
+FREE_MODEL_FALLBACKS: List[str] = [
+    "meta-llama/llama-3.3-70b-instruct",  # paid but very cheap (~$0.001/req), works reliably
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "google/gemma-3-4b-it:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+]
 
 
 class LLMService:
@@ -55,10 +66,80 @@ class LLMService:
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=5, max=60),
+        wait=wait_exponential(multiplier=2, min=5, max=30),
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
         before_sleep=before_sleep_log(logger, logging.WARNING),
     )
+    def _call_llm_single(
+        self,
+        system_prompt: str,
+        user_message: str,
+        max_tokens: int,
+        temperature: float,
+        model: str,
+        client: OpenAI,
+    ) -> str:
+        """
+        Single LLM call with retries (used internally).
+
+        Raises retryable exceptions so tenacity can handle them.
+        """
+        try:
+            kwargs = {
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                "extra_headers": OPENROUTER_HEADERS,
+                "timeout": 600.0,  # 10 minute timeout for long operations
+            }
+
+            response = client.chat.completions.create(**kwargs)
+
+            # Guard against empty/missing response choices
+            if not response.choices:
+                raise ValueError(
+                    f"LLM returned empty choices (model={model}). "
+                    f"This may indicate the request was filtered or the model is unavailable."
+                )
+
+            content = response.choices[0].message.content
+            if content is None:
+                # Some models return null content with a refusal or tool_calls
+                refusal = getattr(response.choices[0].message, "refusal", None)
+                if refusal:
+                    raise ValueError(f"LLM refused the request: {refusal}")
+                raise ValueError(
+                    f"LLM returned null content (model={model}). "
+                    f"Finish reason: {response.choices[0].finish_reason}"
+                )
+
+            logger.info(
+                f"LLM API call successful (model={model}). "
+                f"Response length: {len(content)}, "
+                f"finish_reason: {response.choices[0].finish_reason}"
+            )
+
+            # Warn if response was truncated (might mean incomplete JSON)
+            if response.choices[0].finish_reason == "length":
+                logger.warning(
+                    f"LLM response was truncated (finish_reason=length, "
+                    f"max_tokens={max_tokens}). "
+                    f"Output may be incomplete/malformed JSON."
+                )
+
+            return content
+
+        except RETRYABLE_EXCEPTIONS as e:
+            logger.error(f"LLM API error (model={model}): {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected LLM error (model={model}): {e}")
+            raise
+
     def call_llm(
         self,
         system_prompt: str,
@@ -70,7 +151,17 @@ class LLMService:
         json_mode: bool = False,
     ) -> str:
         """
-        Call LLM via OpenRouter with retry logic (synchronous).
+        Call LLM via OpenRouter with retry logic and model fallback (synchronous).
+
+        NOTE: json_mode is accepted for API compatibility but is intentionally
+        NOT sent to OpenRouter. The ``response_format: json_object`` parameter
+        forces models to return a top-level JSON *object* (``{}``), which breaks
+        prompts that expect a JSON *array* (``[]``).  Instead we rely on the
+        system prompt to instruct the model to return valid JSON, and use robust
+        parsing in ``parse_json_response``.
+
+        When the primary model is persistently rate-limited (common with free
+        OpenRouter models), this method automatically tries fallback models.
 
         Args:
             system_prompt: System prompt/instructions
@@ -79,76 +170,62 @@ class LLMService:
             temperature: Override default temperature
             model: Override default model (e.g. for BYOK premium models)
             api_key: Override default API key (for BYOK)
-            json_mode: If True, request JSON output format
+            json_mode: Accepted but ignored (see note above)
 
         Returns:
             Raw response text from LLM
 
         Raises:
-            APIError: If API call fails after retries
+            APIError: If API call fails after retries on all models
             ValueError: If response has no content
         """
         client = self._get_client(api_key)
         chosen_model = model or self.default_model
+        effective_max_tokens = max_tokens or self.max_tokens
+        effective_temperature = temperature if temperature is not None else self.temperature
 
-        try:
-            kwargs = {
-                "model": chosen_model,
-                "max_tokens": max_tokens or self.max_tokens,
-                "temperature": temperature if temperature is not None else self.temperature,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                "extra_headers": OPENROUTER_HEADERS,
-                "timeout": 600.0,  # 10 minute timeout for long operations
-            }
+        # Build list of models to try: primary first, then fallbacks
+        models_to_try = [chosen_model]
+        # Add fallbacks when no custom api_key is provided.
+        # Fallbacks apply for free models (rate-limited) and also for the default
+        # paid model in case it goes down.
+        if api_key is None:
+            for fallback in FREE_MODEL_FALLBACKS:
+                if fallback != chosen_model and fallback not in models_to_try:
+                    models_to_try.append(fallback)
 
-            if json_mode:
-                kwargs["response_format"] = {"type": "json_object"}
-
-            response = client.chat.completions.create(**kwargs)
-
-            # Guard against empty/missing response choices
-            if not response.choices:
-                raise ValueError(
-                    f"LLM returned empty choices (model={chosen_model}). "
-                    f"This may indicate the request was filtered or the model is unavailable."
+        last_error: Optional[Exception] = None
+        for model_name in models_to_try:
+            try:
+                return self._call_llm_single(
+                    system_prompt=system_prompt,
+                    user_message=user_message,
+                    max_tokens=effective_max_tokens,
+                    temperature=effective_temperature,
+                    model=model_name,
+                    client=client,
                 )
-
-            content = response.choices[0].message.content
-            if content is None:
-                # Some models return null content with a refusal or tool_calls
-                refusal = getattr(response.choices[0].message, "refusal", None)
-                if refusal:
-                    raise ValueError(f"LLM refused the request: {refusal}")
-                raise ValueError(
-                    f"LLM returned null content (model={chosen_model}). "
-                    f"Finish reason: {response.choices[0].finish_reason}"
-                )
-
-            logger.info(
-                f"LLM API call successful (model={chosen_model}). "
-                f"Response length: {len(content)}, "
-                f"finish_reason: {response.choices[0].finish_reason}"
-            )
-
-            # Warn if response was truncated (might mean incomplete JSON)
-            if response.choices[0].finish_reason == "length":
+            except (RateLimitError, RetryError) as e:
                 logger.warning(
-                    f"LLM response was truncated (finish_reason=length, "
-                    f"max_tokens={max_tokens or self.max_tokens}). "
-                    f"Output may be incomplete/malformed JSON."
+                    f"Model {model_name} is rate-limited/failed after retries: "
+                    f"{type(e).__name__}. Trying next fallback model..."
                 )
+                last_error = e
+                continue
+            except (APIError, APIConnectionError) as e:
+                logger.warning(
+                    f"Model {model_name} API error after retries: {e}. "
+                    f"Trying next fallback model..."
+                )
+                last_error = e
+                continue
 
-            return content
-
-        except RETRYABLE_EXCEPTIONS as e:
-            logger.error(f"LLM API error (model={chosen_model}): {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected LLM error (model={chosen_model}): {e}")
-            raise
+        # All models exhausted - raise the underlying error, not RetryError
+        if last_error is not None:
+            if isinstance(last_error, RetryError) and last_error.__cause__:
+                raise last_error.__cause__
+            raise last_error
+        raise RuntimeError("All models failed")
 
     def parse_json_response(self, response: str) -> Any:
         """
@@ -294,6 +371,11 @@ class LLMService:
         """
         Call LLM and parse JSON response (synchronous).
 
+        Does NOT use ``response_format: json_object`` because that forces
+        models to return a top-level ``{}`` which breaks prompts expecting
+        ``[]``.  Instead we rely on the system prompt to request JSON and
+        parse robustly with ``parse_json_response``.
+
         Args:
             system_prompt: System prompt (should instruct to return JSON)
             user_message: User message content
@@ -316,8 +398,10 @@ class LLMService:
             temperature=temperature,
             model=model,
             api_key=api_key,
-            json_mode=True,
+            json_mode=False,
         )
+
+        logger.debug(f"Raw LLM response (first 500 chars): {response[:500]}")
 
         return self.parse_json_response(response)
 

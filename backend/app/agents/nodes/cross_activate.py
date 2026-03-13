@@ -1,11 +1,11 @@
 """CROSS_ACTIVATE node - Create system-level design principles."""
 
-import logging
 import json
-from typing import Dict, Any
+import logging
+from typing import Any, Dict
 
-from app.agents.states import ProjectAnalysisState
 from app.agents.prompts import CROSS_ACTIVATE_SYSTEM_PROMPT
+from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
@@ -69,10 +69,10 @@ Create design principles that provide strategic direction for the entire system.
         }
 
     except Exception as e:
-        logger.error(f"[CROSS_ACTIVATE] Error in cross_activate_node: {e}")
+        logger.error(f"[CROSS_ACTIVATE] Error in cross_activate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "cross_video_principles": None,
             "current_step": "cross_activate",
-            "error": str(e),
+            "error": f"{type(e).__name__}: {e}",
         }

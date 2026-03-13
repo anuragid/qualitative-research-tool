@@ -1,20 +1,21 @@
 """Separate Celery tasks for step-by-step analysis."""
 
-from sqlalchemy.orm import Session
-from uuid import UUID
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Any, Dict
+from uuid import UUID
 
-from app.tasks.celery_app import celery_app
-from app.tasks.base import DatabaseTask
-from app.models.database_models import Video, VideoAnalysis, Transcript, SpeakerLabel
+from sqlalchemy.orm import Session
+
+from app.agents.nodes.activate import activate_node
 from app.agents.nodes.chunk import chunk_node
+from app.agents.nodes.explain import explain_node
 from app.agents.nodes.infer import infer_node
 from app.agents.nodes.relate import relate_node
-from app.agents.nodes.explain import explain_node
-from app.agents.nodes.activate import activate_node
+from app.models.database_models import SpeakerLabel, Transcript, Video, VideoAnalysis
 from app.services.project_state_service import ProjectStateService
+from app.tasks.base import DatabaseTask
+from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 

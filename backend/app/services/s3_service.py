@@ -5,13 +5,14 @@ R2 encrypts all data at rest by default (no SSE-KMS needed).
 R2 does not support ACLs or bucket policies via the S3 API.
 """
 
+import logging
+import uuid
+from pathlib import Path
+from typing import BinaryIO
+
 import boto3
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
-from typing import BinaryIO
-import logging
-from pathlib import Path
-import uuid
 
 from app.config import settings
 

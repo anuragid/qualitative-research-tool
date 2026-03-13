@@ -1,13 +1,14 @@
 """FastAPI main application."""
 
+import logging
 from contextlib import asynccontextmanager
+
+import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-import httpx
-import logging
 
 from app.config import settings
-from app.database import engine, Base
+from app.database import Base, engine
 
 # Configure logging
 logging.basicConfig(
@@ -25,6 +26,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME}")
     logger.info(f"Environment: {settings.APP_ENV}")
     logger.info(f"Debug mode: {settings.DEBUG}")
+
+    if settings.APP_ENV == "development":
+        logger.warning(
+            "DEV AUTH BYPASS is ACTIVE. Requests without an Authorization header "
+            "(or with 'Bearer dev-bypass') will authenticate as dev_user_local. "
+            "Do NOT use APP_ENV=development in production."
+        )
 
     # Create database tables (in production, use Alembic migrations instead)
     if settings.DEBUG:
@@ -102,7 +110,7 @@ async def clerk_proxy(path: str, request: Request):
 
 
 # Import and include routers
-from app.routes import projects, videos, transcriptions, users
+from app.routes import projects, transcriptions, users, videos
 
 # Register routers with API prefix and tags
 app.include_router(

@@ -11,7 +11,6 @@ from app.auth import (
     security,
 )
 
-
 # Export everything for backward compatibility with routes
 __all__ = [
     "security",

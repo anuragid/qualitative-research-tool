@@ -1,21 +1,29 @@
 """Clerk authentication with RBAC for FastAPI."""
 
-from typing import Optional, Dict, Any, List
-from enum import Enum
-from fastapi import HTTPException, Security, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-import jwt
-import httpx
-from functools import lru_cache
+import base64
 import json
 import logging
-import base64
+from enum import Enum
+from functools import lru_cache
+from typing import Any, Dict, List, Optional
+
+import httpx
+import jwt
+from fastapi import HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Security scheme for FastAPI docs
-security = HTTPBearer()
+# Dev bypass constants
+DEV_USER_ID = "dev_user_local"
+DEV_BYPASS_TOKEN = "dev-bypass"
+_is_dev = settings.APP_ENV == "development"
+
+# In development, make the bearer token optional so requests with no
+# Authorization header don't get an automatic 403 from FastAPI.
+security = HTTPBearer(auto_error=not _is_dev)
 
 
 class UserRole(str, Enum):
@@ -207,19 +215,56 @@ class ClerkAuth:
             )
 
 
-# Global instance
-clerk_auth = ClerkAuth()
+# Global instance — in development mode, tolerate missing/invalid Clerk keys
+# since the dev bypass will handle authentication.
+if _is_dev:
+    try:
+        clerk_auth = ClerkAuth()
+    except Exception as e:
+        logger.warning(f"ClerkAuth init failed (dev mode, bypass is available): {e}")
+
+        class _NoOpClerkAuth:
+            """Stub that raises clear errors if Clerk verification is attempted without valid keys."""
+            def verify_token(self, token: str) -> Dict[str, Any]:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Clerk is not configured. Use dev bypass (no auth header) or set Clerk keys.",
+                )
+
+        clerk_auth = _NoOpClerkAuth()  # type: ignore[assignment]
+else:
+    clerk_auth = ClerkAuth()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
 ) -> Dict[str, Any]:
     """
     Dependency to get the current authenticated user from the JWT token with RBAC info.
 
+    In development mode (APP_ENV=development), a dev bypass is available:
+    - No Authorization header at all -> returns dev user
+    - Authorization: Bearer dev-bypass -> returns dev user
+    - A real Clerk JWT is still verified normally
+
     Returns:
         Dict containing user information from the JWT payload including role and permissions
     """
+    # --- Dev bypass (APP_ENV=development only) ---
+    if _is_dev:
+        # No credentials supplied at all
+        if credentials is None:
+            logger.debug("Dev auth bypass: no credentials provided, returning dev user")
+            return _dev_user_dict()
+
+        # Explicit dev-bypass token
+        if credentials.credentials == DEV_BYPASS_TOKEN:
+            logger.debug("Dev auth bypass: dev-bypass token provided, returning dev user")
+            return _dev_user_dict()
+
+        # Otherwise fall through to normal Clerk verification so real
+        # tokens still work during local development.
+
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -241,6 +286,22 @@ async def get_current_user(
         "role": user_data.get("role", "user"),  # User role for RBAC
         "permissions": user_data.get("permissions", []),  # User permissions
         "raw_payload": user_data,  # Keep the full payload for reference
+    }
+
+
+def _dev_user_dict() -> Dict[str, Any]:
+    """Return a synthetic user dict for local development."""
+    return {
+        "id": DEV_USER_ID,
+        "email": "dev@localhost",
+        "email_verified": True,
+        "first_name": "Dev",
+        "last_name": "User",
+        "username": "dev",
+        "session_id": "dev_session",
+        "role": UserRole.ADMIN.value,
+        "permissions": [p.value for p in Permission],
+        "raw_payload": {},
     }
 
 

@@ -1,17 +1,78 @@
-"""Celery tasks for video and project analysis using LangGraph."""
+"""Celery tasks for video and project analysis.
 
-from uuid import UUID
-from datetime import datetime
+Calls analysis nodes directly in sequence rather than via LangGraph's
+graph.invoke(), which in LangGraph 0.1.x runs every node inside a
+ThreadPoolExecutor.  That thread-pool indirection can hang inside
+Celery's solo pool (the executor thread blocks waiting for an HTTP
+response while the main thread blocks waiting for the future, and
+signal-based timeouts do not fire on non-main threads).
+
+By invoking nodes sequentially on the Celery worker thread we get the
+same pipeline semantics with reliable timeout / error handling.
+"""
+
 import logging
+from datetime import datetime
+from uuid import UUID
 
-from app.tasks.celery_app import celery_app
-from app.tasks.base import DatabaseTask
-from app.models.database_models import Video, Transcript, SpeakerLabel, VideoAnalysis, ProjectAnalysis, Project
-from app.agents.graph import video_analysis_graph, project_analysis_graph
-from app.agents.states import VideoAnalysisState, ProjectAnalysisState
+from app.agents.nodes import (
+    activate_node,
+    chunk_node,
+    cross_activate_node,
+    cross_explain_node,
+    cross_relate_node,
+    explain_node,
+    infer_node,
+    relate_node,
+)
+from app.agents.states import ProjectAnalysisState, VideoAnalysisState
+from app.models.database_models import Project, ProjectAnalysis, SpeakerLabel, Transcript, Video, VideoAnalysis
 from app.services.project_state_service import ProjectStateService
+from app.tasks.base import DatabaseTask
+from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
+    """Run the 5-step video analysis pipeline synchronously.
+
+    Each node is called in sequence.  If any node sets ``state["error"]``,
+    the pipeline halts immediately (same behaviour as the LangGraph
+    conditional-edge version, but without the ThreadPoolExecutor).
+
+    Returns the final state dict.
+    """
+    steps = [
+        ("chunk", chunk_node),
+        ("infer", infer_node),
+        ("relate", relate_node),
+        ("explain", explain_node),
+        ("activate", activate_node),
+    ]
+    for step_name, node_fn in steps:
+        logger.info(f"Running pipeline step '{step_name}' for video {state['video_id']}")
+        state = node_fn(state)
+        if state.get("error"):
+            logger.error(f"Pipeline halting at '{step_name}': {state['error']}")
+            break
+    return state
+
+
+def _run_project_pipeline(state) -> dict:
+    """Run the 3-step project analysis pipeline synchronously."""
+    steps = [
+        ("cross_relate", cross_relate_node),
+        ("cross_explain", cross_explain_node),
+        ("cross_activate", cross_activate_node),
+    ]
+    for step_name, node_fn in steps:
+        logger.info(f"Running pipeline step '{step_name}' for project {state['project_id']}")
+        state = node_fn(state)
+        if state.get("error"):
+            logger.error(f"Pipeline halting at '{step_name}': {state['error']}")
+            break
+    return state
 
 
 @celery_app.task(base=DatabaseTask, bind=True, name="analyze_video")
@@ -95,10 +156,10 @@ def analyze_video_task(self, video_id: str):
             "error": None
         }
 
-        logger.info(f"Running LangGraph video analysis for video {video_id}")
+        logger.info(f"Running video analysis pipeline for video {video_id}")
 
-        # Run the LangGraph workflow
-        final_state = video_analysis_graph.invoke(initial_state)
+        # Run the analysis pipeline directly (no LangGraph ThreadPoolExecutor)
+        final_state = _run_video_pipeline(initial_state)
 
         # Check for errors - the graph now halts on any node error via
         # conditional routing, so if error is set the pipeline stopped early
@@ -257,10 +318,10 @@ def analyze_project_task(self, project_id: str):
             "error": None
         }
 
-        logger.info(f"Running LangGraph project analysis for project {project_id}")
+        logger.info(f"Running project analysis pipeline for project {project_id}")
 
-        # Run the LangGraph workflow
-        final_state = project_analysis_graph.invoke(initial_state)
+        # Run the analysis pipeline directly (no LangGraph ThreadPoolExecutor)
+        final_state = _run_project_pipeline(initial_state)
 
         # Check for errors
         if final_state.get("error"):

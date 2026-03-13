@@ -1,10 +1,10 @@
 """Pydantic schemas for request/response validation."""
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ========== User Schemas ==========
 
@@ -186,7 +186,7 @@ class VideoAnalysisResponse(BaseModel):
 
     # Step-by-step tracking fields
     current_step: Optional[str] = "chunk"
-    step_status: Optional[Dict[str, str]] = {}
+    step_status: Optional[Dict[str, str]] = None
     chunk_completed_at: Optional[datetime] = None
     infer_completed_at: Optional[datetime] = None
     relate_completed_at: Optional[datetime] = None

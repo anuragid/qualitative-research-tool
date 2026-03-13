@@ -1,11 +1,11 @@
 """ACTIVATE node - Turn insights into design principles."""
 
-import logging
 import json
-from typing import Dict, Any
+import logging
+from typing import Any, Dict
 
-from app.agents.states import VideoAnalysisState
 from app.agents.prompts import ACTIVATE_SYSTEM_PROMPT
+from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
@@ -68,10 +68,10 @@ For each insight, create one or more design principles that provide strategic di
         }
 
     except Exception as e:
-        logger.error(f"[ACTIVATE] Error in activate_node: {e}")
+        logger.error(f"[ACTIVATE] Error in activate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "design_principles": None,
             "current_step": "activate",
-            "error": str(e),
+            "error": f"{type(e).__name__}: {e}",
         }

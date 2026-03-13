@@ -1,19 +1,20 @@
 """LangGraph workflow definitions for qualitative analysis."""
 
-from langgraph.graph import StateGraph, END
 import logging
 
-from app.agents.states import VideoAnalysisState, ProjectAnalysisState
+from langgraph.graph import END, StateGraph
+
 from app.agents.nodes import (
+    activate_node,
     chunk_node,
+    cross_activate_node,
+    cross_explain_node,
+    cross_relate_node,
+    explain_node,
     infer_node,
     relate_node,
-    explain_node,
-    activate_node,
-    cross_relate_node,
-    cross_explain_node,
-    cross_activate_node,
 )
+from app.agents.states import ProjectAnalysisState, VideoAnalysisState
 
 logger = logging.getLogger(__name__)
 

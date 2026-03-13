@@ -1,21 +1,22 @@
 """Project management API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, selectinload
+import logging
 from typing import List
 from uuid import UUID
-import logging
 
-from app.database import get_db
-from app.models.database_models import Project, Video, VideoAnalysis, ProjectAnalysis
-from app.models.schemas import (
-    ProjectCreate,
-    ProjectUpdate,
-    ProjectResponse,
-    VideoResponse,
-    ProjectAnalysisResponse,
-)
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session, selectinload
+
 from app.auth_bridge import get_current_user_id
+from app.database import get_db
+from app.models.database_models import Project, ProjectAnalysis, Video, VideoAnalysis
+from app.models.schemas import (
+    ProjectAnalysisResponse,
+    ProjectCreate,
+    ProjectResponse,
+    ProjectUpdate,
+    VideoResponse,
+)
 
 logger = logging.getLogger(__name__)
 

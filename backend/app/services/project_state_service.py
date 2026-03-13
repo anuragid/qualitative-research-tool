@@ -1,8 +1,10 @@
 """Service for managing project state transitions."""
 
-from sqlalchemy.orm import Session
-from app.models.database_models import Project, Video
 import logging
+
+from sqlalchemy.orm import Session
+
+from app.models.database_models import Project, Video
 
 logger = logging.getLogger(__name__)
 

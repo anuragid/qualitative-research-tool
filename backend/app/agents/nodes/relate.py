@@ -1,11 +1,11 @@
 """RELATE node - Find patterns across inferences."""
 
-import logging
 import json
-from typing import Dict, Any
+import logging
+from typing import Any, Dict
 
-from app.agents.states import VideoAnalysisState
 from app.agents.prompts import RELATE_SYSTEM_PROMPT
+from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
@@ -67,10 +67,10 @@ Group related inferences into patterns and explain what each pattern represents.
         }
 
     except Exception as e:
-        logger.error(f"[RELATE] Error in relate_node: {e}")
+        logger.error(f"[RELATE] Error in relate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "patterns": None,
             "current_step": "relate",
-            "error": str(e),
+            "error": f"{type(e).__name__}: {e}",
         }

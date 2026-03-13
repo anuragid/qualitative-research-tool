@@ -1,10 +1,11 @@
 """SQLAlchemy database models."""
 
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, ARRAY
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+import uuid
+
+from sqlalchemy import ARRAY, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import uuid
 
 from app.database import Base
 

@@ -1,11 +1,11 @@
 """EXPLAIN node - Generate insights from patterns."""
 
-import logging
 import json
-from typing import Dict, Any
+import logging
+from typing import Any, Dict
 
-from app.agents.states import VideoAnalysisState
 from app.agents.prompts import EXPLAIN_SYSTEM_PROMPT
+from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
@@ -75,10 +75,10 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
         }
 
     except Exception as e:
-        logger.error(f"[EXPLAIN] Error in explain_node: {e}")
+        logger.error(f"[EXPLAIN] Error in explain_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "insights": None,
             "current_step": "explain",
-            "error": str(e),
+            "error": f"{type(e).__name__}: {e}",
         }

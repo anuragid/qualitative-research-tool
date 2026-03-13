@@ -1,6 +1,6 @@
 """LangGraph state definitions for analysis pipelines."""
 
-from typing import TypedDict, List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class VideoAnalysisState(TypedDict):

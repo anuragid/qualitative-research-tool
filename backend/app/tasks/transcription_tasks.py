@@ -1,13 +1,13 @@
 """Celery tasks for video transcription using AssemblyAI."""
 
-from uuid import UUID
 import logging
+from uuid import UUID
 
-from app.tasks.celery_app import celery_app
-from app.tasks.base import DatabaseTask
-from app.models.database_models import Video, Transcript, SpeakerLabel
+from app.models.database_models import SpeakerLabel, Transcript, Video
 from app.services.assemblyai_service import assemblyai_service
 from app.services.s3_service import s3_service
+from app.tasks.base import DatabaseTask
+from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 

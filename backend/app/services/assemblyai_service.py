@@ -1,9 +1,10 @@
 """AssemblyAI service for transcription with speaker diarization."""
 
-import assemblyai as aai
-from typing import Dict, Any
 import logging
 import time
+from typing import Any, Dict
+
+import assemblyai as aai
 
 from app.config import settings
 
@@ -57,7 +58,7 @@ class AssemblyAIService:
             logger.error(f"Error starting transcription: {e}")
             raise Exception(f"Failed to start transcription: {str(e)}")
 
-    def get_transcript_status(self, transcript_id: str) -> str:
+    def get_transcript_status(self, transcript_id: str) -> Dict[str, str]:
         """
         Get the status of a transcription job.
 
@@ -65,14 +66,17 @@ class AssemblyAIService:
             transcript_id: AssemblyAI transcript ID
 
         Returns:
-            Status string: "queued", "processing", "completed", "error"
+            Dict with "status" key and optional "error" key
 
         Raises:
             Exception: If status check fails
         """
         try:
             transcript = aai.Transcript.get_by_id(transcript_id)
-            return transcript.status.value
+            result = {"status": transcript.status.value}
+            if transcript.status.value == "error":
+                result["error"] = transcript.error or "Unknown error"
+            return result
 
         except Exception as e:
             logger.error(f"Error checking transcript status: {e}")
@@ -153,13 +157,15 @@ class AssemblyAIService:
             if elapsed > max_wait_seconds:
                 raise Exception(f"Transcription timed out after {max_wait_seconds}s")
 
-            status = self.get_transcript_status(transcript_id)
+            result = self.get_transcript_status(transcript_id)
+            status = result["status"]
             logger.info(f"Transcript {transcript_id} status: {status}")
 
             if status == "completed":
                 return self.get_transcript(transcript_id)
             elif status == "error":
-                raise Exception("Transcription failed with error")
+                error_detail = result.get("error", "Unknown error")
+                raise Exception(f"Transcription failed: {error_detail}")
 
             time.sleep(poll_interval)
 
