@@ -8,7 +8,7 @@ import { Input } from "./Input";
 import { Label } from "./Label";
 
 const meta = {
-  title: "UI/Dialog",
+  title: "Primitives/Dialog",
   component: Dialog,
   tags: ["autodocs"],
   parameters: { layout: "centered" },
@@ -39,7 +39,31 @@ export const Default: Story = {
           </div>
         </div>
         <DialogFooter>
+          <Button variant="ghost">Cancel</Button>
           <Button type="submit">Create</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+};
+
+export const Confirmation: Story = {
+  name: "Confirmation Dialog",
+  render: () => (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="destructive">Delete Project</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Are you sure?</DialogTitle>
+          <DialogDescription>
+            This action cannot be undone. This will permanently delete the project and all associated data.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost">Cancel</Button>
+          <Button variant="destructive">Delete</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
