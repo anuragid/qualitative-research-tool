@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
-      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} proxyUrl={import.meta.env.VITE_CLERK_PROXY_URL} afterSignOutUrl="/">
+      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} proxyUrl={import.meta.env.VITE_CLERK_PROXY_URL} afterSignOutUrl="/" signInUrl="/sign-in" signUpUrl="/sign-up">
         <QueryClientProvider client={queryClient}>
           <App />
         </QueryClientProvider>

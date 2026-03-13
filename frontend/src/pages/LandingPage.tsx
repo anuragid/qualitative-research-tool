@@ -15,7 +15,7 @@ export default function LandingPage() {
             <Link to="/sign-in" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
               Sign In
             </Link>
-            <Link to="/sign-in" className="px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors">
+            <Link to="/sign-up" className="px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors">
               Sign Up
             </Link>
           </div>

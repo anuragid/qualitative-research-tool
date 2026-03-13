@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SignIn } from "@clerk/react";
+import { SignIn, SignUp } from "@clerk/react";
 import { UploadProvider } from "./contexts/UploadContext";
 import { useAuth } from "./hooks/useAuth";
 import { useUserSync } from "./hooks/useUserSync";
@@ -12,7 +12,17 @@ function SignInPage() {
   return (
     <div className="min-h-screen bg-muted flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <SignIn routing="hash" />
+        <SignIn routing="hash" signUpUrl="/sign-up" />
+      </div>
+    </div>
+  );
+}
+
+function SignUpPage() {
+  return (
+    <div className="min-h-screen bg-muted flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <SignUp routing="hash" signInUrl="/sign-in" />
       </div>
     </div>
   );
@@ -55,6 +65,17 @@ function App() {
               <Navigate to="/projects" replace />
             ) : (
               <SignInPage />
+            )
+          }
+        />
+
+        <Route
+          path="/sign-up"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/projects" replace />
+            ) : (
+              <SignUpPage />
             )
           }
         />
