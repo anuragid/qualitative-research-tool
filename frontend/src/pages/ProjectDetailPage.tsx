@@ -267,17 +267,17 @@ export default function ProjectDetailPage() {
           ) : videos && videos.length > 0 ? (
             <div
               className={`relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-2xl transition-all ${
-                isDragging ? 'bg-accent/10 border-2 border-dashed border-accent/60' : ''
+                isDragging ? 'bg-accent-blue-bg border-2 border-dashed border-accent-blue-border' : ''
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
               {isDragging && (
-                <div className="absolute inset-0 flex items-center justify-center bg-accent/10 bg-opacity-90 rounded-2xl z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-accent-blue-bg bg-opacity-90 rounded-2xl z-10">
                   <div className="text-center">
-                    <Upload className="h-12 w-12 text-accent mx-auto mb-2" />
-                    <p className="text-accent font-medium">Drop videos here to upload</p>
+                    <Upload className="h-12 w-12 text-accent-blue mx-auto mb-2" />
+                    <p className="text-accent-blue font-medium">Drop videos here to upload</p>
                   </div>
                 </div>
               )}
@@ -288,7 +288,7 @@ export default function ProjectDetailPage() {
           ) : (
             <div
               className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all ${
-                isDragging ? 'border-accent/60 bg-accent/10' : 'border-border bg-surface-card'
+                isDragging ? 'border-accent-blue-border bg-accent-blue-bg' : 'border-border bg-surface-card'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -296,11 +296,11 @@ export default function ProjectDetailPage() {
             >
               {isDragging ? (
                 <>
-                  <Upload className="h-12 w-12 text-accent mx-auto mb-4 animate-bounce" />
+                  <Upload className="h-12 w-12 text-accent-blue mx-auto mb-4 animate-bounce" />
                   <h3 className="text-h4 mb-2">
                     Drop videos here
                   </h3>
-                  <p className="text-accent">
+                  <p className="text-accent-blue">
                     Release to upload your video files
                   </p>
                 </>
@@ -391,7 +391,7 @@ export default function ProjectDetailPage() {
                 <CardContent className="py-4">
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin text-accent" />
+                      <Loader2 className="h-5 w-5 animate-spin text-accent-blue" />
                       <div className="flex-1">
                         <p className="font-medium text-foreground">
                           {startProjectAnalysis.isPending || analysisTriggered
@@ -406,7 +406,7 @@ export default function ProjectDetailPage() {
 
                     {/* Progress bar with indeterminate state */}
                     <div className="w-full bg-base-04 rounded-full h-1.5">
-                      <div className="bg-accent h-1.5 rounded-full animate-pulse" style={{ width: '100%' }} />
+                      <div className="bg-accent-blue h-1.5 rounded-full animate-pulse" style={{ width: '100%' }} />
                     </div>
 
                     {projectAnalysis?.status === 'running' && (

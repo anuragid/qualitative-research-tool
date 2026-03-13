@@ -196,6 +196,21 @@ body {
   text-transform: uppercase;
 }
 
+@utility text-body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.16px;
+}
+
+@utility text-body-sm {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.43;
+}
+
 /* ===== NOISE TEXTURE UTILITIES ===== */
 @utility noise-texture {
   position: relative;
