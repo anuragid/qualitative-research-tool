@@ -161,6 +161,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // Show notification
       showNotification('success', `${pendingUpload.file.name} uploaded successfully`);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       // Check if the upload was cancelled
       if (axios.isCancel(error)) {
@@ -496,7 +497,6 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 }
 
 // Placeholder for a proper toast/notification system
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function showNotification(_type: 'success' | 'error' | 'info', _message: string) {
   // TODO: Replace with a proper toast library (e.g., sonner, react-hot-toast)
 }

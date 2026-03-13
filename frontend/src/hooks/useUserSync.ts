@@ -24,5 +24,6 @@ export function useUserSync() {
     };
 
     syncUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- user?.id is sufficient; `user` object changes on every render
   }, [isLoaded, isSignedIn, user?.id]);
 }

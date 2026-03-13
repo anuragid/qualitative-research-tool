@@ -19,7 +19,7 @@ interface TranscriptViewerProps {
 export function TranscriptViewer({
   transcript,
   speakerLabels = [],
-  onLabelSpeaker,
+  onLabelSpeaker: _onLabelSpeaker,
   videoId,
 }: TranscriptViewerProps) {
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
