@@ -42,6 +42,7 @@ export default function VideoCard({ video }: VideoCardProps) {
   const deleteVideo = useDeleteVideo();
   const startAnalysis = useStartVideoAnalysis();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleRetryAnalysis = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -51,33 +52,33 @@ export default function VideoCard({ video }: VideoCardProps) {
   const getStatusBadge = (status: Video["status"]) => {
     switch (status) {
       case "uploaded":
-        return <Badge variant="secondary">Uploaded</Badge>;
+        return <Badge variant="secondary" className="bg-brand-pale-blue/50 text-base-62 border-0">Uploaded</Badge>;
       case "transcribing":
         return (
-          <Badge variant="default">
+          <Badge variant="default" className="bg-brand-mustard/15 text-brand-mustard border-0">
             <Loader2 className="h-3 w-3 animate-spin mr-1" />
             Transcribing
           </Badge>
         );
       case "transcribed":
-        return <Badge variant="secondary">Transcribed</Badge>;
+        return <Badge variant="secondary" className="bg-brand-pale-green/50 text-brand-forest border-0">Transcribed</Badge>;
       case "analyzing":
         return (
-          <Badge variant="default">
+          <Badge variant="default" className="bg-brand-mustard/15 text-brand-mustard border-0">
             <Loader2 className="h-3 w-3 animate-spin mr-1" />
             Analyzing
           </Badge>
         );
       case "analyzed":
         return (
-          <Badge variant="success">
+          <Badge variant="success" className="bg-brand-forest/15 text-brand-forest border-0">
             <CheckCircle className="h-3 w-3 mr-1" />
             Analyzed
           </Badge>
         );
       case "error":
         return (
-          <Badge variant="destructive">
+          <Badge variant="destructive" className="bg-destructive/10 text-destructive border-0">
             <AlertCircle className="h-3 w-3 mr-1" />
             Error
           </Badge>
@@ -97,38 +98,44 @@ export default function VideoCard({ video }: VideoCardProps) {
   return (
     <>
       <Card
-        className="hover:shadow-lg transition-shadow cursor-pointer"
+        className="bg-card rounded-2xl border-0 cursor-pointer transition-[transform,box-shadow] duration-[var(--duration-normal)] ease-[var(--ease)] hover:shadow-subtle hover:-translate-y-[1px]"
         onClick={() => navigate(`/videos/${video.id}`)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <FileVideo className="h-10 w-10 text-muted-foreground flex-shrink-0 mt-1" />
+              <FileVideo className="h-10 w-10 text-base-40 flex-shrink-0 mt-1" />
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg truncate">
+                <CardTitle className="text-lg truncate text-base-85">
                   {video.filename}
                 </CardTitle>
-                <CardDescription className="mt-1">
+                <CardDescription className="mt-1 text-base-40">
                   Uploaded {formatDate(video.uploaded_at)}
                 </CardDescription>
               </div>
             </div>
+            {/* Menu button — progressive disclosure: appears on hover */}
             <Button
               variant="ghost"
               size="icon"
+              className={`rounded-full transition-opacity duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                isHovered ? "opacity-100" : "opacity-0"
+              }`}
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDeleteDialog(true);
               }}
               disabled={deleteVideo.isPending}
             >
-              <MoreVertical className="h-4 w-4" />
+              <MoreVertical className="h-4 w-4 text-base-40" />
             </Button>
           </div>
         </CardHeader>
 
-        <CardContent>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <CardContent className="pb-3">
+          <div className="flex items-center gap-4 text-sm text-base-55">
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               <span>{video.duration_seconds ? formatDuration(video.duration_seconds) : "Unknown"}</span>
@@ -137,7 +144,7 @@ export default function VideoCard({ video }: VideoCardProps) {
           </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-2">
+        <CardFooter className="flex flex-col gap-2 pt-0">
           <div className="flex items-center justify-between w-full">
             {getStatusBadge(video.status)}
             {video.error_message && (
@@ -146,12 +153,12 @@ export default function VideoCard({ video }: VideoCardProps) {
               </p>
             )}
           </div>
-          {/* Retry button for failed analysis - Nielsen #9: Help users recover from errors */}
+          {/* Retry button for failed analysis */}
           {video.status === "error" && (
             <Button
               variant="outline"
               size="sm"
-              className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
+              className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 rounded-full"
               onClick={handleRetryAnalysis}
               disabled={startAnalysis.isPending}
             >
@@ -183,9 +190,10 @@ export default function VideoCard({ video }: VideoCardProps) {
           </DialogHeader>
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setShowDeleteDialog(false)}
               disabled={deleteVideo.isPending}
+              className="rounded-full"
             >
               Cancel
             </Button>
@@ -193,6 +201,7 @@ export default function VideoCard({ video }: VideoCardProps) {
               variant="destructive"
               onClick={handleDelete}
               disabled={deleteVideo.isPending}
+              className="rounded-full"
             >
               {deleteVideo.isPending ? (
                 <>
