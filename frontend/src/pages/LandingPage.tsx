@@ -1,5 +1,5 @@
 import { FolderKanban, Video, Brain, TrendingUp, Lock } from "lucide-react";
-import { SignInButton, SignUpButton } from "@clerk/react";
+import { Link } from "react-router-dom";
 
 export default function LandingPage() {
   return (
@@ -12,16 +12,12 @@ export default function LandingPage() {
             <span className="text-xl font-bold">Qualitative Research Tool</span>
           </div>
           <div className="flex items-center gap-3">
-            <SignInButton>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Sign In
-              </button>
-            </SignInButton>
-            <SignUpButton>
-              <button className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
-                Sign Up
-              </button>
-            </SignUpButton>
+            <Link to="/sign-in" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              Sign In
+            </Link>
+            <Link to="/sign-in" className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+              Sign Up
+            </Link>
           </div>
         </div>
       </header>
@@ -36,11 +32,9 @@ export default function LandingPage() {
             Transform video interviews into actionable insights using advanced AI analysis.
             Extract patterns, generate design principles, and unlock deep understanding from your research data.
           </p>
-          <SignInButton>
-            <button className="px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
-              Get Started
-            </button>
-          </SignInButton>
+          <Link to="/sign-in" className="inline-block px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
+            Get Started
+          </Link>
         </div>
       </section>
 
@@ -117,11 +111,9 @@ export default function LandingPage() {
         <p className="text-xl text-gray-600 mb-8">
           Sign in to start analyzing your qualitative research data with AI.
         </p>
-        <SignInButton>
-          <button className="px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
-            Sign In to Continue
-          </button>
-        </SignInButton>
+        <Link to="/sign-in" className="inline-block px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
+          Sign In to Continue
+        </Link>
       </section>
 
       {/* Footer */}

@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { FolderKanban, Settings } from "lucide-react";
-import { Show, SignInButton, UserButton } from "@clerk/react";
+import { Show, UserButton } from "@clerk/react";
 import { UploadManager } from "./upload/UploadManager";
 import { ModelSettingsDialog } from "./settings/ModelSettingsDialog";
 
@@ -24,11 +24,9 @@ export default function Layout({ children }: LayoutProps) {
 
           <div className="flex items-center gap-4">
             <Show when="signed-out">
-              <SignInButton>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  Sign In
-                </button>
-              </SignInButton>
+              <Link to="/sign-in" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                Sign In
+              </Link>
             </Show>
             <Show when="signed-in">
               <button
