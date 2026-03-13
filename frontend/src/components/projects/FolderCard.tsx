@@ -67,7 +67,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
   return (
     <>
       <div
-        className="relative cursor-pointer pt-6 group"
+        className="relative cursor-pointer pt-6 group active:scale-[0.98]"
         onClick={handleCardClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -86,7 +86,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
       >
         {/* Folder Tab */}
         <div
-          className="absolute top-0 left-4 w-20 h-7 rounded-t-md noise-texture noise-medium"
+          className="absolute top-0 left-4 w-20 h-7 rounded-t-sm noise-texture noise-medium"
           style={{ backgroundColor: color.tab }}
         >
           <span className="relative z-[2]" />
