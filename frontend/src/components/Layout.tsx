@@ -1,51 +1,49 @@
-import { type ReactNode, useState } from "react";
-import { Link } from "react-router-dom";
-import { FolderKanban, Settings } from "lucide-react";
-import { Show, UserButton } from "@clerk/react";
+import { type ReactNode, useState, useCallback } from "react";
+import { Menu } from "lucide-react";
+import { Sidebar } from "./navigation/Sidebar";
 import { UploadManager } from "./upload/UploadManager";
-import { ModelSettingsDialog } from "./settings/ModelSettingsDialog";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleCloseSidebar = useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-muted">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <nav className="container mx-auto flex h-16 items-center justify-between px-4" aria-label="Main navigation">
-          <Link to="/projects" className="flex items-center gap-2">
-            <FolderKanban className="h-6 w-6" aria-hidden="true" />
-            <span className="text-xl font-bold">Qualitative Research Tool</span>
-          </Link>
+    <div className="min-h-screen bg-surface-page">
+      {/* Sidebar */}
+      <Sidebar isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
-          <div className="flex items-center gap-4">
-            <Show when="signed-out">
-              <Link to="/sign-in" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-                Sign In
-              </Link>
-            </Show>
-            <Show when="signed-in">
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent transition-colors"
-                aria-label="Model Settings"
-              >
-                <Settings className="h-5 w-5" aria-hidden="true" />
-              </button>
-              <UserButton />
-            </Show>
-          </div>
-        </nav>
+      {/* Mobile header bar */}
+      <header
+        className="fixed top-0 left-0 right-0 h-14 flex items-center px-4 bg-surface-card border-b border-border lg:hidden"
+        style={{ zIndex: "var(--z-sticky)" }}
+      >
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 -ml-2 rounded-md text-base-62 hover:text-foreground hover:bg-base-04"
+          style={{
+            transition:
+              "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
+          }}
+          aria-label="Open sidebar"
+        >
+          <Menu className="h-5 w-5" aria-hidden="true" />
+        </button>
+        <span className="text-h4 text-foreground ml-3 select-none">
+          method<span className="italic text-brand-burnt-orange">x</span>
+        </span>
       </header>
 
-      <ModelSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-
-      {/* Main Content */}
-      <main className="container mx-auto p-6">{children}</main>
+      {/* Main content area */}
+      <main className="lg:ml-72 pt-14 lg:pt-0 min-h-screen">
+        <div className="p-6">{children}</div>
+      </main>
 
       {/* Global Upload Manager */}
       <UploadManager />
