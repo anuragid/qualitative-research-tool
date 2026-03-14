@@ -1,8 +1,9 @@
 import { useCallback, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { FolderOpen, Settings, X } from "lucide-react";
+import { FolderOpen, Settings, Sun, Moon, Monitor, X } from "lucide-react";
 import { UserButton } from "@clerk/react";
 import { ModelSettingsDialog } from "../settings/ModelSettingsDialog";
+import { useTheme } from "../../hooks/useTheme.tsx";
 import { useState } from "react";
 
 interface SidebarProps {
@@ -14,6 +15,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   // Close sidebar on Escape key
   const handleKeyDown = useCallback(
@@ -116,6 +118,36 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <span className="px-3 text-label text-base-40 uppercase tracking-wider">
               Settings
             </span>
+            <span className="px-3 text-label text-base-40 mt-2 block">Theme</span>
+            <div className="flex items-center gap-1 px-3 mt-1">
+              <button
+                onClick={() => setTheme("light")}
+                className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                  theme === "light" ? "bg-base-08 text-foreground" : "text-base-40 hover:text-base-62 hover:bg-base-04"
+                }`}
+                aria-label="Light theme"
+              >
+                <Sun className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setTheme("dark")}
+                className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                  theme === "dark" ? "bg-base-08 text-foreground" : "text-base-40 hover:text-base-62 hover:bg-base-04"
+                }`}
+                aria-label="Dark theme"
+              >
+                <Moon className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setTheme("system")}
+                className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                  theme === "system" ? "bg-base-08 text-foreground" : "text-base-40 hover:text-base-62 hover:bg-base-04"
+                }`}
+                aria-label="System theme"
+              >
+                <Monitor className="h-4 w-4" />
+              </button>
+            </div>
             <button
               onClick={() => setSettingsOpen(true)}
               className="flex items-center gap-3 h-10 px-3 rounded-lg text-ui text-base-62 hover:bg-base-04 hover:text-foreground w-full mt-1"
