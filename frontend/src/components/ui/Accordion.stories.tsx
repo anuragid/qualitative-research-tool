@@ -29,7 +29,7 @@ export const Default: Story = {
       <AccordionItem value="item-3">
         <AccordionTrigger>Can I use my own API key?</AccordionTrigger>
         <AccordionContent>
-          Yes! Methodex supports BYOK (Bring Your Own Key) for premium models via OpenRouter.
+          Yes! methodex supports BYOK (Bring Your Own Key) for premium models via OpenRouter.
         </AccordionContent>
       </AccordionItem>
     </Accordion>

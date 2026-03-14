@@ -42,7 +42,7 @@ describe("Sidebar", () => {
   });
 
   // 1. Renders methodex typemark
-  it('renders the "methode" text with italic "x"', () => {
+  it('renders the "method" text with accented "ex"', () => {
     const { aside } = renderSidebar();
 
     // The typemark outer span contains "methodex" as full text content
@@ -52,10 +52,10 @@ describe("Sidebar", () => {
     expect(typemark).not.toBeNull();
     expect(typemark.textContent).toBe("methodex");
 
-    // The inner span wraps the "x" portion and should be styled distinctly
+    // The inner span wraps the "ex" portion and should be styled distinctly
     const innerSpan = typemark.querySelector("span") as HTMLElement;
     expect(innerSpan).not.toBeNull();
-    expect(innerSpan.textContent).toContain("x");
+    expect(innerSpan.textContent).toContain("ex");
   });
 
   // 2. Renders "All Projects" nav link
