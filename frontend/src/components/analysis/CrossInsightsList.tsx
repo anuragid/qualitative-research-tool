@@ -28,11 +28,11 @@ const confidenceColors = {
 export function CrossInsightsList({ crossInsights }: CrossInsightsListProps) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold">
           Cross-Video Insights ({crossInsights.length})
         </h3>
-        <div className="flex gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(scopeColors).map(([type, color]) => (
             <Badge key={type} className={color}>
               {type}
@@ -46,7 +46,7 @@ export function CrossInsightsList({ crossInsights }: CrossInsightsListProps) {
           <AccordionItem key={insight.cross_insight_id} value={insight.cross_insight_id}>
             <Card className="border-l-4 border-l-info">
               <CardContent className="p-0">
-                <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted">
+                <AccordionTrigger className="px-3 sm:px-4 py-4 hover:no-underline hover:bg-muted">
                   <div className="flex items-start gap-3 text-left flex-1">
                     <Sparkles className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -71,8 +71,8 @@ export function CrossInsightsList({ crossInsights }: CrossInsightsListProps) {
                   </div>
                 </AccordionTrigger>
 
-                <AccordionContent className="px-4 pb-4">
-                  <div className="space-y-4 pl-8">
+                <AccordionContent className="px-3 sm:px-4 pb-4">
+                  <div className="space-y-4 pl-4 sm:pl-8">
                     <div>
                       <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Explanation

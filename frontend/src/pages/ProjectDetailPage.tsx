@@ -189,9 +189,9 @@ export default function ProjectDetailPage() {
     <Layout>
       <div className="space-y-6">
         {/* Header Section */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">{project.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">{project.name}</h1>
             {project.description && (
               <p className="text-muted-foreground mt-1">{project.description}</p>
             )}
@@ -306,7 +306,7 @@ export default function ProjectDetailPage() {
         {/* Project Analysis Section */}
         {canRunProjectAnalysis && (
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Network className="h-5 w-5 text-chart-3" />
                 <h2 className="text-xl font-semibold">Cross-Video Analysis</h2>
@@ -331,7 +331,7 @@ export default function ProjectDetailPage() {
                   )}
                 </Button>
               ) : projectAnalysis.status === 'running' ? (
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-2">
                   <Badge className="bg-info/20 text-info border-info/40 px-3 py-1.5">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     <span className="font-medium">Cross-Video Analysis Running...</span>
@@ -462,7 +462,7 @@ export default function ProjectDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="meta-patterns" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                       <TabsTrigger value="meta-patterns">
                         Meta-Patterns
                         {metaPatterns && (

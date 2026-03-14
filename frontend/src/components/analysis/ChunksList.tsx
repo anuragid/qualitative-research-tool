@@ -24,11 +24,11 @@ const chunkTypeIcons = {
 export function ChunksList({ chunks }: ChunksListProps) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold">
           Chunks ({chunks.length})
         </h3>
-        <div className="flex gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(chunkTypeColors).map(([type, color]) => (
             <Badge key={type} className={color}>
               {type}
@@ -40,9 +40,9 @@ export function ChunksList({ chunks }: ChunksListProps) {
       <div className="space-y-3">
         {chunks.map((chunk) => (
           <Card key={chunk.chunk_id}>
-            <CardContent className="pt-4">
+            <CardContent className="p-3 sm:p-5 pt-4">
               <div className="flex gap-4">
-                <div className="flex-shrink-0 w-20 text-sm text-muted-foreground flex items-start gap-1">
+                <div className="flex-shrink-0 w-14 sm:w-20 text-sm text-muted-foreground flex items-start gap-1">
                   <Clock className="h-3 w-3 mt-0.5" />
                   <span className="text-xs">{chunk.timestamp}</span>
                 </div>

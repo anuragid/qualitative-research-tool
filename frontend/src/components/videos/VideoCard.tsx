@@ -97,7 +97,7 @@ export default function VideoCard({ video }: VideoCardProps) {
   return (
     <>
       <Card
-        className="hover:shadow-lg transition-shadow cursor-pointer"
+        className="group hover:shadow-lg transition-shadow cursor-pointer"
         onClick={() => navigate(`/videos/${video.id}`)}
       >
         <CardHeader>
@@ -116,6 +116,7 @@ export default function VideoCard({ video }: VideoCardProps) {
             <Button
               variant="ghost"
               size="icon"
+              className="h-9 w-9 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDeleteDialog(true);
