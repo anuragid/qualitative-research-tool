@@ -64,6 +64,7 @@ export default function VideoDetailPage() {
   const { data: transcript, isLoading: transcriptLoading } = useTranscript(videoId || null);
   const { data: speakerLabels } = useSpeakerLabels(transcript?.id || null);
   const { data: analysis, isLoading: analysisLoading } = useVideoAnalysis(videoId || null);
+  const { data: project } = useProject(video?.project_id || null);
 
   const startTranscription = useStartTranscription();
   const startFullAnalysis = useStartFullAnalysis();
@@ -223,8 +224,9 @@ export default function VideoDetailPage() {
   if (videoLoading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-surface-page flex items-center justify-center py-12">
+        <div className="min-h-screen bg-surface-page flex flex-col items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-base-40" />
+          <p className="mt-3 text-sm text-base-55">Loading video details...</p>
         </div>
       </Layout>
     );
@@ -346,7 +348,7 @@ export default function VideoDetailPage() {
             <Link to={`/projects/${video.project_id}`}>
               <Button variant="ghost" size="sm" className="text-base-55 hover:text-base-85 gap-2 rounded-full">
                 <ArrowLeft className="h-4 w-4" />
-                Back to Project
+                {project?.name ? `Back to ${project.name}` : "Back to Project"}
               </Button>
             </Link>
           </div>
@@ -760,21 +762,31 @@ export default function VideoDetailPage() {
                   // Complete mode: Show all steps in tabbed accordion sections
                   <Tabs defaultValue="chunks" className="w-full">
                     <TabsList className="overflow-x-auto">
-                      <TabsTrigger value="chunks" className="whitespace-nowrap">
-                        1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
-                      </TabsTrigger>
-                      <TabsTrigger value="inferences" className="whitespace-nowrap">
-                        2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
-                      </TabsTrigger>
-                      <TabsTrigger value="patterns" className="whitespace-nowrap">
-                        3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
-                      </TabsTrigger>
-                      <TabsTrigger value="insights" className="whitespace-nowrap">
-                        4. Insights {analysis.insights && `(${analysis.insights.length})`}
-                      </TabsTrigger>
-                      <TabsTrigger value="principles" className="whitespace-nowrap">
-                        5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
-                      </TabsTrigger>
+                      <SimpleTooltip content="Breaking interview into segments">
+                        <TabsTrigger value="chunks" className="whitespace-nowrap">
+                          1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
+                        </TabsTrigger>
+                      </SimpleTooltip>
+                      <SimpleTooltip content="Extracting deeper meaning from segments">
+                        <TabsTrigger value="inferences" className="whitespace-nowrap">
+                          2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
+                        </TabsTrigger>
+                      </SimpleTooltip>
+                      <SimpleTooltip content="Connecting inferences into themes">
+                        <TabsTrigger value="patterns" className="whitespace-nowrap">
+                          3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
+                        </TabsTrigger>
+                      </SimpleTooltip>
+                      <SimpleTooltip content="Generating higher-order explanations">
+                        <TabsTrigger value="insights" className="whitespace-nowrap">
+                          4. Insights {analysis.insights && `(${analysis.insights.length})`}
+                        </TabsTrigger>
+                      </SimpleTooltip>
+                      <SimpleTooltip content="Creating actionable design principles">
+                        <TabsTrigger value="principles" className="whitespace-nowrap">
+                          5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
+                        </TabsTrigger>
+                      </SimpleTooltip>
                     </TabsList>
 
                     <TabsContent value="chunks" className="mt-6">

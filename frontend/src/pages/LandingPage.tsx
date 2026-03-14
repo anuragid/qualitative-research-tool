@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Upload, Brain, GitMerge, Lock, Menu, X } from "lucide-react";
 import { gsap, useGSAP, ease, duration, prefersReducedMotion } from "../lib/animations";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useAuth } from "../hooks/useAuth";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -11,6 +12,7 @@ export default function LandingPage() {
   const headerRef = useRef<HTMLElement>(null);
   const [headerScrolled, setHeaderScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isSignedIn } = useAuth();
 
   // Frosted-glass header on scroll
   useEffect(() => {
@@ -108,18 +110,29 @@ export default function LandingPage() {
             >
               How it works
             </a>
-            <Link
-              to="/sign-in"
-              className="text-ui text-base-55 hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/sign-up"
-              className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-            >
-              Try methodex
-            </Link>
+            {isSignedIn ? (
+              <Link
+                to="/projects"
+                className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+              >
+                Go to Projects
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/sign-in"
+                  className="text-ui text-base-55 hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/sign-up"
+                  className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+                >
+                  Try methodex
+                </Link>
+              </>
+            )}
           </nav>
 
           {/* Mobile hamburger */}
@@ -153,20 +166,32 @@ export default function LandingPage() {
             >
               How it works
             </a>
-            <Link
-              to="/sign-in"
-              className="text-ui text-base-55 hover:text-foreground no-underline py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/sign-up"
-              className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2.5 no-underline mt-1"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Try methodex
-            </Link>
+            {isSignedIn ? (
+              <Link
+                to="/projects"
+                className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2.5 no-underline mt-1"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Go to Projects
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/sign-in"
+                  className="text-ui text-base-55 hover:text-foreground no-underline py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/sign-up"
+                  className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2.5 no-underline mt-1"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Try methodex
+                </Link>
+              </>
+            )}
           </div>
         )}
       </header>
@@ -201,10 +226,10 @@ export default function LandingPage() {
           </p>
           <div data-animate="hero">
             <Link
-              to="/sign-up"
+              to={isSignedIn ? "/projects" : "/sign-up"}
               className="inline-flex items-center justify-center frosted-glass text-ui text-foreground rounded-full px-8 py-3 shadow-subtle hover:shadow-card transition-[box-shadow,opacity] duration-[var(--duration-normal)] ease-[var(--ease)] no-underline border border-base-09"
             >
-              Start Analyzing
+              {isSignedIn ? "Go to Projects" : "Start Analyzing"}
             </Link>
           </div>
         </div>
@@ -452,18 +477,29 @@ export default function LandingPage() {
             data-animate="cta"
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link
-              to="/sign-up"
-              className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-8 py-3 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-            >
-              Get Started Free
-            </Link>
-            <Link
-              to="/sign-in"
-              className="inline-flex items-center justify-center text-ui text-foreground rounded-full px-8 py-3 border border-base-09 bg-white/50 hover:bg-white/80 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-            >
-              Sign In
-            </Link>
+            {isSignedIn ? (
+              <Link
+                to="/projects"
+                className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-8 py-3 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+              >
+                Go to Projects
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/sign-up"
+                  className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-8 py-3 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+                >
+                  Get Started Free
+                </Link>
+                <Link
+                  to="/sign-in"
+                  className="inline-flex items-center justify-center text-ui text-foreground rounded-full px-8 py-3 border border-base-09 bg-white/50 hover:bg-white/80 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+                >
+                  Sign In
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -485,20 +521,32 @@ export default function LandingPage() {
 
             {/* Links */}
             <div className="flex items-center gap-6">
-              <Link
-                to="/sign-in"
-                className="text-ui no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
-                style={{ color: "rgba(255, 255, 255, 0.7)" }}
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/sign-up"
-                className="text-ui no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
-                style={{ color: "rgba(255, 255, 255, 0.7)" }}
-              >
-                Sign Up
-              </Link>
+              {isSignedIn ? (
+                <Link
+                  to="/projects"
+                  className="text-ui no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
+                  style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                >
+                  Go to Projects
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    to="/sign-in"
+                    className="text-ui no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
+                    style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/sign-up"
+                    className="text-ui no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
+                    style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 

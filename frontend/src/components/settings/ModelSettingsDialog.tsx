@@ -91,7 +91,7 @@ export function ModelSettingsDialog({
                   />
                   <div>
                     <div className="font-medium text-sm">{model.name}</div>
-                    <div className="text-xs text-base-55">Free tier</div>
+                    <div className="text-xs text-base-55">Free -- good for drafts and exploration</div>
                   </div>
                 </label>
               ))}
@@ -125,7 +125,7 @@ export function ModelSettingsDialog({
                   <div>
                     <div className="font-medium text-sm">{model.name}</div>
                     <div className="text-xs text-base-55">
-                      Premium - BYOK required
+                      Higher quality analysis -- requires your own API key
                     </div>
                   </div>
                 </label>
@@ -136,7 +136,7 @@ export function ModelSettingsDialog({
           {/* API Key */}
           <div>
             <span className="text-section text-base-55">
-              API Key
+              OpenRouter API Key (BYOK)
             </span>
             {settings?.has_api_key ? (
               <div className="mt-2 flex items-center gap-2">
