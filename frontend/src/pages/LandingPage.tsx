@@ -91,7 +91,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl flex h-16 items-center justify-between px-6">
           {/* Typemark */}
           <Link to="/" className="text-h4 text-foreground no-underline">
-            method<span className="italic text-brand-burnt-orange">x</span>
+            methode<span className="italic text-brand-burnt-orange">x</span>
           </Link>
 
           {/* Desktop nav */}
@@ -480,7 +480,7 @@ export default function LandingPage() {
               className="text-h4 text-white no-underline"
               style={{ opacity: 1 }}
             >
-              method<span className="italic" style={{ color: "var(--color-brand-burnt-orange)" }}>x</span>
+              methode<span className="italic" style={{ color: "var(--color-brand-burnt-orange)" }}>x</span>
             </span>
 
             {/* Links */}
