@@ -149,7 +149,7 @@ export function UploadManager() {
   const headerStatus = getHeaderStatus();
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96">
+    <div className="fixed bottom-4 inset-x-4 sm:left-auto sm:right-4 sm:w-96 z-50">
       {/* Header */}
       <div
         className="bg-card border border-border rounded-lg shadow-lg cursor-pointer"
