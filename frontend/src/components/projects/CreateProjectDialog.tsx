@@ -86,6 +86,10 @@ export default function CreateProjectDialog() {
             </div>
           </div>
 
+          {createProject.error && (
+            <p className="text-sm text-destructive mt-2">Failed to save. Please try again.</p>
+          )}
+
           <DialogFooter>
             <Button
               type="button"

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { formatFileSize, formatDuration, formatDate } from "../../lib/utils";
 import {
   FileVideo,
@@ -10,6 +11,7 @@ import {
   Loader2,
   CheckCircle,
   RefreshCw,
+  Eye,
 } from "lucide-react";
 import type { Video } from "../../types";
 import {
@@ -32,6 +34,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "../ui/Dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/DropdownMenu";
 
 interface VideoCardProps {
   video: Video;
@@ -47,6 +56,12 @@ export default function VideoCard({ video }: VideoCardProps) {
   const handleRetryAnalysis = (e: React.MouseEvent) => {
     e.stopPropagation();
     startAnalysis.mutate(video.id);
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate when clicking the dropdown menu
+    if ((e.target as HTMLElement).closest("[data-dropdown-menu]")) return;
+    navigate(`/videos/${video.id}`);
   };
 
   const getStatusBadge = (status: Video["status"]) => {
@@ -91,17 +106,30 @@ export default function VideoCard({ video }: VideoCardProps) {
       await deleteVideo.mutateAsync(video.id);
       setShowDeleteDialog(false);
     } catch {
-      // Error is handled by the mutation's error state
+      toast.error("Failed to delete video. Please try again.");
     }
   };
 
   return (
     <>
       <Card
-        className="group bg-card rounded-2xl border-0 cursor-pointer transition-[transform,box-shadow] duration-[var(--duration-normal)] ease-[var(--ease)] hover:shadow-subtle hover:-translate-y-[1px]"
-        onClick={() => navigate(`/videos/${video.id}`)}
+        className="group bg-card rounded-2xl border-0 cursor-pointer active:scale-[0.98]"
+        onClick={handleCardClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            navigate(`/videos/${video.id}`);
+          }
+        }}
+        style={{
+          transition: `transform var(--duration-normal) var(--ease), box-shadow var(--duration-normal) var(--ease)`,
+          transform: isHovered ? "translateY(-1px)" : "translateY(0)",
+          boxShadow: isHovered ? "var(--shadow-subtle)" : "none",
+        }}
       >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
@@ -116,19 +144,40 @@ export default function VideoCard({ video }: VideoCardProps) {
                 </CardDescription>
               </div>
             </div>
-            {/* Menu button — progressive disclosure: appears on hover */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`rounded-full h-9 w-9 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-[var(--duration-micro)] ease-[var(--ease)]`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDeleteDialog(true);
-              }}
-              disabled={deleteVideo.isPending}
+            {/* Menu -- always visible on mobile, hover-reveal on desktop */}
+            <div
+              data-dropdown-menu
+              onClick={(e) => e.stopPropagation()}
+              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-[var(--duration-micro)]"
             >
-              <MoreVertical className="h-4 w-4 text-base-40" />
-            </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full h-9 w-9"
+                    disabled={deleteVideo.isPending}
+                  >
+                    <MoreVertical className="h-4 w-4 text-base-40" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate(`/videos/${video.id}`)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Details
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CardHeader>
 

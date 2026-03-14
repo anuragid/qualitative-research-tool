@@ -4,10 +4,12 @@ import Layout from "../components/Layout";
 import FolderCard from "../components/projects/FolderCard";
 import CreateProjectDialog from "../components/projects/CreateProjectDialog";
 import { Skeleton } from "../components/ui/Skeleton";
+import { Button } from "../components/ui/Button";
 import { gsap, useGSAP, animations, prefersReducedMotion } from "../lib/animations";
+import { RefreshCw } from "lucide-react";
 
 export default function ProjectsPage() {
-  const { data: projects, isLoading, error } = useProjects();
+  const { data: projects, isLoading, error, refetch } = useProjects();
   const gridRef = useRef<HTMLDivElement>(null);
 
   // GSAP staggered entrance animation for folder cards
@@ -57,6 +59,15 @@ export default function ProjectsPage() {
             <p className="text-destructive">
               Failed to load projects. Please try again.
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 border-destructive/40 text-destructive hover:bg-destructive/10"
+              onClick={() => refetch()}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
           </div>
         )}
 

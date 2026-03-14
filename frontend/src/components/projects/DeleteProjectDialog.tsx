@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '../ui/Dialog';
 import { Button } from '../ui/Button';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 interface DeleteProjectDialogProps {
   open: boolean;
@@ -91,7 +91,7 @@ export function DeleteProjectDialog({
           >
             {isPending ? (
               <>
-                <span className="animate-spin mr-2">⏳</span>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Deleting...
               </>
             ) : (

@@ -110,9 +110,8 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                {project.status !== "planning" && (
+                {project.status !== "planning" && project.status !== "error" && (
                   <Badge variant={STATUS_BADGE_VARIANT[project.status]}>
-                    {project.status === "error" && <AlertCircle className="h-3 w-3 mr-1" />}
                     {project.status}
                   </Badge>
                 )}
@@ -156,14 +155,21 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
               </div>
             </div>
 
+            {project.status === "error" && (
+              <div className="flex items-center gap-1 mb-1 mt-1">
+                <AlertCircle className="h-3 w-3 text-destructive" />
+                <span className="text-xs font-medium text-destructive">Error</span>
+              </div>
+            )}
+
             {project.description && (
               <p className="text-sm text-base-55 line-clamp-2 mb-2">{project.description}</p>
             )}
 
             {project.status === "error" && project.error_message && (
-              <div className="bg-destructive/10 border border-destructive/30 rounded-md p-2 mb-2">
-                <p className="text-xs text-destructive flex items-start gap-1">
-                  <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+              <div className="border-l-2 border-destructive/50 bg-base-04 rounded-r-md pl-3 pr-2 py-2 mb-2">
+                <p className="text-xs text-base-55 flex items-start gap-1.5">
+                  <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0 text-destructive" />
                   <span className="line-clamp-2">{project.error_message}</span>
                 </p>
               </div>

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SignIn, SignUp } from "@clerk/react";
+import { Toaster } from "sonner";
 import { UploadProvider } from "./contexts/UploadContext";
 import { useAuth } from "./hooks/useAuth";
 import { useUserSync } from "./hooks/useUserSync";
@@ -45,6 +46,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <Toaster position="bottom-right" richColors />
       <Routes>
         {/* Public routes */}
         <Route

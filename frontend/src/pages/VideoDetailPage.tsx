@@ -12,6 +12,7 @@ import {
   useStartActivateStep
 } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
+import { useProject } from "../hooks/useProjects";
 import { TranscriptViewer } from "../components/videos/TranscriptViewer";
 import { formatFileSize } from "../lib/utils";
 import { ChunksList } from "../components/analysis/ChunksList";
@@ -233,7 +234,14 @@ export default function VideoDetailPage() {
     return (
       <Layout>
         <div className="min-h-screen bg-surface-page text-center py-12">
-          <p className="text-base-55">Video not found</p>
+          <AlertCircle className="h-12 w-12 text-base-40 mx-auto mb-4" />
+          <h2 className="text-h3 mb-2">Video Not Found</h2>
+          <p className="text-base-55 mb-4">
+            The video you're looking for doesn't exist or has been removed.
+          </p>
+          <Link to="/projects">
+            <Button>Go to Projects</Button>
+          </Link>
         </div>
       </Layout>
     );

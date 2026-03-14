@@ -30,7 +30,7 @@ export function EditProjectDialog({
   onOpenChange,
   project,
 }: EditProjectDialogProps) {
-  const { mutate: updateProject, isPending } = useUpdateProject();
+  const { mutate: updateProject, isPending, error: mutationError } = useUpdateProject();
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description || '');
 
@@ -104,6 +104,9 @@ export function EditProjectDialog({
               />
             </div>
           </div>
+          {mutationError && (
+            <p className="text-sm text-destructive mt-2">Failed to save. Please try again.</p>
+          )}
           <DialogFooter>
             <Button
               type="button"

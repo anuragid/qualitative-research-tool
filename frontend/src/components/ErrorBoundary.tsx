@@ -8,15 +8,16 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  showDetails: boolean;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, showDetails: false };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
@@ -28,6 +29,10 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  toggleDetails = () => {
+    this.setState((prev) => ({ showDetails: !prev.showDetails }));
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -37,19 +42,29 @@ export class ErrorBoundary extends Component<Props, State> {
               Something went wrong
             </h1>
             <p className="mb-6 text-base-62">
-              An unexpected error occurred. Please reload the page to try again.
+              Something went wrong. Please try refreshing the page.
             </p>
-            {this.state.error && (
-              <pre className="mb-6 max-h-32 overflow-auto rounded bg-base-04 p-3 text-left text-xs text-base-55">
-                {this.state.error.message}
-              </pre>
-            )}
             <button
               onClick={this.handleReload}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
-              Reload
+              Refresh Page
             </button>
+            {this.state.error && (
+              <div className="mt-6">
+                <button
+                  onClick={this.toggleDetails}
+                  className="text-sm text-base-40 hover:text-base-62 underline underline-offset-2"
+                >
+                  {this.state.showDetails ? "Hide technical details" : "Show technical details"}
+                </button>
+                {this.state.showDetails && (
+                  <pre className="mt-3 max-h-32 overflow-auto rounded bg-base-04 p-3 text-left text-xs text-base-55">
+                    {this.state.error.message}
+                  </pre>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );

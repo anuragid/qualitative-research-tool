@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { toast } from "sonner";
 import { useProject } from "../hooks/useProjects";
 import { useProjectVideos } from "../hooks/useVideos";
 import { useProjectAnalysis, useStartProjectAnalysis, useMetaPatterns, useCrossInsights, useSystemPrinciples } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
 import { getFolderColor } from "../lib/noise";
-import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2, RefreshCw, ArrowLeft } from "lucide-react";
+import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2, RefreshCw, ArrowLeft, Lightbulb, Compass } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import VideoUploadDialog from "../components/videos/VideoUploadDialogSimple";
 import VideoCard from "../components/videos/VideoCard";
@@ -96,6 +97,13 @@ export default function ProjectDetailPage() {
 
     const files = Array.from(e.dataTransfer.files);
     const videoFiles = files.filter((file) => file.type.startsWith("video/"));
+    const skippedCount = files.length - videoFiles.length;
+
+    if (skippedCount > 0) {
+      toast.warning(
+        `Only video files are supported. ${skippedCount} file${skippedCount > 1 ? "s were" : " was"} skipped.`
+      );
+    }
 
     if (videoFiles.length > 0) {
       setDroppedFiles(videoFiles);
@@ -146,6 +154,15 @@ export default function ProjectDetailPage() {
     return newVideos.length;
   }, [videos, projectAnalysis]);
 
+  // Build a lookup map of video ID -> video filename for display
+  const videoNames = useMemo(() => {
+    if (!videos) return {};
+    return videos.reduce<Record<string, string>>((acc, v) => {
+      acc[v.id] = v.filename;
+      return acc;
+    }, {});
+  }, [videos]);
+
   const handleRunProjectAnalysis = async () => {
     if (!projectId) return;
     setAnalysisTriggered(true);
@@ -181,9 +198,12 @@ export default function ProjectDetailPage() {
           <h2 className="text-h3 mb-2">
             Project Not Found
           </h2>
-          <p className="text-base-55">
+          <p className="text-base-55 mb-4">
             The project you're looking for doesn't exist or has been removed.
           </p>
+          <Link to="/projects">
+            <Button>Go to Projects</Button>
+          </Link>
         </div>
       </Layout>
     );
@@ -362,7 +382,7 @@ export default function ProjectDetailPage() {
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     <span className="font-medium">Cross-Video Analysis Running...</span>
                   </Badge>
-                  <span className="text-label text-base-55">Usually takes 1-2 minutes</span>
+                  <span className="text-label text-base-55">This usually takes a few minutes</span>
                 </div>
               ) : projectAnalysis.status === 'completed' ? (
                 hasNewVideos ? (
@@ -406,7 +426,7 @@ export default function ProjectDetailPage() {
                             : `Analyzing patterns across ${projectAnalysis?.video_ids?.length || 0} videos...`}
                         </p>
                         <p className="text-body-sm text-base-55">
-                          This may take 2-5 minutes depending on the amount of data.
+                          This usually takes a few minutes.
                         </p>
                       </div>
                     </div>
@@ -419,11 +439,11 @@ export default function ProjectDetailPage() {
                     {projectAnalysis?.status === 'running' && (
                       <div className="text-label text-base-55 flex items-center gap-2">
                         <span>Processing:</span>
-                        <span className="font-mono">CROSS_RELATE</span>
+                        <span>Finding patterns</span>
                         <span className="text-base-25">&rarr;</span>
-                        <span className="font-mono">CROSS_EXPLAIN</span>
+                        <span>Generating insights</span>
                         <span className="text-base-25">&rarr;</span>
-                        <span className="font-mono">CROSS_ACTIVATE</span>
+                        <span>Creating principles</span>
                       </div>
                     )}
                   </div>
@@ -524,11 +544,16 @@ export default function ProjectDetailPage() {
                             viewMode={metaPatternsDisplay.viewMode}
                             sort={metaPatternsDisplay.sort}
                             onSort={metaPatternsDisplay.setSort}
+                            videoNames={videoNames}
                           />
                         </>
                       ) : (
-                        <div className="text-center py-8 text-base-55">
-                          No meta-patterns found
+                        <div className="text-center py-12">
+                          <Network className="h-10 w-10 text-base-25 mx-auto mb-3" />
+                          <h4 className="text-h4 text-base-55 mb-1">No patterns yet</h4>
+                          <p className="text-body-sm text-base-40">
+                            Run cross-video analysis to discover recurring patterns across your interviews.
+                          </p>
                         </div>
                       )}
                     </TabsContent>
@@ -545,8 +570,12 @@ export default function ProjectDetailPage() {
                           />
                         </>
                       ) : (
-                        <div className="text-center py-8 text-base-55">
-                          No cross-insights found
+                        <div className="text-center py-12">
+                          <Lightbulb className="h-10 w-10 text-base-25 mx-auto mb-3" />
+                          <h4 className="text-h4 text-base-55 mb-1">No insights yet</h4>
+                          <p className="text-body-sm text-base-40">
+                            Run cross-video analysis to generate insights that span multiple interviews.
+                          </p>
                         </div>
                       )}
                     </TabsContent>
@@ -563,8 +592,12 @@ export default function ProjectDetailPage() {
                           />
                         </>
                       ) : (
-                        <div className="text-center py-8 text-base-55">
-                          No system principles found
+                        <div className="text-center py-12">
+                          <Compass className="h-10 w-10 text-base-25 mx-auto mb-3" />
+                          <h4 className="text-h4 text-base-55 mb-1">No principles yet</h4>
+                          <p className="text-body-sm text-base-40">
+                            Run cross-video analysis to derive system-level design principles from your research.
+                          </p>
                         </div>
                       )}
                     </TabsContent>
