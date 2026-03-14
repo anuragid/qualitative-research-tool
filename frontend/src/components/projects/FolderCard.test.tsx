@@ -121,14 +121,19 @@ describe("FolderCard", () => {
     expect(screen.queryByText("0")).toBeNull();
   });
 
-  // 4. Renders status badge for non-planning statuses
-  it.each(["ready", "processing", "completed", "archived", "error"] as const)(
+  // 4. Renders status indicator for non-planning statuses
+  it.each(["ready", "processing", "completed", "archived"] as const)(
     'renders a badge for status "%s"',
     (status) => {
       renderCard(createProject({ status }));
       expect(screen.getByText(status)).toBeDefined();
     },
   );
+
+  it('renders an error indicator for status "error"', () => {
+    renderCard(createProject({ status: "error" }));
+    expect(screen.getByText("Error")).toBeDefined();
+  });
 
   it('does not render a status badge when status is "planning"', () => {
     renderCard(createProject({ status: "planning" }));
@@ -151,7 +156,7 @@ describe("FolderCard", () => {
       createProject({ status: "error", error_message: null }),
     );
     // The error box has a specific class; it should not be present
-    expect(container.querySelector(".bg-destructive\\/10")).toBeNull();
+    expect(container.querySelector(".border-l-2")).toBeNull();
   });
 
   // 6. Uses correct folder color based on colorIndex (0-5 cycling)
