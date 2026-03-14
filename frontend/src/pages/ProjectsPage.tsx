@@ -27,8 +27,13 @@ export default function ProjectsPage() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-h2">Projects</h1>
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-h2">Projects</h1>
+            <p className="text-base-55 mt-1">
+              Manage your research projects and interview videos
+            </p>
+          </div>
           <CreateProjectDialog />
         </div>
 

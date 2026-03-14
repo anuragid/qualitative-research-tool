@@ -35,11 +35,11 @@ const chunkTypeIcons: Record<string, string> = {
 export function ChunksList({ chunks }: ChunksListProps) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-h4 text-foreground">
           Chunks ({chunks.length})
         </h3>
-        <div className="flex gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(chunkTypeStyles).map(([type, style]) => (
             <Badge key={type} className={style.badge}>
               {type}
@@ -54,10 +54,10 @@ export function ChunksList({ chunks }: ChunksListProps) {
           return (
             <div
               key={chunk.chunk_id}
-              className={`bg-card rounded-2xl p-5 border-l-4 ${style.border}`}
+              className={`bg-card rounded-2xl p-3 sm:p-5 border-l-4 ${style.border}`}
             >
               <div className="flex gap-4">
-                <div className="flex-shrink-0 w-20 text-label text-base-40 flex items-start gap-1">
+                <div className="flex-shrink-0 w-14 sm:w-20 text-label text-base-40 flex items-start gap-1">
                   <Clock className="h-3 w-3 mt-0.5" />
                   <span>{chunk.timestamp}</span>
                 </div>

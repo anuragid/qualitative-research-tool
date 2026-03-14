@@ -98,7 +98,7 @@ export default function VideoCard({ video }: VideoCardProps) {
   return (
     <>
       <Card
-        className="bg-card rounded-2xl border-0 cursor-pointer transition-[transform,box-shadow] duration-[var(--duration-normal)] ease-[var(--ease)] hover:shadow-subtle hover:-translate-y-[1px]"
+        className="group bg-card rounded-2xl border-0 cursor-pointer transition-[transform,box-shadow] duration-[var(--duration-normal)] ease-[var(--ease)] hover:shadow-subtle hover:-translate-y-[1px]"
         onClick={() => navigate(`/videos/${video.id}`)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -120,9 +120,7 @@ export default function VideoCard({ video }: VideoCardProps) {
             <Button
               variant="ghost"
               size="icon"
-              className={`rounded-full transition-opacity duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                isHovered ? "opacity-100" : "opacity-0"
-              }`}
+              className={`rounded-full h-9 w-9 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-[var(--duration-micro)] ease-[var(--ease)]`}
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDeleteDialog(true);

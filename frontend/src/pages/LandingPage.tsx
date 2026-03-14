@@ -124,7 +124,7 @@ export default function LandingPage() {
 
           {/* Mobile hamburger */}
           <button
-            className="md:hidden flex items-center justify-center w-10 h-10 rounded-md hover:bg-base-04 transition-[background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+            className="md:hidden flex items-center justify-center w-11 h-11 rounded-md hover:bg-base-04 transition-[background] duration-[var(--duration-micro)] ease-[var(--ease)]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >

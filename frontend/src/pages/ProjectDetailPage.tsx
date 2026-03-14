@@ -206,7 +206,7 @@ export default function ProjectDetailPage() {
             style={{ backgroundColor: folderColor.tab }}
           />
 
-          <div className="relative z-[2] flex items-start justify-between pt-2">
+          <div className="relative z-[2] flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between pt-2">
             <div>
               <h1 className="text-h2">{project.name}</h1>
               {project.description && (
@@ -326,7 +326,7 @@ export default function ProjectDetailPage() {
         {/* Project Analysis Section */}
         {canRunProjectAnalysis && (
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Network className="h-5 w-5 text-brand-forest" />
                 <h2 className="text-h4">Cross-Video Analysis</h2>
@@ -350,7 +350,7 @@ export default function ProjectDetailPage() {
                   )}
                 </Button>
               ) : projectAnalysis.status === 'running' ? (
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-2">
                   <Badge variant="secondary" className="px-3 py-1.5">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     <span className="font-medium">Cross-Video Analysis Running...</span>
@@ -481,7 +481,7 @@ export default function ProjectDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="meta-patterns" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                       <TabsTrigger value="meta-patterns">
                         Meta-Patterns
                         {metaPatterns && (

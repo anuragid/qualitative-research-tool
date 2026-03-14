@@ -117,16 +117,15 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                   </Badge>
                 )}
 
-                {/* Menu -- appears on hover */}
+                {/* Menu -- always visible on mobile, hover-reveal on desktop */}
                 <div
                   data-dropdown-menu
                   onClick={(e) => e.stopPropagation()}
-                  className="transition-opacity duration-[var(--duration-micro)]"
-                  style={{ opacity: isHovered ? 1 : 0 }}
+                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-[var(--duration-micro)]"
                 >
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                      <Button variant="ghost" size="icon" className="h-9 w-9">
                         <MoreHorizontal className="h-4 w-4" />
                         <span className="sr-only">Open menu</span>
                       </Button>
