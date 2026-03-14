@@ -1,5 +1,5 @@
 // useAnalysisDisplay.ts
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import type { AnalysisStep } from "../config/displayConfig";
 
 export type ViewMode = "list" | "grid" | "table";

@@ -36,7 +36,7 @@ export function SortDropdown({ options, sort, onSort }: SortDropdownProps) {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-ui">
           <ArrowUpDown className="h-3.5 w-3.5" />
-          {sort ? `Sort: ${options.find((o) => o.field === sort.field)?.label}` : "Sort"}
+          {sort ? `Sort: ${options.find((o) => o.field === sort.field)?.label || sort.field}` : "Sort"}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

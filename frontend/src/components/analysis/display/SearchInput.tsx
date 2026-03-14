@@ -24,6 +24,7 @@ export function SearchInput({ value, onChange, placeholder = "Search..." }: Sear
       {value && (
         <button
           onClick={() => { onChange(""); inputRef.current?.focus(); }}
+          aria-label="Clear search"
           className="absolute right-2 p-0.5 text-base-40 hover:text-base-62 rounded"
         >
           <X className="h-3.5 w-3.5" />

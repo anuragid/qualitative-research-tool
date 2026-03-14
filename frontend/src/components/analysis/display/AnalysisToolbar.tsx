@@ -2,7 +2,7 @@ import { ViewModeToggle } from "./ViewModeToggle";
 import { FilterBar } from "./FilterBar";
 import { SortDropdown } from "./SortDropdown";
 import { SearchInput } from "./SearchInput";
-import { ExpandCollapseToggle } from "./ExpandCollapseToggle";
+// ExpandCollapseToggle is deferred until accordion value prop wiring is implemented
 import { sortOptions, filterOptions, type AnalysisStep } from "../config/displayConfig";
 import type { useAnalysisDisplay } from "../hooks/useAnalysisDisplay";
 
@@ -15,7 +15,6 @@ export function AnalysisToolbar(props: ToolbarProps) {
     sort, setSort,
     activeFilters, toggleFilter, clearFilters,
     searchQuery, setSearchQuery,
-    expandedItems, expandAll, collapseAll,
   } = props;
 
   const stepSortOptions = sortOptions[step];
@@ -27,13 +26,6 @@ export function AnalysisToolbar(props: ToolbarProps) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
-          {viewMode === "list" && (
-            <ExpandCollapseToggle
-              expanded={expandedItems}
-              onExpandAll={expandAll}
-              onCollapseAll={collapseAll}
-            />
-          )}
         </div>
         <div className="flex items-center gap-2">
           <SearchInput value={searchQuery} onChange={setSearchQuery} />

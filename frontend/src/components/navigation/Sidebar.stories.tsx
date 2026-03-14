@@ -1,8 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ClerkProvider } from "@clerk/react";
 import { Sidebar } from "./Sidebar";
-
-const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "pk_test_placeholder";
 
 const meta = {
   title: "Navigation/Sidebar",
@@ -10,11 +7,9 @@ const meta = {
   tags: ["autodocs"],
   decorators: [
     (Story) => (
-      <ClerkProvider publishableKey={CLERK_KEY}>
-        <div className="h-screen w-full bg-surface-page relative">
-          <Story />
-        </div>
-      </ClerkProvider>
+      <div className="h-screen w-full bg-surface-page relative">
+        <Story />
+      </div>
     ),
   ],
   argTypes: {

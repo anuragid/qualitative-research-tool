@@ -177,25 +177,17 @@ describe("FolderCard", () => {
     expect(tabDiv.style.backgroundColor).toBe(expectedColor.tab);
   });
 
-  // 7. Menu button opacity transition on hover
-  it("menu button starts with opacity 0 and becomes 1 on hover", () => {
+  // 7. Menu button has responsive opacity classes (hidden on desktop, visible on hover)
+  it("menu button has correct opacity classes for hover-reveal behavior", () => {
     const { container } = renderCard(createProject());
     const menuWrapper = container.querySelector("[data-dropdown-menu]") as HTMLElement;
     expect(menuWrapper).not.toBeNull();
 
-    // Initially opacity is 0 (not hovered)
-    expect(menuWrapper.style.opacity).toBe("0");
-
-    // Simulate mouse enter on the card
-    const card = container.querySelector('[role="button"]') as HTMLElement;
-    fireEvent.mouseEnter(card);
-
-    // After hover, opacity should be 1
-    expect(menuWrapper.style.opacity).toBe("1");
-
-    // Mouse leave should revert
-    fireEvent.mouseLeave(card);
-    expect(menuWrapper.style.opacity).toBe("0");
+    // Always visible on mobile (opacity-100), hidden on desktop (sm:opacity-0),
+    // revealed on group hover (sm:group-hover:opacity-100)
+    expect(menuWrapper.className).toContain("opacity-100");
+    expect(menuWrapper.className).toContain("sm:opacity-0");
+    expect(menuWrapper.className).toContain("sm:group-hover:opacity-100");
   });
 
   // 8. Navigates to /projects/:id on click

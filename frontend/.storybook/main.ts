@@ -1,4 +1,8 @@
 import type { StorybookConfig } from "@storybook/react-vite";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
@@ -17,6 +21,11 @@ const config: StorybookConfig = {
     const { mergeConfig } = await import("vite");
     return mergeConfig(config, {
       plugins: [tailwindcss()],
+      resolve: {
+        alias: {
+          "@clerk/react": path.resolve(__dirname, "mocks/clerk-react.tsx"),
+        },
+      },
     });
   },
 };
