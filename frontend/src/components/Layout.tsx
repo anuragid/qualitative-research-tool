@@ -36,7 +36,7 @@ export default function Layout({ children }: LayoutProps) {
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
         <span className="text-h4 text-foreground ml-3 select-none">
-          methode<span className="italic text-brand-burnt-orange">x</span>
+          method<span className="text-brand-burnt-orange">ex</span>
         </span>
       </header>
 

@@ -75,7 +75,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Top section: typemark + close button (mobile) */}
         <div className="flex items-center justify-between px-5 pt-5 pb-2">
           <span className="text-h4 text-foreground select-none">
-            methode<span className="italic text-brand-burnt-orange">x</span>
+            method<span className="text-brand-burnt-orange">ex</span>
           </span>
           <button
             onClick={onClose}
