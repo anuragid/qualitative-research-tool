@@ -1,4 +1,5 @@
 import type { Preview } from "@storybook/react-vite";
+import { withThemeByClassName } from "@storybook/addon-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import "../src/index.css";
@@ -23,6 +24,14 @@ const preview: Preview = {
     layout: "centered",
   },
   decorators: [
+    withThemeByClassName({
+      themes: {
+        Light: "",
+        Dark: "dark",
+      },
+      defaultTheme: "Light",
+      parentSelector: "html",
+    }),
     (Story) => (
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/projects"]}>
