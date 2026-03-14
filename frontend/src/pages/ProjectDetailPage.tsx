@@ -12,6 +12,8 @@ import VideoCard from "../components/videos/VideoCard";
 import { MetaPatternsList } from "../components/analysis/MetaPatternsList";
 import { CrossInsightsList } from "../components/analysis/CrossInsightsList";
 import { SystemPrinciplesList } from "../components/analysis/SystemPrinciplesList";
+import { useAnalysisDisplay } from "../components/analysis/hooks/useAnalysisDisplay";
+import { AnalysisToolbar } from "../components/analysis/display/AnalysisToolbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -48,6 +50,11 @@ export default function ProjectDetailPage() {
 
   // Nielsen #1: Visibility of system status - Track when analysis was triggered
   const [analysisTriggered, setAnalysisTriggered] = useState(false);
+
+  // Display state for cross-video analysis tabs
+  const metaPatternsDisplay = useAnalysisDisplay("metaPatterns");
+  const crossInsightsDisplay = useAnalysisDisplay("crossInsights");
+  const systemPrinciplesDisplay = useAnalysisDisplay("systemPrinciples");
 
   // Clear triggered state when analysis completes, fails, or enters running state
   useEffect(() => {
@@ -510,7 +517,15 @@ export default function ProjectDetailPage() {
 
                     <TabsContent value="meta-patterns" className="mt-6">
                       {metaPatterns && metaPatterns.length > 0 ? (
-                        <MetaPatternsList metaPatterns={metaPatterns} />
+                        <>
+                          <AnalysisToolbar {...metaPatternsDisplay} />
+                          <MetaPatternsList
+                            metaPatterns={metaPatternsDisplay.processData(metaPatterns)}
+                            viewMode={metaPatternsDisplay.viewMode}
+                            sort={metaPatternsDisplay.sort}
+                            onSort={metaPatternsDisplay.setSort}
+                          />
+                        </>
                       ) : (
                         <div className="text-center py-8 text-base-55">
                           No meta-patterns found
@@ -520,7 +535,15 @@ export default function ProjectDetailPage() {
 
                     <TabsContent value="cross-insights" className="mt-6">
                       {crossInsights && crossInsights.length > 0 ? (
-                        <CrossInsightsList crossInsights={crossInsights} />
+                        <>
+                          <AnalysisToolbar {...crossInsightsDisplay} />
+                          <CrossInsightsList
+                            crossInsights={crossInsightsDisplay.processData(crossInsights)}
+                            viewMode={crossInsightsDisplay.viewMode}
+                            sort={crossInsightsDisplay.sort}
+                            onSort={crossInsightsDisplay.setSort}
+                          />
+                        </>
                       ) : (
                         <div className="text-center py-8 text-base-55">
                           No cross-insights found
@@ -530,7 +553,15 @@ export default function ProjectDetailPage() {
 
                     <TabsContent value="system-principles" className="mt-6">
                       {systemPrinciples && systemPrinciples.length > 0 ? (
-                        <SystemPrinciplesList systemPrinciples={systemPrinciples} />
+                        <>
+                          <AnalysisToolbar {...systemPrinciplesDisplay} />
+                          <SystemPrinciplesList
+                            systemPrinciples={systemPrinciplesDisplay.processData(systemPrinciples)}
+                            viewMode={systemPrinciplesDisplay.viewMode}
+                            sort={systemPrinciplesDisplay.sort}
+                            onSort={systemPrinciplesDisplay.setSort}
+                          />
+                        </>
                       ) : (
                         <div className="text-center py-8 text-base-55">
                           No system principles found

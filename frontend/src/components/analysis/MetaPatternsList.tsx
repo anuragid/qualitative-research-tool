@@ -2,18 +2,82 @@ import type { MetaPattern } from "../../types";
 import { Badge } from "../ui/Badge";
 import { Network } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { consistencyStyles } from "./config/displayConfig";
+import { MetaPatternCard } from "./cards/MetaPatternCard";
+import { CardView } from "./display/CardView";
+import { TableView, type TableColumn } from "./display/TableView";
+import type { ViewMode, SortConfig } from "./hooks/useAnalysisDisplay";
 
 interface MetaPatternsListProps {
   metaPatterns: MetaPattern[];
+  viewMode?: ViewMode;
+  sort?: SortConfig | null;
+  onSort?: (config: SortConfig | null) => void;
 }
 
-const consistencyStyles: Record<string, string> = {
-  consistent: "bg-brand-forest/10 text-brand-forest border-0",
-  varying: "bg-brand-mustard/10 text-brand-mustard border-0",
-  contradictory: "bg-destructive/10 text-destructive border-0",
-};
+const metaPatternColumns: TableColumn<MetaPattern>[] = [
+  {
+    key: "pattern_name",
+    label: "Pattern",
+    sortable: true,
+    render: (mp) => (
+      <span className="font-semibold text-sm text-base-85">{mp.pattern_name}</span>
+    ),
+  },
+  {
+    key: "consistency",
+    label: "Consistency",
+    sortable: true,
+    render: (mp) => (
+      <Badge className={`${consistencyStyles[mp.consistency] || ""} text-label`}>
+        {mp.consistency}
+      </Badge>
+    ),
+    className: "w-32",
+  },
+  {
+    key: "appears_in_videos.length",
+    label: "Videos",
+    sortable: true,
+    render: (mp) => (
+      <Badge className="bg-accent-blue-bg text-accent-blue text-label">
+        {mp.appears_in_videos.length}
+      </Badge>
+    ),
+    className: "w-24",
+  },
+  {
+    key: "significance",
+    label: "Significance",
+    render: (mp) => (
+      <p className="text-sm text-base-55 line-clamp-2">{mp.significance}</p>
+    ),
+  },
+];
 
-export function MetaPatternsList({ metaPatterns }: MetaPatternsListProps) {
+export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort }: MetaPatternsListProps) {
+  if (viewMode === "grid") {
+    return (
+      <CardView columns={2}>
+        {metaPatterns.map((metaPattern) => (
+          <MetaPatternCard key={metaPattern.meta_pattern_id} metaPattern={metaPattern} compact />
+        ))}
+      </CardView>
+    );
+  }
+
+  if (viewMode === "table") {
+    return (
+      <TableView
+        data={metaPatterns}
+        columns={metaPatternColumns}
+        sort={sort || null}
+        onSort={onSort || (() => {})}
+      />
+    );
+  }
+
+  // Default: list view (accordion behavior)
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -21,11 +85,13 @@ export function MetaPatternsList({ metaPatterns }: MetaPatternsListProps) {
           Meta-Patterns ({metaPatterns.length})
         </h3>
         <div className="flex flex-wrap gap-2 text-sm">
-          {Object.entries(consistencyStyles).map(([type, style]) => (
-            <Badge key={type} className={style}>
-              {type}
-            </Badge>
-          ))}
+          {Object.entries(consistencyStyles)
+            .filter(([key]) => ["consistent", "varying", "contradictory"].includes(key))
+            .map(([type, style]) => (
+              <Badge key={type} className={style}>
+                {type}
+              </Badge>
+            ))}
         </div>
       </div>
 

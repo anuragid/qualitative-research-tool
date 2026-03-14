@@ -2,29 +2,86 @@ import type { CrossInsight } from "../../types";
 import { Badge } from "../ui/Badge";
 import { Sparkles } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { scopeStyles, consistencyStyles, confidenceStyles } from "./config/displayConfig";
+import { CrossInsightCard } from "./cards/CrossInsightCard";
+import { CardView } from "./display/CardView";
+import { TableView, type TableColumn } from "./display/TableView";
+import type { ViewMode, SortConfig } from "./hooks/useAnalysisDisplay";
 
 interface CrossInsightsListProps {
   crossInsights: CrossInsight[];
+  viewMode?: ViewMode;
+  sort?: SortConfig | null;
+  onSort?: (config: SortConfig | null) => void;
 }
 
-const scopeStyles: Record<string, string> = {
-  universal: "bg-brand-maroon/10 text-brand-maroon border-0",
-  "context-dependent": "bg-accent-blue-bg text-accent-blue border-0",
-};
+const crossInsightColumns: TableColumn<CrossInsight>[] = [
+  {
+    key: "headline",
+    label: "Headline",
+    sortable: true,
+    render: (ci) => (
+      <span className="font-semibold text-sm text-base-85">{ci.headline}</span>
+    ),
+  },
+  {
+    key: "scope",
+    label: "Scope",
+    sortable: true,
+    render: (ci) => (
+      <Badge className={`${scopeStyles[ci.scope] || ""} text-label`}>
+        {ci.scope}
+      </Badge>
+    ),
+    className: "w-36",
+  },
+  {
+    key: "consistency_across_videos",
+    label: "Consistency",
+    sortable: true,
+    render: (ci) => (
+      <Badge className={`${consistencyStyles[ci.consistency_across_videos] || ""} text-label`}>
+        {ci.consistency_across_videos}
+      </Badge>
+    ),
+    className: "w-32",
+  },
+  {
+    key: "confidence",
+    label: "Confidence",
+    sortable: true,
+    render: (ci) => (
+      <Badge className={`${confidenceStyles[ci.confidence] || ""} text-label`}>
+        {ci.confidence}
+      </Badge>
+    ),
+    className: "w-32",
+  },
+];
 
-const consistencyStyles: Record<string, string> = {
-  high: "bg-brand-forest/10 text-brand-forest border-0",
-  medium: "bg-brand-mustard/10 text-brand-mustard border-0",
-  low: "bg-base-04 text-base-55 border-0",
-};
+export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSort }: CrossInsightsListProps) {
+  if (viewMode === "grid") {
+    return (
+      <CardView columns={2}>
+        {crossInsights.map((insight) => (
+          <CrossInsightCard key={insight.cross_insight_id} insight={insight} compact />
+        ))}
+      </CardView>
+    );
+  }
 
-const confidenceStyles: Record<string, string> = {
-  high: "bg-brand-forest/10 text-brand-forest border-0",
-  medium: "bg-brand-mustard/10 text-brand-mustard border-0",
-  low: "bg-base-04 text-base-55 border-0",
-};
+  if (viewMode === "table") {
+    return (
+      <TableView
+        data={crossInsights}
+        columns={crossInsightColumns}
+        sort={sort || null}
+        onSort={onSort || (() => {})}
+      />
+    );
+  }
 
-export function CrossInsightsList({ crossInsights }: CrossInsightsListProps) {
+  // Default: list view (accordion behavior)
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
