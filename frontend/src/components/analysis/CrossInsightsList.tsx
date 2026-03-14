@@ -89,11 +89,13 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
           Cross-Video Insights ({crossInsights.length})
         </h3>
         <div className="flex flex-wrap gap-2 text-sm">
-          {Object.entries(scopeStyles).map(([type, style]) => (
-            <Badge key={type} className={style}>
-              {type}
-            </Badge>
-          ))}
+          {Object.entries(scopeStyles)
+            .filter(([type]) => crossInsights.some((ci) => ci.scope === type))
+            .map(([type, style]) => (
+              <Badge key={type} className={style}>
+                {type}
+              </Badge>
+            ))}
         </div>
       </div>
 
@@ -176,9 +178,6 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
                     </div>
                   </div>
 
-                  <div className="text-label text-base-25 font-mono">
-                    ID: {insight.cross_insight_id}
-                  </div>
                 </div>
               </AccordionContent>
             </div>

@@ -65,11 +65,13 @@ export function InsightsList({ insights, viewMode = "list", sort, onSort }: Insi
           Insights ({insights.length})
         </h3>
         <div className="flex gap-2 text-sm">
-          {Object.entries(insightTypeStyles).map(([type, style]) => (
-            <Badge key={type} className={style}>
-              {type}
-            </Badge>
-          ))}
+          {Object.entries(insightTypeStyles)
+            .filter(([type]) => insights.some((ins) => ins.type === type))
+            .map(([type, style]) => (
+              <Badge key={type} className={style}>
+                {type}
+              </Badge>
+            ))}
         </div>
       </div>
 
@@ -142,9 +144,6 @@ export function InsightsList({ insights, viewMode = "list", sort, onSort }: Insi
                     </div>
                   </div>
 
-                  <div className="text-label text-base-25 font-mono">
-                    ID: {insight.insight_id}
-                  </div>
                 </div>
               </AccordionContent>
             </div>

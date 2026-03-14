@@ -67,11 +67,13 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
           Patterns ({patterns.length})
         </h3>
         <div className="flex gap-2 text-sm">
-          {Object.entries(relationshipTypeStyles).map(([type, style]) => (
-            <Badge key={type} className={style}>
-              {type}
-            </Badge>
-          ))}
+          {Object.entries(relationshipTypeStyles)
+            .filter(([type]) => patterns.some((p) => p.relationship_type === type))
+            .map(([type, style]) => (
+              <Badge key={type} className={style}>
+                {type}
+              </Badge>
+            ))}
         </div>
       </div>
 
@@ -128,9 +130,6 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
                     </div>
                   </div>
 
-                  <div className="text-label text-base-25 font-mono">
-                    ID: {pattern.pattern_id}
-                  </div>
                 </div>
               </AccordionContent>
             </div>

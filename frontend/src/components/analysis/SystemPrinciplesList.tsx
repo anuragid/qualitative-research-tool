@@ -90,11 +90,13 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
           System-Level Design Principles ({systemPrinciples.length})
         </h3>
         <div className="flex gap-2 text-sm">
-          {Object.entries(priorityStyles).map(([priority, style]) => (
-            <Badge key={priority} className={style.badge}>
-              {priority}
-            </Badge>
-          ))}
+          {Object.entries(priorityStyles)
+            .filter(([priority]) => systemPrinciples.some((sp) => sp.priority === priority))
+            .map(([priority, style]) => (
+              <Badge key={priority} className={style.badge}>
+                {priority}
+              </Badge>
+            ))}
         </div>
       </div>
 
@@ -176,9 +178,6 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
                       </Badge>
                     </div>
 
-                    <div className="text-label text-base-25 font-mono">
-                      ID: {principle.system_principle_id}
-                    </div>
                   </div>
                 </AccordionContent>
               </div>

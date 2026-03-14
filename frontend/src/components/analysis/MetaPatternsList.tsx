@@ -13,6 +13,7 @@ interface MetaPatternsListProps {
   viewMode?: ViewMode;
   sort?: SortConfig | null;
   onSort?: (config: SortConfig | null) => void;
+  videoNames?: Record<string, string>;
 }
 
 const metaPatternColumns: TableColumn<MetaPattern>[] = [
@@ -55,7 +56,7 @@ const metaPatternColumns: TableColumn<MetaPattern>[] = [
   },
 ];
 
-export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort }: MetaPatternsListProps) {
+export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort, videoNames }: MetaPatternsListProps) {
   if (viewMode === "grid") {
     return (
       <CardView columns={2}>
@@ -86,7 +87,10 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
         </h3>
         <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(consistencyStyles)
-            .filter(([key]) => ["consistent", "varying", "contradictory"].includes(key))
+            .filter(([key]) =>
+              ["consistent", "varying", "contradictory"].includes(key) &&
+              metaPatterns.some((mp) => mp.consistency === key)
+            )
             .map(([type, style]) => (
               <Badge key={type} className={style}>
                 {type}
@@ -147,9 +151,9 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
                       Appears In Videos ({metaPattern.appears_in_videos.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {metaPattern.appears_in_videos.map((videoId) => (
-                        <Badge key={videoId} variant="outline" className="font-mono text-xs text-base-55 border-base-09">
-                          {videoId.substring(0, 8)}...
+                      {metaPattern.appears_in_videos.map((videoId, index) => (
+                        <Badge key={videoId} variant="outline" className="text-xs text-base-55 border-base-09">
+                          {videoNames?.[videoId] || `Video ${index + 1}`}
                         </Badge>
                       ))}
                     </div>
@@ -168,9 +172,6 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
                     </div>
                   </div>
 
-                  <div className="text-label text-base-25 font-mono">
-                    ID: {metaPattern.meta_pattern_id}
-                  </div>
                 </div>
               </AccordionContent>
             </div>

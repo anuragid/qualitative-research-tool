@@ -146,9 +146,6 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
                           <p className="text-base-55">{item.context}</p>
                         </div>
 
-                        <div className="mt-2 text-label text-base-25 font-mono">
-                          ID: {item.inference_id}
-                        </div>
                       </div>
                     ))}
                   </div>

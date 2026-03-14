@@ -64,11 +64,13 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
           Design Principles ({principles.length})
         </h3>
         <div className="flex gap-2 text-sm">
-          {Object.entries(priorityStyles).map(([priority, style]) => (
-            <Badge key={priority} className={style.badge}>
-              {priority} priority
-            </Badge>
-          ))}
+          {Object.entries(priorityStyles)
+            .filter(([priority]) => principles.some((p) => p.priority === priority))
+            .map(([priority, style]) => (
+              <Badge key={priority} className={style.badge}>
+                {priority} priority
+              </Badge>
+            ))}
         </div>
       </div>
 
@@ -138,9 +140,6 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
                     </Badge>
                   </div>
 
-                  <div className="text-label text-base-25 font-mono">
-                    ID: {principle.principle_id}
-                  </div>
                 </div>
               </AccordionContent>
             </div>
