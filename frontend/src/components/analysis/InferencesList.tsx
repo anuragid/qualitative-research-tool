@@ -2,24 +2,80 @@ import type { Inference, Chunk } from "../../types";
 import { Badge } from "../ui/Badge";
 import { Lightbulb } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { chunkTypeStyles } from "./config/displayConfig";
+import { InferenceCard } from "./cards/InferenceCard";
+import { CardView } from "./display/CardView";
+import { TableView, type TableColumn } from "./display/TableView";
+import type { ViewMode, SortConfig } from "./hooks/useAnalysisDisplay";
 
 interface InferencesListProps {
   inferences: Inference[];
   chunks?: Chunk[];
+  viewMode?: ViewMode;
+  sort?: SortConfig | null;
+  onSort?: (config: SortConfig | null) => void;
 }
 
-const chunkTypeBadgeStyles: Record<string, string> = {
-  quote: "bg-brand-forest/10 text-brand-forest border-0",
-  fact: "bg-brand-mustard/10 text-brand-mustard border-0",
-  context: "bg-brand-maroon/10 text-brand-maroon border-0",
-  observation: "bg-brand-olive/10 text-brand-olive border-0",
-};
+function makeInferenceColumns(chunks?: Chunk[]): TableColumn<Inference>[] {
+  const getChunk = (chunkId: string) => chunks?.find((c) => c.chunk_id === chunkId);
 
-export function InferencesList({ inferences, chunks }: InferencesListProps) {
+  return [
+    { key: "chunk_id", label: "Chunk", sortable: true, render: (inf) => {
+      const chunk = getChunk(inf.chunk_id);
+      const badgeStyle = chunk
+        ? chunkTypeStyles[chunk.type]?.badge || "bg-base-04 text-base-55"
+        : "bg-base-04 text-base-55";
+      return (
+        <div className="flex items-center gap-2">
+          <Badge className={`${badgeStyle} text-label`}>{chunk?.type || "unknown"}</Badge>
+          <span className="text-label text-base-40 font-mono">{inf.chunk_id}</span>
+        </div>
+      );
+    }, className: "w-48" },
+    { key: "count", label: "Count", sortable: true, render: (inf) => (
+      <span className="text-sm text-base-62">{inf.inferences.length}</span>
+    ), className: "w-20" },
+    { key: "meaning", label: "First Inference", render: (inf) => (
+      <p className="text-sm text-base-85 line-clamp-2">
+        {inf.inferences[0]?.meaning || "\u2014"}
+      </p>
+    ) },
+  ];
+}
+
+export function InferencesList({ inferences, chunks, viewMode = "list", sort, onSort }: InferencesListProps) {
   const getChunkById = (chunkId: string) => {
     return chunks?.find((c) => c.chunk_id === chunkId);
   };
 
+  if (viewMode === "grid") {
+    return (
+      <CardView columns={2}>
+        {inferences.map((inference, i) => (
+          <InferenceCard
+            key={inference.chunk_id || i}
+            inference={inference}
+            chunk={getChunkById(inference.chunk_id)}
+            compact
+          />
+        ))}
+      </CardView>
+    );
+  }
+
+  if (viewMode === "table") {
+    const columns = makeInferenceColumns(chunks);
+    return (
+      <TableView
+        data={inferences}
+        columns={columns}
+        sort={sort || null}
+        onSort={onSort || (() => {})}
+      />
+    );
+  }
+
+  // Default: list view (accordion)
   const totalInferences = inferences.reduce(
     (sum, inf) => sum + inf.inferences.length,
     0
@@ -36,7 +92,7 @@ export function InferencesList({ inferences, chunks }: InferencesListProps) {
       <Accordion type="multiple" className="space-y-2">
         {inferences.map((inference) => {
           const chunk = getChunkById(inference.chunk_id);
-          const badgeStyle = chunk ? (chunkTypeBadgeStyles[chunk.type] || "") : "";
+          const badgeStyle = chunk ? (chunkTypeStyles[chunk.type]?.badge || "") : "";
           return (
             <AccordionItem key={inference.chunk_id} value={inference.chunk_id}>
               <div className="bg-card rounded-2xl overflow-hidden">

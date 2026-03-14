@@ -2,25 +2,62 @@ import type { Insight } from "../../types";
 import { Badge } from "../ui/Badge";
 import { Sparkles } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { insightTypeStyles, confidenceStyles } from "./config/displayConfig";
+import { InsightCard } from "./cards/InsightCard";
+import { CardView } from "./display/CardView";
+import { TableView, type TableColumn } from "./display/TableView";
+import type { ViewMode, SortConfig } from "./hooks/useAnalysisDisplay";
 
 interface InsightsListProps {
   insights: Insight[];
+  viewMode?: ViewMode;
+  sort?: SortConfig | null;
+  onSort?: (config: SortConfig | null) => void;
 }
 
-const insightTypeStyles: Record<string, string> = {
-  "non-consensus": "bg-brand-maroon/10 text-brand-maroon border-0",
-  "first-principles": "bg-accent-blue-bg text-accent-blue border-0",
-  "surprising": "bg-brand-mustard/10 text-brand-mustard border-0",
-  "revealing": "bg-brand-forest/10 text-brand-forest border-0",
-};
+const insightColumns: TableColumn<Insight>[] = [
+  { key: "type", label: "Type", sortable: true, render: (ins) => (
+    <Badge className={`${insightTypeStyles[ins.type] || ""} text-label`}>{ins.type}</Badge>
+  ), className: "w-36" },
+  { key: "confidence", label: "Confidence", sortable: true, render: (ins) => (
+    <Badge className={`${confidenceStyles[ins.confidence] || ""} text-label border`}>
+      {ins.confidence}
+    </Badge>
+  ), className: "w-28" },
+  { key: "headline", label: "Headline", sortable: true, render: (ins) => (
+    <span className="font-semibold text-sm text-base-85">{ins.headline}</span>
+  ) },
+  { key: "explanation", label: "Explanation", render: (ins) => (
+    <p className="text-sm text-base-55 line-clamp-2">{ins.explanation}</p>
+  ) },
+  { key: "evidence", label: "Evidence", sortable: false, render: (ins) => (
+    <span className="text-sm text-base-40">{ins.evidence.length}</span>
+  ), className: "w-24" },
+];
 
-const confidenceStyles: Record<string, string> = {
-  high: "bg-brand-forest/10 text-brand-forest border-0",
-  medium: "bg-brand-mustard/10 text-brand-mustard border-0",
-  low: "bg-base-04 text-base-55 border-0",
-};
+export function InsightsList({ insights, viewMode = "list", sort, onSort }: InsightsListProps) {
+  if (viewMode === "grid") {
+    return (
+      <CardView columns={2}>
+        {insights.map((insight, i) => (
+          <InsightCard key={insight.insight_id || i} insight={insight} compact />
+        ))}
+      </CardView>
+    );
+  }
 
-export function InsightsList({ insights }: InsightsListProps) {
+  if (viewMode === "table") {
+    return (
+      <TableView
+        data={insights}
+        columns={insightColumns}
+        sort={sort || null}
+        onSort={onSort || (() => {})}
+      />
+    );
+  }
+
+  // Default: list view (accordion)
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

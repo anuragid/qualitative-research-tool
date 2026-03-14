@@ -1,88 +1,61 @@
 import type { Chunk } from "../../types";
 import { Badge } from "../ui/Badge";
-import { Clock } from "lucide-react";
+import { chunkTypeStyles } from "./config/displayConfig";
+import { ChunkCard } from "./cards/ChunkCard";
+import { CardView } from "./display/CardView";
+import { TableView, type TableColumn } from "./display/TableView";
+import type { ViewMode, SortConfig } from "./hooks/useAnalysisDisplay";
 
 interface ChunksListProps {
   chunks: Chunk[];
+  viewMode?: ViewMode;
+  sort?: SortConfig | null;
+  onSort?: (config: SortConfig | null) => void;
 }
 
-const chunkTypeStyles: Record<string, { border: string; badge: string }> = {
-  quote: {
-    border: "border-l-brand-forest",
-    badge: "bg-brand-forest/10 text-brand-forest border-0",
-  },
-  fact: {
-    border: "border-l-brand-mustard",
-    badge: "bg-brand-mustard/10 text-brand-mustard border-0",
-  },
-  context: {
-    border: "border-l-brand-maroon",
-    badge: "bg-brand-maroon/10 text-brand-maroon border-0",
-  },
-  observation: {
-    border: "border-l-brand-olive",
-    badge: "bg-brand-olive/10 text-brand-olive border-0",
-  },
-};
+const chunkColumns: TableColumn<Chunk>[] = [
+  { key: "type", label: "Type", sortable: true, render: (c) => (
+    <Badge className={`${chunkTypeStyles[c.type]?.badge || ""} text-label`}>{c.type}</Badge>
+  ), className: "w-28" },
+  { key: "speaker", label: "Speaker", sortable: true, render: (c) => (
+    <span className="text-sm text-base-62">{c.speaker || "\u2014"}</span>
+  ), className: "w-32" },
+  { key: "text", label: "Content", render: (c) => (
+    <p className="text-sm text-base-85 line-clamp-2">{c.text}</p>
+  ) },
+  { key: "timestamp", label: "Time", sortable: true, render: (c) => (
+    <span className="text-label text-base-40">{c.timestamp || "\u2014"}</span>
+  ), className: "w-24" },
+];
 
-const chunkTypeIcons: Record<string, string> = {
-  quote: "\"",
-  observation: "O",
-  context: "C",
-  fact: "F",
-};
+export function ChunksList({ chunks, viewMode = "list", sort, onSort }: ChunksListProps) {
+  if (viewMode === "grid") {
+    return (
+      <CardView columns={3}>
+        {chunks.map((chunk, i) => (
+          <ChunkCard key={chunk.chunk_id || i} chunk={chunk} compact />
+        ))}
+      </CardView>
+    );
+  }
 
-export function ChunksList({ chunks }: ChunksListProps) {
+  if (viewMode === "table") {
+    return (
+      <TableView
+        data={chunks}
+        columns={chunkColumns}
+        sort={sort || null}
+        onSort={onSort || (() => {})}
+      />
+    );
+  }
+
+  // Default: list view
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-h4 text-foreground">
-          Chunks ({chunks.length})
-        </h3>
-        <div className="flex flex-wrap gap-2 text-sm">
-          {Object.entries(chunkTypeStyles).map(([type, style]) => (
-            <Badge key={type} className={style.badge}>
-              {type}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {chunks.map((chunk) => {
-          const style = chunkTypeStyles[chunk.type] || chunkTypeStyles.observation;
-          return (
-            <div
-              key={chunk.chunk_id}
-              className={`bg-card rounded-2xl p-3 sm:p-5 border-l-4 ${style.border}`}
-            >
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-14 sm:w-20 text-label text-base-40 flex items-start gap-1">
-                  <Clock className="h-3 w-3 mt-0.5" />
-                  <span>{chunk.timestamp}</span>
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge className={style.badge}>
-                      {chunkTypeIcons[chunk.type]} {chunk.type}
-                    </Badge>
-                    <Badge variant="outline" className="text-base-55 border-base-09">
-                      {chunk.speaker}
-                    </Badge>
-                  </div>
-
-                  <p className="text-base-85 leading-relaxed">{chunk.text}</p>
-
-                  <div className="mt-2 text-label text-base-25 font-mono">
-                    ID: {chunk.chunk_id}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div className="space-y-3">
+      {chunks.map((chunk, i) => (
+        <ChunkCard key={chunk.chunk_id || i} chunk={chunk} />
+      ))}
     </div>
   );
 }

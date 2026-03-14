@@ -20,6 +20,8 @@ import { PatternsList } from "../components/analysis/PatternsList";
 import { InsightsList } from "../components/analysis/InsightsList";
 import { PrinciplesList } from "../components/analysis/PrinciplesList";
 import { ContinueStepButton } from "../components/analysis/ContinueStepButton";
+import { useAnalysisDisplay } from "../components/analysis/hooks/useAnalysisDisplay";
+import { AnalysisToolbar } from "../components/analysis/display/AnalysisToolbar";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
@@ -80,6 +82,13 @@ export default function VideoDetailPage() {
 
   // Active tab state for step-by-step mode
   const [activeStepTab, setActiveStepTab] = React.useState("chunks");
+
+  // Analysis display state (view mode, sort, filter, search) per tab
+  const chunksDisplay = useAnalysisDisplay("chunks");
+  const inferencesDisplay = useAnalysisDisplay("inferences");
+  const patternsDisplay = useAnalysisDisplay("patterns");
+  const insightsDisplay = useAnalysisDisplay("insights");
+  const principlesDisplay = useAnalysisDisplay("principles");
 
   const handleStartTranscription = () => {
     if (videoId) {
@@ -761,29 +770,73 @@ export default function VideoDetailPage() {
                     </TabsList>
 
                     <TabsContent value="chunks" className="mt-6">
-                      {analysis.chunks && <ChunksList chunks={analysis.chunks} />}
+                      {analysis.chunks && (
+                        <>
+                          <AnalysisToolbar {...chunksDisplay} />
+                          <ChunksList
+                            chunks={chunksDisplay.processData(analysis.chunks)}
+                            viewMode={chunksDisplay.viewMode}
+                            sort={chunksDisplay.sort}
+                            onSort={chunksDisplay.setSort}
+                          />
+                        </>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="inferences" className="mt-6">
                       {analysis.inferences && (
-                        <InferencesList
-                          inferences={analysis.inferences}
-                          chunks={analysis.chunks || []}
-                        />
+                        <>
+                          <AnalysisToolbar {...inferencesDisplay} />
+                          <InferencesList
+                            inferences={inferencesDisplay.processData(analysis.inferences)}
+                            chunks={analysis.chunks || []}
+                            viewMode={inferencesDisplay.viewMode}
+                            sort={inferencesDisplay.sort}
+                            onSort={inferencesDisplay.setSort}
+                          />
+                        </>
                       )}
                     </TabsContent>
 
                     <TabsContent value="patterns" className="mt-6">
-                      {analysis.patterns && <PatternsList patterns={analysis.patterns} />}
+                      {analysis.patterns && (
+                        <>
+                          <AnalysisToolbar {...patternsDisplay} />
+                          <PatternsList
+                            patterns={patternsDisplay.processData(analysis.patterns)}
+                            viewMode={patternsDisplay.viewMode}
+                            sort={patternsDisplay.sort}
+                            onSort={patternsDisplay.setSort}
+                          />
+                        </>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="insights" className="mt-6">
-                      {analysis.insights && <InsightsList insights={analysis.insights} />}
+                      {analysis.insights && (
+                        <>
+                          <AnalysisToolbar {...insightsDisplay} />
+                          <InsightsList
+                            insights={insightsDisplay.processData(analysis.insights)}
+                            viewMode={insightsDisplay.viewMode}
+                            sort={insightsDisplay.sort}
+                            onSort={insightsDisplay.setSort}
+                          />
+                        </>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="principles" className="mt-6">
                       {analysis.design_principles && (
-                        <PrinciplesList principles={analysis.design_principles} />
+                        <>
+                          <AnalysisToolbar {...principlesDisplay} />
+                          <PrinciplesList
+                            principles={principlesDisplay.processData(analysis.design_principles)}
+                            viewMode={principlesDisplay.viewMode}
+                            sort={principlesDisplay.sort}
+                            onSort={principlesDisplay.setSort}
+                          />
+                        </>
                       )}
                     </TabsContent>
                   </Tabs>
@@ -916,7 +969,13 @@ export default function VideoDetailPage() {
                           </div>
                         ) : analysis.chunks ? (
                           <>
-                            <ChunksList chunks={analysis.chunks} />
+                            <AnalysisToolbar {...chunksDisplay} />
+                            <ChunksList
+                              chunks={chunksDisplay.processData(analysis.chunks)}
+                              viewMode={chunksDisplay.viewMode}
+                              sort={chunksDisplay.sort}
+                              onSort={chunksDisplay.setSort}
+                            />
                             {analysis.current_step === "chunk" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
                                 <p className="text-base-55 mb-4">
@@ -943,9 +1002,13 @@ export default function VideoDetailPage() {
                           </div>
                         ) : analysis.inferences ? (
                           <>
+                            <AnalysisToolbar {...inferencesDisplay} />
                             <InferencesList
-                              inferences={analysis.inferences}
+                              inferences={inferencesDisplay.processData(analysis.inferences)}
                               chunks={analysis.chunks || []}
+                              viewMode={inferencesDisplay.viewMode}
+                              sort={inferencesDisplay.sort}
+                              onSort={inferencesDisplay.setSort}
                             />
                             {analysis.current_step === "infer" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
@@ -978,7 +1041,13 @@ export default function VideoDetailPage() {
                           </div>
                         ) : analysis.patterns ? (
                           <>
-                            <PatternsList patterns={analysis.patterns} />
+                            <AnalysisToolbar {...patternsDisplay} />
+                            <PatternsList
+                              patterns={patternsDisplay.processData(analysis.patterns)}
+                              viewMode={patternsDisplay.viewMode}
+                              sort={patternsDisplay.sort}
+                              onSort={patternsDisplay.setSort}
+                            />
                             {analysis.current_step === "relate" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
                                 <p className="text-base-55 mb-4">
@@ -1010,7 +1079,13 @@ export default function VideoDetailPage() {
                           </div>
                         ) : analysis.insights ? (
                           <>
-                            <InsightsList insights={analysis.insights} />
+                            <AnalysisToolbar {...insightsDisplay} />
+                            <InsightsList
+                              insights={insightsDisplay.processData(analysis.insights)}
+                              viewMode={insightsDisplay.viewMode}
+                              sort={insightsDisplay.sort}
+                              onSort={insightsDisplay.setSort}
+                            />
                             {analysis.current_step === "explain" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
                                 <p className="text-base-55 mb-4">
@@ -1042,7 +1117,13 @@ export default function VideoDetailPage() {
                           </div>
                         ) : analysis.design_principles ? (
                           <>
-                            <PrinciplesList principles={analysis.design_principles} />
+                            <AnalysisToolbar {...principlesDisplay} />
+                            <PrinciplesList
+                              principles={principlesDisplay.processData(analysis.design_principles)}
+                              viewMode={principlesDisplay.viewMode}
+                              sort={principlesDisplay.sort}
+                              onSort={principlesDisplay.setSort}
+                            />
                             <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
                               <CheckCircle className="h-12 w-12 text-brand-forest mx-auto mb-4" />
                               <p className="text-base-55">

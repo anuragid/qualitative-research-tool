@@ -2,25 +2,64 @@ import type { Pattern } from "../../types";
 import { Badge } from "../ui/Badge";
 import { Network } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { relationshipTypeStyles, frequencyStyles } from "./config/displayConfig";
+import { PatternCard } from "./cards/PatternCard";
+import { CardView } from "./display/CardView";
+import { TableView, type TableColumn } from "./display/TableView";
+import type { ViewMode, SortConfig } from "./hooks/useAnalysisDisplay";
 
 interface PatternsListProps {
   patterns: Pattern[];
+  viewMode?: ViewMode;
+  sort?: SortConfig | null;
+  onSort?: (config: SortConfig | null) => void;
 }
 
-const relationshipTypeStyles: Record<string, string> = {
-  convergent: "bg-brand-forest/10 text-brand-forest border-0",
-  divergent: "bg-brand-maroon/10 text-brand-maroon border-0",
-  tension: "bg-destructive/10 text-destructive border-0",
-  causal: "bg-accent-blue-bg text-accent-blue border-0",
-};
+const patternColumns: TableColumn<Pattern>[] = [
+  { key: "pattern_name", label: "Name", sortable: true, render: (p) => (
+    <span className="font-semibold text-sm text-base-85">{p.pattern_name}</span>
+  ) },
+  { key: "relationship_type", label: "Relationship", sortable: true, render: (p) => (
+    <Badge className={`${relationshipTypeStyles[p.relationship_type] || ""} text-label`}>
+      {p.relationship_type}
+    </Badge>
+  ), className: "w-32" },
+  { key: "frequency", label: "Frequency", sortable: true, render: (p) => (
+    <Badge className={`${frequencyStyles[p.frequency] || ""} text-label`}>
+      {p.frequency}
+    </Badge>
+  ), className: "w-28" },
+  { key: "description", label: "Description", render: (p) => (
+    <p className="text-sm text-base-55 line-clamp-2">{p.description}</p>
+  ) },
+  { key: "related_inferences", label: "Inferences", sortable: false, render: (p) => (
+    <span className="text-sm text-base-40">{p.related_inferences.length}</span>
+  ), className: "w-24" },
+];
 
-const frequencyStyles: Record<string, string> = {
-  high: "bg-brand-mustard/10 text-brand-mustard border-0",
-  medium: "bg-brand-olive/10 text-brand-olive border-0",
-  low: "bg-base-04 text-base-55 border-0",
-};
+export function PatternsList({ patterns, viewMode = "list", sort, onSort }: PatternsListProps) {
+  if (viewMode === "grid") {
+    return (
+      <CardView columns={2}>
+        {patterns.map((pattern, i) => (
+          <PatternCard key={pattern.pattern_id || i} pattern={pattern} compact />
+        ))}
+      </CardView>
+    );
+  }
 
-export function PatternsList({ patterns }: PatternsListProps) {
+  if (viewMode === "table") {
+    return (
+      <TableView
+        data={patterns}
+        columns={patternColumns}
+        sort={sort || null}
+        onSort={onSort || (() => {})}
+      />
+    );
+  }
+
+  // Default: list view (accordion)
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
