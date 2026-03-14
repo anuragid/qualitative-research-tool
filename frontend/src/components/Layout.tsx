@@ -26,7 +26,7 @@ export default function Layout({ children }: LayoutProps) {
       >
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 -ml-2 rounded-md text-base-62 hover:text-foreground hover:bg-base-04"
+          className="p-2 -ml-2 rounded-md text-base-62 hover:text-foreground hover:bg-base-04 min-h-[44px] min-w-[44px] flex items-center justify-center"
           style={{
             transition:
               "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
@@ -42,7 +42,7 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main content area */}
       <main className="lg:ml-72 pt-14 lg:pt-0 min-h-screen">
-        <div className="p-6">{children}</div>
+        <div className="p-4 sm:p-6">{children}</div>
       </main>
 
       {/* Global Upload Manager */}

@@ -62,7 +62,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Sidebar panel */}
       <aside
-        className={`fixed top-0 left-0 h-full w-72 bg-surface-card border-r border-border flex flex-col transition-transform ${
+        className={`fixed top-0 left-0 h-full w-[85vw] max-w-72 lg:w-72 bg-surface-card border-r border-border flex flex-col transition-transform ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
         style={{
@@ -79,7 +79,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </span>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-base-55 hover:text-foreground hover:bg-base-04 lg:hidden"
+            className="p-2 rounded-md text-base-55 hover:text-foreground hover:bg-base-04 lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
             style={{
               transition:
                 "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
@@ -96,7 +96,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             to="/projects"
             onClick={onClose}
             className={({ isActive }) =>
-              `flex items-center gap-3 h-8 px-3 rounded-lg text-ui ${
+              `flex items-center gap-3 h-10 px-3 rounded-lg text-ui ${
                 isActive
                   ? "bg-base-08 text-foreground"
                   : "text-base-62 hover:bg-base-04 hover:text-foreground"
@@ -118,7 +118,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </span>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="flex items-center gap-3 h-8 px-3 rounded-lg text-ui text-base-62 hover:bg-base-04 hover:text-foreground w-full mt-1"
+              className="flex items-center gap-3 h-10 px-3 rounded-lg text-ui text-base-62 hover:bg-base-04 hover:text-foreground w-full mt-1"
               style={{
                 transition:
                   "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
