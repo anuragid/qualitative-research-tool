@@ -244,12 +244,12 @@ export function TranscriptViewer({
   return (
     <div className="bg-card rounded-2xl shadow-card overflow-hidden">
       {/* Search Bar — frosted glass style header */}
-      <div className="sticky top-0 z-10 frosted-glass border-b border-base-09 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-10 frosted-glass border-b border-base-09 px-4 sm:px-6 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-h4 text-foreground">Transcript</h3>
 
           {/* Search bar */}
-          <div className="relative w-80">
+          <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-40" />
             <Input
               id="transcript-search-input"
@@ -278,7 +278,7 @@ export function TranscriptViewer({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-5 w-5 p-0 hover:bg-base-04 rounded-md"
+                        className="h-7 w-7 p-0 hover:bg-base-04 rounded-md"
                         onClick={navigateToPrevious}
                         title="Previous match (Shift+Enter)"
                       >
@@ -287,7 +287,7 @@ export function TranscriptViewer({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-5 w-5 p-0 hover:bg-base-04 rounded-md"
+                        className="h-7 w-7 p-0 hover:bg-base-04 rounded-md"
                         onClick={navigateToNext}
                         title="Next match (Enter)"
                       >
@@ -313,17 +313,17 @@ export function TranscriptViewer({
       </div>
 
       {/* Transcript Content */}
-      <div className="p-6 space-y-5" ref={transcriptContainerRef}>
+      <div className="p-4 sm:p-6 space-y-3 sm:space-y-5" ref={transcriptContainerRef}>
         {transcript.processed_transcript?.utterances?.map((utterance, index) => {
           const colorSet = speakerColorMap.get(utterance.speaker) || speakerColors[0];
 
           return (
             <div
               key={index}
-              className="flex gap-5 p-4 rounded-xl hover:bg-base-04 transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
+              className="flex gap-3 sm:gap-5 p-4 rounded-xl hover:bg-base-04 transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
             >
               {/* Timestamp */}
-              <div className="flex-shrink-0 w-20 text-label text-base-40 flex items-start gap-1.5 pt-1">
+              <div className="flex-shrink-0 w-14 sm:w-20 text-label text-base-40 flex items-start gap-1.5 pt-1">
                 <Clock className="h-3 w-3 mt-0.5" />
                 {formatTimestamp(utterance.start / 1000)}
               </div>

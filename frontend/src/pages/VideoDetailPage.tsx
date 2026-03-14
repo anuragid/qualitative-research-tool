@@ -323,7 +323,7 @@ export default function VideoDetailPage() {
   return (
     <Layout>
       <div className="min-h-screen bg-surface-page">
-        <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
           {/* Breadcrumb / Back Navigation */}
           <div className="flex items-center gap-3">
             <Link to={`/projects/${video.project_id}`}>
@@ -335,9 +335,9 @@ export default function VideoDetailPage() {
           </div>
 
           {/* Page Header */}
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-h2 text-foreground">{video.filename}</h1>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-h3 sm:text-h2 text-foreground truncate">{video.filename}</h1>
               <div className="flex items-center gap-3 mt-2 text-sm text-base-55">
                 <span>{formatFileSize(video.file_size_bytes)}</span>
                 {video.duration_seconds && (
@@ -359,7 +359,7 @@ export default function VideoDetailPage() {
               <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-destructive">Error</p>
-                <p className="text-sm text-destructive/80">{video.error_message}</p>
+                <p className="text-sm text-destructive/80 break-all">{video.error_message}</p>
               </div>
             </div>
           )}
@@ -371,8 +371,7 @@ export default function VideoDetailPage() {
                 id="main-video-player"
                 key={playbackUrl}
                 controls
-                className="w-full bg-black"
-                style={{ maxHeight: "600px" }}
+                className="w-full bg-black max-h-[60vh] sm:max-h-[600px]"
                 preload="metadata"
               >
                 <source src={playbackUrl} type="video/mp4" />
@@ -385,8 +384,8 @@ export default function VideoDetailPage() {
 
           {/* Progress indicator for ongoing tasks */}
           {(video.status === "transcribing" || video.status === "analyzing") && (
-            <div className="bg-card rounded-2xl shadow-card p-6 space-y-3">
-              <div className="flex items-center gap-2 text-sm text-base-55">
+            <div className="bg-card rounded-2xl shadow-card p-4 sm:p-6 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-base-55 overflow-x-auto">
                 <Clock className="h-4 w-4" />
                 <span>
                   {video.status === "transcribing"
@@ -499,7 +498,7 @@ export default function VideoDetailPage() {
                             <User className={`h-4 w-4 ${hasRole ? "text-brand-forest" : "text-brand-mustard"}`} />
 
                             {editingSpeaker === speaker ? (
-                              <div className="flex-1 flex gap-2">
+                              <div className="flex-1 flex flex-col gap-2 sm:flex-row">
                                 <Input
                                   type="text"
                                   placeholder="Name (optional)"
@@ -615,7 +614,7 @@ export default function VideoDetailPage() {
                       Once all speakers have assigned roles, you can begin the analysis.
                     </p>
 
-                    <div className="mt-4 flex gap-3">
+                    <div className="mt-4 flex flex-wrap gap-3">
                       <SimpleTooltip
                         content={canStartAnalysis()
                           ? "Start step-by-step analysis (recommended)"
@@ -743,20 +742,20 @@ export default function VideoDetailPage() {
                 ) : hasAnalysis ? (
                   // Complete mode: Show all steps in tabbed accordion sections
                   <Tabs defaultValue="chunks" className="w-full">
-                    <TabsList>
-                      <TabsTrigger value="chunks">
+                    <TabsList className="overflow-x-auto">
+                      <TabsTrigger value="chunks" className="whitespace-nowrap">
                         1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
                       </TabsTrigger>
-                      <TabsTrigger value="inferences">
+                      <TabsTrigger value="inferences" className="whitespace-nowrap">
                         2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
                       </TabsTrigger>
-                      <TabsTrigger value="patterns">
+                      <TabsTrigger value="patterns" className="whitespace-nowrap">
                         3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
                       </TabsTrigger>
-                      <TabsTrigger value="insights">
+                      <TabsTrigger value="insights" className="whitespace-nowrap">
                         4. Insights {analysis.insights && `(${analysis.insights.length})`}
                       </TabsTrigger>
-                      <TabsTrigger value="principles">
+                      <TabsTrigger value="principles" className="whitespace-nowrap">
                         5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
                       </TabsTrigger>
                     </TabsList>
@@ -793,7 +792,7 @@ export default function VideoDetailPage() {
                   <div className="space-y-6">
                     {/* Progress indicator */}
                     <div className="bg-card rounded-2xl shadow-card overflow-hidden">
-                      <div className="p-5 flex items-center justify-between border-b border-border">
+                      <div className="p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border">
                         <h3 className="text-h4 text-foreground">Analysis Progress</h3>
                         {stepInfo.nextStep && (
                           <ContinueStepButton
@@ -829,10 +828,11 @@ export default function VideoDetailPage() {
 
                     {/* Step tabs with state indicators */}
                     <Tabs value={activeStepTab} onValueChange={setActiveStepTab} className="w-full">
-                      <TabsList>
+                      <TabsList className="overflow-x-auto">
                         <TabsTrigger
                           value="chunks"
                           disabled={!analysis.chunks}
+                          className="whitespace-nowrap"
                         >
                           {analysis.step_status?.chunk === "completed" && (
                             <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
@@ -845,6 +845,7 @@ export default function VideoDetailPage() {
                         <TabsTrigger
                           value="inferences"
                           disabled={!analysis.inferences && analysis.step_status?.infer !== "error"}
+                          className="whitespace-nowrap"
                         >
                           {analysis.step_status?.infer === "completed" && (
                             <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
@@ -860,6 +861,7 @@ export default function VideoDetailPage() {
                         <TabsTrigger
                           value="patterns"
                           disabled={!analysis.patterns && analysis.step_status?.relate !== "error"}
+                          className="whitespace-nowrap"
                         >
                           {analysis.step_status?.relate === "completed" && (
                             <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
@@ -875,6 +877,7 @@ export default function VideoDetailPage() {
                         <TabsTrigger
                           value="insights"
                           disabled={!analysis.insights && analysis.step_status?.explain !== "error"}
+                          className="whitespace-nowrap"
                         >
                           {analysis.step_status?.explain === "completed" && (
                             <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
@@ -890,6 +893,7 @@ export default function VideoDetailPage() {
                         <TabsTrigger
                           value="principles"
                           disabled={!analysis.design_principles && analysis.step_status?.activate !== "error"}
+                          className="whitespace-nowrap"
                         >
                           {analysis.step_status?.activate === "completed" && (
                             <CheckCircle className="h-3 w-3 mr-1 text-brand-forest" />
