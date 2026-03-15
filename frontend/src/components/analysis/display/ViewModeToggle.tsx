@@ -1,4 +1,5 @@
 import { List, LayoutGrid, Table2 } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "../../ui/toggle-group";
 import type { ViewMode } from "../hooks/useAnalysisDisplay";
 
 interface ViewModeToggleProps {
@@ -14,22 +15,19 @@ const modes: { value: ViewMode; icon: typeof List; label: string }[] = [
 
 export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-lg bg-interactive-fill p-0.5">
+    <ToggleGroup
+      type="single"
+      value={viewMode}
+      onValueChange={(value) => {
+        if (value) onChange(value as ViewMode);
+      }}
+      size="sm"
+    >
       {modes.map(({ value, icon: Icon, label }) => (
-        <button
-          key={value}
-          onClick={() => onChange(value)}
-          className={`p-1.5 rounded-md transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-            viewMode === value
-              ? "bg-surface-card text-foreground shadow-subtle"
-              : "text-text-placeholder hover:text-text-secondary"
-          }`}
-          aria-label={label}
-          aria-pressed={viewMode === value}
-        >
+        <ToggleGroupItem key={value} value={value} aria-label={label}>
           <Icon className="h-4 w-4" />
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

@@ -5,8 +5,11 @@ import FolderCard from "../components/projects/FolderCard";
 import CreateProjectDialog from "../components/projects/CreateProjectDialog";
 import { Skeleton } from "../components/ui/skeleton";
 import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page-header";
+import { AlertBanner } from "../components/ui/alert-banner";
+import { EmptyState } from "../components/ui/empty-state";
 import { gsap, useGSAP, animations, prefersReducedMotion } from "../lib/animations";
-import { RefreshCw } from "lucide-react";
+import { FolderOpen, RefreshCw } from "lucide-react";
 
 export default function ProjectsPage() {
   const { data: projects, isLoading, error, refetch } = useProjects();
@@ -29,15 +32,11 @@ export default function ProjectsPage() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-h2">Projects</h1>
-            <p className="text-text-tertiary mt-1">
-              Manage your research projects and interview videos
-            </p>
-          </div>
-          <CreateProjectDialog />
-        </div>
+        <PageHeader
+          title="Projects"
+          description="Manage your research projects and interview videos"
+          actions={<CreateProjectDialog />}
+        />
 
         {/* Loading State */}
         {isLoading && (
@@ -55,34 +54,33 @@ export default function ProjectsPage() {
 
         {/* Error State */}
         {error && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-5">
-            <p className="text-destructive">
-              Failed to load projects. Please try again.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3 border-destructive/40 text-destructive hover:bg-destructive/10"
-              onClick={() => refetch()}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
+          <AlertBanner
+            variant="error"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => refetch()}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            }
+          >
+            Failed to load projects. Please try again.
+          </AlertBanner>
         )}
 
         {/* Empty State */}
         {projects && projects.length === 0 && (
-          <div className="text-center py-16">
-            <h2 className="text-h3 mb-3">
-              Welcome to methodex
-            </h2>
-            <p className="text-text-tertiary text-body max-w-md mx-auto mb-6">
-              Create your first project to start organizing your qualitative
-              research interviews and discovering insights.
-            </p>
-            <CreateProjectDialog />
-          </div>
+          <EmptyState
+            icon={FolderOpen}
+            heading="Welcome to methodex"
+            description="Create your first project to start organizing your qualitative research interviews and discovering insights."
+            action={<CreateProjectDialog />}
+            className="py-16"
+          />
         )}
 
         {/* Projects Grid */}

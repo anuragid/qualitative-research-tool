@@ -36,9 +36,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
+import { BackLink } from "../components/ui/back-link";
+import { StatusBadge } from "../components/ui/status-badge";
+import type { VideoStatus } from "../components/ui/status-badge";
+import { MetadataRow } from "../components/ui/metadata-row";
+import { LoadingState } from "../components/ui/loading-state";
+import { AlertBanner } from "../components/ui/alert-banner";
+import { EmptyState } from "../components/ui/empty-state";
 import {
   Loader2,
-  ArrowLeft,
   FileText,
   Play,
   Lightbulb,
@@ -148,27 +154,6 @@ export default function VideoDetailPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      uploaded: { variant: "secondary" as const, label: "Uploaded", icon: CheckCircle },
-      transcribing: { variant: "warning" as const, label: "Transcribing...", icon: Loader2 },
-      transcribed: { variant: "success" as const, label: "Transcribed", icon: CheckCircle },
-      analyzing: { variant: "warning" as const, label: "Analyzing...", icon: Loader2 },
-      analyzed: { variant: "success" as const, label: "Analyzed", icon: CheckCircle },
-      error: { variant: "destructive" as const, label: "Error", icon: AlertCircle },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.uploaded;
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className={`h-3 w-3 ${status === "transcribing" || status === "analyzing" ? "animate-spin" : ""}`} />
-        {config.label}
-      </Badge>
-    );
-  };
-
   // Validation functions for workflow prerequisites
   const getUniqueSpeakers = () => {
     if (!transcript?.processed_transcript?.utterances) return [];
@@ -224,10 +209,7 @@ export default function VideoDetailPage() {
   if (videoLoading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-surface-page flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-text-placeholder" />
-          <p className="mt-3 text-sm text-text-tertiary">Loading video details...</p>
-        </div>
+        <LoadingState message="Loading video details..." className="min-h-screen py-12" />
       </Layout>
     );
   }
@@ -235,16 +217,17 @@ export default function VideoDetailPage() {
   if (!video) {
     return (
       <Layout>
-        <div className="min-h-screen bg-surface-page text-center py-12">
-          <AlertCircle className="h-12 w-12 text-text-placeholder mx-auto mb-4" />
-          <h2 className="text-h3 mb-2">Video Not Found</h2>
-          <p className="text-text-tertiary mb-4">
-            The video you're looking for doesn't exist or has been removed.
-          </p>
-          <Link to="/projects">
-            <Button>Go to Projects</Button>
-          </Link>
-        </div>
+        <EmptyState
+          icon={AlertCircle}
+          heading="Video Not Found"
+          description="The video you're looking for doesn't exist or has been removed."
+          action={
+            <Link to="/projects">
+              <Button>Go to Projects</Button>
+            </Link>
+          }
+          className="min-h-screen py-12"
+        />
       </Layout>
     );
   }
@@ -344,43 +327,34 @@ export default function VideoDetailPage() {
       <div className="min-h-screen bg-surface-page">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
           {/* Breadcrumb / Back Navigation */}
-          <div className="flex items-center gap-3">
-            <Link to={`/projects/${video.project_id}`}>
-              <Button variant="ghost" size="sm" className="text-text-tertiary hover:text-text-primary gap-2 rounded-full">
-                <ArrowLeft className="h-4 w-4" />
-                {project?.name ? `Back to ${project.name}` : "Back to Project"}
-              </Button>
-            </Link>
-          </div>
+          <BackLink to={`/projects/${video.project_id}`}>
+            {project?.name ? `Back to ${project.name}` : "Back to Project"}
+          </BackLink>
 
           {/* Page Header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h1 className="text-h3 sm:text-h2 text-foreground truncate">{video.filename}</h1>
-              <div className="flex items-center gap-3 mt-2 text-sm text-text-tertiary">
-                <span>{formatFileSize(video.file_size_bytes)}</span>
-                {video.duration_seconds && (
-                  <>
-                    <span className="text-text-disabled">|</span>
-                    <span>{Math.floor(video.duration_seconds / 60)}:{(video.duration_seconds % 60).toString().padStart(2, '0')}</span>
-                  </>
-                )}
-                <span className="text-text-disabled">|</span>
-                <span>{new Date(video.uploaded_at).toLocaleDateString()}</span>
-              </div>
+              <MetadataRow
+                className="mt-2"
+                separator="|"
+                items={[
+                  { value: formatFileSize(video.file_size_bytes) },
+                  ...(video.duration_seconds
+                    ? [{ value: `${Math.floor(video.duration_seconds / 60)}:${(video.duration_seconds % 60).toString().padStart(2, '0')}` }]
+                    : []),
+                  { value: new Date(video.uploaded_at).toLocaleDateString() },
+                ]}
+              />
             </div>
-            {getStatusBadge(video.status)}
+            <StatusBadge status={video.status as VideoStatus} />
           </div>
 
           {/* Error message */}
           {video.error_message && (
-            <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-2xl flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-destructive">Error</p>
-                <p className="text-sm text-destructive/80 break-all">{video.error_message}</p>
-              </div>
-            </div>
+            <AlertBanner variant="error" title="Error">
+              <span className="break-all">{video.error_message}</span>
+            </AlertBanner>
           )}
 
           {/* Video Player — elevated white card */}
@@ -691,25 +665,27 @@ export default function VideoDetailPage() {
 
           {/* Original transcription button if no transcript yet */}
           {canStartTranscription && (
-            <div className="bg-card rounded-2xl shadow-card p-12 text-center">
-              <FileText className="h-12 w-12 text-text-disabled mx-auto mb-4" />
-              <p className="text-text-tertiary mb-4">
-                No transcript available. Start transcription to begin the analysis process.
-              </p>
-              <Button onClick={handleStartTranscription} disabled={startTranscription.isPending} className="rounded-full">
-                {startTranscription.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Start Transcription
-                  </>
-                )}
-              </Button>
-            </div>
+            <EmptyState
+              icon={FileText}
+              heading="No transcript available"
+              description="Start transcription to begin the analysis process."
+              action={
+                <Button onClick={handleStartTranscription} disabled={startTranscription.isPending} className="rounded-full">
+                  {startTranscription.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Transcription
+                    </>
+                  )}
+                </Button>
+              }
+              className="bg-card rounded-2xl shadow-card p-12"
+            />
           )}
 
           {/* Main Content Tabs — Transcript & Analysis */}
@@ -739,9 +715,7 @@ export default function VideoDetailPage() {
               {/* Transcript Tab */}
               <TabsContent value="transcript" className="mt-6">
                 {transcriptLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-text-placeholder" />
-                  </div>
+                  <LoadingState message="Loading transcript..." className="py-12" />
                 ) : transcript ? (
                   <TranscriptViewer
                     transcript={transcript}
@@ -755,9 +729,7 @@ export default function VideoDetailPage() {
               {/* Analysis Tab */}
               <TabsContent value="analysis" className="mt-6 space-y-6">
                 {analysisLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-text-placeholder" />
-                  </div>
+                  <LoadingState message="Loading analysis..." className="py-12" />
                 ) : hasAnalysis ? (
                   // Complete mode: Show all steps in tabbed accordion sections
                   <Tabs defaultValue="chunks" className="w-full">
@@ -983,10 +955,7 @@ export default function VideoDetailPage() {
 
                       <TabsContent value="chunks" className="mt-6">
                         {analysis.step_status?.chunk === "processing" ? (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">Processing chunks...</p>
-                          </div>
+                          <LoadingState message="Processing chunks..." className="bg-card rounded-2xl p-12" />
                         ) : analysis.chunks ? (
                           <>
                             <AnalysisToolbar {...chunksDisplay} />
@@ -1016,10 +985,7 @@ export default function VideoDetailPage() {
 
                       <TabsContent value="inferences" className="mt-6">
                         {(startInferStep.isPending || analysis.step_status?.infer === "processing") ? (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">{startInferStep.isPending ? "Starting..." : "Generating inferences..."}</p>
-                          </div>
+                          <LoadingState message={startInferStep.isPending ? "Starting..." : "Generating inferences..."} className="bg-card rounded-2xl p-12" />
                         ) : analysis.inferences ? (
                           <>
                             <AnalysisToolbar {...inferencesDisplay} />
@@ -1046,19 +1012,13 @@ export default function VideoDetailPage() {
                             )}
                           </>
                         ) : (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">Loading inferences...</p>
-                          </div>
+                          <LoadingState message="Loading inferences..." className="bg-card rounded-2xl p-12" />
                         )}
                       </TabsContent>
 
                       <TabsContent value="patterns" className="mt-6">
                         {(startRelateStep.isPending || analysis.step_status?.relate === "processing") ? (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">{startRelateStep.isPending ? "Starting..." : "Identifying patterns..."}</p>
-                          </div>
+                          <LoadingState message={startRelateStep.isPending ? "Starting..." : "Identifying patterns..."} className="bg-card rounded-2xl p-12" />
                         ) : analysis.patterns ? (
                           <>
                             <AnalysisToolbar {...patternsDisplay} />
@@ -1084,19 +1044,13 @@ export default function VideoDetailPage() {
                             )}
                           </>
                         ) : (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">Loading patterns...</p>
-                          </div>
+                          <LoadingState message="Loading patterns..." className="bg-card rounded-2xl p-12" />
                         )}
                       </TabsContent>
 
                       <TabsContent value="insights" className="mt-6">
                         {(startExplainStep.isPending || analysis.step_status?.explain === "processing") ? (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">{startExplainStep.isPending ? "Starting..." : "Generating insights..."}</p>
-                          </div>
+                          <LoadingState message={startExplainStep.isPending ? "Starting..." : "Generating insights..."} className="bg-card rounded-2xl p-12" />
                         ) : analysis.insights ? (
                           <>
                             <AnalysisToolbar {...insightsDisplay} />
@@ -1122,19 +1076,13 @@ export default function VideoDetailPage() {
                             )}
                           </>
                         ) : (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">Loading insights...</p>
-                          </div>
+                          <LoadingState message="Loading insights..." className="bg-card rounded-2xl p-12" />
                         )}
                       </TabsContent>
 
                       <TabsContent value="principles" className="mt-6">
                         {(startActivateStep.isPending || analysis.step_status?.activate === "processing") ? (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">{startActivateStep.isPending ? "Starting..." : "Generating design principles..."}</p>
-                          </div>
+                          <LoadingState message={startActivateStep.isPending ? "Starting..." : "Generating design principles..."} className="bg-card rounded-2xl p-12" />
                         ) : analysis.design_principles ? (
                           <>
                             <AnalysisToolbar {...principlesDisplay} />
@@ -1152,21 +1100,18 @@ export default function VideoDetailPage() {
                             </div>
                           </>
                         ) : (
-                          <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
-                            <p className="text-text-tertiary">Loading design principles...</p>
-                          </div>
+                          <LoadingState message="Loading design principles..." className="bg-card rounded-2xl p-12" />
                         )}
                       </TabsContent>
                     </Tabs>
                   </div>
                 ) : (
-                  <div className="bg-card rounded-2xl shadow-card p-12 text-center">
-                    <Lightbulb className="h-12 w-12 text-text-disabled mx-auto mb-4" />
-                    <p className="text-text-tertiary">
-                      No analysis available yet. Complete the prerequisites and start the analysis to see results.
-                    </p>
-                  </div>
+                  <EmptyState
+                    icon={Lightbulb}
+                    heading="No analysis yet"
+                    description="No analysis available yet. Complete the prerequisites and start the analysis to see results."
+                    className="bg-card rounded-2xl shadow-card p-12"
+                  />
                 )}
               </TabsContent>
             </Tabs>

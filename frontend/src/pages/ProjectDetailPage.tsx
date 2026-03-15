@@ -6,8 +6,11 @@ import { useProjectVideos } from "../hooks/useVideos";
 import { useProjectAnalysis, useStartProjectAnalysis, useMetaPatterns, useCrossInsights, useSystemPrinciples } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
 import { getFolderColor } from "../lib/noise";
-import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2, RefreshCw, ArrowLeft, Lightbulb, Compass } from "lucide-react";
+import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2, RefreshCw, Lightbulb, Compass } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { BackLink } from "../components/ui/back-link";
+import { EmptyState } from "../components/ui/empty-state";
+import { AlertBanner } from "../components/ui/alert-banner";
 import VideoUploadDialog from "../components/videos/VideoUploadDialogSimple";
 import VideoCard from "../components/videos/VideoCard";
 import { MetaPatternsList } from "../components/analysis/MetaPatternsList";
@@ -193,18 +196,17 @@ export default function ProjectDetailPage() {
   if (!project) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-text-placeholder mb-4" />
-          <h2 className="text-h3 mb-2">
-            Project Not Found
-          </h2>
-          <p className="text-text-tertiary mb-4">
-            The project you're looking for doesn't exist or has been removed.
-          </p>
-          <Link to="/projects">
-            <Button>Go to Projects</Button>
-          </Link>
-        </div>
+        <EmptyState
+          icon={AlertCircle}
+          heading="Project Not Found"
+          description="The project you're looking for doesn't exist or has been removed."
+          action={
+            <Link to="/projects">
+              <Button>Go to Projects</Button>
+            </Link>
+          }
+          className="py-12"
+        />
       </Layout>
     );
   }
@@ -213,13 +215,7 @@ export default function ProjectDetailPage() {
     <Layout>
       <div className="space-y-6">
         {/* Back navigation */}
-        <Link
-          to="/projects"
-          className="inline-flex items-center gap-2 text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="text-body-sm">All Projects</span>
-        </Link>
+        <BackLink to="/projects">All Projects</BackLink>
 
         {/* Folder-themed header band */}
         <div
@@ -452,40 +448,34 @@ export default function ProjectDetailPage() {
 
             {/* Error state for failed analysis */}
             {projectAnalysis?.status === 'failed' && (
-              <Card className="mb-4 border-destructive/30 bg-destructive/5 shadow-card">
-                <CardContent className="py-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-medium text-destructive mb-1">
-                        Cross-video analysis failed
-                      </p>
-                      <p className="text-body-sm text-destructive/80 mb-3">
-                        There was an error analyzing patterns across videos. This might be due to rate limits or processing issues.
-                      </p>
-                      <Button
-                        onClick={handleRunProjectAnalysis}
-                        disabled={startProjectAnalysis.isPending}
-                        variant="outline"
-                        size="sm"
-                        className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                      >
-                        {startProjectAnalysis.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            Retrying...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Retry Analysis
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AlertBanner
+                variant="error"
+                title="Cross-video analysis failed"
+                className="mb-4"
+                action={
+                  <Button
+                    onClick={handleRunProjectAnalysis}
+                    disabled={startProjectAnalysis.isPending}
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                  >
+                    {startProjectAnalysis.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Retrying...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Retry Analysis
+                      </>
+                    )}
+                  </Button>
+                }
+              >
+                There was an error analyzing patterns across videos. This might be due to rate limits or processing issues.
+              </AlertBanner>
             )}
 
             {projectAnalysis?.status === 'completed' && (
@@ -547,13 +537,12 @@ export default function ProjectDetailPage() {
                           />
                         </>
                       ) : (
-                        <div className="text-center py-12">
-                          <Network className="h-10 w-10 text-text-disabled mx-auto mb-3" />
-                          <h4 className="text-h4 text-text-tertiary mb-1">No patterns yet</h4>
-                          <p className="text-body-sm text-text-placeholder">
-                            Run cross-video analysis to discover recurring patterns across your interviews.
-                          </p>
-                        </div>
+                        <EmptyState
+                          icon={Network}
+                          heading="No patterns yet"
+                          description="Run cross-video analysis to discover recurring patterns across your interviews."
+                          className="py-12"
+                        />
                       )}
                     </TabsContent>
 
@@ -569,13 +558,12 @@ export default function ProjectDetailPage() {
                           />
                         </>
                       ) : (
-                        <div className="text-center py-12">
-                          <Lightbulb className="h-10 w-10 text-text-disabled mx-auto mb-3" />
-                          <h4 className="text-h4 text-text-tertiary mb-1">No insights yet</h4>
-                          <p className="text-body-sm text-text-placeholder">
-                            Run cross-video analysis to generate insights that span multiple interviews.
-                          </p>
-                        </div>
+                        <EmptyState
+                          icon={Lightbulb}
+                          heading="No insights yet"
+                          description="Run cross-video analysis to generate insights that span multiple interviews."
+                          className="py-12"
+                        />
                       )}
                     </TabsContent>
 
@@ -591,13 +579,12 @@ export default function ProjectDetailPage() {
                           />
                         </>
                       ) : (
-                        <div className="text-center py-12">
-                          <Compass className="h-10 w-10 text-text-disabled mx-auto mb-3" />
-                          <h4 className="text-h4 text-text-tertiary mb-1">No principles yet</h4>
-                          <p className="text-body-sm text-text-placeholder">
-                            Run cross-video analysis to derive system-level design principles from your research.
-                          </p>
-                        </div>
+                        <EmptyState
+                          icon={Compass}
+                          heading="No principles yet"
+                          description="Run cross-video analysis to derive system-level design principles from your research."
+                          className="py-12"
+                        />
                       )}
                     </TabsContent>
                   </Tabs>

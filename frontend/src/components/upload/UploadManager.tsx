@@ -23,6 +23,17 @@ import {
   CircleDot
 } from 'lucide-react';
 import { Progress } from '../ui/progress';
+import { ScrollArea } from '../ui/scroll-area';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '../ui/alert-dialog';
 import { formatFileSize } from '../../lib/utils';
 
 export function UploadManager() {
@@ -212,7 +223,7 @@ export function UploadManager() {
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="mt-2 bg-card border border-border rounded-lg shadow-lg max-h-96 overflow-y-auto">
+        <ScrollArea className="mt-2 bg-card border border-border rounded-lg shadow-lg max-h-96">
           {/* Summary Bar */}
           {(pendingCount > 0 || activeCount > 0 || pausedCount > 0) && (
             <div className="p-2 border-b border-border bg-interactive-fill text-xs text-text-tertiary">
@@ -285,33 +296,29 @@ export function UploadManager() {
                   key={upload.id}
                   className={`relative flex items-start gap-2 p-2 rounded-lg border transition-all duration-200 ${uploadStyles}`}
                 >
-                  {/* Confirmation overlay */}
-                  {confirmingCancel === upload.id && (
-                    <div className="absolute inset-0 bg-card/95 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center p-3">
-                      <div className="text-center">
-                        <p className="text-xs font-medium text-foreground mb-2">
-                          Cancel this upload?
-                        </p>
-                        <p className="text-xs text-text-tertiary mb-3">
+                  {/* Confirmation dialog */}
+                  <AlertDialog
+                    open={confirmingCancel === upload.id}
+                    onOpenChange={(open) => { if (!open) cancelConfirmation(); }}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel this upload?</AlertDialogTitle>
+                        <AlertDialogDescription>
                           Progress will be lost and cannot be recovered.
-                        </p>
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => confirmCancel(upload.id)}
-                            className="px-3 py-1 bg-destructive text-destructive-foreground text-xs rounded hover:bg-destructive/90 transition-colors"
-                          >
-                            Cancel Upload
-                          </button>
-                          <button
-                            onClick={cancelConfirmation}
-                            className="px-3 py-1 bg-interactive-fill text-foreground/80 text-xs rounded hover:bg-accent transition-colors"
-                          >
-                            Keep
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep</AlertDialogCancel>
+                        <AlertDialogAction
+                          variant="destructive"
+                          onClick={() => confirmCancel(upload.id)}
+                        >
+                          Cancel Upload
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
 
                   <div className="flex-1 min-w-0">
                     {/* File name and status */}
@@ -518,7 +525,7 @@ export function UploadManager() {
               );
             })}
           </div>
-        </div>
+        </ScrollArea>
       )}
     </div>
   );

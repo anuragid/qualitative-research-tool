@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { FolderOpen, Settings, Sun, Moon, Monitor, X } from "lucide-react";
 import { UserButton } from "@clerk/react";
 import { ModelSettingsDialog } from "../settings/ModelSettingsDialog";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { useTheme } from "../../hooks/useTheme.tsx";
 import { useState } from "react";
 
@@ -101,34 +102,25 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               Settings
             </span>
             <span className="px-3 text-label text-text-placeholder mt-2 block">Theme</span>
-            <div className="flex items-center gap-1 px-3 mt-1">
-              <button
-                onClick={() => setTheme("light")}
-                className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                  theme === "light" ? "bg-interactive-hover text-foreground" : "text-text-placeholder hover:text-text-secondary hover:bg-interactive-fill"
-                }`}
-                aria-label="Light theme"
+            <div className="px-3 mt-1">
+              <ToggleGroup
+                type="single"
+                value={theme}
+                onValueChange={(value) => {
+                  if (value) setTheme(value as "light" | "dark" | "system");
+                }}
+                size="sm"
               >
-                <Sun className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setTheme("dark")}
-                className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                  theme === "dark" ? "bg-interactive-hover text-foreground" : "text-text-placeholder hover:text-text-secondary hover:bg-interactive-fill"
-                }`}
-                aria-label="Dark theme"
-              >
-                <Moon className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setTheme("system")}
-                className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                  theme === "system" ? "bg-interactive-hover text-foreground" : "text-text-placeholder hover:text-text-secondary hover:bg-interactive-fill"
-                }`}
-                aria-label="System theme"
-              >
-                <Monitor className="h-4 w-4" />
-              </button>
+                <ToggleGroupItem value="light" aria-label="Light theme">
+                  <Sun className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="dark" aria-label="Dark theme">
+                  <Moon className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="system" aria-label="System theme">
+                  <Monitor className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
             <button
               onClick={() => setSettingsOpen(true)}

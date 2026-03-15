@@ -9,6 +9,7 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { useSettings } from "../../hooks/useSettings";
 
 interface ModelSettingsDialogProps {
@@ -68,70 +69,65 @@ export function ModelSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Free models */}
-          <div>
-            <span className="text-section text-text-tertiary">Free Models</span>
-            <div className="mt-2 space-y-2">
-              {freeModels.map((model) => (
-                <label
-                  key={model.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                    currentModel === model.id || (!currentModel && model === freeModels[0])
-                      ? "border-interactive-focus bg-interactive-focus-bg"
-                      : "border-border hover:bg-interactive-fill"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={model.id}
-                    checked={currentModel === model.id || (!currentModel && model === freeModels[0])}
-                    onChange={() => setSelectedModel(model.id)}
-                    className="h-4 w-4 accent-interactive-focus"
-                  />
-                  <div>
-                    <div className="font-medium text-sm">{model.name}</div>
-                    <div className="text-xs text-text-tertiary">Free -- good for drafts and exploration</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Premium models */}
-          <div>
-            <span className="text-section text-text-tertiary">
-              Premium Models
-            </span>
-            <div className="mt-2 space-y-2">
-              {premiumModels.map((model) => (
-                <label
-                  key={model.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                    currentModel === model.id
-                      ? "border-interactive-focus bg-interactive-focus-bg"
-                      : "border-border hover:bg-interactive-fill"
-                  } ${!settings?.has_api_key && !apiKey ? "opacity-50" : ""}`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={model.id}
-                    checked={currentModel === model.id}
-                    onChange={() => setSelectedModel(model.id)}
-                    disabled={!settings?.has_api_key && !apiKey}
-                    className="h-4 w-4 accent-interactive-focus"
-                  />
-                  <div>
-                    <div className="font-medium text-sm">{model.name}</div>
-                    <div className="text-xs text-text-tertiary">
-                      Higher quality analysis -- requires your own API key
+          {/* Model selection */}
+          <RadioGroup
+            value={currentModel || freeModels[0]?.id || ""}
+            onValueChange={(value) => setSelectedModel(value)}
+            className="gap-4"
+          >
+            {/* Free models */}
+            <div>
+              <span className="text-section text-text-tertiary">Free Models</span>
+              <div className="mt-2 space-y-2">
+                {freeModels.map((model) => (
+                  <label
+                    key={model.id}
+                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                      (currentModel === model.id || (!currentModel && model === freeModels[0]))
+                        ? "border-interactive-focus bg-interactive-focus-bg"
+                        : "border-border hover:bg-interactive-fill"
+                    }`}
+                  >
+                    <RadioGroupItem value={model.id} />
+                    <div>
+                      <div className="font-medium text-sm">{model.name}</div>
+                      <div className="text-xs text-text-tertiary">Free -- good for drafts and exploration</div>
                     </div>
-                  </div>
-                </label>
-              ))}
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+
+            {/* Premium models */}
+            <div>
+              <span className="text-section text-text-tertiary">
+                Premium Models
+              </span>
+              <div className="mt-2 space-y-2">
+                {premiumModels.map((model) => (
+                  <label
+                    key={model.id}
+                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                      currentModel === model.id
+                        ? "border-interactive-focus bg-interactive-focus-bg"
+                        : "border-border hover:bg-interactive-fill"
+                    } ${!settings?.has_api_key && !apiKey ? "opacity-50" : ""}`}
+                  >
+                    <RadioGroupItem
+                      value={model.id}
+                      disabled={!settings?.has_api_key && !apiKey}
+                    />
+                    <div>
+                      <div className="font-medium text-sm">{model.name}</div>
+                      <div className="text-xs text-text-tertiary">
+                        Higher quality analysis -- requires your own API key
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </RadioGroup>
 
           {/* API Key */}
           <div>

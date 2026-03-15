@@ -7,9 +7,7 @@ import {
   Clock,
   Trash2,
   MoreVertical,
-  AlertCircle,
   Loader2,
-  CheckCircle,
   RefreshCw,
   Eye,
 } from "lucide-react";
@@ -19,11 +17,12 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardContent,
   CardFooter,
 } from "../ui/card";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { StatusBadge } from "../ui/status-badge";
+import type { VideoStatus } from "../ui/status-badge";
+import { MetadataRow } from "../ui/metadata-row";
 import { useDeleteVideo } from "../../hooks/useVideos";
 import { useStartVideoAnalysis } from "../../hooks/useAnalysis";
 import {
@@ -61,43 +60,6 @@ export default function VideoCard({ video }: VideoCardProps) {
     // Don't navigate when clicking the dropdown menu
     if ((e.target as HTMLElement).closest("[data-dropdown-menu]")) return;
     navigate(`/videos/${video.id}`);
-  };
-
-  const getStatusBadge = (status: Video["status"]) => {
-    switch (status) {
-      case "uploaded":
-        return <Badge variant="secondary" className="bg-brand-pale-blue/50 text-text-secondary border-0">Uploaded</Badge>;
-      case "transcribing":
-        return (
-          <Badge variant="default" className="bg-brand-mustard/15 text-brand-mustard border-0">
-            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-            Transcribing
-          </Badge>
-        );
-      case "transcribed":
-        return <Badge variant="secondary" className="bg-brand-pale-green/50 text-brand-forest border-0">Transcribed</Badge>;
-      case "analyzing":
-        return (
-          <Badge variant="default" className="bg-brand-mustard/15 text-brand-mustard border-0">
-            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-            Analyzing
-          </Badge>
-        );
-      case "analyzed":
-        return (
-          <Badge variant="success" className="bg-brand-forest/15 text-brand-forest border-0">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Analyzed
-          </Badge>
-        );
-      case "error":
-        return (
-          <Badge variant="destructive" className="bg-destructive/10 text-destructive border-0">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Error
-          </Badge>
-        );
-    }
   };
 
   const handleDelete = async () => {
@@ -173,19 +135,18 @@ export default function VideoCard({ video }: VideoCardProps) {
           </div>
         </CardHeader>
 
-        <CardContent className="pb-3">
-          <div className="flex items-center gap-4 text-sm text-text-tertiary">
-            <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span>{video.duration_seconds ? formatDuration(video.duration_seconds) : "Unknown"}</span>
-            </div>
-            <div>{formatFileSize(video.file_size_bytes)}</div>
-          </div>
-        </CardContent>
+        <div className="px-6 pb-3">
+          <MetadataRow
+            items={[
+              { value: video.duration_seconds ? formatDuration(video.duration_seconds) : "Unknown", icon: Clock },
+              { value: formatFileSize(video.file_size_bytes) },
+            ]}
+          />
+        </div>
 
         <CardFooter className="flex flex-col gap-2 pt-0">
           <div className="flex items-center justify-between w-full">
-            {getStatusBadge(video.status)}
+            <StatusBadge status={video.status as VideoStatus} />
             {video.error_message && (
               <p className="text-xs text-destructive truncate flex-1 ml-2">
                 {video.error_message}
