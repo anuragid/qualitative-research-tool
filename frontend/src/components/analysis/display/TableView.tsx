@@ -1,6 +1,6 @@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "../../ui/Table";
+} from "../../ui/table";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import type { SortConfig } from "../hooks/useAnalysisDisplay";
 

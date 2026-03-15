@@ -142,6 +142,7 @@ export default function VideoDetailPage() {
     if (transcript?.id) {
       labelSpeaker.mutate({
         transcriptId: transcript.id,
+        videoId: videoId!,
         data: { speaker_label: speakerLabel, assigned_name: name, role },
       });
     }
