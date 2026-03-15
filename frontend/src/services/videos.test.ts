@@ -123,6 +123,7 @@ describe("videosService", () => {
             total: 100000,
             bytes: 50000,
             lengthComputable: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any);
         }
         return { data: mockVideo };
@@ -146,6 +147,7 @@ describe("videosService", () => {
             total: undefined,
             bytes: 50000,
             lengthComputable: false,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any);
         }
         return { data: mockVideo };
@@ -170,6 +172,7 @@ describe("videosService", () => {
             total: 100000,
             bytes: 50000,
             lengthComputable: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any);
         }
         return { data: mockVideo };
@@ -189,6 +192,7 @@ describe("videosService", () => {
       const file = new File(["video content"], "test.mp4", {
         type: "video/mp4",
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cancelToken = { promise: Promise.resolve() } as any;
 
       await videosService.upload("proj-1", file, undefined, cancelToken);

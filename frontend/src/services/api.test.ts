@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import axios from "axios";
-import type { AxiosError, InternalAxiosRequestConfig } from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 
 // We need to test the interceptors that api.ts registers.
 // Since interceptors are registered at module load time, we test
@@ -45,6 +45,7 @@ describe("api module", () => {
       };
 
       // Get the interceptor handlers from the manager
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const requestInterceptors = (api.interceptors.request as any).handlers;
       const interceptor = requestInterceptors[requestInterceptors.length - 1];
       const result = await interceptor.fulfilled(config);
@@ -69,6 +70,7 @@ describe("api module", () => {
         url: "/test",
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const requestInterceptors = (api.interceptors.request as any).handlers;
       const interceptor = requestInterceptors[requestInterceptors.length - 1];
       const result = await interceptor.fulfilled(config);
@@ -87,6 +89,7 @@ describe("api module", () => {
         url: "/test",
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const requestInterceptors = (api.interceptors.request as any).handlers;
       const interceptor = requestInterceptors[requestInterceptors.length - 1];
       const result = await interceptor.fulfilled(config);
@@ -107,6 +110,7 @@ describe("api module", () => {
         url: "/test",
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const requestInterceptors = (api.interceptors.request as any).handlers;
       const interceptor = requestInterceptors[requestInterceptors.length - 1];
       const result = await interceptor.fulfilled(config);
@@ -120,6 +124,7 @@ describe("api module", () => {
 
     it("rejects with error on request interceptor error handler", async () => {
       const { api } = await import("./api");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const requestInterceptors = (api.interceptors.request as any).handlers;
       const interceptor = requestInterceptors[requestInterceptors.length - 1];
 
@@ -129,10 +134,12 @@ describe("api module", () => {
   });
 
   describe("response interceptor", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let responseInterceptor: any;
 
     beforeEach(async () => {
       const { api } = await import("./api");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const responseInterceptors = (api.interceptors.response as any).handlers;
       responseInterceptor = responseInterceptors[responseInterceptors.length - 1];
     });
