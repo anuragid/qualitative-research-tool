@@ -89,13 +89,13 @@
   --color-chart-5: #A11735;
 
   /* ===== BORDER RADIUS ===== */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-3xl: 18px;
-  --radius-full: 9999px;
+  --radius-sm: 0.25rem;   /* 4px (was 6px - off grid) */
+  --radius-md: 0.5rem;    /* 8px */
+  --radius-lg: 0.75rem;   /* 12px (was 10px - off grid) */
+  --radius-xl: 0.75rem;   /* 12px */
+  --radius-2xl: 1rem;     /* 16px */
+  --radius-3xl: 1.5rem;   /* 24px (was 18px - off grid) */
+  --radius-full: 9999px;  /* pill */
 
   /* ===== SHADOWS ===== */
   --shadow-subtle: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -120,6 +120,30 @@
   --duration-micro: 0.15s;
   --duration-normal: 0.2s;
   --duration-slow: 0.5s;
+
+  /* ===== SPACING (8pt grid) ===== */
+  --spacing-0_5: 0.25rem;  /* 4px - fine detail */
+  --spacing-1: 0.5rem;     /* 8px */
+  --spacing-1_5: 0.75rem;  /* 12px */
+  --spacing-2: 1rem;       /* 16px */
+  --spacing-3: 1.5rem;     /* 24px */
+  --spacing-4: 2rem;       /* 32px */
+  --spacing-5: 2.5rem;     /* 40px */
+  --spacing-6: 3rem;       /* 48px */
+  --spacing-8: 4rem;       /* 64px */
+
+  /* ===== SIZING ===== */
+  --size-touch: 2.75rem;   /* 44px - minimum touch target */
+  --ring-width: 0.125rem;  /* 2px - focus ring width */
+
+  /* ===== OVERLAY ===== */
+  --color-overlay: rgba(0, 0, 0, 0.3);
+  --color-overlay-dark: rgba(0, 0, 0, 0.5);
+}
+
+/* ===== DARK MODE OVERRIDES ===== */
+.dark {
+  --color-overlay: rgba(0, 0, 0, 0.5);
 }
 
 /* ===== GLOBAL STYLES ===== */
@@ -134,66 +158,80 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-background);
   color: var(--color-foreground);
-  font-size: 16px;
+  font-size: 1rem;        /* was 16px */
   line-height: 1.5;
-  letter-spacing: -0.16px;
+  letter-spacing: -0.01em; /* was -0.16px */
 }
 
 /* ===== TYPOGRAPHY UTILITIES ===== */
 @utility text-h1 {
   font-family: var(--font-display);
-  font-size: 48px;
+  font-size: clamp(2rem, 5vw, 3rem);        /* 32-48px */
   font-weight: 400;
-  line-height: 1.1;
-  letter-spacing: -1.44px;
+  line-height: 1.125;                         /* 36-54px */
+  letter-spacing: -0.04em;
 }
 
 @utility text-h2 {
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);   /* 24-36px */
   font-weight: 400;
-  line-height: 1.15;
-  letter-spacing: -1.08px;
+  line-height: 1.167;                         /* 28-42px */
+  letter-spacing: -0.03em;
 }
 
 @utility text-h3 {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: clamp(1.25rem, 3.5vw, 1.75rem); /* 20-28px */
   font-weight: 400;
-  line-height: 1.2;
-  letter-spacing: -0.56px;
+  line-height: 1.2;                           /* 24-34px */
+  letter-spacing: -0.02em;
 }
 
 @utility text-h4 {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 1.25rem;                        /* 20px (was 22px off-grid) */
   font-weight: 400;
-  line-height: 1.25;
-  letter-spacing: -0.44px;
+  line-height: 1.4;                           /* 28px */
+  letter-spacing: -0.02em;
 }
 
 @utility text-ui {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 0.75rem;                        /* 12px (was 13px off-grid) */
   font-weight: 500;
-  line-height: 1.38;
+  line-height: 1.333;                         /* 16px */
 }
 
 @utility text-label {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 0.75rem;                        /* 12px */
   font-weight: 600;
-  line-height: 1.33;
-  letter-spacing: -0.04px;
+  line-height: 1.333;                         /* 16px */
 }
 
 @utility text-section {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 0.875rem;                       /* 14px */
   font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: 0.56px;
+  line-height: 1.429;                         /* 20px */
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+@utility text-body {
+  font-family: var(--font-body);
+  font-size: 1rem;                           /* 16px */
+  font-weight: 400;
+  line-height: 1.5;                           /* 24px */
+  letter-spacing: -0.01em;
+}
+
+@utility text-body-sm {
+  font-family: var(--font-body);
+  font-size: 0.875rem;                       /* 14px */
+  font-weight: 400;
+  line-height: 1.429;                         /* 20px */
 }
 
 /* ===== NOISE TEXTURE UTILITIES ===== */
