@@ -48,7 +48,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     <>
       {/* Mobile backdrop */}
       <div
-        className={`fixed inset-0 bg-black/30 transition-opacity lg:hidden ${
+        className={`fixed inset-0 bg-black/30 dark:bg-black/50 transition-opacity lg:hidden ${
           isOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"

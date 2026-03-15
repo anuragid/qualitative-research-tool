@@ -23,7 +23,7 @@ function ColorSwatch({ name, cssVar, hex }: { name: string; cssVar: string; hex:
     <div className="flex flex-col items-center gap-2">
       <div
         className="w-20 h-20 rounded-xl noise-texture noise-medium"
-        style={{ backgroundColor: hex }}
+        style={{ backgroundColor: `var(${cssVar})` }}
       />
       <span className="text-ui text-base-55">{name}</span>
       <code className="text-[10px] text-base-40">{hex}</code>
