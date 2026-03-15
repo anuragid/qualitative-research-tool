@@ -6,7 +6,17 @@ const meta = {
   title: "Composites/AlertBanner",
   component: AlertBanner,
   tags: ["autodocs"],
-  parameters: { layout: "padded" },
+  parameters: {
+    layout: "padded",
+    docs: {
+      description: {
+        component:
+          "Feedback banner for communicating status messages to the user.\n\n" +
+          "**When to use:** Error, warning, info, or success messages that need prominent visibility.\n\n" +
+          "**When NOT to use:** Empty states (use EmptyState) or inline form validation messages.",
+      },
+    },
+  },
   argTypes: {
     variant: {
       control: "select",
@@ -82,6 +92,7 @@ export const NoTitle: Story = {
 
 export const AllVariants: Story = {
   name: "All Variants",
+  args: { variant: "error", children: "All variants shown below" },
   render: () => (
     <div className="space-y-4 max-w-lg">
       <AlertBanner variant="error" title="Error">

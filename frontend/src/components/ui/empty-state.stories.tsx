@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within } from "storybook/test";
 import { Video, FolderOpen, Search, FileText, Upload } from "lucide-react";
 import { EmptyState } from "./empty-state";
 import { Button } from "./button";
@@ -7,7 +8,17 @@ const meta = {
   title: "Composites/EmptyState",
   component: EmptyState,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "Placeholder for empty lists and containers.\n\n" +
+          "**When to use:** When a list, table, or container has no content to display yet.\n\n" +
+          "**When NOT to use:** Error states (use AlertBanner) or loading states (use Skeleton/LoadingState).",
+      },
+    },
+  },
 } satisfies Meta<typeof EmptyState>;
 
 export default meta;
@@ -18,6 +29,11 @@ export const Default: Story = {
     icon: FolderOpen,
     heading: "No items found",
     description: "There are no items to display. Create your first item to get started.",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("No items found")).toBeInTheDocument();
+    await expect(canvas.getByText(/Create your first item/)).toBeInTheDocument();
   },
 };
 

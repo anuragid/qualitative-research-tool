@@ -15,7 +15,7 @@ const mockProject = {
 };
 
 const meta: Meta<typeof FolderCard> = {
-  title: "Components/FolderCard",
+  title: "Features/FolderCard",
   component: FolderCard,
   decorators: [
     (Story) => (

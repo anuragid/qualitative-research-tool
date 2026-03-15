@@ -6,7 +6,17 @@ const meta = {
   title: "Primitives/Input",
   component: Input,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "Text input for single-line data entry.\n\n" +
+          "**When to use:** Single-line text entry such as names, emails, search fields, and URLs.\n\n" +
+          "**When NOT to use:** Multi-line text (use Textarea) or rich text editing.",
+      },
+    },
+  },
 } satisfies Meta<typeof Input>;
 
 export default meta;

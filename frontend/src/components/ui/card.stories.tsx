@@ -2,12 +2,27 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./card";
 import { Button } from "./button";
 import { Badge } from "./badge";
+import {
+  DoExample,
+  DontExample,
+  DoAndDontGrid,
+} from "../../stories/helpers/do-and-dont";
 
 const meta = {
   title: "Primitives/Card",
   component: Card,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "Content container for grouping related information.\n\n" +
+          "**When to use:** Grouping related content such as project info, analysis results, or settings sections.\n\n" +
+          "**When NOT to use:** Page-level layout or full-width sections (use standard layout containers instead).",
+      },
+    },
+  },
 } satisfies Meta<typeof Card>;
 
 export default meta;
@@ -34,7 +49,7 @@ export const Default: Story = {
 export const Simple: Story = {
   render: () => (
     <Card className="w-[350px] p-5">
-      <p>Simple card with just content — no resting shadow, rounded-2xl</p>
+      <p>Simple card with just content -- no resting shadow, rounded-2xl</p>
     </Card>
   ),
 };
@@ -64,7 +79,7 @@ export const OnWarmBackground: Story = {
       <Card className="w-[350px]">
         <CardHeader>
           <CardTitle>Flat on cream</CardTitle>
-          <CardDescription>White card on warm cream background — no shadow needed</CardDescription>
+          <CardDescription>White card on warm cream background -- no shadow needed</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-text-tertiary">The contrast provides visual separation.</p>
@@ -86,5 +101,36 @@ export const ElevatedWithShadow: Story = {
         <p className="text-sm text-text-tertiary">Multi-layer shadow for depth.</p>
       </CardContent>
     </Card>
+  ),
+};
+
+export const DoAndDont: Story = {
+  name: "Do / Don't",
+  parameters: { layout: "padded" },
+  render: () => (
+    <DoAndDontGrid>
+      <DoExample label="Use for grouping related content">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Project Info</CardTitle>
+            <CardDescription>5 videos, 3 analyzed</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-text-tertiary">Analysis results grouped together</p>
+          </CardContent>
+        </Card>
+      </DoExample>
+      <DontExample label="Nest cards more than one level deep">
+        <Card className="w-full p-3">
+          <p className="text-sm mb-2">Outer card</p>
+          <Card className="p-3">
+            <p className="text-sm mb-2">Inner card</p>
+            <Card className="p-3">
+              <p className="text-sm">Too deep!</p>
+            </Card>
+          </Card>
+        </Card>
+      </DontExample>
+    </DoAndDontGrid>
   ),
 };

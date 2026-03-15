@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within, userEvent } from "storybook/test";
 import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
 import {
   AlignLeft,
@@ -14,13 +15,24 @@ const meta = {
   title: "Primitives/ToggleGroup",
   component: ToggleGroup,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "Segmented control for switching between mutually exclusive options.\n\n" +
+          "**When to use:** View mode switches, theme toggles, alignment controls, and layout selectors.\n\n" +
+          "**When NOT to use:** Form selections with many options (use RadioGroup or Select instead).",
+      },
+    },
+  },
 } satisfies Meta<typeof ToggleGroup>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  args: { type: "single" },
   render: () => (
     <ToggleGroup type="single" defaultValue="center">
       <ToggleGroupItem value="left" aria-label="Align left">
@@ -37,10 +49,21 @@ export const Default: Story = {
       </ToggleGroupItem>
     </ToggleGroup>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const centerButton = canvas.getByRole("radio", { name: /align center/i });
+    await expect(centerButton).toBeInTheDocument();
+    await expect(centerButton).toHaveAttribute("data-state", "on");
+    const rightButton = canvas.getByRole("radio", { name: /align right/i });
+    await userEvent.click(rightButton);
+    await expect(rightButton).toHaveAttribute("data-state", "on");
+    await expect(centerButton).toHaveAttribute("data-state", "off");
+  },
 };
 
 export const WithLabels: Story = {
   name: "With Text Labels",
+  args: { type: "single" },
   render: () => (
     <ToggleGroup type="single" defaultValue="grid">
       <ToggleGroupItem value="grid">
@@ -61,6 +84,7 @@ export const WithLabels: Story = {
 
 export const Multiple: Story = {
   name: "Multiple Selection",
+  args: { type: "multiple" },
   render: () => (
     <ToggleGroup type="multiple" defaultValue={["bold"]}>
       <ToggleGroupItem value="bold" className="font-bold">
@@ -78,6 +102,7 @@ export const Multiple: Story = {
 
 export const Small: Story = {
   name: "Small Size",
+  args: { type: "single" },
   render: () => (
     <ToggleGroup type="single" size="sm" defaultValue="left">
       <ToggleGroupItem value="left" aria-label="Align left">

@@ -2,14 +2,24 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Select, SelectTrigger, SelectValue, SelectContent,
   SelectGroup, SelectLabel, SelectItem,
-} from "./Select";
-import { Label } from "./Label";
+} from "./select";
+import { Label } from "./label";
 
 const meta = {
   title: "Primitives/Select",
   component: Select,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "Dropdown selection for choosing from a predefined list.\n\n" +
+          "**When to use:** Choosing one option from a list of 3+ items (e.g., model picker, status selector).\n\n" +
+          "**When NOT to use:** Command actions or contextual menus (use DropdownMenu instead).",
+      },
+    },
+  },
 } satisfies Meta<typeof Select>;
 
 export default meta;

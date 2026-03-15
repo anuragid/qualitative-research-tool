@@ -1,6 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within, userEvent } from "storybook/test";
 import { Button } from "./button";
-import { Loader2, Mail, Plus, ArrowRight } from "lucide-react";
+import { Loader2, Mail, Plus, ArrowRight, Download, Trash2 } from "lucide-react";
+import {
+  DoExample,
+  DontExample,
+  DoAndDontGrid,
+} from "../../stories/helpers/do-and-dont";
 
 const meta = {
   title: "Primitives/Button",
@@ -17,7 +23,17 @@ const meta = {
     },
     disabled: { control: "boolean" },
   },
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "Primary action trigger for user interactions.\n\n" +
+          "**When to use:** Form submissions, CTAs, toolbar actions, and any clickable action.\n\n" +
+          "**When NOT to use:** Navigation links (use `<a>` or router Link) or state toggles (use Toggle/Switch).",
+      },
+    },
+  },
 } satisfies Meta<typeof Button>;
 
 export default meta;
@@ -25,6 +41,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: { children: "Button", variant: "default" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button");
+    await expect(button).toBeInTheDocument();
+    await userEvent.click(button);
+  },
 };
 
 export const Destructive: Story = {
@@ -109,5 +131,38 @@ export const DisabledStates: Story = {
       <Button variant="secondary" disabled>Secondary</Button>
       <Button variant="ghost" disabled>Ghost</Button>
     </div>
+  ),
+};
+
+export const DoAndDont: Story = {
+  name: "Do / Don't",
+  parameters: { layout: "padded" },
+  render: () => (
+    <DoAndDontGrid>
+      <DoExample label="Use ghost variant for secondary actions in toolbars">
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm">
+            <Download className="mr-2 size-4" /> Export
+          </Button>
+          <Button variant="ghost" size="sm">Share</Button>
+        </div>
+      </DoExample>
+      <DontExample label="Use destructive variant for non-destructive actions">
+        <Button variant="destructive">Save Changes</Button>
+      </DontExample>
+      <DoExample label="Include an icon before text for actions">
+        <div className="flex gap-2">
+          <Button>
+            <Download className="mr-2 size-4" /> Download
+          </Button>
+          <Button>
+            <Mail className="mr-2 size-4" /> Email
+          </Button>
+        </div>
+      </DoExample>
+      <DontExample label="Use a button when a link would be more appropriate">
+        <Button variant="default">Go to Dashboard</Button>
+      </DontExample>
+    </DoAndDontGrid>
   ),
 };

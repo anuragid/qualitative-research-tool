@@ -1,5 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Badge } from "./badge";
+import {
+  DoExample,
+  DontExample,
+  DoAndDontGrid,
+} from "../../stories/helpers/do-and-dont";
 
 const meta = {
   title: "Primitives/Badge",
@@ -11,7 +16,17 @@ const meta = {
       options: ["default", "secondary", "destructive", "outline", "success", "warning"],
     },
   },
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "Status indicator for counts, categories, and labels.\n\n" +
+          "**When to use:** Counts, categories, status labels, and metadata tags.\n\n" +
+          "**When NOT to use:** Interactive toggles (use Toggle or Switch instead).",
+      },
+    },
+  },
 } satisfies Meta<typeof Badge>;
 
 export default meta;
@@ -48,5 +63,27 @@ export const ProjectStatuses: Story = {
       <Badge variant="outline">Archived</Badge>
       <Badge variant="destructive">Error</Badge>
     </div>
+  ),
+};
+
+export const DoAndDont: Story = {
+  name: "Do / Don't",
+  parameters: { layout: "padded" },
+  render: () => (
+    <DoAndDontGrid>
+      <DoExample label="Use semantic variants for status">
+        <div className="flex gap-2">
+          <Badge variant="success">Completed</Badge>
+          <Badge variant="warning">Processing</Badge>
+          <Badge variant="destructive">Failed</Badge>
+        </div>
+      </DoExample>
+      <DontExample label="Use badges for interactive elements (use Toggle instead)">
+        <div className="flex gap-2">
+          <Badge className="cursor-pointer">Click me</Badge>
+          <Badge variant="secondary" className="cursor-pointer">Toggle</Badge>
+        </div>
+      </DontExample>
+    </DoAndDontGrid>
   ),
 };

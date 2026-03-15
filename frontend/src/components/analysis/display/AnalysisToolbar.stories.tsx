@@ -5,7 +5,7 @@ import type { ViewMode, SortConfig } from "../hooks/useAnalysisDisplay";
 import type { AnalysisStep } from "../config/displayConfig";
 
 const meta = {
-  title: "Analysis/AnalysisToolbar",
+  title: "Features/AnalysisToolbar",
   component: AnalysisToolbar,
   tags: ["autodocs"],
   parameters: {
