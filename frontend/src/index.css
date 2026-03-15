@@ -91,12 +91,12 @@
   --color-chart-5: #A11735;
 
   /* ===== BORDER RADIUS ===== */
-  --radius-sm: 0.25rem;   /* 4px (was 6px - off grid) */
+  --radius-sm: 0.375rem;  /* 6px */
   --radius-md: 0.5rem;    /* 8px */
-  --radius-lg: 0.75rem;   /* 12px (was 10px - off grid) */
+  --radius-lg: 0.625rem;  /* 10px */
   --radius-xl: 0.75rem;   /* 12px */
   --radius-2xl: 1rem;     /* 16px */
-  --radius-3xl: 1.5rem;   /* 24px (was 18px - off grid) */
+  --radius-3xl: 1.125rem; /* 18px */
   --radius-full: 9999px;  /* pill */
 
   /* ===== SHADOWS ===== */
@@ -122,17 +122,6 @@
   --duration-micro: 0.15s;
   --duration-normal: 0.2s;
   --duration-slow: 0.5s;
-
-  /* ===== SPACING (8pt grid) ===== */
-  --spacing-0_5: 0.25rem;  /* 4px - fine detail */
-  --spacing-1: 0.5rem;     /* 8px */
-  --spacing-1_5: 0.75rem;  /* 12px */
-  --spacing-2: 1rem;       /* 16px */
-  --spacing-3: 1.5rem;     /* 24px */
-  --spacing-4: 2rem;       /* 32px */
-  --spacing-5: 2.5rem;     /* 40px */
-  --spacing-6: 3rem;       /* 48px */
-  --spacing-8: 4rem;       /* 64px */
 
   /* ===== SIZING ===== */
   --size-touch: 2.75rem;   /* 44px - minimum touch target */
@@ -283,9 +272,9 @@ body {
 
 @utility text-ui {
   font-family: var(--font-body);
-  font-size: 0.75rem;                        /* 12px (was 13px off-grid) */
+  font-size: 0.8125rem;                      /* 13px — Craft standard for UI text */
   font-weight: 500;
-  line-height: 1.333;                         /* 16px */
+  line-height: 1.385;                         /* 18px */
 }
 
 @utility text-label {
