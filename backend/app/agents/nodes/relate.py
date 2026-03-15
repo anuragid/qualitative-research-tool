@@ -47,15 +47,13 @@ INFERENCES:
 Group related inferences into patterns and explain what each pattern represents."""
 
         # Call LLM with retry logic
-        patterns = llm_service.call_with_json_response(
+        patterns = llm_service.call_with_json_list_response(
             system_prompt=RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for many inferences
         )
 
         # Validate response
-        if not isinstance(patterns, list):
-            raise ValueError("Expected list of patterns from LLM")
 
         logger.info(f"[RELATE] Identified {len(patterns)} patterns")
 

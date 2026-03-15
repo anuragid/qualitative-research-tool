@@ -48,15 +48,13 @@ CROSS-VIDEO INSIGHTS:
 Create design principles that provide strategic direction for the entire system."""
 
         # Call LLM with retry logic
-        system_principles = llm_service.call_with_json_response(
+        system_principles = llm_service.call_with_json_list_response(
             system_prompt=CROSS_ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
         )
 
         # Validate response
-        if not isinstance(system_principles, list):
-            raise ValueError("Expected list of system principles from LLM")
 
         logger.info(f"[CROSS_ACTIVATE] Generated {len(system_principles)} system-level design principles")
         logger.info(f"[CROSS_ACTIVATE] Project {state['project_id']} cross-video analysis complete!")

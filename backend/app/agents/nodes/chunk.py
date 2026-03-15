@@ -85,15 +85,13 @@ Remember:
 - Use the actual speaker names (not A, B, C) as shown in the transcript"""
 
         # Call LLM with retry logic
-        chunks = llm_service.call_with_json_response(
+        chunks = llm_service.call_with_json_list_response(
             system_prompt=CHUNK_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for long transcripts
         )
 
         # Validate response
-        if not isinstance(chunks, list):
-            raise ValueError("Expected list of chunks from LLM")
 
         # Debug: Log chunk types
         chunk_types = {}

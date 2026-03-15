@@ -47,15 +47,13 @@ CHUNKS:
 Generate multiple inferences per chunk if appropriate."""
 
         # Call LLM with retry logic
-        inferences = llm_service.call_with_json_response(
+        inferences = llm_service.call_with_json_list_response(
             system_prompt=INFER_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=32768,  # Increased for many chunks
         )
 
         # Validate response
-        if not isinstance(inferences, list):
-            raise ValueError("Expected list of inferences from LLM")
 
         logger.info(f"[INFER] Generated inferences for {len(inferences)} chunks")
 

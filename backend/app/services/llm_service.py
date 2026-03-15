@@ -405,6 +405,26 @@ class LLMService:
 
         return self.parse_json_response(response)
 
+    def call_with_json_list_response(self, **kwargs) -> list:
+        """Like call_with_json_response but guarantees a list result.
+
+        If the LLM wraps the list in a dict (e.g. {"insights": [...]}),
+        extracts the first list-valued field.  Raises ValueError if no
+        list can be extracted.
+        """
+        result = self.call_with_json_response(**kwargs)
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            for value in result.values():
+                if isinstance(value, list):
+                    logger.debug("Extracted list from dict wrapper in LLM response")
+                    return value
+        raise ValueError(
+            f"Expected list from LLM but got {type(result).__name__}: "
+            f"{str(result)[:200]}"
+        )
+
 
 # Global service instance
 llm_service = LLMService()

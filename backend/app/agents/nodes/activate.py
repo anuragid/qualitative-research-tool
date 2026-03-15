@@ -47,15 +47,13 @@ INSIGHTS:
 For each insight, create one or more design principles that provide strategic direction."""
 
         # Call LLM with retry logic
-        design_principles = llm_service.call_with_json_response(
+        design_principles = llm_service.call_with_json_list_response(
             system_prompt=ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
         )
 
         # Validate response
-        if not isinstance(design_principles, list):
-            raise ValueError("Expected list of design principles from LLM")
 
         logger.info(f"[ACTIVATE] Generated {len(design_principles)} design principles")
         logger.info(f"[ACTIVATE] Video {state['video_id']} analysis complete!")

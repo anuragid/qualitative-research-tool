@@ -54,15 +54,13 @@ INDIVIDUAL VIDEO INSIGHTS (for context):
 Generate insights that reveal truths about the system as a whole, not just individual experiences."""
 
         # Call LLM with retry logic
-        cross_insights = llm_service.call_with_json_response(
+        cross_insights = llm_service.call_with_json_list_response(
             system_prompt=CROSS_EXPLAIN_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
         )
 
         # Validate response
-        if not isinstance(cross_insights, list):
-            raise ValueError("Expected list of cross-video insights from LLM")
 
         logger.info(f"[CROSS_EXPLAIN] Generated {len(cross_insights)} cross-video insights")
 

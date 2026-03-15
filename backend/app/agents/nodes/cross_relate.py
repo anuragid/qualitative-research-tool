@@ -48,15 +48,13 @@ VIDEO PATTERNS:
 Find patterns that transcend individual videos and reveal system-level themes."""
 
         # Call LLM with retry logic
-        cross_patterns = llm_service.call_with_json_response(
+        cross_patterns = llm_service.call_with_json_list_response(
             system_prompt=CROSS_RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
         )
 
         # Validate response
-        if not isinstance(cross_patterns, list):
-            raise ValueError("Expected list of meta-patterns from LLM")
 
         logger.info(f"[CROSS_RELATE] Identified {len(cross_patterns)} meta-patterns across videos")
 
