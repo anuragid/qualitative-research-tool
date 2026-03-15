@@ -51,7 +51,6 @@ export default function VideoCard({ video }: VideoCardProps) {
   const deleteVideo = useDeleteVideo();
   const startAnalysis = useStartVideoAnalysis();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   const handleRetryAnalysis = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -113,10 +112,8 @@ export default function VideoCard({ video }: VideoCardProps) {
   return (
     <>
       <Card
-        className="group bg-card rounded-2xl border-0 cursor-pointer active:scale-[0.98]"
+        className="group bg-card rounded-2xl border-0 cursor-pointer active:scale-[0.98] transition-[transform,box-shadow] duration-[var(--duration-normal)] ease-[var(--ease)] hover:-translate-y-px hover:shadow-subtle"
         onClick={handleCardClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
@@ -124,11 +121,6 @@ export default function VideoCard({ video }: VideoCardProps) {
             e.preventDefault();
             navigate(`/videos/${video.id}`);
           }
-        }}
-        style={{
-          transition: `transform var(--duration-normal) var(--ease), box-shadow var(--duration-normal) var(--ease)`,
-          transform: isHovered ? "translateY(-1px)" : "translateY(0)",
-          boxShadow: isHovered ? "var(--shadow-subtle)" : "none",
         }}
       >
         <CardHeader className="pb-3">

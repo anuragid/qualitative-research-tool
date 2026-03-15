@@ -21,16 +21,11 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Mobile header bar */}
       <header
-        className="fixed top-0 left-0 right-0 h-14 flex items-center px-4 bg-surface-card border-b border-border lg:hidden"
-        style={{ zIndex: "var(--z-sticky)" }}
+        className="fixed top-0 left-0 right-0 h-14 flex items-center px-4 bg-surface-card border-b border-border lg:hidden z-[var(--z-sticky)]"
       >
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 -ml-2 rounded-md text-base-62 hover:text-foreground hover:bg-base-04 min-h-[44px] min-w-[44px] flex items-center justify-center"
-          style={{
-            transition:
-              "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
-          }}
+          className="p-2 -ml-2 rounded-md text-base-62 hover:text-foreground hover:bg-base-04 min-h-[var(--size-touch)] min-w-[var(--size-touch)] flex items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
           aria-label="Open sidebar"
         >
           <Menu className="h-5 w-5" aria-hidden="true" />

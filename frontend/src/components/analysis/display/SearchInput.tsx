@@ -20,7 +20,7 @@ export function SearchInput({ value, onChange, placeholder = "Search..." }: Sear
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="Search analysis results"
-        className="h-8 w-full sm:w-52 rounded-lg border border-border bg-transparent pl-8 pr-8 text-ui text-foreground placeholder:text-base-40 transition-[border-color] duration-[var(--duration-micro)] ease-[var(--ease)] focus:outline-none focus:border-accent-blue focus:ring-[2px] focus:ring-accent-blue-bg"
+        className="h-8 w-full sm:w-52 rounded-lg border border-border bg-transparent pl-8 pr-8 text-ui text-foreground placeholder:text-base-40 transition-[border-color] duration-[var(--duration-micro)] ease-[var(--ease)] focus:outline-none focus:border-accent-blue focus:ring-[var(--ring-width)] focus:ring-accent-blue-bg"
       />
       {value && (
         <button

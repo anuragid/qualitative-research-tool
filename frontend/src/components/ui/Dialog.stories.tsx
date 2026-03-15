@@ -23,7 +23,7 @@ export const Default: Story = {
       <DialogTrigger asChild>
         <Button variant="outline">Open Dialog</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create Project</DialogTitle>
           <DialogDescription>Add a new research project to organize your videos.</DialogDescription>

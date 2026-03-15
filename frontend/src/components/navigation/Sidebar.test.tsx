@@ -131,7 +131,7 @@ describe("Sidebar", () => {
     const user = userEvent.setup();
     const { container, onClose } = renderSidebar({ isOpen: true });
 
-    // The backdrop is the div with aria-hidden="true" and bg-black/30 class
+    // The backdrop is the div with aria-hidden="true" and bg-[var(--color-overlay)] class
     const backdrop = container.querySelector(
       'div[aria-hidden="true"]'
     ) as HTMLElement;

@@ -218,7 +218,6 @@ export default function LandingPage() {
           <p
             data-animate="hero"
             className="text-lg leading-relaxed text-base-62 mb-10 max-w-2xl mx-auto"
-            style={{ fontFamily: "var(--font-body)" }}
           >
             Upload video interviews, let AI extract deep insights, and discover
             cross-cutting patterns across your qualitative research — all in one
@@ -239,8 +238,7 @@ export default function LandingPage() {
       <section
         id="features"
         data-section="features"
-        className="py-20 sm:py-28"
-        style={{ backgroundColor: "var(--color-surface-page)" }}
+        className="py-20 sm:py-28 bg-surface-page"
       >
         <div className="mx-auto max-w-6xl px-6">
           <h2
@@ -250,9 +248,8 @@ export default function LandingPage() {
             Everything you need
           </h2>
           <p
-            className="text-center text-base-55 mb-14 max-w-xl mx-auto"
+            className="text-center text-base-55 mb-14 max-w-xl mx-auto text-body"
             data-animate="feature-card"
-            style={{ fontFamily: "var(--font-body)", fontSize: "16px", lineHeight: "1.5" }}
           >
             From raw video to actionable design principles, methodex handles the
             entire qualitative analysis pipeline.
@@ -262,8 +259,7 @@ export default function LandingPage() {
             {/* Feature 1: Upload & Transcribe */}
             <div
               data-animate="feature-card"
-              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light"
-              style={{ backgroundColor: "var(--color-brand-pale-blue)" }}
+              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light bg-brand-pale-blue"
             >
               <div className="relative z-[2]">
                 <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
@@ -273,8 +269,7 @@ export default function LandingPage() {
                   Upload &amp; Transcribe
                 </h3>
                 <p
-                  className="text-base-62"
-                  style={{ fontFamily: "var(--font-body)", fontSize: "15px", lineHeight: "1.6" }}
+                  className="text-base-62 text-body-sm"
                 >
                   Drop in video interviews and get speaker-identified
                   transcripts automatically. Supports all major formats.
@@ -285,8 +280,7 @@ export default function LandingPage() {
             {/* Feature 2: AI Analysis */}
             <div
               data-animate="feature-card"
-              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light"
-              style={{ backgroundColor: "var(--color-brand-pale-green)" }}
+              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light bg-brand-pale-green"
             >
               <div className="relative z-[2]">
                 <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
@@ -296,8 +290,7 @@ export default function LandingPage() {
                   AI Analysis
                 </h3>
                 <p
-                  className="text-base-62"
-                  style={{ fontFamily: "var(--font-body)", fontSize: "15px", lineHeight: "1.6" }}
+                  className="text-base-62 text-body-sm"
                 >
                   A five-step framework — chunk, infer, relate, explain,
                   activate — extracts meaning and generates design principles
@@ -309,8 +302,7 @@ export default function LandingPage() {
             {/* Feature 3: Cross-Video Insights */}
             <div
               data-animate="feature-card"
-              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light sm:col-span-2 lg:col-span-1"
-              style={{ backgroundColor: "var(--color-brand-pale-gold)" }}
+              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light sm:col-span-2 lg:col-span-1 bg-brand-pale-gold"
             >
               <div className="relative z-[2]">
                 <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
@@ -320,8 +312,7 @@ export default function LandingPage() {
                   Cross-Video Insights
                 </h3>
                 <p
-                  className="text-base-62"
-                  style={{ fontFamily: "var(--font-body)", fontSize: "15px", lineHeight: "1.6" }}
+                  className="text-base-62 text-body-sm"
                 >
                   Discover meta-patterns, saturation analysis, and system-level
                   insights that emerge across multiple interviews in a project.
@@ -336,8 +327,7 @@ export default function LandingPage() {
       <section
         id="how-it-works"
         data-section="how-it-works"
-        className="py-20 sm:py-28"
-        style={{ backgroundColor: "var(--color-surface-card)" }}
+        className="py-20 sm:py-28 bg-surface-card"
       >
         <div className="mx-auto max-w-4xl px-6">
           <h2
@@ -347,9 +337,8 @@ export default function LandingPage() {
             How it works
           </h2>
           <p
-            className="text-center text-base-55 mb-16 max-w-lg mx-auto"
+            className="text-center text-base-55 mb-16 max-w-lg mx-auto text-body"
             data-animate="step"
-            style={{ fontFamily: "var(--font-body)", fontSize: "16px", lineHeight: "1.5" }}
           >
             Five steps from raw interview to actionable design principles.
           </p>
@@ -394,15 +383,14 @@ export default function LandingPage() {
               >
                 <div
                   className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-white font-semibold text-base"
-                  style={{ backgroundColor: item.color, fontFamily: "var(--font-body)" }}
+                  style={{ backgroundColor: item.color }}
                 >
                   {item.step}
                 </div>
                 <div className="pt-1">
                   <h4 className="text-h4 text-foreground mb-1">{item.name}</h4>
                   <p
-                    className="text-base-62"
-                    style={{ fontFamily: "var(--font-body)", fontSize: "15px", lineHeight: "1.6" }}
+                    className="text-base-62 text-body-sm"
                   >
                     {item.desc}
                   </p>
@@ -416,8 +404,7 @@ export default function LandingPage() {
       {/* ===== SECURITY / TRUST SECTION ===== */}
       <section
         data-section="security"
-        className="py-16 sm:py-20"
-        style={{ backgroundColor: "var(--color-surface-page)" }}
+        className="py-16 sm:py-20 bg-surface-page"
       >
         <div className="mx-auto max-w-3xl px-6">
           <div
@@ -432,8 +419,7 @@ export default function LandingPage() {
                 Your data stays private
               </h3>
               <p
-                className="text-base-55"
-                style={{ fontFamily: "var(--font-body)", fontSize: "15px", lineHeight: "1.6" }}
+                className="text-base-55 text-body-sm"
               >
                 All research videos, transcripts, and analyses are private to
                 your account. We use secure cloud storage, encrypted API keys,
@@ -467,8 +453,7 @@ export default function LandingPage() {
           </h2>
           <p
             data-animate="cta"
-            className="text-base-62 mb-10"
-            style={{ fontFamily: "var(--font-body)", fontSize: "16px", lineHeight: "1.5" }}
+            className="text-base-62 mb-10 text-body"
           >
             Create a free account and start analyzing your qualitative data in
             minutes.
@@ -506,15 +491,13 @@ export default function LandingPage() {
 
       {/* ===== FOOTER ===== */}
       <footer
-        className="rounded-t-3xl py-14"
-        style={{ backgroundColor: "var(--color-primary)" }}
+        className="rounded-t-3xl py-14 bg-primary"
       >
         <div className="mx-auto max-w-6xl px-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             {/* Typemark */}
             <span
               className="text-h4 text-primary-foreground no-underline"
-              style={{ opacity: 1 }}
             >
               method<span className="text-brand-burnt-orange">ex</span>
             </span>
@@ -550,7 +533,6 @@ export default function LandingPage() {
           <div className="mt-10 pt-6 border-t border-primary-foreground/10">
             <p
               className="text-sm text-primary-foreground/50"
-              style={{ fontFamily: "var(--font-body)" }}
             >
               &copy; {new Date().getFullYear()} methodex. All rights reserved.
             </p>

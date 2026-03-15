@@ -47,7 +47,7 @@ export default function ProjectsPage() {
                 {/* Skeleton tab */}
                 <Skeleton className="w-20 h-7 rounded-t-md mb-0" />
                 {/* Skeleton body */}
-                <Skeleton className="h-[160px] rounded-2xl" />
+                <Skeleton className="h-40 rounded-2xl" />
               </div>
             ))}
           </div>

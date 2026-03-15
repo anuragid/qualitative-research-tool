@@ -11,18 +11,18 @@ export type AnalysisStep = (typeof ANALYSIS_STEPS)[number];
 
 // ===== CHUNK TYPES =====
 export const chunkTypeStyles: Record<string, { border: string; badge: string; icon: string }> = {
-  quote: { border: "border-l-brand-forest", badge: "bg-brand-forest text-white", icon: "Q" },
-  fact: { border: "border-l-brand-mustard", badge: "bg-brand-mustard text-white", icon: "F" },
-  context: { border: "border-l-brand-maroon", badge: "bg-brand-maroon text-white", icon: "C" },
-  observation: { border: "border-l-brand-olive", badge: "bg-brand-olive text-white", icon: "O" },
+  quote: { border: "border-l-brand-forest", badge: "bg-brand-forest text-primary-foreground", icon: "Q" },
+  fact: { border: "border-l-brand-mustard", badge: "bg-brand-mustard text-primary-foreground", icon: "F" },
+  context: { border: "border-l-brand-maroon", badge: "bg-brand-maroon text-primary-foreground", icon: "C" },
+  observation: { border: "border-l-brand-olive", badge: "bg-brand-olive text-primary-foreground", icon: "O" },
 };
 
 // ===== INSIGHT TYPES =====
 export const insightTypeStyles: Record<string, string> = {
-  "non-consensus": "bg-brand-crimson text-white",
-  "first-principles": "bg-brand-forest text-white",
-  "surprising": "bg-brand-burnt-orange text-white",
-  "revealing": "bg-brand-maroon text-white",
+  "non-consensus": "bg-brand-crimson text-primary-foreground",
+  "first-principles": "bg-brand-forest text-primary-foreground",
+  "surprising": "bg-brand-burnt-orange text-primary-foreground",
+  "revealing": "bg-brand-maroon text-primary-foreground",
 };
 
 // ===== CONFIDENCE =====
@@ -34,9 +34,9 @@ export const confidenceStyles: Record<string, string> = {
 
 // ===== PRIORITY =====
 export const priorityStyles: Record<string, { badge: string; border: string }> = {
-  critical: { badge: "bg-destructive text-white", border: "border-l-destructive" },
-  high: { badge: "bg-brand-crimson text-white", border: "border-l-brand-crimson" },
-  medium: { badge: "bg-brand-mustard text-white", border: "border-l-brand-mustard" },
+  critical: { badge: "bg-destructive text-primary-foreground", border: "border-l-destructive" },
+  high: { badge: "bg-brand-crimson text-primary-foreground", border: "border-l-brand-crimson" },
+  medium: { badge: "bg-brand-mustard text-primary-foreground", border: "border-l-brand-mustard" },
   low: { badge: "bg-accent-blue-bg text-accent-blue", border: "border-l-accent-blue" },
 };
 

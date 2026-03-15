@@ -391,7 +391,7 @@ export default function VideoDetailPage() {
                 id="main-video-player"
                 key={playbackUrl}
                 controls
-                className="w-full bg-black max-h-[60vh] sm:max-h-[600px]"
+                className="w-full bg-black max-h-[60vh] sm:max-h-[37.5rem]"
                 preload="metadata"
               >
                 <source src={playbackUrl} type="video/mp4" />

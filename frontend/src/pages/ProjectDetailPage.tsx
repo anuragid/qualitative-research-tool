@@ -178,11 +178,11 @@ export default function ProjectDetailPage() {
       <Layout>
         <div className="space-y-6">
           {/* Skeleton header band */}
-          <Skeleton className="h-[140px] rounded-2xl" />
+          <Skeleton className="h-36 rounded-2xl" />
           {/* Skeleton video grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-[200px] rounded-2xl" />
+              <Skeleton key={i} className="h-52 rounded-2xl" />
             ))}
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function ProjectDetailPage() {
           {videosLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-[180px] rounded-2xl" />
+                <Skeleton key={i} className="h-44 rounded-2xl" />
               ))}
             </div>
           ) : videos && videos.length > 0 ? (

@@ -46,7 +46,6 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
   const videoCount = project.videos?.length || 0;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   const color = getFolderColor(colorIndex);
 
@@ -67,10 +66,8 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
   return (
     <>
       <div
-        className="relative cursor-pointer pt-6 group active:scale-[0.98]"
+        className="relative cursor-pointer pt-6 group active:scale-[0.98] transition-[transform,box-shadow] duration-[var(--duration-normal)] ease-[var(--ease)] hover:-translate-y-0.5"
         onClick={handleCardClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
@@ -78,10 +75,6 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
             e.preventDefault();
             navigate(`/projects/${project.id}`);
           }
-        }}
-        style={{
-          transition: `transform var(--duration-normal) var(--ease), box-shadow var(--duration-normal) var(--ease)`,
-          transform: isHovered ? "translateY(-2px)" : "translateY(0)",
         }}
       >
         {/* Folder Tab */}
@@ -94,11 +87,8 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
 
         {/* Folder Body */}
         <div
-          className="relative rounded-2xl min-h-[160px] p-5 noise-texture noise-light flex flex-col justify-between"
-          style={{
-            backgroundColor: color.body,
-            boxShadow: isHovered ? "var(--shadow-subtle)" : "none",
-          }}
+          className="relative rounded-2xl min-h-40 p-5 noise-texture noise-light flex flex-col justify-between group-hover:shadow-subtle"
+          style={{ backgroundColor: color.body }}
         >
           {/* Content sits above noise layer */}
           <div className="relative z-[2]">

@@ -48,30 +48,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     <>
       {/* Mobile backdrop */}
       <div
-        className={`fixed inset-0 bg-black/30 dark:bg-black/50 transition-opacity lg:hidden ${
+        className={`fixed inset-0 bg-[var(--color-overlay)] transition-opacity z-[var(--z-sidebar)] duration-[var(--duration-normal)] ease-[var(--ease)] lg:hidden ${
           isOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
-        style={{
-          zIndex: "var(--z-sidebar)",
-          transitionDuration: "var(--duration-normal)",
-          transitionTimingFunction: "var(--ease)",
-        }}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Sidebar panel */}
       <aside
-        className={`fixed top-0 left-0 h-full w-[85vw] max-w-72 lg:w-72 bg-surface-card border-r border-border flex flex-col transition-transform ${
+        className={`fixed top-0 left-0 h-full w-[85vw] max-w-72 lg:w-72 bg-surface-card border-r border-border flex flex-col transition-transform z-[var(--z-sidebar)] duration-[var(--duration-normal)] ease-[var(--ease)] ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
-        style={{
-          zIndex: "var(--z-sidebar)",
-          transitionDuration: "var(--duration-normal)",
-          transitionTimingFunction: "var(--ease)",
-        }}
         aria-label="Main navigation"
       >
         {/* Top section: typemark + close button (mobile) */}
@@ -81,11 +71,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </span>
           <button
             onClick={onClose}
-            className="p-2 rounded-md text-base-55 hover:text-foreground hover:bg-base-04 lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
-            style={{
-              transition:
-                "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
-            }}
+            className="p-2 rounded-md text-base-55 hover:text-foreground hover:bg-base-04 lg:hidden min-h-[var(--size-touch)] min-w-[var(--size-touch)] flex items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
             aria-label="Close sidebar"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -98,16 +84,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             to="/projects"
             onClick={onClose}
             className={({ isActive }) =>
-              `flex items-center gap-3 h-10 px-3 rounded-lg text-ui ${
+              `flex items-center gap-3 h-10 px-3 rounded-lg text-ui transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                 isActive
                   ? "bg-base-08 text-foreground"
                   : "text-base-62 hover:bg-base-04 hover:text-foreground"
               }`
             }
-            style={{
-              transition:
-                "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
-            }}
           >
             <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
             All Projects
@@ -150,11 +132,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="flex items-center gap-3 h-10 px-3 rounded-lg text-ui text-base-62 hover:bg-base-04 hover:text-foreground w-full mt-1"
-              style={{
-                transition:
-                  "color var(--duration-micro) var(--ease), background var(--duration-micro) var(--ease)",
-              }}
+              className="flex items-center gap-3 h-10 px-3 rounded-lg text-ui text-base-62 hover:bg-base-04 hover:text-foreground w-full mt-1 transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
             >
               <Settings className="h-4 w-4 shrink-0" aria-hidden="true" />
               Model Settings

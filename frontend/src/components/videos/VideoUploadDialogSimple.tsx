@@ -162,7 +162,7 @@ export default function VideoUploadDialog({
           ) : (
             <div className="space-y-3">
               {/* File list */}
-              <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2">
+              <div className="max-h-72 overflow-y-auto space-y-2 pr-2">
                 {selectedFiles.map((file, index) => {
                   const isOversized = file.size > MAX_FILE_SIZE;
                   return (
