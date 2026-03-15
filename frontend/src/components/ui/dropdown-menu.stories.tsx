@@ -3,8 +3,8 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
   DropdownMenuShortcut,
-} from "./DropdownMenu";
-import { Button } from "./Button";
+} from "./dropdown-menu";
+import { Button } from "./button";
 import { MoreHorizontal, Edit, Trash2, Archive, Download } from "lucide-react";
 
 const meta = {

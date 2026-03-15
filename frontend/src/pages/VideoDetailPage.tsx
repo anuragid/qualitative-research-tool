@@ -23,19 +23,19 @@ import { PrinciplesList } from "../components/analysis/PrinciplesList";
 import { ContinueStepButton } from "../components/analysis/ContinueStepButton";
 import { useAnalysisDisplay } from "../components/analysis/hooks/useAnalysisDisplay";
 import { AnalysisToolbar } from "../components/analysis/display/AnalysisToolbar";
-import { Button } from "../components/ui/Button";
-import { Badge } from "../components/ui/Badge";
-import { Input } from "../components/ui/Input";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/Select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
-import { Progress } from "../components/ui/Progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Progress } from "../components/ui/progress";
 import { SimpleTooltip } from "../components/ui/Tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "../components/ui/DropdownMenu";
+} from "../components/ui/dropdown-menu";
 import {
   Loader2,
   ArrowLeft,

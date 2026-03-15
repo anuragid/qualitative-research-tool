@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { Transcript, SpeakerLabel, Word } from "../../types";
 import { useWordLevelTranscript } from "../../hooks/useWordLevelTranscript";
 import { useTranscriptSearch } from "../../hooks/useTranscriptSearch";
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import { Clock, Search, ChevronUp, ChevronDown, X } from "lucide-react";
 import { useDebounce } from "../../hooks/useDebounce";
 

@@ -1,4 +1,4 @@
-import { Badge } from "../../ui/Badge";
+import { Badge } from "../../ui/badge";
 import { Sparkles } from "lucide-react";
 import { scopeStyles, consistencyStyles, confidenceStyles } from "../config/displayConfig";
 import type { CrossInsight } from "../../../types";

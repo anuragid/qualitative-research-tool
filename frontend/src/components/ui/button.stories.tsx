@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Button } from "./Button";
+import { Button } from "./button";
 import { Loader2, Mail, Plus, ArrowRight } from "lucide-react";
 
 const meta = {

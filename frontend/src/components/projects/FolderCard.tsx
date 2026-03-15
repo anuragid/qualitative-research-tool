@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDate } from "../../lib/utils";
 import { getFolderColor } from "../../lib/noise";
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import type { Project, ProjectStatus } from "../../types";
 import {
   MoreHorizontal,
@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../ui/DropdownMenu";
+} from "../ui/dropdown-menu";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { EditProjectDialog } from "./EditProjectDialog";
 import { useUpdateProject } from "../../hooks/useProjects";

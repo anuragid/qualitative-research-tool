@@ -1,4 +1,4 @@
-import { Badge } from "../../ui/Badge";
+import { Badge } from "../../ui/badge";
 import { Compass } from "lucide-react";
 import { priorityStyles, scopeStyles } from "../config/displayConfig";
 import type { SystemPrinciple } from "../../../types";

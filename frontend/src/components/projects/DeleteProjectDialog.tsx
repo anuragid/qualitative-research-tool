@@ -6,8 +6,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../ui/Dialog';
-import { Button } from '../ui/Button';
+} from '../ui/dialog';
+import { Button } from '../ui/button';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
 interface DeleteProjectDialogProps {

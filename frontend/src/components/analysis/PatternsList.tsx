@@ -1,7 +1,7 @@
 import type { Pattern } from "../../types";
-import { Badge } from "../ui/Badge";
+import { Badge } from "../ui/badge";
 import { Network } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { relationshipTypeStyles, frequencyStyles } from "./config/displayConfig";
 import { PatternCard } from "./cards/PatternCard";
 import { CardView } from "./display/CardView";

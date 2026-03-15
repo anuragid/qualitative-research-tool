@@ -7,7 +7,7 @@ import { useProjectAnalysis, useStartProjectAnalysis, useMetaPatterns, useCrossI
 import Layout from "../components/Layout";
 import { getFolderColor } from "../lib/noise";
 import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2, RefreshCw, ArrowLeft, Lightbulb, Compass } from "lucide-react";
-import { Button } from "../components/ui/Button";
+import { Button } from "../components/ui/button";
 import VideoUploadDialog from "../components/videos/VideoUploadDialogSimple";
 import VideoCard from "../components/videos/VideoCard";
 import { MetaPatternsList } from "../components/analysis/MetaPatternsList";
@@ -15,17 +15,17 @@ import { CrossInsightsList } from "../components/analysis/CrossInsightsList";
 import { SystemPrinciplesList } from "../components/analysis/SystemPrinciplesList";
 import { useAnalysisDisplay } from "../components/analysis/hooks/useAnalysisDisplay";
 import { AnalysisToolbar } from "../components/analysis/display/AnalysisToolbar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
-import { Skeleton } from "../components/ui/Skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Skeleton } from "../components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../components/ui/DropdownMenu";
+} from "../components/ui/dropdown-menu";
 import { DeleteProjectDialog } from "../components/projects/DeleteProjectDialog";
 import { EditProjectDialog } from "../components/projects/EditProjectDialog";
 

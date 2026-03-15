@@ -3,8 +3,8 @@ import { useProjects } from "../hooks/useProjects";
 import Layout from "../components/Layout";
 import FolderCard from "../components/projects/FolderCard";
 import CreateProjectDialog from "../components/projects/CreateProjectDialog";
-import { Skeleton } from "../components/ui/Skeleton";
-import { Button } from "../components/ui/Button";
+import { Skeleton } from "../components/ui/skeleton";
+import { Button } from "../components/ui/button";
 import { gsap, useGSAP, animations, prefersReducedMotion } from "../lib/animations";
 import { RefreshCw } from "lucide-react";
 

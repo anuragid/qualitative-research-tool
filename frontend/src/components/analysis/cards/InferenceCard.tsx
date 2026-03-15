@@ -1,4 +1,4 @@
-import { Badge } from "../../ui/Badge";
+import { Badge } from "../../ui/badge";
 import { Lightbulb } from "lucide-react";
 import { chunkTypeStyles } from "../config/displayConfig";
 import type { Inference, Chunk } from "../../../types";

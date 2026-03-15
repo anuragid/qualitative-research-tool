@@ -21,9 +21,9 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "../ui/Card";
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
+} from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { useDeleteVideo } from "../../hooks/useVideos";
 import { useStartVideoAnalysis } from "../../hooks/useAnalysis";
 import {
@@ -33,14 +33,14 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "../ui/Dialog";
+} from "../ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../ui/DropdownMenu";
+} from "../ui/dropdown-menu";
 
 interface VideoCardProps {
   video: Video;

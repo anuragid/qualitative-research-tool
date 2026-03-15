@@ -8,8 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "../ui/Dialog";
-import { Button } from "../ui/Button";
+} from "../ui/dialog";
+import { Button } from "../ui/button";
 import { useUploadContext } from "../../contexts/UploadContext";
 import { useProject } from "../../hooks/useProjects";
 

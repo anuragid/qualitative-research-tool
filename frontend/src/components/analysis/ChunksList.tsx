@@ -1,5 +1,5 @@
 import type { Chunk } from "../../types";
-import { Badge } from "../ui/Badge";
+import { Badge } from "../ui/badge";
 import { chunkTypeStyles } from "./config/displayConfig";
 import { ChunkCard } from "./cards/ChunkCard";
 import { CardView } from "./display/CardView";

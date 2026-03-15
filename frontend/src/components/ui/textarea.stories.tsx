@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Textarea } from "./Textarea";
-import { Label } from "./Label";
+import { Textarea } from "./textarea";
+import { Label } from "./label";
 
 const meta = {
   title: "Primitives/Textarea",

@@ -1,7 +1,7 @@
 import type { MetaPattern } from "../../types";
-import { Badge } from "../ui/Badge";
+import { Badge } from "../ui/badge";
 import { Network } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { consistencyStyles } from "./config/displayConfig";
 import { MetaPatternCard } from "./cards/MetaPatternCard";
 import { CardView } from "./display/CardView";

@@ -1,7 +1,7 @@
 import type { CrossInsight } from "../../types";
-import { Badge } from "../ui/Badge";
+import { Badge } from "../ui/badge";
 import { Sparkles } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { scopeStyles, consistencyStyles, confidenceStyles } from "./config/displayConfig";
 import { CrossInsightCard } from "./cards/CrossInsightCard";
 import { CardView } from "./display/CardView";

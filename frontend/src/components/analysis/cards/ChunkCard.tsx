@@ -1,4 +1,4 @@
-import { Badge } from "../../ui/Badge";
+import { Badge } from "../../ui/badge";
 import { Clock } from "lucide-react";
 import { chunkTypeStyles } from "../config/displayConfig";
 import type { Chunk } from "../../../types";

@@ -22,7 +22,7 @@ import {
   Circle,
   CircleDot
 } from 'lucide-react';
-import { Progress } from '../ui/Progress';
+import { Progress } from '../ui/progress';
 import { formatFileSize } from '../../lib/utils';
 
 export function UploadManager() {

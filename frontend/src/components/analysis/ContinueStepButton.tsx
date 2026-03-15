@@ -1,4 +1,4 @@
-import { Button } from "../ui/Button";
+import { Button } from "../ui/button";
 import { Loader2, PlayCircle } from "lucide-react";
 
 interface ContinueStepButtonProps {

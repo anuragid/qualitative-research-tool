@@ -1,7 +1,7 @@
 import type { Inference, Chunk } from "../../types";
-import { Badge } from "../ui/Badge";
+import { Badge } from "../ui/badge";
 import { Lightbulb } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { chunkTypeStyles } from "./config/displayConfig";
 import { InferenceCard } from "./cards/InferenceCard";
 import { CardView } from "./display/CardView";

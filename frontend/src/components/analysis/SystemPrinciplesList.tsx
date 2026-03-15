@@ -1,7 +1,7 @@
 import type { SystemPrinciple } from "../../types";
-import { Badge } from "../ui/Badge";
+import { Badge } from "../ui/badge";
 import { Compass, Lightbulb } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/Accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { priorityStyles, scopeStyles } from "./config/displayConfig";
 import { SystemPrincipleCard } from "./cards/SystemPrincipleCard";
 import { CardView } from "./display/CardView";

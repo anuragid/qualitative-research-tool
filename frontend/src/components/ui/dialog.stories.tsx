@@ -2,10 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Dialog, DialogTrigger, DialogContent, DialogHeader,
   DialogTitle, DialogDescription, DialogFooter,
-} from "./Dialog";
-import { Button } from "./Button";
-import { Input } from "./Input";
-import { Label } from "./Label";
+} from "./dialog";
+import { Button } from "./button";
+import { Input } from "./input";
+import { Label } from "./label";
 
 const meta = {
   title: "Primitives/Dialog",

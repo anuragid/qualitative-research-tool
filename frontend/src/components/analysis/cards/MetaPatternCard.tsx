@@ -1,4 +1,4 @@
-import { Badge } from "../../ui/Badge";
+import { Badge } from "../../ui/badge";
 import { Network } from "lucide-react";
 import { consistencyStyles } from "../config/displayConfig";
 import type { MetaPattern } from "../../../types";
