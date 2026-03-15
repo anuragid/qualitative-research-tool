@@ -4,6 +4,7 @@ import { FolderOpen, Settings, Sun, Moon, Monitor, X } from "lucide-react";
 import { UserButton } from "@clerk/react";
 import { ModelSettingsDialog } from "../settings/ModelSettingsDialog";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
+import { Logo } from "../ui/logo";
 import { useTheme } from "../../hooks/useTheme.tsx";
 import { useState } from "react";
 
@@ -67,9 +68,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Top section: typemark + close button (mobile) */}
         <div className="flex items-center justify-between px-5 pt-5 pb-2">
-          <span className="text-h4 text-foreground select-none">
-            method<span className="text-brand-burnt-orange">ex</span>
-          </span>
+          <Logo size="sidebar" className="text-foreground" />
           <button
             onClick={onClose}
             className="p-2 rounded-md text-text-tertiary hover:text-foreground hover:bg-interactive-fill lg:hidden min-h-[var(--size-touch)] min-w-[var(--size-touch)] flex items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"

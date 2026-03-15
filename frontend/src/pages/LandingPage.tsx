@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Upload, Brain, GitMerge, Lock, Menu, X } from "lucide-react";
+import { Logo } from "../components/ui/logo";
 import { gsap, useGSAP, ease, duration, prefersReducedMotion } from "../lib/animations";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useAuth } from "../hooks/useAuth";
@@ -92,8 +93,8 @@ export default function LandingPage() {
       >
         <div className="mx-auto max-w-6xl flex h-16 items-center justify-between px-6">
           {/* Typemark */}
-          <Link to="/" className="text-h4 text-foreground no-underline">
-            method<span className="text-brand-burnt-orange">ex</span>
+          <Link to="/" className="no-underline">
+            <Logo size="sidebar" className="text-foreground" />
           </Link>
 
           {/* Desktop nav */}
@@ -496,11 +497,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             {/* Typemark */}
-            <span
-              className="text-h4 text-primary-foreground no-underline"
-            >
-              method<span className="text-brand-burnt-orange">ex</span>
-            </span>
+            <Logo size="sidebar" className="text-primary-foreground" />
 
             {/* Links */}
             <div className="flex items-center gap-6">

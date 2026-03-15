@@ -75,6 +75,10 @@
   --color-on-brand-olive: rgb(26, 28, 30);
 
   /* ===== 8. COLORS — Brand palette ===== */
+  /* Logo accent */
+  --color-brand-accent: #0D9488;
+  --color-brand-accent-dark: #2DD4BF;
+
   /* Saturated (folder tabs, accents) */
   --color-brand-mustard: #D3A848;
   --color-brand-forest: #5D9F55;

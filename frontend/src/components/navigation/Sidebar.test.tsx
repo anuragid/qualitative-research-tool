@@ -41,21 +41,15 @@ describe("Sidebar", () => {
     document.body.style.overflow = "";
   });
 
-  // 1. Renders methodex typemark
-  it('renders the "method" text with accented "ex"', () => {
+  // 1. Renders methodex typemark via Logo component
+  it("renders the methodex logo", () => {
     const { aside } = renderSidebar();
 
-    // The typemark outer span contains "methodex" as full text content
-    const typemark = aside.querySelector(
-      "span.select-none"
+    const logo = aside.querySelector(
+      'span[aria-label="methodex"]'
     ) as HTMLElement;
-    expect(typemark).not.toBeNull();
-    expect(typemark.textContent).toBe("methodex");
-
-    // The inner span wraps the "ex" portion and should be styled distinctly
-    const innerSpan = typemark.querySelector("span") as HTMLElement;
-    expect(innerSpan).not.toBeNull();
-    expect(innerSpan.textContent).toContain("ex");
+    expect(logo).not.toBeNull();
+    expect(logo.textContent).toBe("methodex");
   });
 
   // 2. Renders "All Projects" nav link

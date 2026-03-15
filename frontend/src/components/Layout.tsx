@@ -1,6 +1,7 @@
 import { type ReactNode, useState, useCallback } from "react";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./navigation/Sidebar";
+import { Logo } from "./ui/logo";
 import { UploadManager } from "./upload/UploadManager";
 
 interface LayoutProps {
@@ -30,9 +31,7 @@ export default function Layout({ children }: LayoutProps) {
         >
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
-        <span className="text-h4 text-foreground ml-3 select-none">
-          method<span className="text-brand-burnt-orange">ex</span>
-        </span>
+        <Logo size="sidebar" className="text-foreground ml-3" />
       </header>
 
       {/* Main content area */}
