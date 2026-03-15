@@ -12,7 +12,7 @@ same pipeline semantics with reliable timeout / error handling.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from app.agents.nodes import (
@@ -131,12 +131,12 @@ def analyze_video_task(self, video_id: str):
             video_analysis = VideoAnalysis(
                 video_id=video.id,
                 status="processing",
-                started_at=datetime.utcnow()
+                started_at=datetime.now(timezone.utc)
             )
             self.db.add(video_analysis)
         else:
             video_analysis.status = "processing"
-            video_analysis.started_at = datetime.utcnow()
+            video_analysis.started_at = datetime.now(timezone.utc)
 
         video.status = "analyzing"
         self.db.commit()
@@ -176,7 +176,7 @@ def analyze_video_task(self, video_id: str):
         video_analysis.insights = final_state.get("insights")
         video_analysis.design_principles = final_state.get("design_principles")
         video_analysis.status = "completed"
-        video_analysis.completed_at = datetime.utcnow()
+        video_analysis.completed_at = datetime.now(timezone.utc)
 
         # Refresh video object to ensure it's attached to session
         self.db.refresh(video)
@@ -212,6 +212,7 @@ def analyze_video_task(self, video_id: str):
 
         # Update status to error
         try:
+            self.db.rollback()
             video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
             video_analysis = self.db.query(VideoAnalysis).filter(
                 VideoAnalysis.video_id == UUID(video_id)
@@ -221,7 +222,7 @@ def analyze_video_task(self, video_id: str):
                 video.status = "error"
             if video_analysis:
                 video_analysis.status = "error"
-                video_analysis.completed_at = datetime.utcnow()
+                video_analysis.completed_at = datetime.now(timezone.utc)
 
             # Explicitly flush and commit
             self.db.flush()
@@ -294,13 +295,13 @@ def analyze_project_task(self, project_id: str):
                 project_id=project.id,
                 video_ids=[UUID(vid) for vid in video_ids],
                 status="processing",
-                started_at=datetime.utcnow()
+                started_at=datetime.now(timezone.utc)
             )
             self.db.add(project_analysis)
         else:
             project_analysis.status = "processing"
             project_analysis.video_ids = [UUID(vid) for vid in video_ids]
-            project_analysis.started_at = datetime.utcnow()
+            project_analysis.started_at = datetime.now(timezone.utc)
 
         self.db.commit()
 
@@ -332,7 +333,7 @@ def analyze_project_task(self, project_id: str):
         project_analysis.cross_video_insights = final_state.get("cross_video_insights")
         project_analysis.cross_video_principles = final_state.get("cross_video_principles")
         project_analysis.status = "completed"
-        project_analysis.completed_at = datetime.utcnow()
+        project_analysis.completed_at = datetime.now(timezone.utc)
 
         self.db.commit()
 
@@ -353,13 +354,14 @@ def analyze_project_task(self, project_id: str):
 
         # Update status to error
         try:
+            self.db.rollback()
             project_analysis = self.db.query(ProjectAnalysis).filter(
                 ProjectAnalysis.project_id == UUID(project_id)
             ).first()
 
             if project_analysis:
                 project_analysis.status = "error"
-                project_analysis.completed_at = datetime.utcnow()
+                project_analysis.completed_at = datetime.now(timezone.utc)
 
             self.db.commit()
         except Exception as cleanup_error:

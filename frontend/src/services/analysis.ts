@@ -52,19 +52,7 @@ export const analysisService = {
     return response.data;
   },
 
-  getMetaPatterns: async (projectId: string) => {
-    const response = await api.get(`/api/projects/${projectId}/analysis`);
-    return response.data?.cross_video_patterns || [];
-  },
-
-  getCrossInsights: async (projectId: string) => {
-    const response = await api.get(`/api/projects/${projectId}/analysis`);
-    return response.data?.cross_video_insights || [];
-  },
-
-  getSystemPrinciples: async (projectId: string) => {
-    const response = await api.get(`/api/projects/${projectId}/analysis`);
-    return response.data?.cross_video_principles || [];
-  },
+  // getMetaPatterns, getCrossInsights, getSystemPrinciples removed —
+  // hooks now share the getProjectAnalysis query with `select` to avoid 4x fetch.
 
 };

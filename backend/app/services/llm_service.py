@@ -24,7 +24,7 @@ RETRYABLE_EXCEPTIONS = (APIError, APIConnectionError, RateLimitError)
 
 # OpenRouter headers for analytics
 OPENROUTER_HEADERS = {
-    "HTTP-Referer": "https://qualitative-research.app",
+    "HTTP-Referer": "https://methodex.ai",
     "X-Title": "Qualitative Research Tool",
 }
 

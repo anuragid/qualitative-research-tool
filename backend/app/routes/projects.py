@@ -360,8 +360,12 @@ async def trigger_project_analysis(
                 status="pending"
             )
             db.add(project_analysis)
-            db.commit()
-            db.refresh(project_analysis)
+        else:
+            project_analysis.status = "pending"
+            project_analysis.video_ids = video_ids
+
+        db.commit()
+        db.refresh(project_analysis)
 
         # Trigger Celery task
         from app.tasks.analysis_tasks import analyze_project_task

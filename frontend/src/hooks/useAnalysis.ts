@@ -148,27 +148,44 @@ export function useStartProjectAnalysis() {
   });
 }
 
+// These hooks share the same queryKey as useProjectAnalysis so React Query
+// deduplicates the request — one fetch, three derived views via `select`.
 export function useMetaPatterns(projectId: string | null) {
   return useQuery({
-    queryKey: ["projects", projectId, "meta-patterns"],
-    queryFn: () => analysisService.getMetaPatterns(projectId!),
+    queryKey: ["projects", projectId, "analysis"],
+    queryFn: () => analysisService.getProjectAnalysis(projectId!),
     enabled: !!projectId,
+    select: (data) => data?.cross_video_patterns ?? null,
+    retry: (failureCount, error: unknown) => {
+      if ((error as { status?: number })?.status === 404) return false;
+      return failureCount < 3;
+    },
   });
 }
 
 export function useCrossInsights(projectId: string | null) {
   return useQuery({
-    queryKey: ["projects", projectId, "cross-insights"],
-    queryFn: () => analysisService.getCrossInsights(projectId!),
+    queryKey: ["projects", projectId, "analysis"],
+    queryFn: () => analysisService.getProjectAnalysis(projectId!),
     enabled: !!projectId,
+    select: (data) => data?.cross_video_insights ?? null,
+    retry: (failureCount, error: unknown) => {
+      if ((error as { status?: number })?.status === 404) return false;
+      return failureCount < 3;
+    },
   });
 }
 
 export function useSystemPrinciples(projectId: string | null) {
   return useQuery({
-    queryKey: ["projects", projectId, "system-principles"],
-    queryFn: () => analysisService.getSystemPrinciples(projectId!),
+    queryKey: ["projects", projectId, "analysis"],
+    queryFn: () => analysisService.getProjectAnalysis(projectId!),
     enabled: !!projectId,
+    select: (data) => data?.cross_video_principles ?? null,
+    retry: (failureCount, error: unknown) => {
+      if ((error as { status?: number })?.status === 404) return false;
+      return failureCount < 3;
+    },
   });
 }
 

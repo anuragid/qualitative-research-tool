@@ -20,15 +20,11 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
 
       // Poll if:
       // 1. We don't have transcript data yet, OR
-      // 2. Transcript is still processing, OR
-      // 3. Transcript exists but doesn't have processed content yet
+      // 2. Transcript is still processing (not yet completed)
       if (
         !transcript ||
         transcript.status === "pending" ||
-        transcript.status === "processing" ||
-        !transcript.processed_transcript ||
-        !transcript.processed_transcript.utterances ||
-        transcript.processed_transcript.utterances.length === 0
+        transcript.status === "processing"
       ) {
         return 2000; // Poll every 2 seconds
       }
@@ -86,17 +82,22 @@ export function useLabelSpeaker() {
       data,
     }: {
       transcriptId: string;
+      videoId: string;
       data: LabelSpeakerDto;
     }) => transcriptionsService.labelSpeaker(transcriptId, data),
-    onSuccess: (result, variables) => {
+    onSuccess: (_, variables) => {
       // Invalidate speaker query
       queryClient.invalidateQueries({
         queryKey: ["transcripts", variables.transcriptId, "speakers"],
       });
 
-      // Also invalidate transcript and video queries to reflect the update
-      // Note: result is SpeakerLabel[] which doesn't contain video_id
-      // TODO: If needed, we could extract video_id from the transcript context
+      // Invalidate video and transcript queries so TranscriptViewer refreshes
+      queryClient.invalidateQueries({
+        queryKey: ["videos", variables.videoId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["videos", variables.videoId, "transcript"],
+      });
     },
   });
 }

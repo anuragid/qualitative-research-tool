@@ -1,6 +1,6 @@
 """User routes for syncing with Clerk."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +14,16 @@ from app.services.clerk_service import fetch_clerk_user
 from app.services.encryption_service import encryption_service
 
 router = APIRouter()
+
+# Available models exposed by GET/PUT /settings
+AVAILABLE_MODELS = [
+    {"id": "meta-llama/llama-3.3-70b-instruct:free", "name": "Llama 3.3 70B (Free)", "tier": "free"},
+    {"id": "google/gemma-3-27b-it:free", "name": "Gemma 3 27B (Free)", "tier": "free"},
+    {"id": "mistralai/mistral-small-3.1-24b-instruct:free", "name": "Mistral Small 3.1 (Free)", "tier": "free"},
+    {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "tier": "premium"},
+    {"id": "openai/gpt-4o", "name": "GPT-4o", "tier": "premium"},
+    {"id": "google/gemini-2.5-pro-preview", "name": "Gemini 2.5 Pro", "tier": "premium"},
+]
 
 
 @router.get("/me", response_model=UserResponse)
@@ -54,14 +64,14 @@ async def get_current_user_profile(
             last_name=last_name,
             username=username,
             role=current_user.get("role", "user"),
-            last_seen=datetime.utcnow()
+            last_seen=datetime.now(timezone.utc)
         )
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
     else:
         # Update last_seen and role
-        db_user.last_seen = datetime.utcnow()
+        db_user.last_seen = datetime.now(timezone.utc)
         db_user.role = current_user.get("role", db_user.role)
         # Update profile fields if we got fresh data from Clerk API
         if email and not db_user.email:
@@ -115,7 +125,7 @@ async def sync_user(
             last_name=last_name,
             username=username,
             role=current_user.get("role", "user"),  # Default to 'user' role
-            last_seen=datetime.utcnow()
+            last_seen=datetime.now(timezone.utc)
         )
         db.add(db_user)
     else:
@@ -129,8 +139,8 @@ async def sync_user(
         if username:
             db_user.username = username
         db_user.role = current_user.get("role", db_user.role)  # Update role if changed
-        db_user.last_seen = datetime.utcnow()
-        db_user.updated_at = datetime.utcnow()
+        db_user.last_seen = datetime.now(timezone.utc)
+        db_user.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(db_user)
@@ -164,14 +174,7 @@ async def get_user_settings(
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
         has_api_key=bool(db_user.encrypted_api_key),
-        available_models=[
-            {"id": "meta-llama/llama-3.3-70b-instruct:free", "name": "Llama 3.3 70B (Free)", "tier": "free"},
-            {"id": "google/gemma-3-27b-it:free", "name": "Gemma 3 27B (Free)", "tier": "free"},
-            {"id": "mistralai/mistral-small-3.1-24b-instruct:free", "name": "Mistral Small 3.1 (Free)", "tier": "free"},
-            {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "tier": "premium"},
-            {"id": "openai/gpt-4o", "name": "GPT-4o", "tier": "premium"},
-            {"id": "google/gemini-2.5-pro-preview", "name": "Gemini 2.5 Pro", "tier": "premium"},
-        ]
+        available_models=AVAILABLE_MODELS,
     )
 
 
@@ -201,6 +204,7 @@ async def update_user_settings(
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
         has_api_key=bool(db_user.encrypted_api_key),
+        available_models=AVAILABLE_MODELS,
     )
 
 
