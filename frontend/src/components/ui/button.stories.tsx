@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within, userEvent } from "storybook/test";
 import { Button } from "./button";
-import { Loader2, Mail, Plus, ArrowRight, Download, Trash2 } from "lucide-react";
+import { Loader2, Mail, Plus, ArrowRight, Download } from "lucide-react";
 import {
   DoExample,
   DontExample,
