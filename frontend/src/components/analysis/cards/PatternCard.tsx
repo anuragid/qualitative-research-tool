@@ -18,7 +18,7 @@ export function PatternCard({ pattern, compact = false }: PatternCardProps) {
         <Network className="h-4 w-4 text-brand-maroon flex-shrink-0 mt-0.5" />
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="font-semibold text-sm text-base-85">
+            <span className="font-semibold text-sm text-text-primary">
               {pattern.pattern_name}
             </span>
           </div>
@@ -32,11 +32,11 @@ export function PatternCard({ pattern, compact = false }: PatternCardProps) {
           </div>
         </div>
       </div>
-      <p className={`text-sm text-base-55 mt-2 ${compact ? "line-clamp-2" : ""}`}>
+      <p className={`text-sm text-text-tertiary mt-2 ${compact ? "line-clamp-2" : ""}`}>
         {pattern.description}
       </p>
       {!compact && (
-        <div className="mt-2 text-label text-base-40">
+        <div className="mt-2 text-label text-text-placeholder">
           {pattern.related_inferences.length} related inference{pattern.related_inferences.length !== 1 ? "s" : ""}
         </div>
       )}

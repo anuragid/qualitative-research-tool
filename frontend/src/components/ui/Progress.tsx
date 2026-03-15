@@ -12,14 +12,14 @@ const Progress = React.forwardRef<
     <ProgressPrimitive.Root
       ref={ref}
       className={cn(
-        "relative h-1.5 w-full overflow-hidden rounded-full bg-base-04",
+        "relative h-1.5 w-full overflow-hidden rounded-full bg-interactive-fill",
         className
       )}
       {...props}
     >
       <ProgressPrimitive.Indicator
         className={cn(
-          "h-full flex-1 bg-accent-blue",
+          "h-full flex-1 bg-interactive-focus",
           isIndeterminate
             ? "w-1/3 animate-[progress-indeterminate_1.5s_ease-in-out_infinite]"
             : "w-full transition-all duration-[var(--duration-normal)] ease-[var(--ease)]"

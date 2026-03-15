@@ -23,14 +23,14 @@ export function InsightCard({ insight, compact = false }: InsightCardProps) {
           </Badge>
         </div>
       </div>
-      <h4 className="font-semibold text-sm text-base-85 mb-1">
+      <h4 className="font-semibold text-sm text-text-primary mb-1">
         {insight.headline}
       </h4>
-      <p className={`text-sm text-base-55 ${compact ? "line-clamp-2" : ""}`}>
+      <p className={`text-sm text-text-tertiary ${compact ? "line-clamp-2" : ""}`}>
         {insight.explanation}
       </p>
       {!compact && (
-        <div className="mt-2 text-label text-base-40">
+        <div className="mt-2 text-label text-text-placeholder">
           {insight.evidence.length} evidence &middot; {insight.supporting_patterns.length} pattern{insight.supporting_patterns.length !== 1 ? "s" : ""}
         </div>
       )}

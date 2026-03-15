@@ -16,14 +16,14 @@ export function ChunkCard({ chunk, compact = false }: ChunkCardProps) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <Badge className={`${styles.badge} text-label`}>{chunk.type}</Badge>
         {chunk.speaker && (
-          <span className="text-label text-base-40">{chunk.speaker}</span>
+          <span className="text-label text-text-placeholder">{chunk.speaker}</span>
         )}
       </div>
-      <p className={`text-sm text-base-85 ${compact ? "line-clamp-3" : ""}`}>
+      <p className={`text-sm text-text-primary ${compact ? "line-clamp-3" : ""}`}>
         {chunk.text}
       </p>
       {chunk.timestamp && (
-        <div className="flex items-center gap-1 mt-2 text-label text-base-40">
+        <div className="flex items-center gap-1 mt-2 text-label text-text-placeholder">
           <Clock className="h-3 w-3" />
           <span>{chunk.timestamp}</span>
         </div>

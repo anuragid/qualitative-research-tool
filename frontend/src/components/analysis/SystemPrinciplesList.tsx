@@ -21,7 +21,7 @@ const systemPrincipleColumns: TableColumn<SystemPrinciple>[] = [
     label: "Principle",
     sortable: true,
     render: (sp) => (
-      <span className="font-semibold text-sm text-base-85">{sp.principle}</span>
+      <span className="font-semibold text-sm text-text-primary">{sp.principle}</span>
     ),
   },
   {
@@ -54,7 +54,7 @@ const systemPrincipleColumns: TableColumn<SystemPrinciple>[] = [
     label: "HMW Questions",
     sortable: true,
     render: (sp) => (
-      <span className="text-sm text-base-55">{sp.how_might_we.length}</span>
+      <span className="text-sm text-text-tertiary">{sp.how_might_we.length}</span>
     ),
     className: "w-32",
   },
@@ -106,7 +106,7 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
           return (
             <AccordionItem key={principle.system_principle_id} value={principle.system_principle_id}>
               <div className={`bg-card rounded-2xl overflow-hidden border-l-4 ${pStyle.border}`}>
-                <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-base-04">
+                <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-interactive-fill">
                   <div className="flex items-start gap-3 text-left flex-1">
                     <Compass className="h-5 w-5 text-brand-maroon flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -118,7 +118,7 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
                           {principle.scope}
                         </Badge>
                       </div>
-                      <h4 className="font-semibold text-base text-base-85">
+                      <h4 className="font-semibold text-base text-text-primary">
                         {principle.principle}
                       </h4>
                     </div>
@@ -128,52 +128,52 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
                 <AccordionContent className="px-5 pb-5">
                   <div className="space-y-4 pl-8">
                     <div>
-                      <div className="text-label text-base-40 uppercase mb-2">
+                      <div className="text-label text-text-placeholder uppercase mb-2">
                         Principle
                       </div>
-                      <p className="text-base-85 text-base font-medium leading-relaxed">
+                      <p className="text-text-primary text-base font-medium leading-relaxed">
                         {principle.principle}
                       </p>
                     </div>
 
                     <div>
-                      <div className="text-label text-base-40 uppercase mb-2">
+                      <div className="text-label text-text-placeholder uppercase mb-2">
                         Rationale
                       </div>
-                      <p className="text-base-55 leading-relaxed">
+                      <p className="text-text-tertiary leading-relaxed">
                         {principle.rationale}
                       </p>
                     </div>
 
                     <div>
-                      <div className="text-label text-base-40 uppercase mb-2">
+                      <div className="text-label text-text-placeholder uppercase mb-2">
                         Context Considerations
                       </div>
-                      <p className="text-base-55 leading-relaxed">
+                      <p className="text-text-tertiary leading-relaxed">
                         {principle.context_considerations}
                       </p>
                     </div>
 
                     <div>
-                      <div className="text-label text-base-40 uppercase mb-2 flex items-center gap-2">
+                      <div className="text-label text-text-placeholder uppercase mb-2 flex items-center gap-2">
                         <Lightbulb className="h-4 w-4" />
                         Strategic How Might We... ({principle.how_might_we.length})
                       </div>
                       <ul className="space-y-3">
                         {principle.how_might_we.map((hmw, idx) => (
-                          <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl border border-accent-blue-border/20">
-                            <span className="text-accent-blue font-semibold">{idx + 1}.</span>
-                            <span className="text-base-85">{hmw}</span>
+                          <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl border border-interactive-focus-border/20">
+                            <span className="text-interactive-focus font-semibold">{idx + 1}.</span>
+                            <span className="text-text-primary">{hmw}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
                     <div>
-                      <div className="text-label text-base-40 uppercase mb-2">
+                      <div className="text-label text-text-placeholder uppercase mb-2">
                         Related Cross-Video Insight
                       </div>
-                      <Badge variant="outline" className="font-mono text-xs text-base-55 border-base-09">
+                      <Badge variant="outline" className="font-mono text-xs text-text-tertiary border-border">
                         {principle.cross_insight_id}
                       </Badge>
                     </div>

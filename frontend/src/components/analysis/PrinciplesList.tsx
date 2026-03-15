@@ -21,16 +21,16 @@ const principleColumns: TableColumn<DesignPrinciple>[] = [
     return <Badge className={`${pStyle.badge} text-label`}>{p.priority}</Badge>;
   }, className: "w-28" },
   { key: "principle", label: "Principle", sortable: true, render: (p) => (
-    <span className="font-semibold text-sm text-base-85">{p.principle}</span>
+    <span className="font-semibold text-sm text-text-primary">{p.principle}</span>
   ) },
   { key: "rationale", label: "Rationale", render: (p) => (
-    <p className="text-sm text-base-55 line-clamp-2">{p.rationale}</p>
+    <p className="text-sm text-text-tertiary line-clamp-2">{p.rationale}</p>
   ) },
   { key: "how_might_we", label: "HMWs", sortable: false, render: (p) => (
-    <span className="text-sm text-base-40">{p.how_might_we.length}</span>
+    <span className="text-sm text-text-placeholder">{p.how_might_we.length}</span>
   ), className: "w-20" },
   { key: "insight_id", label: "Insight", sortable: false, render: (p) => (
-    <span className="text-label text-base-40 font-mono">{p.insight_id}</span>
+    <span className="text-label text-text-placeholder font-mono">{p.insight_id}</span>
   ), className: "w-32" },
 ];
 
@@ -78,18 +78,18 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
         {principles.map((principle) => (
           <AccordionItem key={principle.principle_id} value={principle.principle_id}>
             <div className={`bg-card rounded-2xl overflow-hidden border-l-4 ${
-              priorityStyles[principle.priority]?.border || "border-l-accent-blue"
+              priorityStyles[principle.priority]?.border || "border-l-interactive-focus"
             }`}>
-              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-base-04">
+              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-interactive-fill">
                 <div className="flex items-start gap-3 text-left flex-1">
-                  <Compass className="h-5 w-5 text-accent-blue flex-shrink-0 mt-0.5" />
+                  <Compass className="h-5 w-5 text-interactive-focus flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge className={priorityStyles[principle.priority]?.badge}>
                         {principle.priority} priority
                       </Badge>
                     </div>
-                    <h4 className="font-semibold text-base text-base-85">
+                    <h4 className="font-semibold text-base text-text-primary">
                       {principle.principle}
                     </h4>
                   </div>
@@ -99,43 +99,43 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
               <AccordionContent className="px-5 pb-5">
                 <div className="space-y-4 pl-8">
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Principle
                     </div>
-                    <p className="text-base-85 text-base font-medium leading-relaxed">
+                    <p className="text-text-primary text-base font-medium leading-relaxed">
                       {principle.principle}
                     </p>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Rationale
                     </div>
-                    <p className="text-base-55 leading-relaxed">
+                    <p className="text-text-tertiary leading-relaxed">
                       {principle.rationale}
                     </p>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2 flex items-center gap-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2 flex items-center gap-2">
                       <Lightbulb className="h-4 w-4" />
                       How Might We... ({principle.how_might_we.length})
                     </div>
                     <ul className="space-y-3">
                       {principle.how_might_we.map((hmw, idx) => (
-                        <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl border border-accent-blue-border/20">
-                          <span className="text-accent-blue font-semibold">{idx + 1}.</span>
-                          <span className="text-base-85">{hmw}</span>
+                        <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl border border-interactive-focus-border/20">
+                          <span className="text-interactive-focus font-semibold">{idx + 1}.</span>
+                          <span className="text-text-primary">{hmw}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Related Insight
                     </div>
-                    <Badge variant="outline" className="font-mono text-xs text-base-55 border-base-09">
+                    <Badge variant="outline" className="font-mono text-xs text-text-tertiary border-border">
                       {principle.insight_id}
                     </Badge>
                   </div>

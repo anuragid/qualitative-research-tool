@@ -23,14 +23,14 @@ export function SystemPrincipleCard({ principle, compact = false }: SystemPrinci
           <Badge className={`${scStyle} text-label`}>{principle.scope}</Badge>
         </div>
       </div>
-      <h4 className="font-semibold text-sm text-base-85 mb-1">
+      <h4 className="font-semibold text-sm text-text-primary mb-1">
         {principle.principle}
       </h4>
-      <p className={`text-sm text-base-55 ${compact ? "line-clamp-2" : ""}`}>
+      <p className={`text-sm text-text-tertiary ${compact ? "line-clamp-2" : ""}`}>
         {principle.rationale}
       </p>
       {!compact && (
-        <div className="mt-2 text-label text-base-40">
+        <div className="mt-2 text-label text-text-placeholder">
           {principle.how_might_we.length} HMW question{principle.how_might_we.length !== 1 ? "s" : ""}
         </div>
       )}

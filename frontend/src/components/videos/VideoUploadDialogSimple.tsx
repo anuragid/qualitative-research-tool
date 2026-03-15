@@ -133,15 +133,15 @@ export default function VideoUploadDialog({
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-2xl p-8 text-center transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                 isDragging
-                  ? "border-accent-blue bg-accent-blue-bg"
-                  : "border-border hover:bg-base-04"
+                  ? "border-interactive-focus bg-interactive-focus-bg"
+                  : "border-border hover:bg-interactive-fill"
               }`}
             >
-              <Upload className="mx-auto h-12 w-12 text-base-55 mb-4" />
-              <p className="text-sm text-base-55 mb-2">
+              <Upload className="mx-auto h-12 w-12 text-text-tertiary mb-4" />
+              <p className="text-sm text-text-tertiary mb-2">
                 Drag and drop video files here, or click to browse
               </p>
-              <p className="text-xs text-base-55 mb-4">
+              <p className="text-xs text-text-tertiary mb-4">
                 You can select multiple files at once
               </p>
               <input
@@ -172,12 +172,12 @@ export default function VideoUploadDialog({
                         isOversized ? "border-destructive/50" : "border-border"
                       }`}
                     >
-                      <FileVideo className={`h-5 w-5 flex-shrink-0 ${isOversized ? "text-destructive" : "text-base-55"}`} />
+                      <FileVideo className={`h-5 w-5 flex-shrink-0 ${isOversized ? "text-destructive" : "text-text-tertiary"}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">
                           {file.name}
                         </p>
-                        <p className={`text-xs ${isOversized ? "text-destructive" : "text-base-55"}`}>
+                        <p className={`text-xs ${isOversized ? "text-destructive" : "text-text-tertiary"}`}>
                           {formatFileSize(file.size)}
                         </p>
                         {isOversized && (
@@ -189,10 +189,10 @@ export default function VideoUploadDialog({
                       </div>
                       <button
                         onClick={() => removeFile(index)}
-                        className="p-1 hover:bg-base-04 rounded-md transition-[background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+                        className="p-1 hover:bg-interactive-fill rounded-md transition-[background] duration-[var(--duration-micro)] ease-[var(--ease)]"
                         title="Remove file"
                       >
-                        <X className="h-4 w-4 text-base-55" />
+                        <X className="h-4 w-4 text-text-tertiary" />
                       </button>
                     </div>
                   );
@@ -206,11 +206,11 @@ export default function VideoUploadDialog({
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-2xl p-4 text-center transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                   isDragging
-                    ? "border-accent-blue bg-accent-blue-bg"
-                    : "border-border hover:bg-base-04"
+                    ? "border-interactive-focus bg-interactive-focus-bg"
+                    : "border-border hover:bg-interactive-fill"
                 }`}
               >
-                <p className="text-xs text-base-55 mb-2">
+                <p className="text-xs text-text-tertiary mb-2">
                   Drag more files here or
                 </p>
                 <input

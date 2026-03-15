@@ -22,21 +22,21 @@ export const UploadProgress: Story = {
     <div className="w-[300px] space-y-4">
       <div className="space-y-1">
         <div className="flex justify-between text-sm">
-          <span className="text-base-85">interview_01.mp4</span>
-          <span className="text-base-40">25%</span>
+          <span className="text-text-primary">interview_01.mp4</span>
+          <span className="text-text-placeholder">25%</span>
         </div>
         <Progress value={25} />
       </div>
       <div className="space-y-1">
         <div className="flex justify-between text-sm">
-          <span className="text-base-85">interview_02.mp4</span>
-          <span className="text-base-40">75%</span>
+          <span className="text-text-primary">interview_02.mp4</span>
+          <span className="text-text-placeholder">75%</span>
         </div>
         <Progress value={75} />
       </div>
       <div className="space-y-1">
         <div className="flex justify-between text-sm">
-          <span className="text-base-85">interview_03.mp4</span>
+          <span className="text-text-primary">interview_03.mp4</span>
           <span className="text-brand-forest">Complete</span>
         </div>
         <Progress value={100} />

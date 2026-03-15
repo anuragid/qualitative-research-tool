@@ -21,7 +21,7 @@ const crossInsightColumns: TableColumn<CrossInsight>[] = [
     label: "Headline",
     sortable: true,
     render: (ci) => (
-      <span className="font-semibold text-sm text-base-85">{ci.headline}</span>
+      <span className="font-semibold text-sm text-text-primary">{ci.headline}</span>
     ),
   },
   {
@@ -102,10 +102,10 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
       <Accordion type="multiple" className="space-y-3">
         {crossInsights.map((insight) => (
           <AccordionItem key={insight.cross_insight_id} value={insight.cross_insight_id}>
-            <div className="bg-card rounded-2xl overflow-hidden border-l-4 border-l-accent-blue">
-              <AccordionTrigger className="px-3 sm:px-5 py-4 hover:no-underline hover:bg-base-04">
+            <div className="bg-card rounded-2xl overflow-hidden border-l-4 border-l-interactive-focus">
+              <AccordionTrigger className="px-3 sm:px-5 py-4 hover:no-underline hover:bg-interactive-fill">
                 <div className="flex items-start gap-3 text-left flex-1">
-                  <Sparkles className="h-5 w-5 text-accent-blue flex-shrink-0 mt-0.5" />
+                  <Sparkles className="h-5 w-5 text-interactive-focus flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <Badge className={scopeStyles[insight.scope]}>
@@ -118,10 +118,10 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
                         {insight.confidence} confidence
                       </Badge>
                     </div>
-                    <h4 className="font-semibold text-base text-base-85 mb-1">
+                    <h4 className="font-semibold text-base text-text-primary mb-1">
                       {insight.headline}
                     </h4>
-                    <p className="text-sm text-base-55 line-clamp-2">
+                    <p className="text-sm text-text-tertiary line-clamp-2">
                       {insight.explanation}
                     </p>
                   </div>
@@ -131,47 +131,47 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
               <AccordionContent className="px-3 sm:px-5 pb-5">
                 <div className="space-y-4 pl-4 sm:pl-8">
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Explanation
                     </div>
-                    <p className="text-base-85 leading-relaxed">{insight.explanation}</p>
+                    <p className="text-text-primary leading-relaxed">{insight.explanation}</p>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Implications
                     </div>
-                    <p className="text-base-85 leading-relaxed">{insight.implications}</p>
+                    <p className="text-text-primary leading-relaxed">{insight.implications}</p>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Contextual Factors
                     </div>
-                    <p className="text-base-85 leading-relaxed">{insight.contextual_factors}</p>
+                    <p className="text-text-primary leading-relaxed">{insight.contextual_factors}</p>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Evidence From Videos ({insight.evidence.length})
                     </div>
                     <ul className="space-y-2">
                       {insight.evidence.map((item, idx) => (
                         <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl">
-                          <span className="text-base-25">&#8226;</span>
-                          <span className="text-base-55">{item}</span>
+                          <span className="text-text-disabled">&#8226;</span>
+                          <span className="text-text-tertiary">{item}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Supporting Meta-Patterns ({insight.supporting_meta_patterns.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {insight.supporting_meta_patterns.map((patternId) => (
-                        <Badge key={patternId} variant="outline" className="font-mono text-xs text-base-55 border-base-09">
+                        <Badge key={patternId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
                           {patternId}
                         </Badge>
                       ))}

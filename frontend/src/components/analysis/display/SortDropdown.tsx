@@ -45,8 +45,8 @@ export function SortDropdown({ options, sort, onSort }: SortDropdownProps) {
             <span className="flex-1">{opt.label}</span>
             {sort?.field === opt.field && (
               sort.direction === "desc"
-                ? <ArrowDown className="h-3.5 w-3.5 text-accent-blue" />
-                : <ArrowUp className="h-3.5 w-3.5 text-accent-blue" />
+                ? <ArrowDown className="h-3.5 w-3.5 text-interactive-focus" />
+                : <ArrowUp className="h-3.5 w-3.5 text-interactive-focus" />
             )}
           </DropdownMenuItem>
         ))}

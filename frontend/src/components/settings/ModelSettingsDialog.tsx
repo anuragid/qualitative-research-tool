@@ -70,15 +70,15 @@ export function ModelSettingsDialog({
         <div className="space-y-4 py-4">
           {/* Free models */}
           <div>
-            <span className="text-section text-base-55">Free Models</span>
+            <span className="text-section text-text-tertiary">Free Models</span>
             <div className="mt-2 space-y-2">
               {freeModels.map((model) => (
                 <label
                   key={model.id}
                   className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                     currentModel === model.id || (!currentModel && model === freeModels[0])
-                      ? "border-accent-blue bg-accent-blue-bg"
-                      : "border-border hover:bg-base-04"
+                      ? "border-interactive-focus bg-interactive-focus-bg"
+                      : "border-border hover:bg-interactive-fill"
                   }`}
                 >
                   <input
@@ -87,11 +87,11 @@ export function ModelSettingsDialog({
                     value={model.id}
                     checked={currentModel === model.id || (!currentModel && model === freeModels[0])}
                     onChange={() => setSelectedModel(model.id)}
-                    className="h-4 w-4 accent-accent-blue"
+                    className="h-4 w-4 accent-interactive-focus"
                   />
                   <div>
                     <div className="font-medium text-sm">{model.name}</div>
-                    <div className="text-xs text-base-55">Free -- good for drafts and exploration</div>
+                    <div className="text-xs text-text-tertiary">Free -- good for drafts and exploration</div>
                   </div>
                 </label>
               ))}
@@ -100,7 +100,7 @@ export function ModelSettingsDialog({
 
           {/* Premium models */}
           <div>
-            <span className="text-section text-base-55">
+            <span className="text-section text-text-tertiary">
               Premium Models
             </span>
             <div className="mt-2 space-y-2">
@@ -109,8 +109,8 @@ export function ModelSettingsDialog({
                   key={model.id}
                   className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                     currentModel === model.id
-                      ? "border-accent-blue bg-accent-blue-bg"
-                      : "border-border hover:bg-base-04"
+                      ? "border-interactive-focus bg-interactive-focus-bg"
+                      : "border-border hover:bg-interactive-fill"
                   } ${!settings?.has_api_key && !apiKey ? "opacity-50" : ""}`}
                 >
                   <input
@@ -120,11 +120,11 @@ export function ModelSettingsDialog({
                     checked={currentModel === model.id}
                     onChange={() => setSelectedModel(model.id)}
                     disabled={!settings?.has_api_key && !apiKey}
-                    className="h-4 w-4 accent-accent-blue"
+                    className="h-4 w-4 accent-interactive-focus"
                   />
                   <div>
                     <div className="font-medium text-sm">{model.name}</div>
-                    <div className="text-xs text-base-55">
+                    <div className="text-xs text-text-tertiary">
                       Higher quality analysis -- requires your own API key
                     </div>
                   </div>
@@ -135,7 +135,7 @@ export function ModelSettingsDialog({
 
           {/* API Key */}
           <div>
-            <span className="text-section text-base-55">
+            <span className="text-section text-text-tertiary">
               OpenRouter API Key (BYOK)
             </span>
             {settings?.has_api_key ? (
@@ -162,13 +162,13 @@ export function ModelSettingsDialog({
                 className="mt-2"
               />
             )}
-            <p className="mt-1 text-xs text-base-55">
+            <p className="mt-1 text-xs text-text-tertiary">
               Get your key at{" "}
               <a
                 href="https://openrouter.ai/keys"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-accent-blue underline"
+                className="text-interactive-focus underline"
               >
                 openrouter.ai/keys
               </a>

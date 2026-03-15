@@ -47,8 +47,8 @@ export function TableView<T extends object>({
                   {col.label}
                   {sort?.field === col.key && (
                     sort.direction === "desc"
-                      ? <ArrowDown className="h-3 w-3 text-accent-blue" />
-                      : <ArrowUp className="h-3 w-3 text-accent-blue" />
+                      ? <ArrowDown className="h-3 w-3 text-interactive-focus" />
+                      : <ArrowUp className="h-3 w-3 text-interactive-focus" />
                   )}
                 </div>
               </TableHead>
@@ -59,7 +59,7 @@ export function TableView<T extends object>({
           {data.map((item, i) => (
             <TableRow
               key={i}
-              className={onRowClick ? "cursor-pointer hover:bg-base-04" : ""}
+              className={onRowClick ? "cursor-pointer hover:bg-interactive-fill" : ""}
               onClick={() => onRowClick?.(item)}
             >
               {columns.map((col) => (

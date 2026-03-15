@@ -15,11 +15,11 @@ export const Horizontal: Story = {
   render: () => (
     <div className="w-[300px]">
       <div className="space-y-1">
-        <h4 className="text-ui text-base-85">methodex</h4>
-        <p className="text-sm text-base-55">Qualitative research analysis tool</p>
+        <h4 className="text-ui text-text-primary">methodex</h4>
+        <p className="text-sm text-text-tertiary">Qualitative research analysis tool</p>
       </div>
       <Separator className="my-4" />
-      <div className="flex h-5 items-center space-x-4 text-sm text-base-62">
+      <div className="flex h-5 items-center space-x-4 text-sm text-text-secondary">
         <div>Projects</div>
         <Separator orientation="vertical" />
         <div>Videos</div>
@@ -32,7 +32,7 @@ export const Horizontal: Story = {
 
 export const Vertical: Story = {
   render: () => (
-    <div className="flex h-8 items-center space-x-4 text-sm text-base-62">
+    <div className="flex h-8 items-center space-x-4 text-sm text-text-secondary">
       <div>Chunks</div>
       <Separator orientation="vertical" />
       <div>Inferences</div>

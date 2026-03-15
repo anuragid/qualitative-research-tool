@@ -21,7 +21,7 @@ export const Default: Story = {
         <CardDescription>Qualitative analysis of user interviews</CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-base-55">3 videos uploaded, 2 analyzed</p>
+        <p className="text-sm text-text-tertiary">3 videos uploaded, 2 analyzed</p>
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button variant="ghost">Cancel</Button>
@@ -51,7 +51,7 @@ export const WithBadge: Story = {
         <CardDescription>Analysis of 5 participant interviews</CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-base-62">5 videos, all analyzed</p>
+        <p className="text-sm text-text-secondary">5 videos, all analyzed</p>
       </CardContent>
     </Card>
   ),
@@ -67,7 +67,7 @@ export const OnWarmBackground: Story = {
           <CardDescription>White card on warm cream background — no shadow needed</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-base-55">The contrast provides visual separation.</p>
+          <p className="text-sm text-text-tertiary">The contrast provides visual separation.</p>
         </CardContent>
       </Card>
     </div>
@@ -83,7 +83,7 @@ export const ElevatedWithShadow: Story = {
         <CardDescription>Uses shadow-card for white-on-white contexts</CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-base-55">Multi-layer shadow for depth.</p>
+        <p className="text-sm text-text-tertiary">Multi-layer shadow for depth.</p>
       </CardContent>
     </Card>
   ),

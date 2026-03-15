@@ -24,7 +24,7 @@ function NoiseSwatch({ name, cssVar, intensity }: { name: string; cssVar: string
         className={`w-20 h-20 rounded-xl noise-texture noise-${intensity}`}
         style={{ backgroundColor: `var(${cssVar})` }}
       />
-      <span className="text-[10px] text-base-40">{name}</span>
+      <span className="text-[10px] text-text-placeholder">{name}</span>
     </div>
   );
 }
@@ -35,7 +35,7 @@ function NoisePage() {
       {INTENSITIES.map((intensity) => (
         <div key={intensity}>
           <h2 className="text-h3 mb-2 capitalize">{intensity} Noise</h2>
-          <p className="text-ui text-base-55 mb-6">
+          <p className="text-ui text-text-tertiary mb-6">
             noise-texture noise-{intensity} (--noise-opacity: {intensity === "light" ? "0.25" : intensity === "medium" ? "0.4" : "0.55"})
           </p>
           <div className="flex gap-4 flex-wrap">

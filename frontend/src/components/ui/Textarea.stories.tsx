@@ -38,7 +38,7 @@ export const LongContent: Story = {
         id="long"
         defaultValue="The participant expressed frustration with the onboarding flow, specifically noting that the number of required fields felt overwhelming. They mentioned preferring a progressive approach where information is collected gradually."
       />
-      <p className="text-sm text-base-40">Drag bottom edge to resize vertically</p>
+      <p className="text-sm text-text-placeholder">Drag bottom edge to resize vertically</p>
     </div>
   ),
 };

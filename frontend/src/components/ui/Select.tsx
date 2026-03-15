@@ -15,9 +15,9 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       "flex h-10 w-full items-center justify-between whitespace-nowrap rounded-lg border border-border bg-card px-3 py-2 text-base",
-      "placeholder:text-base-40",
+      "placeholder:text-text-placeholder",
       "transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)]",
-      "focus:outline-none focus:border-accent-blue focus:ring-[var(--ring-width)] focus:ring-accent-blue-bg",
+      "focus:outline-none focus:border-interactive-focus focus:ring-[var(--ring-width)] focus:ring-interactive-focus-bg",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "[&>span]:line-clamp-1",
       className
@@ -26,7 +26,7 @@ const SelectTrigger = React.forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="size-4 text-base-40" />
+      <ChevronDown className="size-4 text-text-placeholder" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ))
@@ -103,7 +103,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn("px-2 py-1.5 text-label text-base-55", className)}
+    className={cn("px-2 py-1.5 text-label text-text-tertiary", className)}
     {...props}
   />
 ))
@@ -117,7 +117,7 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       "relative flex w-full cursor-default select-none items-center h-8 rounded-md py-1.5 pl-2 pr-8 text-ui outline-none",
-      "transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] hover:bg-base-04 focus:bg-base-04",
+      "transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] hover:bg-interactive-fill focus:bg-interactive-fill",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
@@ -139,7 +139,7 @@ const SelectSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
-    className={cn("h-px bg-base-09 mx-2 my-1", className)}
+    className={cn("h-px bg-border mx-2 my-1", className)}
     {...props}
   />
 ))

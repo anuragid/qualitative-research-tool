@@ -3,15 +3,15 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-ui transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] focus-visible:outline-2 focus-visible:outline-accent-blue focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-ui transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] focus-visible:outline-2 focus-visible:outline-interactive-focus focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground rounded-full hover:bg-primary/90",
         destructive: "bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90",
-        outline: "border border-border bg-transparent rounded-full hover:bg-base-04",
-        secondary: "bg-secondary text-secondary-foreground rounded-lg hover:bg-base-08",
-        ghost: "hover:bg-base-04 rounded-md",
+        outline: "border border-border bg-transparent rounded-full hover:bg-interactive-fill",
+        secondary: "bg-secondary text-secondary-foreground rounded-lg hover:bg-interactive-hover",
+        ghost: "hover:bg-interactive-fill rounded-md",
         link: "text-foreground underline-offset-4 hover:underline",
       },
       size: {

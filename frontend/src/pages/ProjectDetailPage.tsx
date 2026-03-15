@@ -194,11 +194,11 @@ export default function ProjectDetailPage() {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-base-40 mb-4" />
+          <AlertCircle className="h-12 w-12 text-text-placeholder mb-4" />
           <h2 className="text-h3 mb-2">
             Project Not Found
           </h2>
-          <p className="text-base-55 mb-4">
+          <p className="text-text-tertiary mb-4">
             The project you're looking for doesn't exist or has been removed.
           </p>
           <Link to="/projects">
@@ -215,7 +215,7 @@ export default function ProjectDetailPage() {
         {/* Back navigation */}
         <Link
           to="/projects"
-          className="inline-flex items-center gap-2 text-base-55 hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)]"
+          className="inline-flex items-center gap-2 text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)]"
         >
           <ArrowLeft className="h-4 w-4" />
           <span className="text-body-sm">All Projects</span>
@@ -236,7 +236,7 @@ export default function ProjectDetailPage() {
             <div>
               <h1 className="text-h2">{project.name}</h1>
               {project.description && (
-                <p className="text-base-62 mt-1 max-w-2xl">{project.description}</p>
+                <p className="text-text-secondary mt-1 max-w-2xl">{project.description}</p>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -277,9 +277,9 @@ export default function ProjectDetailPage() {
         {/* Videos Section */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <VideoIcon className="h-5 w-5 text-base-62" />
+            <VideoIcon className="h-5 w-5 text-text-secondary" />
             <h2 className="text-h4">Videos</h2>
-            <span className="text-label text-base-40">
+            <span className="text-label text-text-placeholder">
               ({videos?.length || 0})
             </span>
           </div>
@@ -293,17 +293,17 @@ export default function ProjectDetailPage() {
           ) : videos && videos.length > 0 ? (
             <div
               className={`relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-2xl transition-all ${
-                isDragging ? 'bg-accent-blue-bg border-2 border-dashed border-accent-blue-border' : ''
+                isDragging ? 'bg-interactive-focus-bg border-2 border-dashed border-interactive-focus-border' : ''
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
               {isDragging && (
-                <div className="absolute inset-0 flex items-center justify-center bg-accent-blue-bg bg-opacity-90 rounded-2xl z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-interactive-focus-bg bg-opacity-90 rounded-2xl z-10">
                   <div className="text-center">
-                    <Upload className="h-12 w-12 text-accent-blue mx-auto mb-2" />
-                    <p className="text-accent-blue font-medium">Drop videos here to upload</p>
+                    <Upload className="h-12 w-12 text-interactive-focus mx-auto mb-2" />
+                    <p className="text-interactive-focus font-medium">Drop videos here to upload</p>
                   </div>
                 </div>
               )}
@@ -314,7 +314,7 @@ export default function ProjectDetailPage() {
           ) : (
             <div
               className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all ${
-                isDragging ? 'border-accent-blue-border bg-accent-blue-bg' : 'border-border bg-surface-card'
+                isDragging ? 'border-interactive-focus-border bg-interactive-focus-bg' : 'border-border bg-surface-card'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -322,21 +322,21 @@ export default function ProjectDetailPage() {
             >
               {isDragging ? (
                 <>
-                  <Upload className="h-12 w-12 text-accent-blue mx-auto mb-4 animate-bounce" />
+                  <Upload className="h-12 w-12 text-interactive-focus mx-auto mb-4 animate-bounce" />
                   <h3 className="text-h4 mb-2">
                     Drop videos here
                   </h3>
-                  <p className="text-accent-blue">
+                  <p className="text-interactive-focus">
                     Release to upload your video files
                   </p>
                 </>
               ) : (
                 <>
-                  <VideoIcon className="h-12 w-12 text-base-40 mx-auto mb-4" />
+                  <VideoIcon className="h-12 w-12 text-text-placeholder mx-auto mb-4" />
                   <h3 className="text-h4 mb-2">
                     No videos yet
                   </h3>
-                  <p className="text-base-55 mb-4">
+                  <p className="text-text-tertiary mb-4">
                     Drag and drop video files here, or click to upload
                   </p>
                   <Button onClick={() => setUploadDialogOpen(true)}>
@@ -381,7 +381,7 @@ export default function ProjectDetailPage() {
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     <span className="font-medium">Cross-Video Analysis Running...</span>
                   </Badge>
-                  <span className="text-label text-base-55">This usually takes a few minutes</span>
+                  <span className="text-label text-text-tertiary">This usually takes a few minutes</span>
                 </div>
               ) : projectAnalysis.status === 'completed' ? (
                 hasNewVideos ? (
@@ -417,31 +417,31 @@ export default function ProjectDetailPage() {
                 <CardContent className="py-4">
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin text-accent-blue" />
+                      <Loader2 className="h-5 w-5 animate-spin text-interactive-focus" />
                       <div className="flex-1">
                         <p className="font-medium text-foreground">
                           {startProjectAnalysis.isPending || analysisTriggered
                             ? "Starting cross-video analysis..."
                             : `Analyzing patterns across ${projectAnalysis?.video_ids?.length || 0} videos...`}
                         </p>
-                        <p className="text-body-sm text-base-55">
+                        <p className="text-body-sm text-text-tertiary">
                           This usually takes a few minutes.
                         </p>
                       </div>
                     </div>
 
                     {/* Progress bar with indeterminate state */}
-                    <div className="w-full bg-base-04 rounded-full h-1.5">
-                      <div className="bg-accent-blue h-1.5 rounded-full animate-pulse w-full" />
+                    <div className="w-full bg-interactive-fill rounded-full h-1.5">
+                      <div className="bg-interactive-focus h-1.5 rounded-full animate-pulse w-full" />
                     </div>
 
                     {projectAnalysis?.status === 'running' && (
-                      <div className="text-label text-base-55 flex items-center gap-2">
+                      <div className="text-label text-text-tertiary flex items-center gap-2">
                         <span>Processing:</span>
                         <span>Finding patterns</span>
-                        <span className="text-base-25">&rarr;</span>
+                        <span className="text-text-disabled">&rarr;</span>
                         <span>Generating insights</span>
-                        <span className="text-base-25">&rarr;</span>
+                        <span className="text-text-disabled">&rarr;</span>
                         <span>Creating principles</span>
                       </div>
                     )}
@@ -548,9 +548,9 @@ export default function ProjectDetailPage() {
                         </>
                       ) : (
                         <div className="text-center py-12">
-                          <Network className="h-10 w-10 text-base-25 mx-auto mb-3" />
-                          <h4 className="text-h4 text-base-55 mb-1">No patterns yet</h4>
-                          <p className="text-body-sm text-base-40">
+                          <Network className="h-10 w-10 text-text-disabled mx-auto mb-3" />
+                          <h4 className="text-h4 text-text-tertiary mb-1">No patterns yet</h4>
+                          <p className="text-body-sm text-text-placeholder">
                             Run cross-video analysis to discover recurring patterns across your interviews.
                           </p>
                         </div>
@@ -570,9 +570,9 @@ export default function ProjectDetailPage() {
                         </>
                       ) : (
                         <div className="text-center py-12">
-                          <Lightbulb className="h-10 w-10 text-base-25 mx-auto mb-3" />
-                          <h4 className="text-h4 text-base-55 mb-1">No insights yet</h4>
-                          <p className="text-body-sm text-base-40">
+                          <Lightbulb className="h-10 w-10 text-text-disabled mx-auto mb-3" />
+                          <h4 className="text-h4 text-text-tertiary mb-1">No insights yet</h4>
+                          <p className="text-body-sm text-text-placeholder">
                             Run cross-video analysis to generate insights that span multiple interviews.
                           </p>
                         </div>
@@ -592,9 +592,9 @@ export default function ProjectDetailPage() {
                         </>
                       ) : (
                         <div className="text-center py-12">
-                          <Compass className="h-10 w-10 text-base-25 mx-auto mb-3" />
-                          <h4 className="text-h4 text-base-55 mb-1">No principles yet</h4>
-                          <p className="text-body-sm text-base-40">
+                          <Compass className="h-10 w-10 text-text-disabled mx-auto mb-3" />
+                          <h4 className="text-h4 text-text-tertiary mb-1">No principles yet</h4>
+                          <p className="text-body-sm text-text-placeholder">
                             Run cross-video analysis to derive system-level design principles from your research.
                           </p>
                         </div>
@@ -614,7 +614,7 @@ export default function ProjectDetailPage() {
                     <h3 className="text-h4 mb-2">
                       Ready for Cross-Video Analysis
                     </h3>
-                    <p className="text-base-55 mb-4">
+                    <p className="text-text-tertiary mb-4">
                       You have {videos?.filter(v => v.status === 'analyzed' && v.analysis?.status === 'completed').length} analyzed videos.
                       Run project analysis to discover patterns and insights across all videos.
                     </p>

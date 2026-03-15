@@ -20,7 +20,7 @@ const speakerColors = [
   { bg: "bg-brand-forest/15", text: "text-brand-forest", border: "border-brand-forest/30" },
   { bg: "bg-brand-maroon/15", text: "text-brand-maroon", border: "border-brand-maroon/30" },
   { bg: "bg-brand-mustard/15", text: "text-brand-mustard", border: "border-brand-mustard/30" },
-  { bg: "bg-accent-blue-bg", text: "text-accent-blue", border: "border-accent-blue-border/30" },
+  { bg: "bg-interactive-focus-bg", text: "text-interactive-focus", border: "border-interactive-focus-border/30" },
   { bg: "bg-brand-olive/15", text: "text-brand-olive", border: "border-brand-olive/30" },
   { bg: "bg-brand-crimson/15", text: "text-brand-crimson", border: "border-brand-crimson/30" },
 ];
@@ -244,13 +244,13 @@ export function TranscriptViewer({
   return (
     <div className="bg-card rounded-2xl shadow-card overflow-hidden">
       {/* Search Bar — frosted glass style header */}
-      <div className="sticky top-0 z-10 frosted-glass border-b border-base-09 px-4 sm:px-6 py-4">
+      <div className="sticky top-0 z-10 frosted-glass border-b border-border px-4 sm:px-6 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-h4 text-foreground">Transcript</h3>
 
           {/* Search bar */}
           <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-40" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-placeholder" />
             <Input
               id="transcript-search-input"
               type="text"
@@ -265,20 +265,20 @@ export function TranscriptViewer({
               <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 {/* No results found state */}
                 {debouncedSearchQuery && !searchLoading && sortedMatchIndexes.length === 0 && (
-                  <span className="text-label text-base-40 px-2">No results</span>
+                  <span className="text-label text-text-placeholder px-2">No results</span>
                 )}
 
                 {/* Navigation controls when matches found */}
                 {sortedMatchIndexes.length > 0 && (
                   <div className="flex items-center gap-0.5 px-1">
-                    <span className="text-label font-medium text-base-55">
+                    <span className="text-label font-medium text-text-tertiary">
                       {currentMatchIndex + 1} of {sortedMatchIndexes.length}
                     </span>
                     <div className="flex items-center ml-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 hover:bg-base-04 rounded-md"
+                        className="h-7 w-7 p-0 hover:bg-interactive-fill rounded-md"
                         onClick={navigateToPrevious}
                         title="Previous match (Shift+Enter)"
                       >
@@ -287,7 +287,7 @@ export function TranscriptViewer({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 hover:bg-base-04 rounded-md"
+                        className="h-7 w-7 p-0 hover:bg-interactive-fill rounded-md"
                         onClick={navigateToNext}
                         title="Next match (Enter)"
                       >
@@ -301,7 +301,7 @@ export function TranscriptViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 hover:bg-base-04 rounded-md"
+                  className="h-6 w-6 p-0 hover:bg-interactive-fill rounded-md"
                   onClick={clearSearch}
                 >
                   <X className="h-3 w-3" />
@@ -320,10 +320,10 @@ export function TranscriptViewer({
           return (
             <div
               key={index}
-              className="flex gap-3 sm:gap-5 p-4 rounded-xl hover:bg-base-04 transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
+              className="flex gap-3 sm:gap-5 p-4 rounded-xl hover:bg-interactive-fill transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
             >
               {/* Timestamp */}
-              <div className="flex-shrink-0 w-14 sm:w-20 text-label text-base-40 flex items-start gap-1.5 pt-1">
+              <div className="flex-shrink-0 w-14 sm:w-20 text-label text-text-placeholder flex items-start gap-1.5 pt-1">
                 <Clock className="h-3 w-3 mt-0.5" />
                 {formatTimestamp(utterance.start / 1000)}
               </div>
@@ -335,14 +335,14 @@ export function TranscriptViewer({
                     {getSpeakerLabel(utterance.speaker)}
                   </Badge>
                   {getSpeakerRole(utterance.speaker) && (
-                    <span className="text-label text-base-40">
+                    <span className="text-label text-text-placeholder">
                       {getSpeakerRole(utterance.speaker)}
                     </span>
                   )}
                 </div>
 
                 {/* Word-level transcript text */}
-                <div className="text-base-85 leading-relaxed">
+                <div className="text-text-primary leading-relaxed">
                   {wordLevelData ? (
                     // Render words with highlighting
                     getWordsForUtterance(utterance.start, utterance.end).map(({ word, globalIndex }) => {
@@ -360,10 +360,10 @@ export function TranscriptViewer({
                         className += 'bg-brand-pale-gold/40 hover:bg-brand-pale-gold/60';
                       } else if (isCurrentWord) {
                         // Currently playing word (video sync) — accent blue bg
-                        className += 'bg-accent-blue-bg font-semibold shadow-sm';
+                        className += 'bg-interactive-focus-bg font-semibold shadow-sm';
                       } else {
                         // Normal word
-                        className += 'hover:bg-base-04';
+                        className += 'hover:bg-interactive-fill';
                       }
 
                       return (

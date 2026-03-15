@@ -3,11 +3,20 @@
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* ===== TYPOGRAPHY ===== */
+  /* ===== 1. TYPOGRAPHY ===== */
   --font-display: 'DM Serif Display', 'Georgia', serif;
   --font-body: 'Inter', -apple-system, 'system-ui', sans-serif;
 
-  /* ===== COLORS — Base neutrals (opacity-based hierarchy) ===== */
+  --text-h1-size: clamp(2rem, 5vw, 3rem);
+  --text-h2-size: clamp(1.5rem, 4vw, 2.25rem);
+  --text-h3-size: clamp(1.25rem, 3.5vw, 1.75rem);
+  --text-h4-size: 1.25rem;
+  --text-body-size: 1rem;
+  --text-body-sm-size: 0.875rem;
+  --text-ui-size: 0.8125rem;
+  --text-label-size: 0.75rem;
+
+  /* ===== 2. COLORS — Reference palette ===== */
   --color-base: rgb(26, 28, 30);
   --color-base-90: rgba(26, 28, 30, 0.90);
   --color-base-85: rgba(26, 28, 30, 0.85);
@@ -20,12 +29,84 @@
   --color-base-04: rgba(26, 28, 30, 0.04);
   --color-base-08: rgba(26, 28, 30, 0.08);
 
-  /* ===== COLORS — Surfaces ===== */
+  /* ===== 3. COLORS — Semantic text ===== */
+  --color-text-primary: rgba(26, 28, 30, 0.90);
+  --color-text-secondary: rgba(26, 28, 30, 0.62);
+  --color-text-tertiary: rgba(26, 28, 30, 0.55);
+  --color-text-placeholder: rgba(26, 28, 30, 0.40);
+  --color-text-disabled: rgba(26, 28, 30, 0.25);
+  --color-text-on-dark: #FFFFFF;
+  --color-text-on-brand: #FFFFFF;
+
+  /* ===== 4. COLORS — Surfaces ===== */
   --color-surface-page: #FCF9F7;
   --color-surface-card: #FFFFFF;
   --color-surface-app: #FCFDFE;
 
-  /* ===== COLORS — shadcn/ui compatibility layer ===== */
+  /* ===== 5. COLORS — Interactive states ===== */
+  --color-interactive-fill: rgba(26, 28, 30, 0.04);
+  --color-interactive-hover: rgba(26, 28, 30, 0.08);
+  --color-interactive-active: rgba(26, 28, 30, 0.12);
+  --color-interactive-focus: rgb(0, 136, 255);
+  --color-interactive-focus-bg: rgba(0, 136, 255, 0.12);
+  --color-interactive-focus-border: rgba(0, 136, 255, 0.4);
+  --color-interactive-selected: rgba(26, 28, 30, 0.08);
+
+  /* ===== 6. COLORS — Feedback & status ===== */
+  --color-success: #5D9F55;
+  --color-success-foreground: #FFFFFF;
+  --color-success-subtle: rgba(93, 159, 85, 0.12);
+  --color-warning: #D3A848;
+  --color-warning-foreground: #FFFFFF;
+  --color-warning-subtle: rgba(211, 168, 72, 0.12);
+  --color-destructive: rgb(255, 56, 60);
+  --color-destructive-foreground: #FFFFFF;
+  --color-destructive-subtle: rgba(255, 56, 60, 0.10);
+  --color-info: rgb(0, 136, 255);
+  --color-info-foreground: #FFFFFF;
+  --color-info-subtle: rgba(0, 136, 255, 0.12);
+
+  /* ===== 7. COLORS — On-colors (contrast pairing) ===== */
+  --color-on-brand-mustard: #FFFFFF;
+  --color-on-brand-forest: #FFFFFF;
+  --color-on-brand-maroon: #FFFFFF;
+  --color-on-brand-crimson: #FFFFFF;
+  --color-on-brand-burnt-orange: #FFFFFF;
+  --color-on-brand-olive: rgb(26, 28, 30);
+
+  /* ===== 8. COLORS — Brand palette ===== */
+  /* Saturated (folder tabs, accents) */
+  --color-brand-mustard: #D3A848;
+  --color-brand-forest: #5D9F55;
+  --color-brand-maroon: #7D4D54;
+  --color-brand-crimson: #A11735;
+  --color-brand-burnt-orange: #D25600;
+  --color-brand-olive: #B8AC00;
+
+  /* Medium (card fills) */
+  --color-brand-ice: #B9A8B6;
+  --color-brand-emerald: #1AA53C;
+  --color-brand-sand: #C7A898;
+  --color-brand-gold: #EEB834;
+  --color-brand-lemon: #E4DC57;
+  --color-brand-peach: #E3C3B8;
+
+  /* Pastel (backgrounds) */
+  --color-brand-pale-blue: #DBE5F0;
+  --color-brand-pale-green: #EBF0D6;
+  --color-brand-lavender: #D7D8E8;
+  --color-brand-sage: #C8CAC0;
+  --color-brand-pale-gold: #F0DAA7;
+  --color-brand-pale-yellow: #F0E587;
+
+  /* ===== 9. COLORS — Chart ===== */
+  --color-chart-1: #3D8B8B;
+  --color-chart-2: #D3A848;
+  --color-chart-3: #7D4D9A;
+  --color-chart-4: #5D9F55;
+  --color-chart-5: #A11735;
+
+  /* ===== 10. COLORS — shadcn/ui compatibility ===== */
   --color-background: #FCF9F7;
   --color-foreground: rgb(26, 28, 30);
   --color-card: #FFFFFF;
@@ -40,57 +121,27 @@
   --color-muted-foreground: rgba(26, 28, 30, 0.55);
   --color-accent: rgba(26, 28, 30, 0.04);
   --color-accent-foreground: rgb(26, 28, 30);
-  --color-destructive: rgb(255, 56, 60);
-  --color-destructive-foreground: #FFFFFF;
   --color-border: rgba(26, 28, 30, 0.09);
   --color-input: rgba(26, 28, 30, 0.09);
   --color-ring: rgb(0, 136, 255);
 
-  /* ===== COLORS — Accent ===== */
-  --color-accent-blue: rgb(0, 136, 255);
-  --color-accent-blue-bg: rgba(0, 136, 255, 0.12);
-  --color-accent-blue-border: rgba(0, 136, 255, 0.4);
+  /* ===== 11. COLORS — Overlay ===== */
+  --color-overlay: rgba(0, 0, 0, 0.3);
+  --color-overlay-dark: rgba(0, 0, 0, 0.5);
 
-  /* ===== COLORS — Semantic status ===== */
-  --color-success: #5D9F55;
-  --color-success-foreground: #FFFFFF;
-  --color-warning: #D3A848;
-  --color-warning-foreground: #FFFFFF;
-  --color-info: rgb(0, 136, 255);
-  --color-info-foreground: #FFFFFF;
+  /* ===== 12. SPACING ===== */
+  --space-page-gutter: 1.5rem;
+  --space-section-gap: 1.5rem;
+  --space-card-padding: 1.25rem;
+  --space-card-gap: 1rem;
+  --space-element-gap: 0.75rem;
+  --space-inline-gap: 0.5rem;
+  --space-tight: 0.25rem;
+  --space-touch-target: 2.75rem;
+  --space-sidebar-width: 18rem;
+  --space-header-height: 3.5rem;
 
-  /* ===== COLORS — Brand palette: Saturated (folder tabs, accents) ===== */
-  --color-brand-mustard: #D3A848;
-  --color-brand-forest: #5D9F55;
-  --color-brand-maroon: #7D4D54;
-  --color-brand-crimson: #A11735;
-  --color-brand-burnt-orange: #D25600;
-  --color-brand-olive: #B8AC00;
-
-  /* ===== COLORS — Brand palette: Medium (card fills) ===== */
-  --color-brand-ice: #B9A8B6;
-  --color-brand-emerald: #1AA53C;
-  --color-brand-sand: #C7A898;
-  --color-brand-gold: #EEB834;
-  --color-brand-lemon: #E4DC57;
-  --color-brand-peach: #E3C3B8;
-
-  /* ===== COLORS — Brand palette: Pastel (backgrounds) ===== */
-  --color-brand-pale-blue: #DBE5F0;
-  --color-brand-pale-green: #EBF0D6;
-  --color-brand-lavender: #D7D8E8;
-  --color-brand-sage: #C8CAC0;
-  --color-brand-pale-gold: #F0DAA7;
-  --color-brand-pale-yellow: #F0E587;
-
-  /* ===== COLORS — Chart / data palette (analysis types) ===== */
-  --color-chart-1: #3D8B8B;
-  --color-chart-2: #D3A848;
-  --color-chart-3: #7D4D9A;
-  --color-chart-4: #5D9F55;
-  --color-chart-5: #A11735;
-
-  /* ===== BORDER RADIUS ===== */
+  /* ===== 13. BORDER RADIUS ===== */
   --radius-sm: 0.375rem;  /* 6px */
   --radius-md: 0.5rem;    /* 8px */
   --radius-lg: 0.625rem;  /* 10px */
@@ -98,15 +149,20 @@
   --radius-2xl: 1rem;     /* 16px */
   --radius-3xl: 1.125rem; /* 18px */
   --radius-full: 9999px;  /* pill */
+  --radius-badge: 0.25rem;
+  --radius-control: 0.5rem;
+  --radius-card: 1rem;
+  --radius-popup: 1.5rem;
+  --radius-pill: 9999px;
 
-  /* ===== SHADOWS ===== */
+  /* ===== 14. SHADOWS ===== */
   --shadow-subtle: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.08), 0 8px 12px -6px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.03);
   --shadow-block: 0 50px 40px rgba(0, 0, 0, 0.01), 0 50px 40px rgba(0, 0, 0, 0.02), 0 20px 40px rgba(0, 0, 0, 0.05), 0 3px 10px rgba(0, 0, 0, 0.08);
   --shadow-popup: 0 4px 9px rgba(0, 0, 0, 0.07), 0 16px 16px rgba(0, 0, 0, 0.06), 0 36px 22px rgba(0, 0, 0, 0.04), 0 65px 26px rgba(0, 0, 0, 0.01), 0 0 0 1px rgba(0, 0, 0, 0.03);
   --shadow-hover: 0 20px 25px 4px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
-  /* ===== Z-INDEX ===== */
+  /* ===== 15. Z-INDEX ===== */
   --z-base: 0;
   --z-noise: 1;
   --z-content: 2;
@@ -117,19 +173,21 @@
   --z-modal: 100;
   --z-toast: 200;
 
-  /* ===== TRANSITIONS ===== */
+  /* ===== 16. TRANSITIONS ===== */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-micro: 0.15s;
   --duration-normal: 0.2s;
   --duration-slow: 0.5s;
 
-  /* ===== SIZING ===== */
+  /* ===== 17. SIZING ===== */
   --size-touch: 2.75rem;   /* 44px - minimum touch target */
   --ring-width: 0.125rem;  /* 2px - focus ring width */
 
-  /* ===== OVERLAY ===== */
-  --color-overlay: rgba(0, 0, 0, 0.3);
-  --color-overlay-dark: rgba(0, 0, 0, 0.5);
+  /* ===== COLORS — Accent (kept for backwards compat) ===== */
+  --color-accent-blue: rgb(0, 136, 255);
+  --color-accent-blue-bg: rgba(0, 136, 255, 0.12);
+  --color-accent-blue-border: rgba(0, 136, 255, 0.4);
 }
 
 /* ===== DARK MODE OVERRIDES ===== */
@@ -153,6 +211,38 @@
   --color-base-05: rgba(237, 235, 233, 0.05);
   --color-base-04: rgba(237, 235, 233, 0.04);
   --color-base-08: rgba(237, 235, 233, 0.08);
+
+  /* Semantic text — dark mode */
+  --color-text-primary: rgba(237, 235, 233, 0.90);
+  --color-text-secondary: rgba(237, 235, 233, 0.62);
+  --color-text-tertiary: rgba(237, 235, 233, 0.55);
+  --color-text-placeholder: rgba(237, 235, 233, 0.40);
+  --color-text-disabled: rgba(237, 235, 233, 0.25);
+  --color-text-on-dark: #FFFFFF;
+  --color-text-on-brand: #FFFFFF;
+
+  /* Interactive states — dark mode */
+  --color-interactive-fill: rgba(237, 235, 233, 0.04);
+  --color-interactive-hover: rgba(237, 235, 233, 0.08);
+  --color-interactive-active: rgba(237, 235, 233, 0.12);
+  --color-interactive-focus: rgb(56, 162, 255);
+  --color-interactive-focus-bg: rgba(56, 162, 255, 0.12);
+  --color-interactive-focus-border: rgba(56, 162, 255, 0.4);
+  --color-interactive-selected: rgba(237, 235, 233, 0.08);
+
+  /* On-colors — dark mode */
+  --color-on-brand-mustard: #FFFFFF;
+  --color-on-brand-forest: #FFFFFF;
+  --color-on-brand-maroon: #FFFFFF;
+  --color-on-brand-crimson: #FFFFFF;
+  --color-on-brand-burnt-orange: #FFFFFF;
+  --color-on-brand-olive: rgb(237, 235, 233);
+
+  /* Feedback subtle — dark mode (slightly higher opacity) */
+  --color-success-subtle: rgba(93, 159, 85, 0.15);
+  --color-warning-subtle: rgba(211, 168, 72, 0.15);
+  --color-destructive-subtle: rgba(255, 56, 60, 0.15);
+  --color-info-subtle: rgba(0, 136, 255, 0.15);
 
   /* shadcn compatibility */
   --color-background: #141618;
@@ -240,7 +330,7 @@ body {
 /* ===== TYPOGRAPHY UTILITIES ===== */
 @utility text-h1 {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3rem);        /* 32-48px */
+  font-size: var(--text-h1-size);              /* 32-48px */
   font-weight: 400;
   line-height: 1.125;                         /* 36-54px */
   letter-spacing: -0.04em;
@@ -248,7 +338,7 @@ body {
 
 @utility text-h2 {
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 4vw, 2.25rem);   /* 24-36px */
+  font-size: var(--text-h2-size);              /* 24-36px */
   font-weight: 400;
   line-height: 1.167;                         /* 28-42px */
   letter-spacing: -0.03em;
@@ -256,7 +346,7 @@ body {
 
 @utility text-h3 {
   font-family: var(--font-display);
-  font-size: clamp(1.25rem, 3.5vw, 1.75rem); /* 20-28px */
+  font-size: var(--text-h3-size);              /* 20-28px */
   font-weight: 400;
   line-height: 1.2;                           /* 24-34px */
   letter-spacing: -0.02em;
@@ -264,7 +354,7 @@ body {
 
 @utility text-h4 {
   font-family: var(--font-display);
-  font-size: 1.25rem;                        /* 20px (was 22px off-grid) */
+  font-size: var(--text-h4-size);              /* 20px */
   font-weight: 400;
   line-height: 1.4;                           /* 28px */
   letter-spacing: -0.02em;
@@ -272,21 +362,21 @@ body {
 
 @utility text-ui {
   font-family: var(--font-body);
-  font-size: 0.8125rem;                      /* 13px — Craft standard for UI text */
+  font-size: var(--text-ui-size);              /* 13px — Craft standard for UI text */
   font-weight: 500;
   line-height: 1.385;                         /* 18px */
 }
 
 @utility text-label {
   font-family: var(--font-body);
-  font-size: 0.75rem;                        /* 12px */
+  font-size: var(--text-label-size);           /* 12px */
   font-weight: 600;
   line-height: 1.333;                         /* 16px */
 }
 
 @utility text-section {
   font-family: var(--font-body);
-  font-size: 0.875rem;                       /* 14px */
+  font-size: var(--text-body-sm-size);         /* 14px */
   font-weight: 500;
   line-height: 1.429;                         /* 20px */
   letter-spacing: 0.04em;
@@ -295,7 +385,7 @@ body {
 
 @utility text-body {
   font-family: var(--font-body);
-  font-size: 1rem;                           /* 16px */
+  font-size: var(--text-body-size);            /* 16px */
   font-weight: 400;
   line-height: 1.5;                           /* 24px */
   letter-spacing: -0.01em;
@@ -303,7 +393,7 @@ body {
 
 @utility text-body-sm {
   font-family: var(--font-body);
-  font-size: 0.875rem;                       /* 14px */
+  font-size: var(--text-body-sm-size);         /* 14px */
   font-weight: 400;
   line-height: 1.429;                         /* 20px */
 }

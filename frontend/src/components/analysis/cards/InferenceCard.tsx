@@ -11,8 +11,8 @@ interface InferenceCardProps {
 
 export function InferenceCard({ inference, chunk, compact = false }: InferenceCardProps) {
   const badgeStyle = chunk
-    ? chunkTypeStyles[chunk.type]?.badge || "bg-base-04 text-base-55"
-    : "bg-base-04 text-base-55";
+    ? chunkTypeStyles[chunk.type]?.badge || "bg-interactive-fill text-text-tertiary"
+    : "bg-interactive-fill text-text-tertiary";
 
   return (
     <div className="bg-card rounded-xl p-3 sm:p-4">
@@ -22,17 +22,17 @@ export function InferenceCard({ inference, chunk, compact = false }: InferenceCa
           <Badge className={`${badgeStyle} text-label`}>
             {chunk?.type || "unknown"}
           </Badge>
-          <span className="text-label text-base-40 font-mono">
+          <span className="text-label text-text-placeholder font-mono">
             {inference.chunk_id}
           </span>
         </div>
       </div>
 
       {compact ? (
-        <p className="text-sm text-base-85">
+        <p className="text-sm text-text-primary">
           {inference.inferences.length} inference{inference.inferences.length !== 1 ? "s" : ""}
           {chunk && (
-            <span className="text-base-40 ml-1 line-clamp-1">
+            <span className="text-text-placeholder ml-1 line-clamp-1">
               &mdash; {chunk.text}
             </span>
           )}
@@ -40,7 +40,7 @@ export function InferenceCard({ inference, chunk, compact = false }: InferenceCa
       ) : (
         <div className="space-y-2 mt-2">
           {chunk && (
-            <p className="text-sm text-base-55 line-clamp-2 mb-3">
+            <p className="text-sm text-text-tertiary line-clamp-2 mb-3">
               {chunk.text}
             </p>
           )}
@@ -49,8 +49,8 @@ export function InferenceCard({ inference, chunk, compact = false }: InferenceCa
               key={item.inference_id}
               className="border-l-2 border-brand-mustard/40 pl-3 py-1"
             >
-              <p className="text-sm text-base-85">{item.meaning}</p>
-              <p className="text-label text-base-40 mt-1">{item.importance}</p>
+              <p className="text-sm text-text-primary">{item.meaning}</p>
+              <p className="text-label text-text-placeholder mt-1">{item.importance}</p>
             </div>
           ))}
         </div>

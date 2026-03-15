@@ -25,13 +25,13 @@ const insightColumns: TableColumn<Insight>[] = [
     </Badge>
   ), className: "w-28" },
   { key: "headline", label: "Headline", sortable: true, render: (ins) => (
-    <span className="font-semibold text-sm text-base-85">{ins.headline}</span>
+    <span className="font-semibold text-sm text-text-primary">{ins.headline}</span>
   ) },
   { key: "explanation", label: "Explanation", render: (ins) => (
-    <p className="text-sm text-base-55 line-clamp-2">{ins.explanation}</p>
+    <p className="text-sm text-text-tertiary line-clamp-2">{ins.explanation}</p>
   ) },
   { key: "evidence", label: "Evidence", sortable: false, render: (ins) => (
-    <span className="text-sm text-base-40">{ins.evidence.length}</span>
+    <span className="text-sm text-text-placeholder">{ins.evidence.length}</span>
   ), className: "w-24" },
 ];
 
@@ -79,7 +79,7 @@ export function InsightsList({ insights, viewMode = "list", sort, onSort }: Insi
         {insights.map((insight) => (
           <AccordionItem key={insight.insight_id} value={insight.insight_id}>
             <div className="bg-card rounded-2xl overflow-hidden border-l-4 border-l-brand-maroon">
-              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-base-04">
+              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-interactive-fill">
                 <div className="flex items-start gap-3 text-left flex-1">
                   <Sparkles className="h-5 w-5 text-brand-maroon flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -91,10 +91,10 @@ export function InsightsList({ insights, viewMode = "list", sort, onSort }: Insi
                         {insight.confidence} confidence
                       </Badge>
                     </div>
-                    <h4 className="font-semibold text-base text-base-85 mb-1">
+                    <h4 className="font-semibold text-base text-text-primary mb-1">
                       {insight.headline}
                     </h4>
-                    <p className="text-sm text-base-55 line-clamp-2">
+                    <p className="text-sm text-text-tertiary line-clamp-2">
                       {insight.explanation}
                     </p>
                   </div>
@@ -104,40 +104,40 @@ export function InsightsList({ insights, viewMode = "list", sort, onSort }: Insi
               <AccordionContent className="px-5 pb-5">
                 <div className="space-y-4 pl-8">
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Explanation
                     </div>
-                    <p className="text-base-85 leading-relaxed">{insight.explanation}</p>
+                    <p className="text-text-primary leading-relaxed">{insight.explanation}</p>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Implications
                     </div>
-                    <p className="text-base-85 leading-relaxed">{insight.implications}</p>
+                    <p className="text-text-primary leading-relaxed">{insight.implications}</p>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Evidence ({insight.evidence.length})
                     </div>
                     <ul className="space-y-2">
                       {insight.evidence.map((item, idx) => (
                         <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl">
-                          <span className="text-base-25">&#8226;</span>
-                          <span className="text-base-55">{item}</span>
+                          <span className="text-text-disabled">&#8226;</span>
+                          <span className="text-text-tertiary">{item}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
                   <div>
-                    <div className="text-label text-base-40 uppercase mb-2">
+                    <div className="text-label text-text-placeholder uppercase mb-2">
                       Supporting Patterns ({insight.supporting_patterns.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {insight.supporting_patterns.map((patternId) => (
-                        <Badge key={patternId} variant="outline" className="font-mono text-xs text-base-55 border-base-09">
+                        <Badge key={patternId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
                           {patternId}
                         </Badge>
                       ))}

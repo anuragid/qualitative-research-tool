@@ -14,10 +14,10 @@ export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCar
   return (
     <div className="bg-card rounded-xl p-3 sm:p-4">
       <div className="flex items-start gap-2 mb-2">
-        <Network className="h-4 w-4 text-accent-blue flex-shrink-0 mt-0.5" />
+        <Network className="h-4 w-4 text-interactive-focus flex-shrink-0 mt-0.5" />
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="font-semibold text-sm text-base-85">
+            <span className="font-semibold text-sm text-text-primary">
               {metaPattern.pattern_name}
             </span>
           </div>
@@ -25,17 +25,17 @@ export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCar
             <Badge className={`${consStyle} text-label`}>
               {metaPattern.consistency}
             </Badge>
-            <Badge className="bg-accent-blue-bg text-accent-blue text-label">
+            <Badge className="bg-interactive-focus-bg text-interactive-focus text-label">
               {metaPattern.appears_in_videos.length} video{metaPattern.appears_in_videos.length !== 1 ? "s" : ""}
             </Badge>
           </div>
         </div>
       </div>
-      <p className={`text-sm text-base-55 mt-2 ${compact ? "line-clamp-2" : ""}`}>
+      <p className={`text-sm text-text-tertiary mt-2 ${compact ? "line-clamp-2" : ""}`}>
         {metaPattern.description}
       </p>
       {!compact && (
-        <div className="mt-2 text-label text-base-40">
+        <div className="mt-2 text-label text-text-placeholder">
           {metaPattern.related_patterns.length} related pattern{metaPattern.related_patterns.length !== 1 ? "s" : ""}
         </div>
       )}

@@ -14,7 +14,7 @@ const modes: { value: ViewMode; icon: typeof List; label: string }[] = [
 
 export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-lg bg-base-04 p-0.5">
+    <div className="inline-flex items-center gap-0.5 rounded-lg bg-interactive-fill p-0.5">
       {modes.map(({ value, icon: Icon, label }) => (
         <button
           key={value}
@@ -22,7 +22,7 @@ export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
           className={`p-1.5 rounded-md transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
             viewMode === value
               ? "bg-surface-card text-foreground shadow-subtle"
-              : "text-base-40 hover:text-base-62"
+              : "text-text-placeholder hover:text-text-secondary"
           }`}
           aria-label={label}
           aria-pressed={viewMode === value}

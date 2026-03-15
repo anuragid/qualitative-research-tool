@@ -64,7 +64,7 @@ function ToolbarDemo({ step }: { step: AnalysisStep }) {
         collapseAll={collapseAll}
         processData={processData}
       />
-      <div className="mt-4 p-4 rounded-lg bg-base-04 text-sm text-base-55">
+      <div className="mt-4 p-4 rounded-lg bg-interactive-fill text-sm text-text-tertiary">
         <p><strong>View mode:</strong> {viewMode}</p>
         <p><strong>Sort:</strong> {sort ? `${sort.field} (${sort.direction})` : "none"}</p>
         <p><strong>Filters:</strong> {Object.keys(activeFilters).length > 0

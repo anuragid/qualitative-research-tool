@@ -173,7 +173,7 @@ export function UploadManager() {
                     title="Pause all uploads"
                     aria-label="Pause all uploads"
                   >
-                    <Pause className="h-4 w-4 text-base-55" />
+                    <Pause className="h-4 w-4 text-text-tertiary" />
                   </button>
                 ) : (
                   <button
@@ -196,15 +196,15 @@ export function UploadManager() {
                   e.stopPropagation();
                   clearCompleted();
                 }}
-                className="text-xs text-base-55 hover:text-foreground/80 transition-colors"
+                className="text-xs text-text-tertiary hover:text-foreground/80 transition-colors"
               >
                 Clear
               </button>
             )}
             {isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-base-55" />
+              <ChevronDown className="h-4 w-4 text-text-tertiary" />
             ) : (
-              <ChevronUp className="h-4 w-4 text-base-55" />
+              <ChevronUp className="h-4 w-4 text-text-tertiary" />
             )}
           </div>
         </div>
@@ -215,7 +215,7 @@ export function UploadManager() {
         <div className="mt-2 bg-card border border-border rounded-lg shadow-lg max-h-96 overflow-y-auto">
           {/* Summary Bar */}
           {(pendingCount > 0 || activeCount > 0 || pausedCount > 0) && (
-            <div className="p-2 border-b border-border bg-base-04 text-xs text-base-55">
+            <div className="p-2 border-b border-border bg-interactive-fill text-xs text-text-tertiary">
               <div className="flex items-center gap-3">
                 {uploadingCount > 0 && (
                   <span className="flex items-center gap-1">
@@ -231,7 +231,7 @@ export function UploadManager() {
                 )}
                 {pendingCount > 0 && (
                   <span className="flex items-center gap-1">
-                    <Circle className="h-3 w-3 text-base-55" />
+                    <Circle className="h-3 w-3 text-text-tertiary" />
                     Waiting: {pendingCount}
                   </span>
                 )}
@@ -270,7 +270,7 @@ export function UploadManager() {
                   case 'error':
                     return 'border-destructive/30 bg-destructive/5';
                   case 'cancelled':
-                    return 'border-border bg-base-04/50 opacity-60';
+                    return 'border-border bg-interactive-fill/50 opacity-60';
                   case 'pending':
                     return 'border-border bg-card';
                   default:
@@ -292,7 +292,7 @@ export function UploadManager() {
                         <p className="text-xs font-medium text-foreground mb-2">
                           Cancel this upload?
                         </p>
-                        <p className="text-xs text-base-55 mb-3">
+                        <p className="text-xs text-text-tertiary mb-3">
                           Progress will be lost and cannot be recovered.
                         </p>
                         <div className="flex gap-2 justify-center">
@@ -304,7 +304,7 @@ export function UploadManager() {
                           </button>
                           <button
                             onClick={cancelConfirmation}
-                            className="px-3 py-1 bg-base-04 text-foreground/80 text-xs rounded hover:bg-accent transition-colors"
+                            className="px-3 py-1 bg-interactive-fill text-foreground/80 text-xs rounded hover:bg-accent transition-colors"
                           >
                             Keep
                           </button>
@@ -333,18 +333,18 @@ export function UploadManager() {
                         <PauseCircle className="h-3 w-3 text-warning flex-shrink-0" />
                       )}
                       {upload.status === 'cancelled' && (
-                        <XCircle className="h-3 w-3 text-base-55 flex-shrink-0" />
+                        <XCircle className="h-3 w-3 text-text-tertiary flex-shrink-0" />
                       )}
                       {upload.status === 'pending' && (
-                        <Clock className="h-3 w-3 text-base-55 flex-shrink-0" />
+                        <Clock className="h-3 w-3 text-text-tertiary flex-shrink-0" />
                       )}
                     </div>
 
                     {/* Project name and status details */}
-                    <p className="text-xs text-base-55 truncate">
+                    <p className="text-xs text-text-tertiary truncate">
                       {upload.projectName}
                       {upload.status === 'pending' && queuePosition > 0 && (
-                        <span className="text-base-55"> • Position {queuePosition} in queue</span>
+                        <span className="text-text-tertiary"> • Position {queuePosition} in queue</span>
                       )}
                       {upload.status === 'paused' && upload.pausedProgress !== undefined && upload.pausedProgress > 0 && (
                         <span className="text-warning font-medium"> • Ready to resume ({Math.round(upload.pausedProgress)}% uploaded)</span>
@@ -353,7 +353,7 @@ export function UploadManager() {
                         <span className="text-chart-3 font-medium"> • {upload.processingMessage || 'Processing on server...'}</span>
                       )}
                       {upload.status === 'cancelled' && (
-                        <span className="text-base-55"> • Cancelled by user</span>
+                        <span className="text-text-tertiary"> • Cancelled by user</span>
                       )}
                       {upload.status === 'completed' && (
                         <span className="text-success"> • Upload complete</span>
@@ -363,7 +363,7 @@ export function UploadManager() {
                     {/* Upload progress details */}
                     {upload.status === 'uploading' && upload.uploadedBytes && (
                       <>
-                        <p className="text-xs text-base-55">
+                        <p className="text-xs text-text-tertiary">
                           {formatFileSize(upload.uploadedBytes)} / {formatFileSize(upload.file.size)}
                           {upload.uploadSpeed && upload.uploadSpeed > 0 && (
                             <> • {formatSpeed(upload.uploadSpeed)}</>
@@ -374,7 +374,7 @@ export function UploadManager() {
                           className="mt-1 h-1.5"
                         />
                         {upload.eta && upload.eta !== Infinity && (
-                          <p className="text-xs text-base-55 mt-1">
+                          <p className="text-xs text-text-tertiary mt-1">
                             ~{formatETA(upload.eta)} remaining
                           </p>
                         )}
@@ -413,7 +413,7 @@ export function UploadManager() {
                     {/* Paused progress */}
                     {upload.status === 'paused' && upload.pausedProgress && upload.pausedProgress > 0 && (
                       <>
-                        <p className="text-xs text-base-55">
+                        <p className="text-xs text-text-tertiary">
                           {upload.pausedUploadedBytes ? formatFileSize(upload.pausedUploadedBytes) : '0 Bytes'} / {formatFileSize(upload.file.size)}
                         </p>
                         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-warning/30">
@@ -439,7 +439,7 @@ export function UploadManager() {
                         title="Pause upload"
                         aria-label="Pause upload"
                       >
-                        <Pause className="h-3.5 w-3.5 text-base-55 group-hover:text-warning" />
+                        <Pause className="h-3.5 w-3.5 text-text-tertiary group-hover:text-warning" />
                       </button>
                     )}
 
@@ -463,7 +463,7 @@ export function UploadManager() {
                         title="Cancel upload permanently"
                         aria-label="Cancel upload"
                       >
-                        <X className="h-3.5 w-3.5 text-base-55 group-hover:text-destructive" />
+                        <X className="h-3.5 w-3.5 text-text-tertiary group-hover:text-destructive" />
                       </button>
                     )}
 
@@ -475,7 +475,7 @@ export function UploadManager() {
                         title="Cancel upload permanently"
                         aria-label="Cancel upload"
                       >
-                        <X className="h-3.5 w-3.5 text-base-55 group-hover:text-destructive" />
+                        <X className="h-3.5 w-3.5 text-text-tertiary group-hover:text-destructive" />
                       </button>
                     )}
 
@@ -499,7 +499,7 @@ export function UploadManager() {
                         title="Remove from list"
                         aria-label="Remove from list"
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-base-55 group-hover:text-base-55" />
+                        <Trash2 className="h-3.5 w-3.5 text-text-tertiary group-hover:text-text-tertiary" />
                       </button>
                     )}
 
@@ -510,7 +510,7 @@ export function UploadManager() {
                         title={`Error type: ${upload.errorType || 'unknown'}`}
                         aria-label="Error information"
                       >
-                        <HelpCircle className="h-3.5 w-3.5 text-base-55 group-hover:text-base-55" />
+                        <HelpCircle className="h-3.5 w-3.5 text-text-tertiary group-hover:text-text-tertiary" />
                       </button>
                     )}
                   </div>

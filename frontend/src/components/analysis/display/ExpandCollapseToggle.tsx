@@ -12,7 +12,7 @@ export function ExpandCollapseToggle({ expanded, onExpandAll, onCollapseAll }: E
   return (
     <button
       onClick={isAllExpanded ? onCollapseAll : onExpandAll}
-      className="h-8 px-2 text-ui text-base-40 hover:text-base-62 rounded-md hover:bg-base-04 flex items-center gap-1.5 transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+      className="h-8 px-2 text-ui text-text-placeholder hover:text-text-secondary rounded-md hover:bg-interactive-fill flex items-center gap-1.5 transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
       aria-label={isAllExpanded ? "Collapse all" : "Expand all"}
     >
       {isAllExpanded ? (

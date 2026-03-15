@@ -224,8 +224,8 @@ export default function VideoDetailPage() {
     return (
       <Layout>
         <div className="min-h-screen bg-surface-page flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-base-40" />
-          <p className="mt-3 text-sm text-base-55">Loading video details...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-placeholder" />
+          <p className="mt-3 text-sm text-text-tertiary">Loading video details...</p>
         </div>
       </Layout>
     );
@@ -235,9 +235,9 @@ export default function VideoDetailPage() {
     return (
       <Layout>
         <div className="min-h-screen bg-surface-page text-center py-12">
-          <AlertCircle className="h-12 w-12 text-base-40 mx-auto mb-4" />
+          <AlertCircle className="h-12 w-12 text-text-placeholder mx-auto mb-4" />
           <h2 className="text-h3 mb-2">Video Not Found</h2>
-          <p className="text-base-55 mb-4">
+          <p className="text-text-tertiary mb-4">
             The video you're looking for doesn't exist or has been removed.
           </p>
           <Link to="/projects">
@@ -345,7 +345,7 @@ export default function VideoDetailPage() {
           {/* Breadcrumb / Back Navigation */}
           <div className="flex items-center gap-3">
             <Link to={`/projects/${video.project_id}`}>
-              <Button variant="ghost" size="sm" className="text-base-55 hover:text-base-85 gap-2 rounded-full">
+              <Button variant="ghost" size="sm" className="text-text-tertiary hover:text-text-primary gap-2 rounded-full">
                 <ArrowLeft className="h-4 w-4" />
                 {project?.name ? `Back to ${project.name}` : "Back to Project"}
               </Button>
@@ -356,15 +356,15 @@ export default function VideoDetailPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h1 className="text-h3 sm:text-h2 text-foreground truncate">{video.filename}</h1>
-              <div className="flex items-center gap-3 mt-2 text-sm text-base-55">
+              <div className="flex items-center gap-3 mt-2 text-sm text-text-tertiary">
                 <span>{formatFileSize(video.file_size_bytes)}</span>
                 {video.duration_seconds && (
                   <>
-                    <span className="text-base-25">|</span>
+                    <span className="text-text-disabled">|</span>
                     <span>{Math.floor(video.duration_seconds / 60)}:{(video.duration_seconds % 60).toString().padStart(2, '0')}</span>
                   </>
                 )}
-                <span className="text-base-25">|</span>
+                <span className="text-text-disabled">|</span>
                 <span>{new Date(video.uploaded_at).toLocaleDateString()}</span>
               </div>
             </div>
@@ -403,7 +403,7 @@ export default function VideoDetailPage() {
           {/* Progress indicator for ongoing tasks */}
           {(video.status === "transcribing" || video.status === "analyzing") && (
             <div className="bg-card rounded-2xl shadow-card p-4 sm:p-6 space-y-3">
-              <div className="flex items-center gap-2 text-sm text-base-55 overflow-x-auto">
+              <div className="flex items-center gap-2 text-sm text-text-tertiary overflow-x-auto">
                 <Clock className="h-4 w-4" />
                 <span>
                   {video.status === "transcribing"
@@ -417,13 +417,13 @@ export default function VideoDetailPage() {
 
           {/* WORKFLOW PREREQUISITES SECTION */}
           {transcript && !analysis && (
-            <div className="bg-card rounded-2xl shadow-card border border-accent-blue-border/30 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-card border border-interactive-focus-border/30 overflow-hidden">
               <div className="p-6 border-b border-border">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-accent-blue" />
+                  <CheckCircle className="h-5 w-5 text-interactive-focus" />
                   <h2 className="text-h4 text-foreground">Analysis Prerequisites</h2>
                   <SimpleTooltip content="Complete these steps before starting the 5D analysis">
-                    <Info className="h-4 w-4 text-accent-blue" />
+                    <Info className="h-4 w-4 text-interactive-focus" />
                   </SimpleTooltip>
                 </div>
               </div>
@@ -435,10 +435,10 @@ export default function VideoDetailPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-base-85">1. Upload Video</h3>
+                      <h3 className="font-semibold text-text-primary">1. Upload Video</h3>
                       <Badge variant="success" className="text-xs">Complete</Badge>
                     </div>
-                    <p className="text-sm text-base-55 mt-1">Your video has been uploaded successfully.</p>
+                    <p className="text-sm text-text-tertiary mt-1">Your video has been uploaded successfully.</p>
                   </div>
                 </div>
 
@@ -449,10 +449,10 @@ export default function VideoDetailPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-base-85">2. Complete Transcription</h3>
+                      <h3 className="font-semibold text-text-primary">2. Complete Transcription</h3>
                       <Badge variant="success" className="text-xs">Complete</Badge>
                     </div>
-                    <p className="text-sm text-base-55 mt-1">Audio has been transcribed with speaker detection.</p>
+                    <p className="text-sm text-text-tertiary mt-1">Audio has been transcribed with speaker detection.</p>
                   </div>
                 </div>
 
@@ -469,34 +469,34 @@ export default function VideoDetailPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-base-85">3. Assign Speaker Roles</h3>
+                      <h3 className="font-semibold text-text-primary">3. Assign Speaker Roles</h3>
                       {canStartAnalysis() ? (
                         <Badge variant="success" className="text-xs">Complete</Badge>
                       ) : (
                         <Badge variant="warning" className="text-xs">Required</Badge>
                       )}
                       <SimpleTooltip content="The analysis filters content based on speaker roles. Only participant responses are analyzed to extract insights.">
-                        <Info className="h-4 w-4 text-accent-blue" />
+                        <Info className="h-4 w-4 text-interactive-focus" />
                       </SimpleTooltip>
                     </div>
-                    <p className="text-sm text-base-55 mt-1">
+                    <p className="text-sm text-text-tertiary mt-1">
                       <strong>Critical:</strong> Identify who is the interviewer vs. participant in your video.
                     </p>
 
                     {/* Why this matters */}
-                    <div className="mt-3 p-4 bg-brand-pale-blue/30 border border-accent-blue-border/20 rounded-xl">
+                    <div className="mt-3 p-4 bg-brand-pale-blue/30 border border-interactive-focus-border/20 rounded-xl">
                       <div className="flex items-start gap-2">
-                        <Info className="h-4 w-4 text-accent-blue flex-shrink-0 mt-0.5" />
-                        <div className="text-sm text-base-85">
+                        <Info className="h-4 w-4 text-interactive-focus flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-text-primary">
                           <p className="font-semibold mb-1">Why speaker roles matter:</p>
-                          <p className="text-base-62">The 5D analysis focuses exclusively on <strong>participant responses</strong> to extract insights about user needs and behaviors. Interviewer questions provide context but are not analyzed. This ensures the analysis captures the participant's perspective, not the interviewer's.</p>
+                          <p className="text-text-secondary">The 5D analysis focuses exclusively on <strong>participant responses</strong> to extract insights about user needs and behaviors. Interviewer questions provide context but are not analyzed. This ensures the analysis captures the participant's perspective, not the interviewer's.</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Speaker labels interface */}
                     <div className="mt-4 space-y-3">
-                      <h4 className="text-sm font-semibold text-base-62 flex items-center gap-2">
+                      <h4 className="text-sm font-semibold text-text-secondary flex items-center gap-2">
                         <Users className="h-4 w-4" />
                         Detected Speakers ({getUniqueSpeakers().length})
                       </h4>
@@ -569,11 +569,11 @@ export default function VideoDetailPage() {
                             ) : (
                               <>
                                 <div className="flex-1">
-                                  <div className="font-medium text-base-85">
+                                  <div className="font-medium text-text-primary">
                                     {label?.assigned_name || speaker}
                                   </div>
                                   {label?.role ? (
-                                    <div className="text-sm font-semibold text-base-62">
+                                    <div className="text-sm font-semibold text-text-secondary">
                                       Role: {label.role}
                                     </div>
                                   ) : (
@@ -617,18 +617,18 @@ export default function VideoDetailPage() {
                 {/* Step 4: Start Analysis */}
                 <div className="flex items-start gap-3">
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                    canStartAnalysis() ? "bg-accent-blue-bg" : "bg-base-04"
+                    canStartAnalysis() ? "bg-interactive-focus-bg" : "bg-interactive-fill"
                   }`}>
-                    <Lightbulb className={`h-5 w-5 ${canStartAnalysis() ? "text-accent-blue" : "text-base-40"}`} />
+                    <Lightbulb className={`h-5 w-5 ${canStartAnalysis() ? "text-interactive-focus" : "text-text-placeholder"}`} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-base-85">4. Start 5D Analysis</h3>
+                      <h3 className="font-semibold text-text-primary">4. Start 5D Analysis</h3>
                       {!canStartAnalysis() && (
                         <Badge variant="secondary" className="text-xs">Waiting</Badge>
                       )}
                     </div>
-                    <p className="text-sm text-base-55 mt-1">
+                    <p className="text-sm text-text-tertiary mt-1">
                       Once all speakers have assigned roles, you can begin the analysis.
                     </p>
 
@@ -691,8 +691,8 @@ export default function VideoDetailPage() {
           {/* Original transcription button if no transcript yet */}
           {canStartTranscription && (
             <div className="bg-card rounded-2xl shadow-card p-12 text-center">
-              <FileText className="h-12 w-12 text-base-25 mx-auto mb-4" />
-              <p className="text-base-55 mb-4">
+              <FileText className="h-12 w-12 text-text-disabled mx-auto mb-4" />
+              <p className="text-text-tertiary mb-4">
                 No transcript available. Start transcription to begin the analysis process.
               </p>
               <Button onClick={handleStartTranscription} disabled={startTranscription.isPending} className="rounded-full">
@@ -739,7 +739,7 @@ export default function VideoDetailPage() {
               <TabsContent value="transcript" className="mt-6">
                 {transcriptLoading ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-base-40" />
+                    <Loader2 className="h-8 w-8 animate-spin text-text-placeholder" />
                   </div>
                 ) : transcript ? (
                   <TranscriptViewer
@@ -755,7 +755,7 @@ export default function VideoDetailPage() {
               <TabsContent value="analysis" className="mt-6 space-y-6">
                 {analysisLoading ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-base-40" />
+                    <Loader2 className="h-8 w-8 animate-spin text-text-placeholder" />
                   </div>
                 ) : hasAnalysis ? (
                   // Complete mode: Show all steps in tabbed accordion sections
@@ -879,7 +879,7 @@ export default function VideoDetailPage() {
                       </div>
                       <div className="p-5 space-y-4">
                         <div className="flex items-center gap-2 text-sm">
-                          <span className="text-base-55">Current Step:</span>
+                          <span className="text-text-tertiary">Current Step:</span>
                           <Badge variant="default">
                             Step {stepInfo.number}: {stepInfo.name}
                           </Badge>
@@ -891,7 +891,7 @@ export default function VideoDetailPage() {
                           )}
                         </div>
                         <Progress value={(stepInfo.number / 5) * 100} />
-                        <div className="flex items-center gap-2 text-xs text-base-40">
+                        <div className="flex items-center gap-2 text-xs text-text-placeholder">
                           <CheckCircle className="h-4 w-4 text-brand-forest" />
                           {stepInfo.number} of 5 steps completed
                         </div>
@@ -983,8 +983,8 @@ export default function VideoDetailPage() {
                       <TabsContent value="chunks" className="mt-6">
                         {analysis.step_status?.chunk === "processing" ? (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">Processing chunks...</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">Processing chunks...</p>
                           </div>
                         ) : analysis.chunks ? (
                           <>
@@ -997,7 +997,7 @@ export default function VideoDetailPage() {
                             />
                             {analysis.current_step === "chunk" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
-                                <p className="text-base-55 mb-4">
+                                <p className="text-text-tertiary mb-4">
                                   Review the {analysis.chunks.length} chunks above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -1016,8 +1016,8 @@ export default function VideoDetailPage() {
                       <TabsContent value="inferences" className="mt-6">
                         {(startInferStep.isPending || analysis.step_status?.infer === "processing") ? (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">{startInferStep.isPending ? "Starting..." : "Generating inferences..."}</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">{startInferStep.isPending ? "Starting..." : "Generating inferences..."}</p>
                           </div>
                         ) : analysis.inferences ? (
                           <>
@@ -1031,7 +1031,7 @@ export default function VideoDetailPage() {
                             />
                             {analysis.current_step === "infer" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
-                                <p className="text-base-55 mb-4">
+                                <p className="text-text-tertiary mb-4">
                                   Review the {analysis.inferences.length} inferences above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -1046,8 +1046,8 @@ export default function VideoDetailPage() {
                           </>
                         ) : (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">Loading inferences...</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">Loading inferences...</p>
                           </div>
                         )}
                       </TabsContent>
@@ -1055,8 +1055,8 @@ export default function VideoDetailPage() {
                       <TabsContent value="patterns" className="mt-6">
                         {(startRelateStep.isPending || analysis.step_status?.relate === "processing") ? (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">{startRelateStep.isPending ? "Starting..." : "Identifying patterns..."}</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">{startRelateStep.isPending ? "Starting..." : "Identifying patterns..."}</p>
                           </div>
                         ) : analysis.patterns ? (
                           <>
@@ -1069,7 +1069,7 @@ export default function VideoDetailPage() {
                             />
                             {analysis.current_step === "relate" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
-                                <p className="text-base-55 mb-4">
+                                <p className="text-text-tertiary mb-4">
                                   Review the {analysis.patterns.length} patterns above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -1084,8 +1084,8 @@ export default function VideoDetailPage() {
                           </>
                         ) : (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">Loading patterns...</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">Loading patterns...</p>
                           </div>
                         )}
                       </TabsContent>
@@ -1093,8 +1093,8 @@ export default function VideoDetailPage() {
                       <TabsContent value="insights" className="mt-6">
                         {(startExplainStep.isPending || analysis.step_status?.explain === "processing") ? (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">{startExplainStep.isPending ? "Starting..." : "Generating insights..."}</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">{startExplainStep.isPending ? "Starting..." : "Generating insights..."}</p>
                           </div>
                         ) : analysis.insights ? (
                           <>
@@ -1107,7 +1107,7 @@ export default function VideoDetailPage() {
                             />
                             {analysis.current_step === "explain" && stepInfo.nextStep && (
                               <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
-                                <p className="text-base-55 mb-4">
+                                <p className="text-text-tertiary mb-4">
                                   Review the {analysis.insights.length} insights above. When ready, continue to the next step.
                                 </p>
                                 <ContinueStepButton
@@ -1122,8 +1122,8 @@ export default function VideoDetailPage() {
                           </>
                         ) : (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">Loading insights...</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">Loading insights...</p>
                           </div>
                         )}
                       </TabsContent>
@@ -1131,8 +1131,8 @@ export default function VideoDetailPage() {
                       <TabsContent value="principles" className="mt-6">
                         {(startActivateStep.isPending || analysis.step_status?.activate === "processing") ? (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">{startActivateStep.isPending ? "Starting..." : "Generating design principles..."}</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">{startActivateStep.isPending ? "Starting..." : "Generating design principles..."}</p>
                           </div>
                         ) : analysis.design_principles ? (
                           <>
@@ -1145,15 +1145,15 @@ export default function VideoDetailPage() {
                             />
                             <div className="bg-card rounded-2xl shadow-card mt-4 p-6 text-center">
                               <CheckCircle className="h-12 w-12 text-brand-forest mx-auto mb-4" />
-                              <p className="text-base-55">
+                              <p className="text-text-tertiary">
                                 Analysis complete! All 5 steps have been processed.
                               </p>
                             </div>
                           </>
                         ) : (
                           <div className="bg-card rounded-2xl p-12 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-base-40 mx-auto mb-4" />
-                            <p className="text-base-55">Loading design principles...</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-text-placeholder mx-auto mb-4" />
+                            <p className="text-text-tertiary">Loading design principles...</p>
                           </div>
                         )}
                       </TabsContent>
@@ -1161,8 +1161,8 @@ export default function VideoDetailPage() {
                   </div>
                 ) : (
                   <div className="bg-card rounded-2xl shadow-card p-12 text-center">
-                    <Lightbulb className="h-12 w-12 text-base-25 mx-auto mb-4" />
-                    <p className="text-base-55">
+                    <Lightbulb className="h-12 w-12 text-text-disabled mx-auto mb-4" />
+                    <p className="text-text-tertiary">
                       No analysis available yet. Complete the prerequisites and start the analysis to see results.
                     </p>
                   </div>

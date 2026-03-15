@@ -24,8 +24,8 @@ export function FilterBar({ options, activeFilters, onToggle, onClear }: FilterB
               onClick={() => onToggle(opt.field, value)}
               className={`text-label px-2.5 py-1 rounded-full border transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                 isActive
-                  ? "bg-accent-blue-bg text-accent-blue border-accent-blue-border"
-                  : "bg-transparent text-base-55 border-border hover:border-base-25 hover:text-base-85"
+                  ? "bg-interactive-focus-bg text-interactive-focus border-interactive-focus-border"
+                  : "bg-transparent text-text-tertiary border-border hover:border-base-25 hover:text-text-primary"
               }`}
             >
               {value}
@@ -36,7 +36,7 @@ export function FilterBar({ options, activeFilters, onToggle, onClear }: FilterB
       {hasActiveFilters && (
         <button
           onClick={onClear}
-          className="text-label text-base-40 hover:text-base-62 flex items-center gap-1 transition-colors duration-[var(--duration-micro)]"
+          className="text-label text-text-placeholder hover:text-text-secondary flex items-center gap-1 transition-colors duration-[var(--duration-micro)]"
         >
           <X className="h-3 w-3" />
           Clear

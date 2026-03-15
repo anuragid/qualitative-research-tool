@@ -18,13 +18,13 @@ const chunkColumns: TableColumn<Chunk>[] = [
     <Badge className={`${chunkTypeStyles[c.type]?.badge || ""} text-label`}>{c.type}</Badge>
   ), className: "w-28" },
   { key: "speaker", label: "Speaker", sortable: true, render: (c) => (
-    <span className="text-sm text-base-62">{c.speaker || "\u2014"}</span>
+    <span className="text-sm text-text-secondary">{c.speaker || "\u2014"}</span>
   ), className: "w-32" },
   { key: "text", label: "Content", render: (c) => (
-    <p className="text-sm text-base-85 line-clamp-2">{c.text}</p>
+    <p className="text-sm text-text-primary line-clamp-2">{c.text}</p>
   ) },
   { key: "timestamp", label: "Time", sortable: true, render: (c) => (
-    <span className="text-label text-base-40">{c.timestamp || "\u2014"}</span>
+    <span className="text-label text-text-placeholder">{c.timestamp || "\u2014"}</span>
   ), className: "w-24" },
 ];
 

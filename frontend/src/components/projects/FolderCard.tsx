@@ -153,12 +153,12 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
             )}
 
             {project.description && (
-              <p className="text-sm text-base-55 line-clamp-2 mb-2">{project.description}</p>
+              <p className="text-sm text-text-tertiary line-clamp-2 mb-2">{project.description}</p>
             )}
 
             {project.status === "error" && project.error_message && (
-              <div className="border-l-2 border-destructive/50 bg-base-04 rounded-r-md pl-3 pr-2 py-2 mb-2">
-                <p className="text-xs text-base-55 flex items-start gap-1.5">
+              <div className="border-l-2 border-destructive/50 bg-interactive-fill rounded-r-md pl-3 pr-2 py-2 mb-2">
+                <p className="text-xs text-text-tertiary flex items-start gap-1.5">
                   <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0 text-destructive" />
                   <span className="line-clamp-2">{project.error_message}</span>
                 </p>
@@ -169,17 +169,17 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
           {/* Bottom row: metadata + arrow */}
           <div className="relative z-[2] flex items-center justify-between mt-auto pt-3">
             <div className="flex items-center gap-3">
-              <span className="text-label uppercase text-base-55">
+              <span className="text-label uppercase text-text-tertiary">
                 {formatDate(project.created_at)}
               </span>
               {videoCount > 0 && (
-                <span className="flex items-center gap-1 text-label text-base-40">
+                <span className="flex items-center gap-1 text-label text-text-placeholder">
                   <Video className="h-3 w-3" />
                   {videoCount}
                 </span>
               )}
             </div>
-            <ArrowRight className="h-4 w-4 text-base-40" />
+            <ArrowRight className="h-4 w-4 text-text-placeholder" />
           </div>
         </div>
       </div>

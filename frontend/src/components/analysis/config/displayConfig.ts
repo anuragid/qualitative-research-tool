@@ -29,7 +29,7 @@ export const insightTypeStyles: Record<string, string> = {
 export const confidenceStyles: Record<string, string> = {
   high: "bg-brand-forest/20 text-brand-forest border-brand-forest/30",
   medium: "bg-brand-mustard/20 text-brand-mustard border-brand-mustard/30",
-  low: "bg-base-04 text-base-55 border-border",
+  low: "bg-interactive-fill text-text-tertiary border-border",
 };
 
 // ===== PRIORITY =====
@@ -37,14 +37,14 @@ export const priorityStyles: Record<string, { badge: string; border: string }> =
   critical: { badge: "bg-destructive text-primary-foreground", border: "border-l-destructive" },
   high: { badge: "bg-brand-crimson text-primary-foreground", border: "border-l-brand-crimson" },
   medium: { badge: "bg-brand-mustard text-primary-foreground", border: "border-l-brand-mustard" },
-  low: { badge: "bg-accent-blue-bg text-accent-blue", border: "border-l-accent-blue" },
+  low: { badge: "bg-interactive-focus-bg text-interactive-focus", border: "border-l-interactive-focus" },
 };
 
 // ===== FREQUENCY =====
 export const frequencyStyles: Record<string, string> = {
   high: "bg-brand-forest/20 text-brand-forest",
   medium: "bg-brand-mustard/20 text-brand-mustard",
-  low: "bg-base-04 text-base-55",
+  low: "bg-interactive-fill text-text-tertiary",
 };
 
 // ===== RELATIONSHIP TYPE =====
@@ -52,7 +52,7 @@ export const relationshipTypeStyles: Record<string, string> = {
   convergent: "bg-brand-forest/20 text-brand-forest",
   divergent: "bg-brand-burnt-orange/20 text-brand-burnt-orange",
   tension: "bg-brand-crimson/20 text-brand-crimson",
-  causal: "bg-accent-blue-bg text-accent-blue",
+  causal: "bg-interactive-focus-bg text-interactive-focus",
 };
 
 // ===== CONSISTENCY =====
@@ -67,7 +67,7 @@ export const consistencyStyles: Record<string, string> = {
 
 // ===== SCOPE =====
 export const scopeStyles: Record<string, string> = {
-  universal: "bg-accent-blue-bg text-accent-blue",
+  universal: "bg-interactive-focus-bg text-interactive-focus",
   "context-dependent": "bg-brand-mustard/20 text-brand-mustard",
   segmented: "bg-brand-maroon/20 text-brand-maroon",
 };

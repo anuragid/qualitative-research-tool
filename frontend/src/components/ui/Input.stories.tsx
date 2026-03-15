@@ -44,7 +44,7 @@ export const FocusState: Story = {
     <div className="grid w-full max-w-sm items-center gap-1">
       <Label htmlFor="focus-demo">Project Name</Label>
       <Input id="focus-demo" placeholder="Click to see accent focus ring" />
-      <p className="text-sm text-base-40">Focus shows accent-blue border + ring</p>
+      <p className="text-sm text-text-placeholder">Focus shows accent-blue border + ring</p>
     </div>
   ),
 };

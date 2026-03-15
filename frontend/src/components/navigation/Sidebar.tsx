@@ -71,7 +71,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </span>
           <button
             onClick={onClose}
-            className="p-2 rounded-md text-base-55 hover:text-foreground hover:bg-base-04 lg:hidden min-h-[var(--size-touch)] min-w-[var(--size-touch)] flex items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+            className="p-2 rounded-md text-text-tertiary hover:text-foreground hover:bg-interactive-fill lg:hidden min-h-[var(--size-touch)] min-w-[var(--size-touch)] flex items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
             aria-label="Close sidebar"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -86,8 +86,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             className={({ isActive }) =>
               `flex items-center gap-3 h-10 px-3 rounded-lg text-ui transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                 isActive
-                  ? "bg-base-08 text-foreground"
-                  : "text-base-62 hover:bg-base-04 hover:text-foreground"
+                  ? "bg-interactive-hover text-foreground"
+                  : "text-text-secondary hover:bg-interactive-fill hover:text-foreground"
               }`
             }
           >
@@ -97,15 +97,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           {/* Settings section */}
           <div className="pt-6">
-            <span className="px-3 text-label text-base-40 uppercase tracking-wider">
+            <span className="px-3 text-label text-text-placeholder uppercase tracking-wider">
               Settings
             </span>
-            <span className="px-3 text-label text-base-40 mt-2 block">Theme</span>
+            <span className="px-3 text-label text-text-placeholder mt-2 block">Theme</span>
             <div className="flex items-center gap-1 px-3 mt-1">
               <button
                 onClick={() => setTheme("light")}
                 className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                  theme === "light" ? "bg-base-08 text-foreground" : "text-base-40 hover:text-base-62 hover:bg-base-04"
+                  theme === "light" ? "bg-interactive-hover text-foreground" : "text-text-placeholder hover:text-text-secondary hover:bg-interactive-fill"
                 }`}
                 aria-label="Light theme"
               >
@@ -114,7 +114,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <button
                 onClick={() => setTheme("dark")}
                 className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                  theme === "dark" ? "bg-base-08 text-foreground" : "text-base-40 hover:text-base-62 hover:bg-base-04"
+                  theme === "dark" ? "bg-interactive-hover text-foreground" : "text-text-placeholder hover:text-text-secondary hover:bg-interactive-fill"
                 }`}
                 aria-label="Dark theme"
               >
@@ -123,7 +123,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <button
                 onClick={() => setTheme("system")}
                 className={`p-2 rounded-lg transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                  theme === "system" ? "bg-base-08 text-foreground" : "text-base-40 hover:text-base-62 hover:bg-base-04"
+                  theme === "system" ? "bg-interactive-hover text-foreground" : "text-text-placeholder hover:text-text-secondary hover:bg-interactive-fill"
                 }`}
                 aria-label="System theme"
               >
@@ -132,7 +132,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="flex items-center gap-3 h-10 px-3 rounded-lg text-ui text-base-62 hover:bg-base-04 hover:text-foreground w-full mt-1 transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+              className="flex items-center gap-3 h-10 px-3 rounded-lg text-ui text-text-secondary hover:bg-interactive-fill hover:text-foreground w-full mt-1 transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
             >
               <Settings className="h-4 w-4 shrink-0" aria-hidden="true" />
               Model Settings
@@ -146,7 +146,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             appearance={{
               elements: {
                 rootBox: "flex items-center",
-                userButtonTrigger: "focus:outline-none focus-visible:outline-2 focus-visible:outline-accent-blue focus-visible:outline-offset-2",
+                userButtonTrigger: "focus:outline-none focus-visible:outline-2 focus-visible:outline-interactive-focus focus-visible:outline-offset-2",
               },
             }}
           />

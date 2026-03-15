@@ -14,9 +14,9 @@ export function CrossInsightCard({ insight, compact = false }: CrossInsightCardP
   const confStyle = confidenceStyles[insight.confidence] || "";
 
   return (
-    <div className="bg-card rounded-xl p-3 sm:p-4 border-l-4 border-l-accent-blue">
+    <div className="bg-card rounded-xl p-3 sm:p-4 border-l-4 border-l-interactive-focus">
       <div className="flex items-start gap-2 mb-2">
-        <Sparkles className="h-4 w-4 text-accent-blue flex-shrink-0 mt-0.5" />
+        <Sparkles className="h-4 w-4 text-interactive-focus flex-shrink-0 mt-0.5" />
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={`${scStyle} text-label`}>{insight.scope}</Badge>
           <Badge className={`${consStyle} text-label`}>
@@ -27,14 +27,14 @@ export function CrossInsightCard({ insight, compact = false }: CrossInsightCardP
           </Badge>
         </div>
       </div>
-      <h4 className="font-semibold text-sm text-base-85 mb-1">
+      <h4 className="font-semibold text-sm text-text-primary mb-1">
         {insight.headline}
       </h4>
-      <p className={`text-sm text-base-55 ${compact ? "line-clamp-2" : ""}`}>
+      <p className={`text-sm text-text-tertiary ${compact ? "line-clamp-2" : ""}`}>
         {insight.explanation}
       </p>
       {!compact && (
-        <div className="mt-2 text-label text-base-40">
+        <div className="mt-2 text-label text-text-placeholder">
           {insight.evidence.length} evidence &middot; {insight.supporting_meta_patterns.length} meta-pattern{insight.supporting_meta_patterns.length !== 1 ? "s" : ""}
         </div>
       )}

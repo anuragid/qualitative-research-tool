@@ -25,8 +25,8 @@ function ColorSwatch({ name, cssVar, hex }: { name: string; cssVar: string; hex:
         className="w-20 h-20 rounded-xl noise-texture noise-medium"
         style={{ backgroundColor: `var(${cssVar})` }}
       />
-      <span className="text-ui text-base-55">{name}</span>
-      <code className="text-[10px] text-base-40">{hex}</code>
+      <span className="text-ui text-text-tertiary">{name}</span>
+      <code className="text-[10px] text-text-placeholder">{hex}</code>
     </div>
   );
 }

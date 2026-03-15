@@ -32,7 +32,7 @@ export default function ProjectsPage() {
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-h2">Projects</h1>
-            <p className="text-base-55 mt-1">
+            <p className="text-text-tertiary mt-1">
               Manage your research projects and interview videos
             </p>
           </div>
@@ -77,7 +77,7 @@ export default function ProjectsPage() {
             <h2 className="text-h3 mb-3">
               Welcome to methodex
             </h2>
-            <p className="text-base-55 text-body max-w-md mx-auto mb-6">
+            <p className="text-text-tertiary text-body max-w-md mx-auto mb-6">
               Create your first project to start organizing your qualitative
               research interviews and discovering insights.
             </p>

@@ -66,7 +66,7 @@ export default function VideoCard({ video }: VideoCardProps) {
   const getStatusBadge = (status: Video["status"]) => {
     switch (status) {
       case "uploaded":
-        return <Badge variant="secondary" className="bg-brand-pale-blue/50 text-base-62 border-0">Uploaded</Badge>;
+        return <Badge variant="secondary" className="bg-brand-pale-blue/50 text-text-secondary border-0">Uploaded</Badge>;
       case "transcribing":
         return (
           <Badge variant="default" className="bg-brand-mustard/15 text-brand-mustard border-0">
@@ -126,12 +126,12 @@ export default function VideoCard({ video }: VideoCardProps) {
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <FileVideo className="h-10 w-10 text-base-40 flex-shrink-0 mt-1" />
+              <FileVideo className="h-10 w-10 text-text-placeholder flex-shrink-0 mt-1" />
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg truncate text-base-85">
+                <CardTitle className="text-lg truncate text-text-primary">
                   {video.filename}
                 </CardTitle>
-                <CardDescription className="mt-1 text-base-40">
+                <CardDescription className="mt-1 text-text-placeholder">
                   Uploaded {formatDate(video.uploaded_at)}
                 </CardDescription>
               </div>
@@ -150,7 +150,7 @@ export default function VideoCard({ video }: VideoCardProps) {
                     className="rounded-full h-9 w-9"
                     disabled={deleteVideo.isPending}
                   >
-                    <MoreVertical className="h-4 w-4 text-base-40" />
+                    <MoreVertical className="h-4 w-4 text-text-placeholder" />
                     <span className="sr-only">Open menu</span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -174,7 +174,7 @@ export default function VideoCard({ video }: VideoCardProps) {
         </CardHeader>
 
         <CardContent className="pb-3">
-          <div className="flex items-center gap-4 text-sm text-base-55">
+          <div className="flex items-center gap-4 text-sm text-text-tertiary">
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               <span>{video.duration_seconds ? formatDuration(video.duration_seconds) : "Unknown"}</span>

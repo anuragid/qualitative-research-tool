@@ -25,7 +25,7 @@ export default function Layout({ children }: LayoutProps) {
       >
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 -ml-2 rounded-md text-base-62 hover:text-foreground hover:bg-base-04 min-h-[var(--size-touch)] min-w-[var(--size-touch)] flex items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+          className="p-2 -ml-2 rounded-md text-text-secondary hover:text-foreground hover:bg-interactive-fill min-h-[var(--size-touch)] min-w-[var(--size-touch)] flex items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
           aria-label="Open sidebar"
         >
           <Menu className="h-5 w-5" aria-hidden="true" />

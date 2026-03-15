@@ -16,8 +16,8 @@ function ShadowCard({ name, token, usage }: { name: string; token: string; usage
         style={{ boxShadow: `var(${token})` }}
       />
       <span className="text-ui font-semibold">{name}</span>
-      <code className="text-[10px] text-base-40">{token}</code>
-      <span className="text-label text-base-55">{usage}</span>
+      <code className="text-[10px] text-text-placeholder">{token}</code>
+      <span className="text-label text-text-tertiary">{usage}</span>
     </div>
   );
 }

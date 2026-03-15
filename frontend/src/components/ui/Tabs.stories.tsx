@@ -38,10 +38,10 @@ export const TwoTabs: Story = {
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="details">Details</TabsTrigger>
       </TabsList>
-      <TabsContent value="overview" className="p-4 text-base-85">
+      <TabsContent value="overview" className="p-4 text-text-primary">
         Project overview with pill-style active indicator.
       </TabsContent>
-      <TabsContent value="details" className="p-4 text-base-62">
+      <TabsContent value="details" className="p-4 text-text-secondary">
         Detailed analysis results with opacity-based text hierarchy.
       </TabsContent>
     </Tabs>

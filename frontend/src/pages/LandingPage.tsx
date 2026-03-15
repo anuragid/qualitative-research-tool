@@ -100,13 +100,13 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-8">
             <a
               href="#features"
-              className="text-ui text-base-55 hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+              className="text-ui text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
             >
               Features
             </a>
             <a
               href="#how-it-works"
-              className="text-ui text-base-55 hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+              className="text-ui text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
             >
               How it works
             </a>
@@ -121,7 +121,7 @@ export default function LandingPage() {
               <>
                 <Link
                   to="/sign-in"
-                  className="text-ui text-base-55 hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+                  className="text-ui text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
                 >
                   Sign In
                 </Link>
@@ -137,7 +137,7 @@ export default function LandingPage() {
 
           {/* Mobile hamburger */}
           <button
-            className="md:hidden flex items-center justify-center w-11 h-11 rounded-md hover:bg-base-04 transition-[background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+            className="md:hidden flex items-center justify-center w-11 h-11 rounded-md hover:bg-interactive-fill transition-[background] duration-[var(--duration-micro)] ease-[var(--ease)]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >
@@ -154,14 +154,14 @@ export default function LandingPage() {
           <div className="md:hidden frosted-glass border-t border-border px-6 py-4 flex flex-col gap-3">
             <a
               href="#features"
-              className="text-ui text-base-55 hover:text-foreground no-underline py-2"
+              className="text-ui text-text-tertiary hover:text-foreground no-underline py-2"
               onClick={() => setMobileMenuOpen(false)}
             >
               Features
             </a>
             <a
               href="#how-it-works"
-              className="text-ui text-base-55 hover:text-foreground no-underline py-2"
+              className="text-ui text-text-tertiary hover:text-foreground no-underline py-2"
               onClick={() => setMobileMenuOpen(false)}
             >
               How it works
@@ -178,7 +178,7 @@ export default function LandingPage() {
               <>
                 <Link
                   to="/sign-in"
-                  className="text-ui text-base-55 hover:text-foreground no-underline py-2"
+                  className="text-ui text-text-tertiary hover:text-foreground no-underline py-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Sign In
@@ -217,7 +217,7 @@ export default function LandingPage() {
           </h1>
           <p
             data-animate="hero"
-            className="text-lg leading-relaxed text-base-62 mb-10 max-w-2xl mx-auto"
+            className="text-lg leading-relaxed text-text-secondary mb-10 max-w-2xl mx-auto"
           >
             Upload video interviews, let AI extract deep insights, and discover
             cross-cutting patterns across your qualitative research — all in one
@@ -226,7 +226,7 @@ export default function LandingPage() {
           <div data-animate="hero">
             <Link
               to={isSignedIn ? "/projects" : "/sign-up"}
-              className="inline-flex items-center justify-center frosted-glass text-ui text-foreground rounded-full px-8 py-3 shadow-subtle hover:shadow-card transition-[box-shadow,opacity] duration-[var(--duration-normal)] ease-[var(--ease)] no-underline border border-base-09"
+              className="inline-flex items-center justify-center frosted-glass text-ui text-foreground rounded-full px-8 py-3 shadow-subtle hover:shadow-card transition-[box-shadow,opacity] duration-[var(--duration-normal)] ease-[var(--ease)] no-underline border border-border"
             >
               {isSignedIn ? "Go to Projects" : "Start Analyzing"}
             </Link>
@@ -248,7 +248,7 @@ export default function LandingPage() {
             Everything you need
           </h2>
           <p
-            className="text-center text-base-55 mb-14 max-w-xl mx-auto text-body"
+            className="text-center text-text-tertiary mb-14 max-w-xl mx-auto text-body"
             data-animate="feature-card"
           >
             From raw video to actionable design principles, methodex handles the
@@ -269,7 +269,7 @@ export default function LandingPage() {
                   Upload &amp; Transcribe
                 </h3>
                 <p
-                  className="text-base-62 text-body-sm"
+                  className="text-text-secondary text-body-sm"
                 >
                   Drop in video interviews and get speaker-identified
                   transcripts automatically. Supports all major formats.
@@ -290,7 +290,7 @@ export default function LandingPage() {
                   AI Analysis
                 </h3>
                 <p
-                  className="text-base-62 text-body-sm"
+                  className="text-text-secondary text-body-sm"
                 >
                   A five-step framework — chunk, infer, relate, explain,
                   activate — extracts meaning and generates design principles
@@ -312,7 +312,7 @@ export default function LandingPage() {
                   Cross-Video Insights
                 </h3>
                 <p
-                  className="text-base-62 text-body-sm"
+                  className="text-text-secondary text-body-sm"
                 >
                   Discover meta-patterns, saturation analysis, and system-level
                   insights that emerge across multiple interviews in a project.
@@ -337,7 +337,7 @@ export default function LandingPage() {
             How it works
           </h2>
           <p
-            className="text-center text-base-55 mb-16 max-w-lg mx-auto text-body"
+            className="text-center text-text-tertiary mb-16 max-w-lg mx-auto text-body"
             data-animate="step"
           >
             Five steps from raw interview to actionable design principles.
@@ -382,7 +382,7 @@ export default function LandingPage() {
                 className="flex items-start gap-5"
               >
                 <div
-                  className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-white font-semibold text-base"
+                  className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-text-on-brand font-semibold text-base"
                   style={{ backgroundColor: item.color }}
                 >
                   {item.step}
@@ -390,7 +390,7 @@ export default function LandingPage() {
                 <div className="pt-1">
                   <h4 className="text-h4 text-foreground mb-1">{item.name}</h4>
                   <p
-                    className="text-base-62 text-body-sm"
+                    className="text-text-secondary text-body-sm"
                   >
                     {item.desc}
                   </p>
@@ -411,15 +411,15 @@ export default function LandingPage() {
             data-animate="security"
             className="flex flex-col sm:flex-row items-start gap-5"
           >
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-base-04 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-base-55" />
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-interactive-fill flex items-center justify-center">
+              <Lock className="w-5 h-5 text-text-tertiary" />
             </div>
             <div>
               <h3 className="text-h4 text-foreground mb-2">
                 Your data stays private
               </h3>
               <p
-                className="text-base-55 text-body-sm"
+                className="text-text-tertiary text-body-sm"
               >
                 All research videos, transcripts, and analyses are private to
                 your account. We use secure cloud storage, encrypted API keys,
@@ -453,7 +453,7 @@ export default function LandingPage() {
           </h2>
           <p
             data-animate="cta"
-            className="text-base-62 mb-10 text-body"
+            className="text-text-secondary mb-10 text-body"
           >
             Create a free account and start analyzing your qualitative data in
             minutes.
@@ -479,7 +479,7 @@ export default function LandingPage() {
                 </Link>
                 <Link
                   to="/sign-in"
-                  className="inline-flex items-center justify-center text-ui text-foreground rounded-full px-8 py-3 border border-base-09 bg-surface-card/50 hover:bg-surface-card/80 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+                  className="inline-flex items-center justify-center text-ui text-foreground rounded-full px-8 py-3 border border-border bg-surface-card/50 hover:bg-surface-card/80 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
                 >
                   Sign In
                 </Link>

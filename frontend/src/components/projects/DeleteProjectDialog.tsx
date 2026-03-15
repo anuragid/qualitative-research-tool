@@ -53,7 +53,7 @@ export function DeleteProjectDialog({
             Delete Project
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-sm text-base-55">
+        <div className="space-y-3 text-sm text-text-tertiary">
           <p>
             Are you sure you want to delete the project{' '}
             <span className="font-semibold text-foreground">"{project.name}"</span>?
