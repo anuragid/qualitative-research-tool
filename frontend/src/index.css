@@ -2,7 +2,7 @@
 
 @variant dark (&:where(.dark, .dark *));
 
-@theme inline {
+@theme {
   /* ===== TYPOGRAPHY ===== */
   --font-display: 'DM Serif Display', 'Georgia', serif;
   --font-body: 'Inter', -apple-system, 'system-ui', sans-serif;
