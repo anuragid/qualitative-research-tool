@@ -1,28 +1,28 @@
 import type { Meta, StoryObj } from "@storybook/react";
 
 const BRAND_COLORS = [
-  { name: "Mustard", hex: "#D3A848" },
-  { name: "Forest", hex: "#5D9F55" },
-  { name: "Maroon", hex: "#7D4D54" },
-  { name: "Crimson", hex: "#A11735" },
-  { name: "Burnt Orange", hex: "#D25600" },
-  { name: "Olive", hex: "#B8AC00" },
-  { name: "Pale Blue", hex: "#DBE5F0" },
-  { name: "Pale Green", hex: "#EBF0D6" },
-  { name: "Lavender", hex: "#D7D8E8" },
-  { name: "Sage", hex: "#C8CAC0" },
-  { name: "Pale Gold", hex: "#F0DAA7" },
-  { name: "Pale Yellow", hex: "#F0E587" },
+  { name: "Mustard", var: "--color-brand-mustard", hex: "#D3A848" },
+  { name: "Forest", var: "--color-brand-forest", hex: "#5D9F55" },
+  { name: "Maroon", var: "--color-brand-maroon", hex: "#7D4D54" },
+  { name: "Crimson", var: "--color-brand-crimson", hex: "#A11735" },
+  { name: "Burnt Orange", var: "--color-brand-burnt-orange", hex: "#D25600" },
+  { name: "Olive", var: "--color-brand-olive", hex: "#B8AC00" },
+  { name: "Pale Blue", var: "--color-brand-pale-blue", hex: "#DBE5F0" },
+  { name: "Pale Green", var: "--color-brand-pale-green", hex: "#EBF0D6" },
+  { name: "Lavender", var: "--color-brand-lavender", hex: "#D7D8E8" },
+  { name: "Sage", var: "--color-brand-sage", hex: "#C8CAC0" },
+  { name: "Pale Gold", var: "--color-brand-pale-gold", hex: "#F0DAA7" },
+  { name: "Pale Yellow", var: "--color-brand-pale-yellow", hex: "#F0E587" },
 ];
 
 const INTENSITIES = ["light", "medium", "heavy"] as const;
 
-function NoiseSwatch({ name, hex, intensity }: { name: string; hex: string; intensity: string }) {
+function NoiseSwatch({ name, cssVar, intensity }: { name: string; cssVar: string; intensity: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
       <div
         className={`w-20 h-20 rounded-xl noise-texture noise-${intensity}`}
-        style={{ backgroundColor: hex }}
+        style={{ backgroundColor: `var(${cssVar})` }}
       />
       <span className="text-[10px] text-base-40">{name}</span>
     </div>
@@ -40,7 +40,7 @@ function NoisePage() {
           </p>
           <div className="flex gap-4 flex-wrap">
             {BRAND_COLORS.map((c) => (
-              <NoiseSwatch key={`${c.name}-${intensity}`} name={c.name} hex={c.hex} intensity={intensity} />
+              <NoiseSwatch key={`${c.name}-${intensity}`} name={c.name} cssVar={c.var} intensity={intensity} />
             ))}
           </div>
         </div>

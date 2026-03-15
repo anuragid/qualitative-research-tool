@@ -257,7 +257,7 @@ export default function LandingPage() {
               style={{ backgroundColor: "var(--color-brand-pale-blue)" }}
             >
               <div className="relative z-[2]">
-                <div className="w-12 h-12 rounded-xl bg-white/60 flex items-center justify-center mb-5">
+                <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
                   <Upload className="w-6 h-6 text-foreground" />
                 </div>
                 <h3 className="text-h3 text-foreground mb-3">
@@ -280,7 +280,7 @@ export default function LandingPage() {
               style={{ backgroundColor: "var(--color-brand-pale-green)" }}
             >
               <div className="relative z-[2]">
-                <div className="w-12 h-12 rounded-xl bg-white/60 flex items-center justify-center mb-5">
+                <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
                   <Brain className="w-6 h-6 text-foreground" />
                 </div>
                 <h3 className="text-h3 text-foreground mb-3">
@@ -304,7 +304,7 @@ export default function LandingPage() {
               style={{ backgroundColor: "var(--color-brand-pale-gold)" }}
             >
               <div className="relative z-[2]">
-                <div className="w-12 h-12 rounded-xl bg-white/60 flex items-center justify-center mb-5">
+                <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
                   <GitMerge className="w-6 h-6 text-foreground" />
                 </div>
                 <h3 className="text-h3 text-foreground mb-3">
@@ -476,7 +476,7 @@ export default function LandingPage() {
             </Link>
             <Link
               to="/sign-in"
-              className="inline-flex items-center justify-center text-ui text-foreground rounded-full px-8 py-3 border border-base-09 bg-white/50 hover:bg-white/80 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
+              className="inline-flex items-center justify-center text-ui text-foreground rounded-full px-8 py-3 border border-base-09 bg-surface-card/50 hover:bg-surface-card/80 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
             >
               Sign In
             </Link>
@@ -493,7 +493,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             {/* Typemark */}
             <span
-              className="text-h4 text-white no-underline"
+              className="text-h4 text-primary-foreground no-underline"
               style={{ opacity: 1 }}
             >
               method<span className="italic" style={{ color: "var(--color-brand-burnt-orange)" }}>x</span>
@@ -503,25 +503,23 @@ export default function LandingPage() {
             <div className="flex items-center gap-6">
               <Link
                 to="/sign-in"
-                className="text-ui no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
-                style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                className="text-ui text-primary-foreground/70 no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
               >
                 Sign In
               </Link>
               <Link
                 to="/sign-up"
-                className="text-ui no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
-                style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                className="text-ui text-primary-foreground/70 no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
               >
                 Sign Up
               </Link>
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t" style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}>
+          <div className="mt-10 pt-6 border-t border-primary-foreground/10">
             <p
-              className="text-sm"
-              style={{ color: "rgba(255, 255, 255, 0.5)", fontFamily: "var(--font-body)" }}
+              className="text-sm text-primary-foreground/50"
+              style={{ fontFamily: "var(--font-body)" }}
             >
               &copy; {new Date().getFullYear()} methodex. All rights reserved.
             </p>
