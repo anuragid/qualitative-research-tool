@@ -34,6 +34,8 @@ class UserSettingsResponse(BaseModel):
     """Schema for user settings response."""
     preferred_model: Optional[str] = None
     has_api_key: bool = False
+    key_hint: Optional[str] = None
+    key_validated_at: Optional[datetime] = None
     available_models: List[Dict[str, str]] = []
 
 

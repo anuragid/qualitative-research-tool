@@ -12,18 +12,22 @@ from app.models import database_models
 from app.models.schemas import UserResponse, UserSettingsResponse, UserSettingsUpdate
 from app.services.clerk_service import fetch_clerk_user
 from app.services.encryption_service import encryption_service
+from app.services.openrouter_validation import validate_openrouter_key
 
 router = APIRouter()
 
 # Available models exposed by GET/PUT /settings
 AVAILABLE_MODELS = [
-    {"id": "meta-llama/llama-3.3-70b-instruct:free", "name": "Llama 3.3 70B (Free)", "tier": "free"},
-    {"id": "google/gemma-3-27b-it:free", "name": "Gemma 3 27B (Free)", "tier": "free"},
-    {"id": "mistralai/mistral-small-3.1-24b-instruct:free", "name": "Mistral Small 3.1 (Free)", "tier": "free"},
+    {"id": "meta-llama/llama-3.3-70b-instruct", "name": "Llama 3.3 70B", "tier": "free"},
+    {"id": "google/gemma-3-27b-it", "name": "Gemma 3 27B", "tier": "free"},
+    {"id": "mistralai/mistral-small-3.1-24b-instruct", "name": "Mistral Small 3.1", "tier": "free"},
+    {"id": "qwen/qwen3-235b-a22b", "name": "Qwen 3 235B", "tier": "free"},
     {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "tier": "premium"},
     {"id": "openai/gpt-4o", "name": "GPT-4o", "tier": "premium"},
     {"id": "google/gemini-2.5-pro-preview", "name": "Gemini 2.5 Pro", "tier": "premium"},
 ]
+
+FREE_MODEL_IDS = {m["id"] for m in AVAILABLE_MODELS if m["tier"] == "free"}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -174,6 +178,8 @@ async def get_user_settings(
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
         has_api_key=bool(db_user.encrypted_api_key),
+        key_hint=db_user.key_hint,
+        key_validated_at=db_user.key_validated_at,
         available_models=AVAILABLE_MODELS,
     )
 
@@ -193,17 +199,35 @@ async def update_user_settings(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if settings.preferred_model is not None:
-        db_user.preferred_model = settings.preferred_model
-
+    # Validate and store API key
     if settings.api_key is not None:
+        is_valid = await validate_openrouter_key(settings.api_key)
+        if not is_valid:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid API key or insufficient credits. Check your key on the OpenRouter dashboard.",
+            )
         db_user.encrypted_api_key = encryption_service.encrypt(settings.api_key)
+        db_user.key_hint = settings.api_key[-4:]
+        db_user.key_validated_at = datetime.now(timezone.utc)
+
+    # Enforce model tier: non-BYOK users can only select free-tier models
+    if settings.preferred_model is not None:
+        has_key = bool(db_user.encrypted_api_key)
+        if not has_key and settings.preferred_model not in FREE_MODEL_IDS:
+            raise HTTPException(
+                status_code=403,
+                detail="Add your OpenRouter API key in Settings to unlock premium models.",
+            )
+        db_user.preferred_model = settings.preferred_model
 
     db.commit()
 
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
         has_api_key=bool(db_user.encrypted_api_key),
+        key_hint=db_user.key_hint,
+        key_validated_at=db_user.key_validated_at,
         available_models=AVAILABLE_MODELS,
     )
 
@@ -223,6 +247,8 @@ async def delete_api_key(
         raise HTTPException(status_code=404, detail="User not found")
 
     db_user.encrypted_api_key = None
+    db_user.key_hint = None
+    db_user.key_validated_at = None
     db_user.preferred_model = None
     db.commit()
 

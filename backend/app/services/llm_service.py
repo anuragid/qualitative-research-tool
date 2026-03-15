@@ -28,14 +28,18 @@ OPENROUTER_HEADERS = {
     "X-Title": "Qualitative Research Tool",
 }
 
-# Fallback models to try when the primary model is rate-limited or unavailable.
-# Ordered by preference: paid-but-cheap first (reliable), then free backups.
+# Open-source models available to all users via the Methodex key.
+# Ordered by preference. These are paid-but-cheap on OpenRouter.
 FREE_MODEL_FALLBACKS: List[str] = [
-    "meta-llama/llama-3.3-70b-instruct",  # paid but very cheap (~$0.001/req), works reliably
-    "mistralai/mistral-small-3.1-24b-instruct:free",
-    "google/gemma-3-4b-it:free",
-    "nvidia/nemotron-nano-9b-v2:free",
+    "meta-llama/llama-3.3-70b-instruct",
+    "mistralai/mistral-small-3.1-24b-instruct",
+    "google/gemma-3-27b-it",
+    "qwen/qwen3-235b-a22b",
 ]
+
+# Set of allowed model IDs when using the Methodex (shared) key.
+# The Methodex key must never be used with premium models.
+_METHODEX_ALLOWED_MODELS = set(FREE_MODEL_FALLBACKS)
 
 
 class LLMService:
@@ -184,11 +188,17 @@ class LLMService:
         effective_max_tokens = max_tokens or self.max_tokens
         effective_temperature = temperature if temperature is not None else self.temperature
 
+        # Server-side enforcement: Methodex key can only be used with open-source models
+        if api_key is None and chosen_model not in _METHODEX_ALLOWED_MODELS:
+            logger.warning(
+                f"Blocked premium model '{chosen_model}' request without BYOK key. "
+                f"Falling back to default model."
+            )
+            chosen_model = self.default_model
+
         # Build list of models to try: primary first, then fallbacks
         models_to_try = [chosen_model]
         # Add fallbacks when no custom api_key is provided.
-        # Fallbacks apply for free models (rate-limited) and also for the default
-        # paid model in case it goes down.
         if api_key is None:
             for fallback in FREE_MODEL_FALLBACKS:
                 if fallback != chosen_model and fallback not in models_to_try:

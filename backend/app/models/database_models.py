@@ -23,6 +23,8 @@ class User(Base):
     role = Column(String(50), nullable=False, default="user")  # admin, user, viewer
     preferred_model = Column(String(255))  # OpenRouter model ID for BYOK
     encrypted_api_key = Column(Text)  # Fernet-encrypted OpenRouter API key
+    key_hint = Column(String(8))  # Last 4 chars of plaintext key
+    key_validated_at = Column(DateTime(timezone=True))  # Last successful validation
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_seen = Column(DateTime(timezone=True))

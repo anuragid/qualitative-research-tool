@@ -30,6 +30,7 @@ export function useSettings() {
     isLoading: settingsQuery.isLoading,
     updateSettings: updateMutation.mutate,
     isUpdating: updateMutation.isPending,
+    updateError: updateMutation.error,
     deleteApiKey: deleteKeyMutation.mutate,
     isDeletingKey: deleteKeyMutation.isPending,
   };

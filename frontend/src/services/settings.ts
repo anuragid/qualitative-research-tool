@@ -3,6 +3,8 @@ import { api } from "./api";
 export interface UserSettings {
   preferred_model: string | null;
   has_api_key: boolean;
+  key_hint: string | null;
+  key_validated_at: string | null;
   available_models: { id: string; name: string; tier: string }[];
 }
 

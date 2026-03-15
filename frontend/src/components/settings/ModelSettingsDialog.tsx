@@ -26,6 +26,7 @@ export function ModelSettingsDialog({
     isLoading,
     updateSettings,
     isUpdating,
+    updateError,
     deleteApiKey,
     isDeletingKey,
   } = useSettings();
@@ -41,12 +42,18 @@ export function ModelSettingsDialog({
   const currentModel = selectedModel ?? settings?.preferred_model ?? null;
 
   const handleSave = () => {
-    updateSettings({
-      preferred_model: currentModel,
-      api_key: apiKey || undefined,
-    });
-    setApiKey("");
-    onOpenChange(false);
+    updateSettings(
+      {
+        preferred_model: currentModel,
+        api_key: apiKey || undefined,
+      },
+      {
+        onSuccess: () => {
+          setApiKey("");
+          onOpenChange(false);
+        },
+      },
+    );
   };
 
   const handleRemoveKey = () => {
@@ -57,18 +64,30 @@ export function ModelSettingsDialog({
 
   if (isLoading) return null;
 
+  const errorMessage = updateError
+    ? (updateError as { message?: string }).message ??
+      (updateError instanceof Error ? updateError.message : String(updateError))
+    : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Model Settings</DialogTitle>
           <DialogDescription>
-            Choose your AI model. Free models work for everyone. Bring your own
-            OpenRouter API key for premium models.
+            Choose your AI model. Open-source models work for everyone. Bring
+            your own OpenRouter API key for premium models.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Error banner */}
+          {errorMessage && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {errorMessage}
+            </div>
+          )}
+
           {/* Model selection */}
           <RadioGroup
             value={currentModel || freeModels[0]?.id || ""}
@@ -77,13 +96,16 @@ export function ModelSettingsDialog({
           >
             {/* Free models */}
             <div>
-              <span className="text-section text-text-tertiary">Free Models</span>
+              <span className="text-section text-text-tertiary">
+                Open Source Models
+              </span>
               <div className="mt-2 space-y-2">
                 {freeModels.map((model) => (
                   <label
                     key={model.id}
                     className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                      (currentModel === model.id || (!currentModel && model === freeModels[0]))
+                      currentModel === model.id ||
+                      (!currentModel && model === freeModels[0])
                         ? "border-interactive-focus bg-interactive-focus-bg"
                         : "border-border hover:bg-interactive-fill"
                     }`}
@@ -91,7 +113,9 @@ export function ModelSettingsDialog({
                     <RadioGroupItem value={model.id} />
                     <div>
                       <div className="font-medium text-sm">{model.name}</div>
-                      <div className="text-xs text-text-tertiary">Free -- good for drafts and exploration</div>
+                      <div className="text-xs text-text-tertiary">
+                        Free -- good for drafts and exploration
+                      </div>
                     </div>
                   </label>
                 ))}
@@ -107,11 +131,11 @@ export function ModelSettingsDialog({
                 {premiumModels.map((model) => (
                   <label
                     key={model.id}
-                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                    className={`flex items-center gap-3 rounded-lg border p-3 transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
                       currentModel === model.id
-                        ? "border-interactive-focus bg-interactive-focus-bg"
-                        : "border-border hover:bg-interactive-fill"
-                    } ${!settings?.has_api_key && !apiKey ? "opacity-50" : ""}`}
+                        ? "border-interactive-focus bg-interactive-focus-bg cursor-pointer"
+                        : "border-border hover:bg-interactive-fill cursor-pointer"
+                    } ${!settings?.has_api_key && !apiKey ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <RadioGroupItem
                       value={model.id}
@@ -120,7 +144,9 @@ export function ModelSettingsDialog({
                     <div>
                       <div className="font-medium text-sm">{model.name}</div>
                       <div className="text-xs text-text-tertiary">
-                        Higher quality analysis -- requires your own API key
+                        {!settings?.has_api_key && !apiKey
+                          ? "Add your API key in Settings to unlock"
+                          : "Higher quality analysis -- uses your API key"}
                       </div>
                     </div>
                   </label>
@@ -137,7 +163,7 @@ export function ModelSettingsDialog({
             {settings?.has_api_key ? (
               <div className="mt-2 flex items-center gap-2">
                 <div className="flex-1 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-                  API key configured
+                  Key ending in ...{settings.key_hint ?? "****"}
                 </div>
                 <Button
                   variant="ghost"
@@ -177,7 +203,7 @@ export function ModelSettingsDialog({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isUpdating}>
-            {isUpdating ? "Saving..." : "Save"}
+            {isUpdating ? "Validating..." : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

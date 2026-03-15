@@ -28,17 +28,23 @@ from app.agents.nodes import (
 from app.agents.states import ProjectAnalysisState, VideoAnalysisState
 from app.models.database_models import Project, ProjectAnalysis, SpeakerLabel, Transcript, User, Video, VideoAnalysis
 from app.services.encryption_service import encryption_service
+from app.services.openrouter_validation import validate_openrouter_key_sync
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
+# Re-validate BYOK keys older than 24 hours
+_REVALIDATION_HOURS = 24
+
 
 def _resolve_byok(db, user_id: str | None) -> tuple[str | None, str | None]:
     """Look up and decrypt a user's BYOK API key and preferred model.
 
     Returns (api_key, model) — both None when no BYOK is configured.
+    Raises Exception if a BYOK key exists but cannot be decrypted or
+    fails re-validation, so we never silently fall back to the Methodex key.
     """
     if not user_id:
         return None, None
@@ -46,16 +52,44 @@ def _resolve_byok(db, user_id: str | None) -> tuple[str | None, str | None]:
     if not user:
         return None, None
 
-    api_key = None
-    if user.encrypted_api_key:
-        api_key = encryption_service.decrypt(user.encrypted_api_key)
-        if api_key:
-            logger.info(f"Using BYOK API key for user {user_id}")
-        else:
-            logger.warning(f"Failed to decrypt BYOK key for user {user_id}, falling back to server default")
+    if not user.encrypted_api_key:
+        return None, user.preferred_model
 
-    model = user.preferred_model  # may be None
-    return api_key, model
+    api_key = encryption_service.decrypt(user.encrypted_api_key)
+    if not api_key:
+        # Corrupted ciphertext — clear the key and error out
+        user.encrypted_api_key = None
+        user.key_hint = None
+        user.key_validated_at = None
+        db.commit()
+        raise Exception(
+            "Your stored API key could not be decrypted (encryption key may have been rotated). "
+            "Please re-enter your OpenRouter API key in Settings."
+        )
+
+    # Re-validate if key_validated_at is stale (>24h)
+    if user.key_validated_at:
+        age = datetime.now(timezone.utc) - user.key_validated_at
+        if age.total_seconds() > _REVALIDATION_HOURS * 3600:
+            if not validate_openrouter_key_sync(api_key):
+                raise Exception(
+                    "Your OpenRouter API key failed re-validation. "
+                    "Please check that your account has credits."
+                )
+            user.key_validated_at = datetime.now(timezone.utc)
+            db.commit()
+    else:
+        # Never validated — validate now
+        if not validate_openrouter_key_sync(api_key):
+            raise Exception(
+                "Your OpenRouter API key is invalid or has no credits. "
+                "Please check your key in Settings."
+            )
+        user.key_validated_at = datetime.now(timezone.utc)
+        db.commit()
+
+    logger.info(f"Using BYOK API key for user {user_id}")
+    return api_key, user.preferred_model
 
 
 def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
