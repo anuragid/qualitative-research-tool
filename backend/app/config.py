@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     # Authentication (Clerk)
     CLERK_SECRET_KEY: str = ""
     CLERK_PUBLISHABLE_KEY: str = ""
+    CLERK_JWKS_URL: str = ""  # Override JWKS URL; defaults to Clerk Backend API
 
     # Encryption for BYOK API keys (required in production)
     ENCRYPTION_KEY: str = ""

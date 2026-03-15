@@ -3,8 +3,8 @@
 import base64
 import json
 import logging
+import time
 from enum import Enum
-from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -76,21 +76,40 @@ ROLE_PERMISSIONS: Dict[UserRole, List[Permission]] = {
 class ClerkAuth:
     """Production-ready Clerk authentication with JWKS verification."""
 
+    # TTL for JWKS cache: 1 hour
+    JWKS_CACHE_TTL = 3600
+
     def __init__(self):
         self.secret_key = settings.CLERK_SECRET_KEY
         self.publishable_key = settings.CLERK_PUBLISHABLE_KEY
         self.jwks_url = None
+        self._jwks_headers: Dict[str, str] = {}
+        self._cached_keys: Optional[Dict[str, Any]] = None
+        self._keys_fetched_at: float = 0.0
         self.is_production = "pk_live" in self.publishable_key
 
         if self.is_production:
-            logger.info("🔒 Running with PRODUCTION Clerk keys")
+            logger.info("Running with PRODUCTION Clerk keys")
         else:
-            logger.warning("⚠️  Running with DEVELOPMENT Clerk keys - not for production use!")
+            logger.warning("Running with DEVELOPMENT Clerk keys - not for production use!")
 
         logger.info(f"Initializing ClerkAuth with publishable_key: {self.publishable_key[:20]}...")
 
-        if self.publishable_key:
+        # JWKS URL priority: explicit override > Clerk Backend API > derived domain
+        if settings.CLERK_JWKS_URL:
+            self.jwks_url = settings.CLERK_JWKS_URL
+            logger.info(f"Using explicit CLERK_JWKS_URL: {self.jwks_url}")
+            if "api.clerk.com" in self.jwks_url and self.secret_key:
+                self._jwks_headers = {"Authorization": f"Bearer {self.secret_key}"}
+        elif self.secret_key:
+            self.jwks_url = "https://api.clerk.com/v1/jwks"
+            self._jwks_headers = {"Authorization": f"Bearer {self.secret_key}"}
+            logger.info(f"Using Clerk Backend API for JWKS: {self.jwks_url}")
+        elif self.publishable_key:
             self._derive_jwks_url()
+            logger.info(f"Using derived JWKS URL: {self.jwks_url}")
+        else:
+            raise ValueError("No Clerk keys configured - cannot determine JWKS URL")
 
     def _derive_jwks_url(self):
         """Derive JWKS URL from Clerk publishable key."""
@@ -112,15 +131,32 @@ class ClerkAuth:
             logger.error(f"Failed to decode publishable key: {e}")
             raise ValueError(f"Invalid Clerk publishable key format: {e}")
 
-    @lru_cache(maxsize=1)
-    def get_public_keys(self) -> Optional[Dict[str, Any]]:
-        """Fetch and cache Clerk's public keys for JWT verification."""
+    def get_public_keys(self, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """Fetch and cache Clerk's public keys for JWT verification.
+
+        Keys are cached for JWKS_CACHE_TTL seconds. Pass force_refresh=True to bypass cache.
+        On fetch failure, returns stale cached keys if available (resilience).
+        """
+        now = time.monotonic()
+
+        # Return cached keys if still valid
+        if (
+            not force_refresh
+            and self._cached_keys is not None
+            and (now - self._keys_fetched_at) < self.JWKS_CACHE_TTL
+        ):
+            return self._cached_keys
+
         if not self.jwks_url:
             logger.error("JWKS URL not configured")
             return None
 
         try:
-            response = httpx.get(self.jwks_url, timeout=10.0)
+            response = httpx.get(
+                self.jwks_url,
+                headers=self._jwks_headers,
+                timeout=10.0,
+            )
             response.raise_for_status()
             jwks = response.json()
 
@@ -130,14 +166,23 @@ class ClerkAuth:
                 if key.get("kty") == "RSA" and key.get("use") == "sig":
                     keys[key["kid"]] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key))
 
-            logger.info(f"Successfully fetched {len(keys)} public keys from Clerk")
+            if keys:
+                logger.info(f"Successfully fetched {len(keys)} public keys from Clerk")
+                self._cached_keys = keys
+                self._keys_fetched_at = now
+            else:
+                logger.warning("JWKS response contained no usable RSA signing keys")
+
             return keys
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP {e.response.status_code} fetching JWKS from {self.jwks_url}")
+            return self._cached_keys  # Return stale cache if available
         except httpx.TimeoutException:
-            logger.error("Timeout fetching JWKS from Clerk")
-            return None
+            logger.error(f"Timeout fetching JWKS from {self.jwks_url}")
+            return self._cached_keys
         except Exception as e:
             logger.error(f"Failed to fetch JWKS: {e}")
-            return None
+            return self._cached_keys
 
     def verify_token(self, token: str) -> Dict[str, Any]:
         """Verify a Clerk JWT token and return the payload with role information."""
@@ -156,12 +201,12 @@ class ClerkAuth:
             public_keys = self.get_public_keys()
 
             if not public_keys or kid not in public_keys:
-                # Clear cache and retry once
-                self.get_public_keys.cache_clear()
-                public_keys = self.get_public_keys()
+                # Force refresh and retry once
+                public_keys = self.get_public_keys(force_refresh=True)
 
                 if not public_keys or kid not in public_keys:
-                    logger.error(f"Token kid {kid} not found. Available: {list(public_keys.keys()) if public_keys else 'None'}")
+                    available = list(public_keys.keys()) if public_keys else []
+                    logger.error(f"Token kid {kid} not found. Available: {available}")
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Invalid token: signature verification failed",
