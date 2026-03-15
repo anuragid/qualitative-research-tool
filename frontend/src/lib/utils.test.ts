@@ -16,6 +16,7 @@ describe("cn", () => {
 
   it("deduplicates and resolves conflicting tailwind classes", () => {
     expect(cn("px-2", "px-4")).toBe("px-4");
+    // eslint-disable-next-line design-system/no-raw-tailwind-colors -- Testing cn() merge behavior with conflicting classes
     expect(cn("text-red-500", "text-blue-500")).toBe("text-blue-500");
   });
 

@@ -364,6 +364,7 @@ export default function VideoDetailPage() {
                 id="main-video-player"
                 key={playbackUrl}
                 controls
+                // eslint-disable-next-line design-system/no-raw-tailwind-colors -- Video player needs true black background for letterboxing
                 className="w-full bg-black max-h-[60vh] sm:max-h-[37.5rem]"
                 preload="metadata"
               >

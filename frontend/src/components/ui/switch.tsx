@@ -19,6 +19,7 @@ function Switch({
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
+          // eslint-disable-next-line design-system/no-raw-tailwind-colors -- Switch thumb must stay white in both light/dark themes for contrast against the track
           "pointer-events-none block h-4 w-4 rounded-full bg-white shadow-subtle ring-0 transition-transform duration-[var(--duration-normal)] ease-[var(--ease-standard)] data-[state=checked]:translate-x-[calc(100%+2px)] data-[state=unchecked]:translate-x-0.5"
         )}
       />
