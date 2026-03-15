@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within, userEvent } from "storybook/test";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -62,6 +63,19 @@ function SimpleFormExample() {
 
 export const Default: Story = {
   render: () => <SimpleFormExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Submit empty form to trigger validation error
+    const submitButton = canvas.getByRole("button", { name: /submit/i });
+    await userEvent.click(submitButton);
+
+    // Validation error should appear
+    const errorMessage = await canvas.findByText(
+      /username must be at least 2 characters/i
+    );
+    await expect(errorMessage).toBeInTheDocument();
+  },
 };
 
 const projectSchema = z.object({

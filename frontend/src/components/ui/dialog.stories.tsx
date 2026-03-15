@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within, userEvent } from "storybook/test";
 import {
   Dialog, DialogTrigger, DialogContent, DialogHeader,
-  DialogTitle, DialogDescription, DialogFooter,
+  DialogTitle, DialogDescription, DialogFooter, DialogClose,
 } from "./dialog";
 import { Button } from "./button";
 import { Input } from "./input";
@@ -95,6 +95,48 @@ export const Confirmation: Story = {
       </DialogContent>
     </Dialog>
   ),
+};
+
+export const WithExplicitClose: Story = {
+  name: "With DialogClose Button",
+  render: () => (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline">Open With Close</Button>
+      </DialogTrigger>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>Custom Close</DialogTitle>
+          <DialogDescription>
+            This dialog uses a DialogClose component as an explicit close button
+            instead of the default X icon.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Dismiss</Button>
+          </DialogClose>
+          <Button>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /open with close/i });
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const dialog = await body.findByRole("dialog");
+    await expect(dialog).toBeInTheDocument();
+    await expect(within(dialog).getByText("Custom Close")).toBeInTheDocument();
+
+    // Dismiss using DialogClose
+    const dismissButton = within(dialog).getByRole("button", {
+      name: /dismiss/i,
+    });
+    await userEvent.click(dismissButton);
+  },
 };
 
 export const DoAndDont: Story = {

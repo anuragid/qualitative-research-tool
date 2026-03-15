@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./card";
+import { expect, within } from "storybook/test";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from "./card";
 import { Button } from "./button";
 import { Badge } from "./badge";
 import {
@@ -102,6 +103,39 @@ export const ElevatedWithShadow: Story = {
       </CardContent>
     </Card>
   ),
+};
+
+export const WithAction: Story = {
+  name: "With Card Action",
+  render: () => (
+    <Card className="w-[350px]">
+      <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4">
+        <div>
+          <CardTitle>User Study Q1</CardTitle>
+          <CardDescription>5 videos, 3 analyzed</CardDescription>
+        </div>
+        <CardAction>
+          <Button variant="ghost" size="sm">
+            Edit
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-text-tertiary">Analysis in progress...</p>
+      </CardContent>
+      <CardFooter>
+        <Button variant="outline" size="sm">
+          View Details
+        </Button>
+      </CardFooter>
+    </Card>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const action = canvasElement.querySelector('[data-slot="card-action"]');
+    await expect(action).toBeInTheDocument();
+    await expect(canvas.getByText("Edit")).toBeInTheDocument();
+  },
 };
 
 export const DoAndDont: Story = {

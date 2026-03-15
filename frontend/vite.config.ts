@@ -21,6 +21,14 @@ export default defineConfig({
     sourcemap: false,
   },
   test: {
+    coverage: {
+      exclude: [
+        '.storybook/**',
+        'node_modules/**',
+        'src/**/*.stories.{ts,tsx}',
+        'src/stories/**',
+      ],
+    },
     projects: [
       {
         extends: true,

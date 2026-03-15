@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
@@ -9,9 +9,20 @@ vi.mock("@clerk/react", () => ({
   UserButton: () => <div data-testid="user-button" />,
 }));
 
-// Mock ModelSettingsDialog to avoid pulling in Radix Dialog internals
+// Mock useTheme so we can verify theme changes
+const mockSetTheme = vi.fn();
+vi.mock("../../hooks/useTheme.tsx", () => ({
+  useTheme: () => ({
+    theme: "system",
+    resolvedTheme: "light",
+    setTheme: mockSetTheme,
+  }),
+}));
+
+// Mock ModelSettingsDialog — render a testable element that shows the open prop
 vi.mock("../settings/ModelSettingsDialog", () => ({
-  ModelSettingsDialog: () => null,
+  ModelSettingsDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="model-settings-dialog">Model Settings Dialog</div> : null,
 }));
 
 function renderSidebar(props: { isOpen?: boolean; onClose?: () => void } = {}) {
@@ -39,6 +50,7 @@ describe("Sidebar", () => {
   beforeEach(() => {
     // Reset body overflow between tests (sidebar modifies it)
     document.body.style.overflow = "";
+    mockSetTheme.mockReset();
   });
 
   // 1. Renders methodex typemark via Logo component
@@ -165,5 +177,94 @@ describe("Sidebar", () => {
     const { aside } = renderSidebar({ isOpen: false });
 
     expect(aside.className).toContain("lg:translate-x-0");
+  });
+
+  // 13. Theme toggle: renders light, dark, system toggle items
+  it("renders theme toggle items for light, dark, and system", () => {
+    const { aside } = renderSidebar();
+    const scoped = within(aside);
+
+    expect(scoped.getByRole("radio", { name: /light theme/i })).toBeDefined();
+    expect(scoped.getByRole("radio", { name: /dark theme/i })).toBeDefined();
+    expect(scoped.getByRole("radio", { name: /system theme/i })).toBeDefined();
+  });
+
+  // 14. Theme toggle: clicking light calls setTheme("light")
+  it('clicking light theme toggle calls setTheme with "light"', async () => {
+    const user = userEvent.setup();
+    const { aside } = renderSidebar();
+    const scoped = within(aside);
+
+    const lightBtn = scoped.getByRole("radio", { name: /light theme/i });
+    await user.click(lightBtn);
+
+    expect(mockSetTheme).toHaveBeenCalledWith("light");
+  });
+
+  // 15. Theme toggle: clicking dark calls setTheme("dark")
+  it('clicking dark theme toggle calls setTheme with "dark"', async () => {
+    const user = userEvent.setup();
+    const { aside } = renderSidebar();
+    const scoped = within(aside);
+
+    const darkBtn = scoped.getByRole("radio", { name: /dark theme/i });
+    await user.click(darkBtn);
+
+    expect(mockSetTheme).toHaveBeenCalledWith("dark");
+  });
+
+  // 16. Clicking the already-selected theme does not call setTheme (empty value guard)
+  it("does not call setTheme when clicking the already-selected theme toggle", async () => {
+    // The mock returns theme="system" which is the current value.
+    // Clicking system again in a single ToggleGroup sends empty string,
+    // and the handler's `if (value)` guard prevents calling setTheme.
+    const user = userEvent.setup();
+    const { aside } = renderSidebar();
+    const scoped = within(aside);
+
+    await user.click(scoped.getByRole("radio", { name: /system theme/i }));
+    expect(mockSetTheme).not.toHaveBeenCalled();
+  });
+
+  // 17. Renders "Theme" label
+  it('renders "Theme" label text', () => {
+    const { aside } = renderSidebar();
+    const scoped = within(aside);
+
+    expect(scoped.getByText("Theme")).toBeDefined();
+  });
+
+  // 18. Model Settings button opens the settings dialog
+  it("clicking Model Settings button opens the settings dialog", async () => {
+    const user = userEvent.setup();
+    const { aside } = renderSidebar();
+    const scoped = within(aside);
+
+    const modelSettingsBtn = scoped.getByRole("button", { name: /model settings/i });
+    await user.click(modelSettingsBtn);
+
+    // The mocked dialog should now be visible
+    expect(screen.getByTestId("model-settings-dialog")).toBeDefined();
+  });
+
+  // 19. Body overflow is set to "hidden" when sidebar is open
+  it('sets body overflow to "hidden" when isOpen', () => {
+    renderSidebar({ isOpen: true });
+    expect(document.body.style.overflow).toBe("hidden");
+  });
+
+  // 20. Body overflow is restored when sidebar closes
+  it('restores body overflow to "" when isOpen is false', () => {
+    renderSidebar({ isOpen: false });
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  // 21. Body overflow cleanup runs on unmount
+  it("restores body overflow on unmount", () => {
+    const { unmount } = renderSidebar({ isOpen: true });
+    expect(document.body.style.overflow).toBe("hidden");
+
+    unmount();
+    expect(document.body.style.overflow).toBe("");
   });
 });

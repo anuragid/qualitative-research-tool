@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within, userEvent } from "storybook/test";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -43,6 +44,26 @@ export const Default: Story = {
       </AlertDialogContent>
     </AlertDialog>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /show alert/i });
+    await expect(trigger).toBeInTheDocument();
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const dialog = await body.findByRole("alertdialog");
+    await expect(dialog).toBeInTheDocument();
+    await expect(within(dialog).getByText("Are you sure?")).toBeInTheDocument();
+    await expect(
+      within(dialog).getByText(/This action cannot be undone/)
+    ).toBeInTheDocument();
+
+    // Click Cancel to dismiss
+    const cancelButton = within(dialog).getByRole("button", {
+      name: /cancel/i,
+    });
+    await userEvent.click(cancelButton);
+  },
 };
 
 export const Destructive: Story = {
@@ -69,6 +90,27 @@ export const Destructive: Story = {
       </AlertDialogContent>
     </AlertDialog>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /delete project/i });
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const dialog = await body.findByRole("alertdialog");
+    await expect(dialog).toBeInTheDocument();
+
+    // Verify the title is present
+    const title = within(dialog).getByText("Delete Project", {
+      selector: '[data-slot="alert-dialog-title"]',
+    });
+    await expect(title).toBeInTheDocument();
+
+    // Click the destructive action to dismiss
+    const actionButton = within(dialog).getByRole("button", {
+      name: /delete project/i,
+    });
+    await userEvent.click(actionButton);
+  },
 };
 
 export const Informational: Story = {
@@ -94,4 +136,63 @@ export const Informational: Story = {
       </AlertDialogContent>
     </AlertDialog>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /start analysis/i });
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const dialog = await body.findByRole("alertdialog");
+    await expect(
+      within(dialog).getByText("Start Analysis?")
+    ).toBeInTheDocument();
+
+    // Click action to dismiss
+    const actionButton = within(dialog).getByRole("button", {
+      name: /start/i,
+    });
+    await userEvent.click(actionButton);
+  },
+};
+
+export const CustomButtonSizes: Story = {
+  name: "Custom Button Sizes",
+  render: () => (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline">Custom Sizes</Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Custom Size Buttons</AlertDialogTitle>
+          <AlertDialogDescription>
+            This dialog demonstrates action and cancel buttons with custom size
+            props.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel variant="ghost" size="sm">
+            Dismiss
+          </AlertDialogCancel>
+          <AlertDialogAction variant="default" size="sm">
+            Confirm
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /custom sizes/i });
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const dialog = await body.findByRole("alertdialog");
+    await expect(dialog).toBeInTheDocument();
+
+    const dismissBtn = within(dialog).getByRole("button", {
+      name: /dismiss/i,
+    });
+    await userEvent.click(dismissBtn);
+  },
 };

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Avatar, AvatarImage, AvatarFallback, AvatarGroup, AvatarGroupCount } from "./avatar";
+import { expect, within } from "storybook/test";
+import { Avatar, AvatarImage, AvatarFallback, AvatarBadge, AvatarGroup, AvatarGroupCount } from "./avatar";
 
 const meta = {
   title: "Primitives/Avatar",
@@ -81,6 +82,34 @@ export const Group: Story = {
       <AvatarGroupCount>+5</AvatarGroupCount>
     </AvatarGroup>
   ),
+};
+
+export const WithBadge: Story = {
+  name: "With Badge",
+  render: () => (
+    <div className="flex items-center gap-6">
+      <Avatar size="sm">
+        <AvatarFallback>SM</AvatarFallback>
+        <AvatarBadge />
+      </Avatar>
+      <Avatar size="default">
+        <AvatarFallback>DF</AvatarFallback>
+        <AvatarBadge />
+      </Avatar>
+      <Avatar size="lg">
+        <AvatarImage src="https://github.com/shadcn.png" alt="User" />
+        <AvatarFallback>LG</AvatarFallback>
+        <AvatarBadge />
+      </Avatar>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const badges = canvas.getAllByTestId
+      ? canvasElement.querySelectorAll('[data-slot="avatar-badge"]')
+      : canvasElement.querySelectorAll('[data-slot="avatar-badge"]');
+    await expect(badges.length).toBe(3);
+  },
 };
 
 export const ResearchTeam: Story = {

@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within } from "storybook/test";
 import {
   Table, TableBody, TableCaption, TableCell,
-  TableHead, TableHeader, TableRow,
+  TableHead, TableHeader, TableRow, TableFooter,
 } from "./Table";
 
 const meta = {
@@ -51,6 +52,19 @@ export const Default: Story = {
           <TableCell>Pending</TableCell>
         </TableRow>
       </TableBody>
+      <TableFooter>
+        <TableRow>
+          <TableCell className="font-medium">Total</TableCell>
+          <TableCell>53</TableCell>
+          <TableCell></TableCell>
+        </TableRow>
+      </TableFooter>
     </Table>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const footer = canvasElement.querySelector("tfoot");
+    await expect(footer).toBeInTheDocument();
+    await expect(canvas.getByText("Total")).toBeInTheDocument();
+  },
 };

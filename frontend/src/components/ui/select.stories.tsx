@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within, userEvent } from "storybook/test";
 import {
   Select, SelectTrigger, SelectValue, SelectContent,
-  SelectGroup, SelectLabel, SelectItem,
+  SelectGroup, SelectLabel, SelectItem, SelectSeparator,
 } from "./select";
 import { Label } from "./label";
 
@@ -46,6 +47,59 @@ export const Default: Story = {
       </SelectContent>
     </Select>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("combobox");
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const listbox = await body.findByRole("listbox");
+    await expect(listbox).toBeInTheDocument();
+
+    // Select an item
+    const gemmaOption = within(listbox).getByText("Gemma 2 9B");
+    await userEvent.click(gemmaOption);
+  },
+};
+
+export const WithSeparator: Story = {
+  name: "With Separator",
+  render: () => (
+    <Select>
+      <SelectTrigger className="w-[220px]">
+        <SelectValue placeholder="Select a model..." />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>Free Models</SelectLabel>
+          <SelectItem value="gemma">Gemma 2 9B</SelectItem>
+          <SelectItem value="llama">Llama 3.1 8B</SelectItem>
+          <SelectItem value="mistral">Mistral 7B</SelectItem>
+        </SelectGroup>
+        <SelectSeparator />
+        <SelectGroup>
+          <SelectLabel>Premium (BYOK)</SelectLabel>
+          <SelectItem value="claude">Claude Sonnet</SelectItem>
+          <SelectItem value="gpt4">GPT-4o</SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("combobox");
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const listbox = await body.findByRole("listbox");
+    await expect(listbox).toBeInTheDocument();
+    await expect(within(listbox).getByText("Gemma 2 9B")).toBeInTheDocument();
+    await expect(
+      within(listbox).getByText("Claude Sonnet")
+    ).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+  },
 };
 
 export const WithLabel: Story = {

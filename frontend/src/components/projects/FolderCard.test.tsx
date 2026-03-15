@@ -330,4 +330,52 @@ describe("FolderCard", () => {
 
     expect(mockNavigate).not.toHaveBeenCalled();
   });
+
+  // 13. Clicking "Edit" in dropdown opens the edit dialog
+  it("opens the edit dialog when Edit is clicked from dropdown", async () => {
+    const user = userEvent.setup();
+    const { container } = renderCard(createProject({ id: "edit-test" }));
+
+    const menuTrigger = getMenuTrigger(container);
+    await user.click(menuTrigger);
+    await user.click(screen.getByText("Edit"));
+
+    expect(screen.getByTestId("edit-dialog")).toBeDefined();
+  });
+
+  // 14. Clicking "Delete" in dropdown opens the delete dialog
+  it("opens the delete dialog when Delete is clicked from dropdown", async () => {
+    const user = userEvent.setup();
+    const { container } = renderCard(createProject({ id: "delete-test" }));
+
+    const menuTrigger = getMenuTrigger(container);
+    await user.click(menuTrigger);
+    await user.click(screen.getByText("Delete"));
+
+    expect(screen.getByTestId("delete-dialog")).toBeDefined();
+  });
+
+  // 15. Clicking Edit does not navigate
+  it("clicking Edit in dropdown does not navigate", async () => {
+    const user = userEvent.setup();
+    const { container } = renderCard(createProject({ id: "no-nav-edit" }));
+
+    const menuTrigger = getMenuTrigger(container);
+    await user.click(menuTrigger);
+    await user.click(screen.getByText("Edit"));
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  // 16. Clicking Delete does not navigate
+  it("clicking Delete in dropdown does not navigate", async () => {
+    const user = userEvent.setup();
+    const { container } = renderCard(createProject({ id: "no-nav-del" }));
+
+    const menuTrigger = getMenuTrigger(container);
+    await user.click(menuTrigger);
+    await user.click(screen.getByText("Delete"));
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });
