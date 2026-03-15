@@ -11,7 +11,7 @@ import LandingPage from "./pages/LandingPage";
 
 function SignInPage() {
   return (
-    <div className="min-h-screen bg-muted flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface-page flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <SignIn routing="hash" signUpUrl="/sign-up" />
       </div>
@@ -21,7 +21,7 @@ function SignInPage() {
 
 function SignUpPage() {
   return (
-    <div className="min-h-screen bg-muted flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface-page flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <SignUp routing="hash" signInUrl="/sign-in" />
       </div>

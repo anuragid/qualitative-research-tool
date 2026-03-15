@@ -435,7 +435,7 @@ export function UploadManager() {
                     {upload.status === 'uploading' && (
                       <button
                         onClick={() => pauseUpload(upload.id)}
-                        className="p-1.5 hover:bg-card/60 rounded transition-colors group"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-card/60 rounded transition-colors group"
                         title="Pause upload"
                         aria-label="Pause upload"
                       >
@@ -447,7 +447,7 @@ export function UploadManager() {
                     {upload.status === 'paused' && (
                       <button
                         onClick={() => resumeUpload(upload.id)}
-                        className="p-1.5 hover:bg-card/60 rounded transition-colors group"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-card/60 rounded transition-colors group"
                         title="Resume upload"
                         aria-label="Resume upload"
                       >
@@ -459,7 +459,7 @@ export function UploadManager() {
                     {(upload.status === 'uploading' || upload.status === 'pending') && (
                       <button
                         onClick={() => handleCancelClick(upload.id)}
-                        className="p-1.5 hover:bg-card/60 rounded transition-colors group"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-card/60 rounded transition-colors group"
                         title="Cancel upload permanently"
                         aria-label="Cancel upload"
                       >
@@ -471,7 +471,7 @@ export function UploadManager() {
                     {upload.status === 'paused' && (
                       <button
                         onClick={() => handleCancelClick(upload.id)}
-                        className="p-1.5 hover:bg-card/60 rounded transition-colors group"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-card/60 rounded transition-colors group"
                         title="Cancel upload permanently"
                         aria-label="Cancel upload"
                       >
@@ -483,7 +483,7 @@ export function UploadManager() {
                     {upload.status === 'error' && (
                       <button
                         onClick={() => retryUpload(upload.id)}
-                        className="p-1.5 hover:bg-card/60 rounded transition-colors group"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-card/60 rounded transition-colors group"
                         title="Retry upload"
                         aria-label="Retry upload"
                       >
@@ -495,7 +495,7 @@ export function UploadManager() {
                     {(upload.status === 'completed' || upload.status === 'cancelled' || upload.status === 'error') && (
                       <button
                         onClick={() => removeUpload(upload.id)}
-                        className="p-1.5 hover:bg-card/60 rounded transition-colors group"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-card/60 rounded transition-colors group"
                         title="Remove from list"
                         aria-label="Remove from list"
                       >
@@ -506,7 +506,7 @@ export function UploadManager() {
                     {/* Help icon for errors */}
                     {upload.status === 'error' && (
                       <button
-                        className="p-1.5 hover:bg-card/60 rounded transition-colors group"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-card/60 rounded transition-colors group"
                         title={`Error type: ${upload.errorType || 'unknown'}`}
                         aria-label="Error information"
                       >

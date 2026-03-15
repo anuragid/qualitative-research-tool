@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Input } from "../components/ui/Input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/Select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
 import { Progress } from "../components/ui/Progress";
 import { SimpleTooltip } from "../components/ui/Tooltip";
@@ -525,15 +526,15 @@ export default function VideoDetailPage() {
                                   onChange={(e) => setSpeakerName(e.target.value)}
                                   className="flex-1"
                                 />
-                                <select
-                                  value={speakerRole}
-                                  onChange={(e) => setSpeakerRole(e.target.value)}
-                                  className="flex-1 px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-card"
-                                >
-                                  <option value="">Select role...</option>
-                                  <option value="Interviewer">Interviewer</option>
-                                  <option value="Participant">Participant</option>
-                                </select>
+                                <Select value={speakerRole} onValueChange={(value) => setSpeakerRole(value)}>
+                                  <SelectTrigger className="flex-1 h-9 text-sm">
+                                    <SelectValue placeholder="Select role..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Interviewer">Interviewer</SelectItem>
+                                    <SelectItem value="Participant">Participant</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <Button
                                   size="sm"
                                   className="rounded-full"

@@ -3,6 +3,7 @@ import { useUploadVideo } from '../hooks/useVideos';
 import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import type { CancelTokenSource } from 'axios';
+import { toast } from 'sonner';
 
 export interface FileUploadStatus {
   id: string;
@@ -496,7 +497,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Placeholder for a proper toast/notification system
-function showNotification(_type: 'success' | 'error' | 'info', _message: string) {
-  // TODO: Replace with a proper toast library (e.g., sonner, react-hot-toast)
+function showNotification(type: 'success' | 'error' | 'info', message: string) {
+  if (type === 'success') toast.success(message);
+  else if (type === 'error') toast.error(message);
+  else toast.info(message);
 }
