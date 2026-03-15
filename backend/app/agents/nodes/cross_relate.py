@@ -47,11 +47,13 @@ VIDEO PATTERNS:
 
 Find patterns that transcend individual videos and reveal system-level themes."""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         cross_patterns = llm_service.call_with_json_list_response(
             system_prompt=CROSS_RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response

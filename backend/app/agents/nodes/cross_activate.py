@@ -47,11 +47,13 @@ CROSS-VIDEO INSIGHTS:
 
 Create design principles that provide strategic direction for the entire system."""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         system_principles = llm_service.call_with_json_list_response(
             system_prompt=CROSS_ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response

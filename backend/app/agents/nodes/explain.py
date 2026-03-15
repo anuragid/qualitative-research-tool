@@ -54,11 +54,13 @@ ORIGINAL CHUNKS (for evidence):
 
 Generate non-consensus insights that challenge assumptions and reveal fundamental truths. Write each insight as a short, punchy headline."""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         insights = llm_service.call_with_json_list_response(
             system_prompt=EXPLAIN_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for many patterns
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response

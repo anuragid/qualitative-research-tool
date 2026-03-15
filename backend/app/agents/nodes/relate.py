@@ -46,11 +46,13 @@ INFERENCES:
 
 Group related inferences into patterns and explain what each pattern represents."""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         patterns = llm_service.call_with_json_list_response(
             system_prompt=RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for many inferences
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response

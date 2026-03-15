@@ -53,11 +53,13 @@ INDIVIDUAL VIDEO INSIGHTS (for context):
 
 Generate insights that reveal truths about the system as a whole, not just individual experiences."""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         cross_insights = llm_service.call_with_json_list_response(
             system_prompt=CROSS_EXPLAIN_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response

@@ -46,11 +46,13 @@ CHUNKS:
 
 Generate multiple inferences per chunk if appropriate."""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         inferences = llm_service.call_with_json_list_response(
             system_prompt=INFER_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=32768,  # Increased for many chunks
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response

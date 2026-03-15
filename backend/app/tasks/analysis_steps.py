@@ -12,12 +12,36 @@ from app.agents.nodes.chunk import chunk_node
 from app.agents.nodes.explain import explain_node
 from app.agents.nodes.infer import infer_node
 from app.agents.nodes.relate import relate_node
-from app.models.database_models import SpeakerLabel, Transcript, Video, VideoAnalysis
+from app.models.database_models import SpeakerLabel, Transcript, User, Video, VideoAnalysis
+from app.services.encryption_service import encryption_service
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_byok(db: Session, user_id: str | None) -> tuple[str | None, str | None]:
+    """Look up and decrypt a user's BYOK API key and preferred model.
+
+    Returns (api_key, model) — both None when no BYOK is configured.
+    """
+    if not user_id:
+        return None, None
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None, None
+
+    api_key = None
+    if user.encrypted_api_key:
+        api_key = encryption_service.decrypt(user.encrypted_api_key)
+        if api_key:
+            logger.info(f"Using BYOK API key for user {user_id}")
+        else:
+            logger.warning(f"Failed to decrypt BYOK key for user {user_id}, falling back to server default")
+
+    model = user.preferred_model  # may be None
+    return api_key, model
 
 
 def get_video_analysis_state(db: Session, video_id: UUID) -> Dict[str, Any]:
@@ -97,7 +121,7 @@ def _update_analysis_error(db: Session, video_id: str, step_name: str):
     retry_jitter=True,
     max_retries=3,
 )
-def analyze_chunk_step(self, video_id: str):
+def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
     """
     Step 1: CHUNK - Break transcript into discrete pieces.
     """
@@ -107,6 +131,9 @@ def analyze_chunk_step(self, video_id: str):
         # Get state from database
         state = get_video_analysis_state(self.db, UUID(video_id))
         analysis = state["analysis"]
+
+        # Resolve BYOK API key and preferred model
+        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
 
         # Update status
         analysis.status = "processing"
@@ -120,7 +147,9 @@ def analyze_chunk_step(self, video_id: str):
             "video_id": video_id,
             "transcript": state["transcript"],
             "speaker_labels": state["speaker_labels"],
-            "speaker_roles": state["speaker_roles"]
+            "speaker_roles": state["speaker_roles"],
+            "api_key": byok_api_key,
+            "model": byok_model,
         })
 
         # Check for errors in node result
@@ -157,7 +186,7 @@ def analyze_chunk_step(self, video_id: str):
     retry_jitter=True,
     max_retries=3
 )
-def analyze_infer_step(self, video_id: str):
+def analyze_infer_step(self, video_id: str, user_id: str | None = None):
     """
     Step 2: INFER - Interpret meaning from each chunk.
     Automatically retries up to 3 times with exponential backoff on failure.
@@ -173,6 +202,9 @@ def analyze_infer_step(self, video_id: str):
         if not analysis or not analysis.chunks:
             raise Exception("No chunks available for inference")
 
+        # Resolve BYOK API key and preferred model
+        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+
         # Update status
         analysis.current_step = "infer"
         analysis.step_status = {**(analysis.step_status or {}), "infer": "processing"}
@@ -181,7 +213,9 @@ def analyze_infer_step(self, video_id: str):
         # Run infer node
         result = infer_node({
             "video_id": video_id,
-            "chunks": analysis.chunks
+            "chunks": analysis.chunks,
+            "api_key": byok_api_key,
+            "model": byok_model,
         })
 
         # Check if result has error
@@ -218,7 +252,7 @@ def analyze_infer_step(self, video_id: str):
     retry_jitter=True,
     max_retries=3,
 )
-def analyze_relate_step(self, video_id: str):
+def analyze_relate_step(self, video_id: str, user_id: str | None = None):
     """
     Step 3: RELATE - Find patterns across inferences.
     """
@@ -233,6 +267,9 @@ def analyze_relate_step(self, video_id: str):
         if not analysis or not analysis.inferences:
             raise Exception("No inferences available for pattern analysis")
 
+        # Resolve BYOK API key and preferred model
+        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+
         # Update status
         analysis.current_step = "relate"
         analysis.step_status = {**(analysis.step_status or {}), "relate": "processing"}
@@ -241,7 +278,9 @@ def analyze_relate_step(self, video_id: str):
         # Run relate node
         result = relate_node({
             "video_id": video_id,
-            "inferences": analysis.inferences
+            "inferences": analysis.inferences,
+            "api_key": byok_api_key,
+            "model": byok_model,
         })
 
         # Check for errors in node result
@@ -278,7 +317,7 @@ def analyze_relate_step(self, video_id: str):
     retry_jitter=True,
     max_retries=3,
 )
-def analyze_explain_step(self, video_id: str):
+def analyze_explain_step(self, video_id: str, user_id: str | None = None):
     """
     Step 4: EXPLAIN - Generate insights from patterns.
     """
@@ -293,6 +332,9 @@ def analyze_explain_step(self, video_id: str):
         if not analysis or not analysis.patterns:
             raise Exception("No patterns available for insight generation")
 
+        # Resolve BYOK API key and preferred model
+        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+
         # Update status
         analysis.current_step = "explain"
         analysis.step_status = {**(analysis.step_status or {}), "explain": "processing"}
@@ -303,6 +345,8 @@ def analyze_explain_step(self, video_id: str):
             "video_id": video_id,
             "patterns": analysis.patterns,
             "chunks": analysis.chunks,  # Provide chunks for evidence context
+            "api_key": byok_api_key,
+            "model": byok_model,
         })
 
         # Check for errors in node result
@@ -339,7 +383,7 @@ def analyze_explain_step(self, video_id: str):
     retry_jitter=True,
     max_retries=3,
 )
-def analyze_activate_step(self, video_id: str):
+def analyze_activate_step(self, video_id: str, user_id: str | None = None):
     """
     Step 5: ACTIVATE - Create design principles from insights.
     """
@@ -354,6 +398,9 @@ def analyze_activate_step(self, video_id: str):
         if not analysis or not analysis.insights:
             raise Exception("No insights available for design principle generation")
 
+        # Resolve BYOK API key and preferred model
+        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+
         # Update status
         analysis.current_step = "activate"
         analysis.step_status = {**(analysis.step_status or {}), "activate": "processing"}
@@ -362,7 +409,9 @@ def analyze_activate_step(self, video_id: str):
         # Run activate node
         result = activate_node({
             "video_id": video_id,
-            "insights": analysis.insights
+            "insights": analysis.insights,
+            "api_key": byok_api_key,
+            "model": byok_model,
         })
 
         # Check for errors in node result

@@ -369,9 +369,9 @@ async def trigger_video_analysis(
         db.commit()
         db.refresh(video_analysis)
 
-        # Trigger Celery task
+        # Trigger Celery task (pass user_id so BYOK key can be looked up)
         from app.tasks.analysis_tasks import analyze_video_task
-        task = analyze_video_task.delay(str(video_id))
+        task = analyze_video_task.delay(str(video_id), current_user_id)
 
         logger.info(f"Video analysis task started for video {video_id}, task_id: {task.id}")
         return {
@@ -569,7 +569,7 @@ async def trigger_chunk_step(
             )
 
         from app.tasks.analysis_steps import analyze_chunk_step
-        task = analyze_chunk_step.delay(str(video_id))
+        task = analyze_chunk_step.delay(str(video_id), current_user_id)
         logger.info(f"CHUNK step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -609,7 +609,7 @@ async def trigger_infer_step(
             )
 
         from app.tasks.analysis_steps import analyze_infer_step
-        task = analyze_infer_step.delay(str(video_id))
+        task = analyze_infer_step.delay(str(video_id), current_user_id)
         logger.info(f"INFER step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -649,7 +649,7 @@ async def trigger_relate_step(
             )
 
         from app.tasks.analysis_steps import analyze_relate_step
-        task = analyze_relate_step.delay(str(video_id))
+        task = analyze_relate_step.delay(str(video_id), current_user_id)
         logger.info(f"RELATE step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -689,7 +689,7 @@ async def trigger_explain_step(
             )
 
         from app.tasks.analysis_steps import analyze_explain_step
-        task = analyze_explain_step.delay(str(video_id))
+        task = analyze_explain_step.delay(str(video_id), current_user_id)
         logger.info(f"EXPLAIN step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -729,7 +729,7 @@ async def trigger_activate_step(
             )
 
         from app.tasks.analysis_steps import analyze_activate_step
-        task = analyze_activate_step.delay(str(video_id))
+        task = analyze_activate_step.delay(str(video_id), current_user_id)
         logger.info(f"ACTIVATE step started for video {video_id}, task_id: {task.id}")
 
         return {

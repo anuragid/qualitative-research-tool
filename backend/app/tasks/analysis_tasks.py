@@ -26,12 +26,36 @@ from app.agents.nodes import (
     relate_node,
 )
 from app.agents.states import ProjectAnalysisState, VideoAnalysisState
-from app.models.database_models import Project, ProjectAnalysis, SpeakerLabel, Transcript, Video, VideoAnalysis
+from app.models.database_models import Project, ProjectAnalysis, SpeakerLabel, Transcript, User, Video, VideoAnalysis
+from app.services.encryption_service import encryption_service
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_byok(db, user_id: str | None) -> tuple[str | None, str | None]:
+    """Look up and decrypt a user's BYOK API key and preferred model.
+
+    Returns (api_key, model) — both None when no BYOK is configured.
+    """
+    if not user_id:
+        return None, None
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None, None
+
+    api_key = None
+    if user.encrypted_api_key:
+        api_key = encryption_service.decrypt(user.encrypted_api_key)
+        if api_key:
+            logger.info(f"Using BYOK API key for user {user_id}")
+        else:
+            logger.warning(f"Failed to decrypt BYOK key for user {user_id}, falling back to server default")
+
+    model = user.preferred_model  # may be None
+    return api_key, model
 
 
 def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
@@ -76,7 +100,7 @@ def _run_project_pipeline(state) -> dict:
 
 
 @celery_app.task(base=DatabaseTask, bind=True, name="analyze_video")
-def analyze_video_task(self, video_id: str):
+def analyze_video_task(self, video_id: str, user_id: str | None = None):
     """
     Analyze a video using the 5-step LangGraph pipeline.
 
@@ -89,6 +113,7 @@ def analyze_video_task(self, video_id: str):
 
     Args:
         video_id: UUID of the video to analyze
+        user_id: Optional user ID for BYOK key lookup
 
     Returns:
         Dictionary with analysis results
@@ -141,6 +166,9 @@ def analyze_video_task(self, video_id: str):
         video.status = "analyzing"
         self.db.commit()
 
+        # Resolve BYOK API key and preferred model for this user
+        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+
         # Prepare initial state for LangGraph
         initial_state: VideoAnalysisState = {
             "video_id": video_id,
@@ -152,6 +180,8 @@ def analyze_video_task(self, video_id: str):
             "patterns": None,
             "insights": None,
             "design_principles": None,
+            "api_key": byok_api_key,
+            "model": byok_model,
             "current_step": "chunk",
             "error": None
         }
@@ -235,7 +265,7 @@ def analyze_video_task(self, video_id: str):
 
 
 @celery_app.task(base=DatabaseTask, bind=True, name="analyze_project")
-def analyze_project_task(self, project_id: str):
+def analyze_project_task(self, project_id: str, user_id: str | None = None):
     """
     Analyze a project using cross-video synthesis (3-step pipeline).
 
@@ -246,6 +276,7 @@ def analyze_project_task(self, project_id: str):
 
     Args:
         project_id: UUID of the project to analyze
+        user_id: Optional user ID for BYOK key lookup
 
     Returns:
         Dictionary with cross-video analysis results
@@ -305,6 +336,9 @@ def analyze_project_task(self, project_id: str):
 
         self.db.commit()
 
+        # Resolve BYOK API key and preferred model for this user
+        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+
         # Prepare initial state for LangGraph
         initial_state: ProjectAnalysisState = {
             "project_id": project_id,
@@ -315,6 +349,8 @@ def analyze_project_task(self, project_id: str):
             "cross_video_patterns": None,
             "cross_video_insights": None,
             "cross_video_principles": None,
+            "api_key": byok_api_key,
+            "model": byok_model,
             "current_step": "cross_relate",
             "error": None
         }

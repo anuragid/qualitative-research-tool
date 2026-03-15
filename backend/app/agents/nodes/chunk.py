@@ -84,11 +84,13 @@ Remember:
 - Include relevant context in each chunk to maintain meaning (e.g., what question the participant is responding to)
 - Use the actual speaker names (not A, B, C) as shown in the transcript"""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         chunks = llm_service.call_with_json_list_response(
             system_prompt=CHUNK_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for long transcripts
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response

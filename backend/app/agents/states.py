@@ -30,6 +30,10 @@ class VideoAnalysisState(TypedDict):
     # Step 5: ACTIVATE - Create design principles from insights
     design_principles: Optional[List[Dict[str, Any]]]
 
+    # BYOK (Bring Your Own Key) overrides — if None, server defaults are used
+    api_key: Optional[str]  # Decrypted OpenRouter API key
+    model: Optional[str]  # User's preferred model
+
     # Metadata
     current_step: str  # Track progress: "chunk", "infer", "relate", "explain", "activate"
     error: Optional[str]  # Store any errors that occur
@@ -58,6 +62,10 @@ class ProjectAnalysisState(TypedDict):
 
     # Step 8: CROSS_ACTIVATE - Create system-level design principles
     cross_video_principles: Optional[List[Dict[str, Any]]]
+
+    # BYOK (Bring Your Own Key) overrides — if None, server defaults are used
+    api_key: Optional[str]  # Decrypted OpenRouter API key
+    model: Optional[str]  # User's preferred model
 
     # Metadata
     current_step: str  # Track progress: "cross_relate", "cross_explain", "cross_activate"

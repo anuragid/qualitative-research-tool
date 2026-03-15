@@ -367,9 +367,9 @@ async def trigger_project_analysis(
         db.commit()
         db.refresh(project_analysis)
 
-        # Trigger Celery task
+        # Trigger Celery task (pass user_id so BYOK key can be looked up)
         from app.tasks.analysis_tasks import analyze_project_task
-        task = analyze_project_task.delay(str(project_id))
+        task = analyze_project_task.delay(str(project_id), current_user_id)
 
         logger.info(f"Project analysis task started for project {project_id}, task_id: {task.id}")
         return {

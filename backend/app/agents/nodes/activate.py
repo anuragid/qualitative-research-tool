@@ -46,11 +46,13 @@ INSIGHTS:
 
 For each insight, create one or more design principles that provide strategic direction."""
 
-        # Call LLM with retry logic
+        # Call LLM with retry logic (pass BYOK overrides if present)
         design_principles = llm_service.call_with_json_list_response(
             system_prompt=ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
+            api_key=state.get("api_key"),
+            model=state.get("model"),
         )
 
         # Validate response
