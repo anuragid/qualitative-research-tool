@@ -215,8 +215,7 @@ export default function ProjectDetailPage() {
         {/* Back navigation */}
         <Link
           to="/projects"
-          className="inline-flex items-center gap-2 text-base-55 hover:text-foreground"
-          style={{ transition: "color var(--duration-micro) var(--ease)" }}
+          className="inline-flex items-center gap-2 text-base-55 hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)]"
         >
           <ArrowLeft className="h-4 w-4" />
           <span className="text-body-sm">All Projects</span>
@@ -433,7 +432,7 @@ export default function ProjectDetailPage() {
 
                     {/* Progress bar with indeterminate state */}
                     <div className="w-full bg-base-04 rounded-full h-1.5">
-                      <div className="bg-accent-blue h-1.5 rounded-full animate-pulse" style={{ width: '100%' }} />
+                      <div className="bg-accent-blue h-1.5 rounded-full animate-pulse w-full" />
                     </div>
 
                     {projectAnalysis?.status === 'running' && (
