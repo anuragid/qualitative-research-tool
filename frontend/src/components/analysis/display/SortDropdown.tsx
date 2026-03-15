@@ -5,7 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "../../ui/DropdownMenu";
+} from "../../ui/dropdown-menu";
 import type { SortOption } from "../config/displayConfig";
 import type { SortConfig } from "../hooks/useAnalysisDisplay";
 
