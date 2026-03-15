@@ -44,7 +44,7 @@ function ToolbarDemo({ step }: { step: AnalysisStep }) {
   const expandAll = () => setExpandedItems("all");
   const collapseAll = () => setExpandedItems("none");
 
-  const processData = <T extends Record<string, any>>(items: T[]): T[] => items;
+  const processData = <T extends object>(items: T[]): T[] => items;
 
   return (
     <div className="max-w-3xl">

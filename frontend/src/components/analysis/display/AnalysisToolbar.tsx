@@ -3,7 +3,7 @@ import { FilterBar } from "./FilterBar";
 import { SortDropdown } from "./SortDropdown";
 import { SearchInput } from "./SearchInput";
 // ExpandCollapseToggle is deferred until accordion value prop wiring is implemented
-import { sortOptions, filterOptions, type AnalysisStep } from "../config/displayConfig";
+import { sortOptions, filterOptions } from "../config/displayConfig";
 import type { useAnalysisDisplay } from "../hooks/useAnalysisDisplay";
 
 type ToolbarProps = ReturnType<typeof useAnalysisDisplay>;

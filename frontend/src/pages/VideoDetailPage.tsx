@@ -23,7 +23,6 @@ import { PrinciplesList } from "../components/analysis/PrinciplesList";
 import { ContinueStepButton } from "../components/analysis/ContinueStepButton";
 import { useAnalysisDisplay } from "../components/analysis/hooks/useAnalysisDisplay";
 import { AnalysisToolbar } from "../components/analysis/display/AnalysisToolbar";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Input } from "../components/ui/Input";
@@ -40,7 +39,6 @@ import {
 import {
   Loader2,
   ArrowLeft,
-  Video as VideoIcon,
   FileText,
   Play,
   Lightbulb,

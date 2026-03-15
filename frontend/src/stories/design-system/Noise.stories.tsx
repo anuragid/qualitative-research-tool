@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 
 const BRAND_COLORS = [
   { name: "Mustard", var: "--color-brand-mustard", hex: "#D3A848" },

@@ -2,13 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   chunkTypeStyles,
-  insightTypeStyles,
   confidenceStyles,
-  priorityStyles,
-  frequencyStyles,
-  consistencyStyles,
-  scopeStyles,
-  relationshipTypeStyles,
   sortOptions,
   filterOptions,
   ANALYSIS_STEPS,

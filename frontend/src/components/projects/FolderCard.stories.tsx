@@ -1,5 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import FolderCard from "./FolderCard";
+import type { Video } from "../../types";
 
 const mockProject = {
   id: "1",
@@ -10,7 +11,7 @@ const mockProject = {
   error_message: null,
   created_at: "2025-04-08T00:00:00Z",
   updated_at: "2025-04-08T00:00:00Z",
-  videos: [{ id: "v1" }, { id: "v2" }] as any[],
+  videos: [{ id: "v1" }, { id: "v2" }] as unknown as Video[],
 };
 
 const meta: Meta<typeof FolderCard> = {

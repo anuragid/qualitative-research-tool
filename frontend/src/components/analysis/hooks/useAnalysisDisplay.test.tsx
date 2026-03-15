@@ -2,7 +2,6 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAnalysisDisplay } from "./useAnalysisDisplay";
-import type { AnalysisStep } from "../config/displayConfig";
 
 // Wrap with MemoryRouter for useSearchParams
 import { MemoryRouter } from "react-router-dom";
@@ -72,7 +71,7 @@ describe("useAnalysisDisplay", () => {
     act(() => result.current.toggleFilter("type", "quote"));
     const processed = result.current.processData(chunks);
     expect(processed).toHaveLength(2);
-    expect(processed.every((c: any) => c.type === "quote")).toBe(true);
+    expect(processed.every((c: Record<string, unknown>) => c.type === "quote")).toBe(true);
   });
 
   it("processData searches by text content", () => {

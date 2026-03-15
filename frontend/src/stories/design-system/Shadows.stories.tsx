@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 
 const SHADOWS = [
   { name: "Subtle", token: "--shadow-subtle", usage: "Hover cards" },

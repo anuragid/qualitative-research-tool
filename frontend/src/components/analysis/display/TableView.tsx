@@ -20,7 +20,7 @@ interface TableViewProps<T> {
   onRowClick?: (item: T) => void;
 }
 
-export function TableView<T extends Record<string, any>>({
+export function TableView<T extends object>({
   data, columns, sort, onSort, onRowClick,
 }: TableViewProps<T>) {
   const handleHeaderClick = (col: TableColumn<T>) => {

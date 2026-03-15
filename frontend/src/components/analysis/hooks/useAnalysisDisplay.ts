@@ -47,13 +47,13 @@ export function useAnalysisDisplay(step: AnalysisStep) {
   const collapseAll = useCallback(() => setExpandedItems("none"), []);
 
   const processData = useCallback(
-    <T extends Record<string, any>>(items: T[]): T[] => {
+    <T extends object>(items: T[]): T[] => {
       let result = [...items];
 
       // Apply filters
       for (const [field, values] of Object.entries(activeFilters)) {
         if (values.length > 0) {
-          result = result.filter((item) => values.includes(String(item[field])));
+          result = result.filter((item) => values.includes(String((item as Record<string, unknown>)[field])));
         }
       }
 
@@ -76,8 +76,8 @@ export function useAnalysisDisplay(step: AnalysisStep) {
         const dir = sort.direction === "desc" ? -1 : 1;
 
         result.sort((a, b) => {
-          const aVal = getNestedValue(a, sort.field);
-          const bVal = getNestedValue(b, sort.field);
+          const aVal = getNestedValue(a as Record<string, unknown>, sort.field);
+          const bVal = getNestedValue(b as Record<string, unknown>, sort.field);
 
           // Handle priority/frequency/confidence ordering
           if (sort.field === "priority" || sort.field === "frequency" || sort.field === "confidence" || sort.field === "consistency_across_videos") {
@@ -119,6 +119,11 @@ export function useAnalysisDisplay(step: AnalysisStep) {
   };
 }
 
-function getNestedValue(obj: any, path: string): any {
-  return path.split(".").reduce((acc, key) => acc?.[key], obj);
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  return path.split(".").reduce<unknown>((acc, key) => {
+    if (acc && typeof acc === "object" && key in acc) {
+      return (acc as Record<string, unknown>)[key];
+    }
+    return undefined;
+  }, obj);
 }
