@@ -93,7 +93,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
       >
         {/* Hover outline — fades in on hover, contains everything visually */}
         <div
-          className="transition-[border-color] ease-[var(--ease)] border-transparent
+          className="relative transition-[border-color] ease-[var(--ease)] border-transparent
             group-hover/folder:border-[var(--folder-hover-outline-color)]
             group-active/folder:scale-[0.98] transition-transform"
           style={{
@@ -103,6 +103,48 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
             padding: "var(--folder-hover-outline-padding)",
           }}
         >
+          {/* Dropdown menu — top-right of hover outline, appears on hover */}
+          <div
+            data-dropdown-menu
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-[var(--space-tight)] right-[var(--space-tight)] z-[10]
+              opacity-100 sm:opacity-0 sm:group-hover/folder:opacity-100
+              transition-opacity duration-[var(--duration-micro)]"
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 frosted-glass rounded-full"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShowEditDialog(true); }}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleArchiveToggle}>
+                  {project.status === "archived" ? (
+                    <><ArchiveRestore className="mr-2 h-4 w-4" />Unarchive</>
+                  ) : (
+                    <><Archive className="mr-2 h-4 w-4" />Archive</>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(true); }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {/*
             Folder wrapper — padding-top gives thumbnails room to fan into on hover.
             perspective on this element for 3D tilt.
@@ -208,48 +250,6 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
 
               </div>
 
-              {/* Dropdown menu — top-right, appears on hover */}
-              <div
-                data-dropdown-menu
-                onClick={(e) => e.stopPropagation()}
-                className="absolute top-[var(--space-inline-gap)] right-[var(--space-inline-gap)] z-[10]
-                  opacity-100 sm:opacity-0 sm:group-hover/folder:opacity-100
-                  transition-opacity duration-[var(--duration-micro)]"
-              >
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 frosted-glass rounded-full"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">Open menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShowEditDialog(true); }}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleArchiveToggle}>
-                      {project.status === "archived" ? (
-                        <><ArchiveRestore className="mr-2 h-4 w-4" />Unarchive</>
-                      ) : (
-                        <><Archive className="mr-2 h-4 w-4" />Archive</>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(true); }}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
             </div>
           </div>
 
