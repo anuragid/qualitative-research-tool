@@ -18,13 +18,14 @@ router = APIRouter()
 
 # Available models exposed by GET/PUT /settings
 AVAILABLE_MODELS = [
-    {"id": "meta-llama/llama-3.3-70b-instruct", "name": "Llama 3.3 70B", "tier": "free"},
-    {"id": "google/gemma-3-27b-it", "name": "Gemma 3 27B", "tier": "free"},
-    {"id": "mistralai/mistral-small-3.1-24b-instruct", "name": "Mistral Small 3.1", "tier": "free"},
-    {"id": "qwen/qwen3-235b-a22b", "name": "Qwen 3 235B", "tier": "free"},
-    {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "tier": "premium"},
-    {"id": "openai/gpt-4o", "name": "GPT-4o", "tier": "premium"},
-    {"id": "google/gemini-2.5-pro-preview", "name": "Gemini 2.5 Pro", "tier": "premium"},
+    {"id": "nvidia/nemotron-3-super-120b-a12b:free", "name": "Nemotron 3 Super 120B", "tier": "free"},
+    {"id": "qwen/qwen3.5-flash-02-23", "name": "Qwen 3.5 Flash", "tier": "free"},
+    {"id": "stepfun/step-3.5-flash:free", "name": "Step 3.5 Flash", "tier": "free"},
+    {"id": "z-ai/glm-5", "name": "GLM-5", "tier": "free"},
+    {"id": "anthropic/claude-sonnet-4.6", "name": "Claude Sonnet 4.6", "tier": "premium"},
+    {"id": "anthropic/claude-opus-4.6", "name": "Claude Opus 4.6", "tier": "premium"},
+    {"id": "openai/gpt-5.4", "name": "GPT-5.4", "tier": "premium"},
+    {"id": "google/gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "tier": "premium"},
 ]
 
 FREE_MODEL_IDS = {m["id"] for m in AVAILABLE_MODELS if m["tier"] == "free"}
