@@ -477,6 +477,16 @@ body {
   100% { transform: translateX(-100%); }
 }
 
+/* ===== FOLDER CARD THUMBNAIL ANIMATION ===== */
+.folder-thumbnail {
+  transform: translateX(var(--thumb-x, 0px)) translateY(var(--thumb-y, 0px)) rotate(var(--thumb-r, 0deg));
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.group\/folder:hover .folder-thumbnail {
+  transform: translateX(var(--thumb-hx, 0px)) translateY(var(--thumb-hy, 0px)) rotate(var(--thumb-hr, 0deg));
+}
+
 /* ===== SCROLLBAR HIDE UTILITY ===== */
 @utility scrollbar-hide {
   -ms-overflow-style: none;

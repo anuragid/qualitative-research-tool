@@ -42,11 +42,14 @@ export default function ProjectsPage() {
         {isLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="pt-6">
-                {/* Skeleton tab */}
-                <Skeleton className="w-20 h-7 rounded-t-md mb-0" />
-                {/* Skeleton body */}
-                <Skeleton className="h-40 rounded-2xl" />
+              <div key={i} className="p-2">
+                {/* Skeleton folder */}
+                <Skeleton className="h-40 rounded-[var(--radius-card)]" />
+                {/* Skeleton meta */}
+                <div className="mt-3 flex flex-col items-center gap-1">
+                  <Skeleton className="h-5 w-24 rounded" />
+                  <Skeleton className="h-3 w-16 rounded" />
+                </div>
               </div>
             ))}
           </div>
@@ -90,9 +93,7 @@ export default function ProjectsPage() {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
           >
             {projects.map((project, index) => (
-              <div key={project.id} data-animate="folder-card">
-                <FolderCard project={project} colorIndex={index} />
-              </div>
+              <FolderCard key={project.id} project={project} colorIndex={index} />
             ))}
           </div>
         )}
