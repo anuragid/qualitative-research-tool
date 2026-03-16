@@ -119,7 +119,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
       </svg>
 
       <div
-        className="group/folder relative cursor-pointer outline-none"
+        className="group/folder relative cursor-pointer outline-none max-w-xs mx-auto"
         onClick={handleCardClick}
         role="button"
         tabIndex={0}
@@ -140,7 +140,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
             group-active/folder:scale-[0.98]"
         >
           {/* Folder area */}
-          <div className="relative aspect-[4/3]" style={{ perspective: "800px" }}>
+          <div className="relative aspect-[4/3] overflow-hidden" style={{ perspective: "800px" }}>
 
             {/* Back panel — simple rounded rectangle, saturated color */}
             <div
@@ -186,7 +186,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                 group-hover/folder:[transform:rotateX(-14deg)]
                 motion-reduce:group-hover/folder:transform-none"
               style={{
-                height: "82%",
+                height: "83%",
                 clipPath: `url(#folder-clip-${project.id})`,
                 backgroundColor: color.body,
               }}
