@@ -212,8 +212,7 @@
   /* Thumbnail fan-out — 2 thumbnails */
   --folder-thumb-fan-y-2: 1.875rem;      /* 30px */
   --folder-thumb-fan-x-2: 0.25rem;       /* 4px */
-  /* Thumbnail fan-out — 1 thumbnail */
-  --folder-thumb-fan-y-1: 2rem;          /* 32px */
+  /* 1-thumbnail reuses --folder-thumb-fan-y-center for consistent peak height */
 
   /* ===== 19. FOLDER STATUS ICON ===== */
   --folder-icon-size: 1.625rem;       /* 26px — icon badge diameter */
@@ -644,7 +643,7 @@ body {
 .folder-thumb-1-0 { left: 34%; top: 36%; transform: rotate(0deg); }
 
 .group\/folder:hover .folder-thumb-1-0 {
-  transform: rotate(0deg) translateY(calc(-1 * var(--folder-thumb-fan-y-1)));
+  transform: rotate(0deg) translateY(calc(-1 * var(--folder-thumb-fan-y-center)));
 }
 
 /* ===== SCROLLBAR HIDE UTILITY ===== */
