@@ -5,8 +5,8 @@ import { useProject } from "../hooks/useProjects";
 import { useProjectVideos } from "../hooks/useVideos";
 import { useProjectAnalysis, useStartProjectAnalysis, useMetaPatterns, useCrossInsights, useSystemPrinciples } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
-import { getFolderColor } from "../lib/noise";
 import { Loader2, Upload, Video as VideoIcon, AlertCircle, Network, PlayCircle, CheckCircle2, MoreVertical, Edit, Trash2, RefreshCw, Lightbulb, Compass } from "lucide-react";
+import { Separator } from "../components/ui/separator";
 import { Button } from "../components/ui/button";
 import { BackLink } from "../components/ui/back-link";
 import { EmptyState } from "../components/ui/empty-state";
@@ -73,10 +73,6 @@ export default function ProjectDetailPage() {
   const isAnalysisLoading = startProjectAnalysis.isPending ||
     analysisTriggered ||
     projectAnalysis?.status === 'processing';
-
-  // Derive folder color from project ID
-  const colorIndex = project?.id ? project.id.charCodeAt(0) % 6 : 0;
-  const folderColor = getFolderColor(colorIndex);
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -217,58 +213,49 @@ export default function ProjectDetailPage() {
         {/* Back navigation */}
         <BackLink to="/projects">All Projects</BackLink>
 
-        {/* Folder-themed header band */}
-        <div
-          className="relative rounded-2xl p-6 noise-texture noise-light overflow-hidden"
-          style={{ backgroundColor: folderColor.body }}
-        >
-          {/* Folder tab accent at top-left */}
-          <div
-            className="absolute top-0 left-6 w-20 h-2 rounded-b-sm noise-texture noise-medium"
-            style={{ backgroundColor: folderColor.tab }}
-          />
-
-          <div className="relative z-[2] flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between pt-2">
-            <div>
-              <h1 className="text-h2">{project.name}</h1>
-              {project.description && (
-                <p className="text-text-secondary mt-1 max-w-2xl">{project.description}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => setUploadDialogOpen(true)}>
-                <Upload className="h-4 w-4" />
-                Upload Video
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 w-9 p-0"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">Open menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit Project
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Project
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+        {/* Project header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-h2 text-text-primary">{project.name}</h1>
+            {project.description && (
+              <p className="text-body-sm text-text-tertiary max-w-2xl">{project.description}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button onClick={() => setUploadDialogOpen(true)}>
+              <Upload className="h-4 w-4" />
+              Upload Video
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Project
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
+
+        <Separator />
 
         {/* Videos Section */}
         <div>

@@ -36,6 +36,12 @@ export function TranscriptViewer({
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll control: only auto-scroll after user clicks a word;
+  // disable when the user manually scrolls the transcript container.
+  const autoScrollEnabledRef = useRef(false);
+  // Guard flag to ignore scroll events triggered by our own scrollIntoView calls
+  const isProgrammaticScrollRef = useRef(false);
+
   // Fetch word-level transcript for highlighting
   const { data: wordLevelData } = useWordLevelTranscript(videoId);
 
@@ -137,14 +143,33 @@ export function TranscriptViewer({
     };
   }, [wordLevelData, findCurrentWordIndex]);
 
-  // Click word to jump video
+  // Click word to jump video — also re-enables auto-scroll
   const handleWordClick = useCallback((wordIndex: number) => {
     const video = document.getElementById("main-video-player") as HTMLVideoElement;
     const word = wordLevelData?.words[wordIndex];
     if (video && word) {
+      autoScrollEnabledRef.current = true;
       video.currentTime = word.start / 1000;
     }
   }, [wordLevelData]);
+
+  // Detect manual (user-initiated) scrolls on the page.
+  // The transcript doesn't have its own scroll container — it scrolls with
+  // the page body. When the user scrolls away, disable auto-scroll.
+  // Programmatic scrolls from scrollIntoView are ignored via the guard flag.
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isProgrammaticScrollRef.current) {
+        // This scroll was triggered by our scrollIntoView — ignore it
+        return;
+      }
+      // User manually scrolled — disable auto-scroll
+      autoScrollEnabledRef.current = false;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Get words for a specific utterance, returning both words and their global indexes
   const getWordsForUtterance = useCallback((utteranceStart: number, utteranceEnd: number): { word: Word; globalIndex: number }[] => {
@@ -220,28 +245,43 @@ export function TranscriptViewer({
 
     const matchElement = document.getElementById(`word-${currentMatchWordIndex}`);
     if (matchElement && transcriptContainerRef.current) {
+      isProgrammaticScrollRef.current = true;
       matchElement.scrollIntoView({
         behavior: "smooth",
         block: "center"
       });
+      setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 600);
     }
   }, [currentMatchWordIndex, wordLevelData]);
 
-  // Auto-scroll to current word during video playback
+  // Auto-scroll to current word during video playback.
+  // Only scrolls when autoScrollEnabledRef is true (set by clicking a word,
+  // cleared when the user manually scrolls the transcript container).
   useEffect(() => {
     if (currentWordIndex < 0 || searchQuery) return; // Don't auto-scroll during search
+    if (!autoScrollEnabledRef.current) return; // User scrolled away — respect that
 
     const wordElement = document.getElementById(`word-${currentWordIndex}`);
     if (!wordElement) return;
 
-    // Only scroll if the word is outside the viewport
-    const rect = wordElement.getBoundingClientRect();
-    if (rect.top < 0 || rect.bottom > window.innerHeight) {
-      wordElement.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
+    // Only scroll if the word is outside the visible viewport
+    const wordRect = wordElement.getBoundingClientRect();
+    const isVisible = wordRect.top >= 0 && wordRect.bottom <= window.innerHeight;
+    if (isVisible) return;
+
+    // Mark the upcoming scroll as programmatic so the scroll listener ignores it
+    isProgrammaticScrollRef.current = true;
+    wordElement.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    // Clear the programmatic flag after the smooth scroll has had time to fire
+    // scroll events. 600ms covers the typical smooth-scroll animation duration.
+    setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 600);
   }, [currentWordIndex, searchQuery]);
 
   // Reset match index when search results change

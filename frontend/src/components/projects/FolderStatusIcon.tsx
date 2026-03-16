@@ -90,64 +90,24 @@ function SpinnerIcon() {
   );
 }
 
+/**
+ * Checks whether any video in the project is actively being processed,
+ * even if the project-level status hasn't been updated to "processing".
+ */
+function isAnyVideoProcessing(videos?: Video[]): boolean {
+  if (!videos || videos.length === 0) return false;
+  return videos.some((v) => v.status === "transcribing" || v.status === "analyzing");
+}
+
 export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIconProps) {
   const iconSize = "w-[var(--folder-icon-inner)] h-[var(--folder-icon-inner)]";
 
-  // Static states
-  if (status === "planning" || (status === "ready" && videoCount === 0)) {
-    return (
-      <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)" }}>
-        <Plus className={`${iconSize} text-white/70`} />
-      </div>
-    );
-  }
+  // Derive effective processing state from videos — the project-level status
+  // may not reflect ongoing work (backend doesn't always set it to "processing").
+  const effectivelyProcessing = status === "processing" || isAnyVideoProcessing(videos);
 
-  if (status === "ready") {
-    return (
-      <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)" }}>
-        <Play className={`${iconSize} text-white/70 fill-white/70`} />
-      </div>
-    );
-  }
-
-  if (status === "completed") {
-    return (
-      <div
-        className="folder-status-icon"
-        style={{
-          background: "var(--folder-icon-bg-success)",
-          animation: "folder-icon-bounce-in 0.5s ease both",
-        }}
-      >
-        <Check className={`${iconSize} text-white`} />
-      </div>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <div
-        className="folder-status-icon"
-        style={{
-          background: "var(--folder-icon-bg-error)",
-          animation: "folder-icon-shake 0.5s ease",
-        }}
-      >
-        <AlertCircle className={`${iconSize} text-white`} />
-      </div>
-    );
-  }
-
-  if (status === "archived") {
-    return (
-      <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)", opacity: 0.6 }}>
-        <Archive className={`${iconSize} text-white/70`} />
-      </div>
-    );
-  }
-
-  // Processing states — animated
-  if (status === "processing") {
+  // Processing states — animated (checked first so active work always shows)
+  if (effectivelyProcessing) {
     const phase = getProcessingPhase(videos);
 
     if (phase === "transcribing") {
@@ -206,6 +166,59 @@ export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIco
         } as React.CSSProperties}
       >
         <SpinnerIcon />
+      </div>
+    );
+  }
+
+  // Static states
+  if (status === "planning" || (status === "ready" && videoCount === 0)) {
+    return (
+      <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)" }}>
+        <Plus className={`${iconSize} text-white/70`} />
+      </div>
+    );
+  }
+
+  if (status === "ready") {
+    return (
+      <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)" }}>
+        <Play className={`${iconSize} text-white/70 fill-white/70`} />
+      </div>
+    );
+  }
+
+  if (status === "completed") {
+    return (
+      <div
+        className="folder-status-icon"
+        style={{
+          background: "var(--folder-icon-bg-success)",
+          animation: "folder-icon-bounce-in 0.5s ease both",
+        }}
+      >
+        <Check className={`${iconSize} text-white`} />
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div
+        className="folder-status-icon"
+        style={{
+          background: "var(--folder-icon-bg-error)",
+          animation: "folder-icon-shake 0.5s ease",
+        }}
+      >
+        <AlertCircle className={`${iconSize} text-white`} />
+      </div>
+    );
+  }
+
+  if (status === "archived") {
+    return (
+      <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)", opacity: 0.6 }}>
+        <Archive className={`${iconSize} text-white/70`} />
       </div>
     );
   }

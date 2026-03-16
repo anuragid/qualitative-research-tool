@@ -8,8 +8,15 @@ export function useProjects() {
     queryFn: projectsService.getAll,
     refetchInterval: (query) => {
       const projects = query.state.data;
-      // Poll if any project is in processing state
-      if (projects?.some((p) => p.status === "processing")) {
+      // Poll if any project or its videos are actively processing
+      const hasActiveWork = projects?.some(
+        (p) =>
+          p.status === "processing" ||
+          p.videos?.some(
+            (v) => v.status === "transcribing" || v.status === "analyzing"
+          )
+      );
+      if (hasActiveWork) {
         return 3000; // Poll every 3 seconds
       }
       return false;
@@ -24,8 +31,13 @@ export function useProject(id: string | null) {
     enabled: !!id,
     refetchInterval: (query) => {
       const project = query.state.data;
-      // Poll while project is processing
-      if (project?.status === "processing") {
+      // Poll while project or any of its videos are actively processing
+      const hasActiveWork =
+        project?.status === "processing" ||
+        project?.videos?.some(
+          (v) => v.status === "transcribing" || v.status === "analyzing"
+        );
+      if (hasActiveWork) {
         return 3000; // Poll every 3 seconds
       }
       return false;
