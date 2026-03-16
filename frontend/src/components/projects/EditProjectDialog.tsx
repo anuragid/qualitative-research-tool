@@ -98,7 +98,7 @@ export function EditProjectDialog({
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter project description (optional)"
+                placeholder="What is this research about? e.g., 'Understanding why users abandon onboarding in mobile banking apps.' This guides the AI analysis — be specific about your research question."
                 disabled={isPending}
                 rows={4}
               />

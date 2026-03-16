@@ -65,12 +65,21 @@ def chunk_node(state: VideoAnalysisState) -> Dict[str, Any]:
             role = speaker_roles.get(speaker_id, "unknown")
             speaker_mapping_text += f"- {speaker_id} = {speaker_name} (Role: {role})\n"
 
+        # Build research context if available
+        research_context = ""
+        if state.get("project_description"):
+            research_context = f"""
+RESEARCH CONTEXT:
+{state['project_description']}
+Focus on extracting chunks that are relevant to this research context. Ignore small talk and conversation that is not related to the research topic.
+"""
+
         user_message = f"""Please analyze the following interview transcript and break it down into chunks.
 
 IMPORTANT: You should ONLY create chunks from PARTICIPANT responses. Interviewer questions should be used for context but NOT chunked.
 
 {speaker_mapping_text}
-
+{research_context}
 FULL TRANSCRIPT (for context):
 {full_transcript_text}
 
@@ -129,6 +138,34 @@ Remember:
                 elif speaker_value.replace("Speaker ", "").replace("SPEAKER_", "").strip() in speaker_labels:
                     clean_id = speaker_value.replace("Speaker ", "").replace("SPEAKER_", "").strip()
                     chunk["speaker"] = speaker_labels[clean_id]
+
+        # Quality filter: remove low-substance chunks
+        FILLER_PHRASES = {
+            "yeah", "yes", "no", "okay", "ok", "sure", "right", "mhm",
+            "mm-hmm", "uh-huh", "um", "uh", "ah", "oh", "hmm",
+            "i see", "i agree", "thank you", "thanks", "hello", "hi",
+            "bye", "goodbye", "nice to meet you", "good to see you",
+            "that's a good question", "let me think", "interesting",
+        }
+
+        original_count = len(chunks)
+        filtered_chunks = []
+        for chunk in chunks:
+            text = chunk.get("text", "").strip()
+            # Drop chunks under 5 words
+            if len(text.split()) < 5:
+                continue
+            # Drop exact filler matches (case-insensitive, strip punctuation)
+            cleaned = text.lower().rstrip(".!?,;:")
+            if cleaned in FILLER_PHRASES:
+                continue
+            filtered_chunks.append(chunk)
+
+        dropped = original_count - len(filtered_chunks)
+        if dropped > 0:
+            logger.info(f"[CHUNK] Quality filter: dropped {dropped}/{original_count} low-substance chunks")
+
+        chunks = filtered_chunks
 
         logger.info(f"[CHUNK] Generated {len(chunks)} chunks for video {state['video_id']}")
 

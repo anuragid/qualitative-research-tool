@@ -34,8 +34,17 @@ def relate_node(state: VideoAnalysisState) -> Dict[str, Any]:
         # Format inferences for Claude
         inferences_json = json.dumps(inferences, indent=2)
 
-        user_message = f"""Please analyze the following inferences and identify patterns.
+        # Build research context if available
+        research_context = ""
+        if state.get("project_description"):
+            research_context = f"""
+RESEARCH CONTEXT:
+{state['project_description']}
+Focus on patterns that are relevant to this research context.
+"""
 
+        user_message = f"""Please analyze the following inferences and identify patterns.
+{research_context}
 Look for:
 - Inferences that point in the same direction
 - Repeated themes or meanings
@@ -58,6 +67,17 @@ Group related inferences into patterns and explain what each pattern represents.
         # Validate response
 
         logger.info(f"[RELATE] Identified {len(patterns)} patterns")
+
+        # Ensure relationship_type is present on all patterns
+        VALID_RELATIONSHIP_TYPES = {"convergent", "divergent", "tension", "causal"}
+        for pattern in patterns:
+            rt = pattern.get("relationship_type", "")
+            if rt not in VALID_RELATIONSHIP_TYPES:
+                pattern["relationship_type"] = "convergent"
+                logger.warning(
+                    f"[RELATE] Pattern {pattern.get('pattern_id', '?')} missing/invalid "
+                    f"relationship_type '{rt}', defaulting to 'convergent'"
+                )
 
         return {
             **state,

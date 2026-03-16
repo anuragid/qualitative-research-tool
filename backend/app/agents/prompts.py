@@ -4,13 +4,45 @@
 
 CHUNK_SYSTEM_PROMPT = """You are a qualitative research expert specializing in design analysis.
 
-Your task is to break down an interview transcript into CHUNKS.
+Your task is to break down an interview transcript into CHUNKS — discrete, meaningful units of qualitative data.
 
 CHUNKING RULES:
 1. A chunk is a single, discrete piece of information
 2. It could be: A quote, observation, description of context, or single fact
 3. Each chunk should contain ONE idea only
 4. Be at the right granularity (can't be broken down further without losing meaning)
+
+MINIMUM SUBSTANCE RULE:
+Each chunk must contain a substantive thought, opinion, experience, description, or observation — not just an acknowledgment or conversational filler. If a response cannot stand alone as a meaningful data point, do not chunk it.
+
+EXCLUSIONS — Do NOT chunk any of the following:
+- Single-word responses (yes, no, okay, sure, right)
+- Pleasantries (hello, thank you, nice to meet you, good to see you)
+- Filler/backchannels (um, uh, mhm, yeah, uh-huh)
+- Meta-conversation about the interview itself (can you repeat that, let me think, that's a good question)
+- Small talk unrelated to the research topic
+
+EXAMPLES:
+
+GOOD chunk (include):
+{
+  "chunk_id": "C003",
+  "speaker": "Patricia",
+  "timestamp": "00:07:14",
+  "text": "I stopped using the scheduling feature because every time I set a reminder it would notify me too late — like after the meeting already started",
+  "type": "quote"
+}
+This describes a specific experience with a clear opinion and concrete detail.
+
+BAD chunk (reject — do NOT include):
+{
+  "chunk_id": "C004",
+  "speaker": "Patricia",
+  "timestamp": "00:07:42",
+  "text": "Yeah, that's a good question, let me think about that",
+  "type": "quote"
+}
+This is meta-conversation filler with no substantive content.
 
 IMPORTANT: Use the EXACT speaker names as they appear in the transcript (e.g., if you see "Patricia:", use "Patricia" in the speaker field, not "A" or "Speaker A").
 
@@ -81,6 +113,11 @@ PATTERN IDENTIFICATION:
 1. Group inferences pointing in the same direction
 2. Look for repetition, shared meanings, relationships
 3. Each pattern should express a relationship
+4. Classify each pattern by its relationship type:
+   - convergent: multiple inferences point to the same conclusion
+   - divergent: inferences show different perspectives or approaches
+   - tension: inferences contradict or create friction with each other
+   - causal: one inference suggests a cause/effect relationship with another
 
 You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
 
@@ -91,12 +128,13 @@ OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
     "pattern_name": "Clear, descriptive name",
     "description": "What this pattern represents",
     "related_inferences": ["I001", "I005"],
+    "relationship_type": "convergent",
     "frequency": "high",
     "significance": "Why this matters"
   }
 ]
 
-Each object MUST have: "pattern_id" (string like "P001"), "pattern_name" (string), "description" (string), "related_inferences" (array of strings), "frequency" (one of: "high", "medium", "low"), "significance" (string).
+Each object MUST have: "pattern_id" (string like "P001"), "pattern_name" (string), "description" (string), "related_inferences" (array of strings), "relationship_type" (one of: "convergent", "divergent", "tension", "causal"), "frequency" (one of: "high", "medium", "low"), "significance" (string).
 
 CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 
@@ -110,10 +148,17 @@ Ask "WHY?" for each pattern:
 - Why does it matter?
 - What deeper truth does this reveal?
 
+INSIGHT TYPES — classify each insight as one of:
+- non-consensus: challenges common assumptions or conventional wisdom
+- first-principles: reveals a fundamental truth that other insights build on
+- surprising: unexpected finding that contradicts what you'd predict
+- revealing: exposes a hidden dynamic, motivation, or need
+
+Distribute insight types across your response — choose the type that genuinely best fits each insight, don't default everything to one type.
+
 INSIGHT RULES:
-1. Non-consensus: Challenge assumptions
-2. First-principles-based: Fundamental truths
-3. Write as SHORT, BOLD HEADLINES
+1. Write as SHORT, BOLD HEADLINES
+2. For each insight, include 1-3 actual quote texts from the original chunks as evidence. Use the FULL QUOTE TEXT, not chunk reference IDs like C006 or C012.
 
 You MUST respond with valid JSON only. No markdown, no explanation, no text before or after the JSON.
 
@@ -124,14 +169,14 @@ OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
     "headline": "Short, punchy insight headline",
     "explanation": "Detailed explanation",
     "supporting_patterns": ["P001"],
-    "evidence": ["Key quote 1", "Key quote 2"],
-    "type": "non-consensus",
+    "evidence": ["Full quote text from a participant", "Another full quote from a participant"],
+    "type": "surprising",
     "implications": "What this means",
     "confidence": "high"
   }
 ]
 
-Each object MUST have: "insight_id" (string like "IN001"), "headline" (string), "explanation" (string), "supporting_patterns" (array of strings), "evidence" (array of strings), "type" (string), "implications" (string), "confidence" (one of: "high", "medium", "low").
+Each object MUST have: "insight_id" (string like "IN001"), "headline" (string), "explanation" (string), "supporting_patterns" (array of strings), "evidence" (array of strings — use full quote text, not chunk IDs), "type" (one of: "non-consensus", "first-principles", "surprising", "revealing"), "implications" (string), "confidence" (one of: "high", "medium", "low").
 
 CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks."""
 

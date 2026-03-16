@@ -80,7 +80,7 @@ export default function CreateProjectDialog() {
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the purpose and goals of this research project..."
+                placeholder="What is this research about? e.g., 'Understanding why users abandon onboarding in mobile banking apps.' This guides the AI analysis — be specific about your research question."
                 rows={4}
               />
             </div>

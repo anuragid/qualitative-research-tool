@@ -106,6 +106,10 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         if not video:
             raise Exception(f"Video {video_id} not found")
 
+        # Fetch project description for research context
+        project = self.db.query(Project).filter(Project.id == video.project_id).first()
+        project_description = project.description if project else None
+
         transcript = self.db.query(Transcript).filter(Transcript.video_id == video.id).first()
         if not transcript or transcript.status != "completed":
             raise Exception(f"No completed transcript found for video {video_id}")
@@ -152,6 +156,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
             "transcript": transcript.processed_transcript,
             "speaker_labels": speaker_mapping,
             "speaker_roles": speaker_roles,  # Add role information
+            "project_description": project_description,
             "chunks": None,
             "inferences": None,
             "patterns": None,

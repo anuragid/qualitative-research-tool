@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from typing import Any, Dict
 
 from app.agents.prompts import EXPLAIN_SYSTEM_PROMPT
@@ -39,8 +40,17 @@ def explain_node(state: VideoAnalysisState) -> Dict[str, Any]:
         # Include original chunks for context and evidence
         chunks_json = json.dumps(chunks, indent=2) if chunks else "[]"
 
-        user_message = f"""Please analyze the following patterns and generate insights.
+        # Build research context if available
+        research_context = ""
+        if state.get("project_description"):
+            research_context = f"""
+RESEARCH CONTEXT:
+{state['project_description']}
+Generate insights that are relevant to this research context.
+"""
 
+        user_message = f"""Please analyze the following patterns and generate insights.
+{research_context}
 Ask "WHY?" for each pattern:
 - Why is this happening?
 - Why does it matter?
@@ -66,6 +76,44 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
         # Validate response
 
         logger.info(f"[EXPLAIN] Generated {len(insights)} insights")
+
+        # Build chunk lookup for evidence resolution
+        chunk_lookup = {}
+        if chunks:
+            for c in chunks:
+                cid = c.get("chunk_id", "")
+                if cid:
+                    chunk_lookup[cid.upper()] = c.get("text", cid)
+
+        # Post-process insights
+        VALID_INSIGHT_TYPES = {"non-consensus", "first-principles", "surprising", "revealing"}
+        chunk_id_pattern = re.compile(r"^C\d{1,4}$", re.IGNORECASE)
+
+        for insight in insights:
+            # Evidence resolution: replace chunk IDs with actual quote text
+            if "evidence" in insight and isinstance(insight["evidence"], list):
+                resolved = []
+                for item in insight["evidence"]:
+                    item_stripped = item.strip()
+                    if chunk_id_pattern.match(item_stripped):
+                        resolved_text = chunk_lookup.get(item_stripped.upper(), item)
+                        resolved.append(resolved_text)
+                        if resolved_text != item:
+                            logger.debug(
+                                f"[EXPLAIN] Resolved evidence ref '{item}' to quote text"
+                            )
+                    else:
+                        resolved.append(item)
+                insight["evidence"] = resolved
+
+            # Type fallback: ensure valid insight type
+            it = insight.get("type", "")
+            if it not in VALID_INSIGHT_TYPES:
+                insight["type"] = "non-consensus"
+                logger.warning(
+                    f"[EXPLAIN] Insight {insight.get('insight_id', '?')} missing/invalid "
+                    f"type '{it}', defaulting to 'non-consensus'"
+                )
 
         return {
             **state,
