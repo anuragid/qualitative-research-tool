@@ -188,6 +188,19 @@
   --size-touch: 2.75rem;   /* 44px - minimum touch target */
   --ring-width: 0.125rem;  /* 2px - focus ring width */
 
+  /* ===== 18. FOLDER CARD ===== */
+  --folder-max-w: 20rem;              /* 320px — max card width in grid */
+  --folder-aspect: 4 / 3;             /* width:height ratio of folder area */
+  --folder-front-height: 83%;         /* front panel covers this much of folder area */
+  --folder-thumb-width: 30%;          /* thumbnail width relative to folder */
+  --folder-thumb-aspect: 16 / 11;     /* landscape video thumbnail ratio */
+  --folder-thumb-top: 12%;            /* how far down thumbnails sit from top */
+  --folder-hover-outline-radius: 1.25rem; /* 20px — hover container radius */
+  --folder-hover-outline-width: 1.5px;
+  --folder-hover-outline-color: var(--color-base-05);
+  --folder-front-tilt: -14deg;        /* rotateX on hover */
+  --duration-folder: 0.4s;            /* folder-specific animation duration */
+
   /* ===== COLORS — Accent (kept for backwards compat) ===== */
   --color-accent-blue: rgb(0, 136, 255);
   --color-accent-blue-bg: rgba(0, 136, 255, 0.12);
@@ -301,6 +314,9 @@
   --shadow-block: 0 50px 40px rgba(0, 0, 0, 0.05), 0 50px 40px rgba(0, 0, 0, 0.08), 0 20px 40px rgba(0, 0, 0, 0.15), 0 3px 10px rgba(0, 0, 0, 0.25);
   --shadow-popup: 0 4px 9px rgba(0, 0, 0, 0.2), 0 16px 16px rgba(0, 0, 0, 0.2), 0 36px 22px rgba(0, 0, 0, 0.12), 0 65px 26px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.05);
   --shadow-hover: 0 20px 25px 4px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.15);
+
+  /* Folder card — dark mode */
+  --folder-hover-outline-color: rgba(237, 235, 233, 0.06);
 }
 
 /* Dark mode noise texture adjustment */
