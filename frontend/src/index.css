@@ -479,12 +479,12 @@ body {
 
 /* ===== FOLDER CARD THUMBNAIL ANIMATION ===== */
 .folder-thumbnail {
-  transform: translateX(var(--thumb-x, 0px)) translateY(var(--thumb-y, 0px)) rotate(var(--thumb-r, 0deg));
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(var(--t-x, 0px)) rotate(var(--t-r, 0deg));
+  transition: transform 0.4s var(--ease);
 }
 
 .group\/folder:hover .folder-thumbnail {
-  transform: translateX(var(--thumb-hx, 0px)) translateY(var(--thumb-hy, 0px)) rotate(var(--thumb-hr, 0deg));
+  transform: translateX(var(--t-hx, 0px)) translateY(var(--t-hy, 0px)) rotate(var(--t-hr, 0deg));
 }
 
 /* ===== SCROLLBAR HIDE UTILITY ===== */

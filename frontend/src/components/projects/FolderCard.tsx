@@ -11,7 +11,7 @@ import {
   Archive,
   ArchiveRestore,
   Plus,
-  FolderOpen,
+  Video as VideoIcon,
   Play,
 } from "lucide-react";
 import {
@@ -39,7 +39,6 @@ const STATUS_BADGE_VARIANT: Record<ProjectStatus, "default" | "secondary" | "des
   error: "destructive",
 };
 
-/** Deterministic gradient pairs for video thumbnail placeholders */
 const THUMBNAIL_GRADIENTS = [
   ["#667eea", "#764ba2"],
   ["#f093fb", "#f5576c"],
@@ -48,7 +47,6 @@ const THUMBNAIL_GRADIENTS = [
   ["#fbc2eb", "#a6c1ee"],
 ];
 
-/** Get up to 3 most-recent videos, sorted by uploaded_at descending */
 function getRecentVideos(videos: Video[] | undefined): Video[] {
   if (!videos || videos.length === 0) return [];
   return [...videos]
@@ -57,11 +55,33 @@ function getRecentVideos(videos: Video[] | undefined): Video[] {
 }
 
 /**
- * SVG folder-notch front panel path.
- * Original viewBox coords: 0 0 220 142
+ * Folder notch clip path using objectBoundingBox units (0-1 range).
+ * Derived from viewBox 0 0 220 142 by dividing x/220, y/142.
+ * This scales to any element size without distortion.
  */
-const FOLDER_NOTCH_PATH =
-  "M12 24 C5 24,0 29,0 36 L0 128 C0 136,5 142,12 142 L208 142 C215 142,220 136,220 128 L220 36 C220 29,215 24,208 24 L95 24 C89 24,85 20,82 14 L76 5 C73 1,69 0,63 0 L12 0 C5 0,0 5,0 12 L0 36";
+const FOLDER_CLIP_PATH = `M0.0545 0.169 C0.0227 0.169 0 0.204 0 0.2535 L0 0.9014 C0 0.9577 0.0227 1 0.0545 1 L0.9455 1 C0.9773 1 1 0.9577 1 0.9014 L1 0.2535 C1 0.204 0.9773 0.169 0.9455 0.169 L0.4318 0.169 C0.4045 0.169 0.3864 0.1408 0.3727 0.0986 L0.3455 0.0352 C0.3318 0.007 0.3136 0 0.2864 0 L0.0545 0 C0.0227 0 0 0.0352 0 0.0845 L0 0.2535`;
+
+/** Thumbnail default/hover transform config per position */
+function getThumbStyle(count: number, index: number) {
+  // Default: stacked near center, tucked in, barely peeking
+  const defaultRotate = count === 1 ? 0 : count === 2 ? (index === 0 ? -3 : 3) : [-3, 1, 4][index];
+  // Horizontal spread from center
+  const spreadX = count === 1 ? 0 : count === 2 ? (index === 0 ? -18 : 18) : (index - 1) * 26;
+  // Hover fan-out rotation
+  const hoverRotate = count === 1 ? 0 : count === 2 ? (index === 0 ? -10 : 10) : [-12, 0, 12][index];
+  // Hover rise amount
+  const hoverY = count === 1 ? -28 : count === 2 ? -26 : [-24, -30, -24][index];
+  // Hover horizontal spread
+  const hoverX = count === 1 ? 0 : count === 2 ? (index === 0 ? -22 : 22) : (index - 1) * 32;
+
+  return {
+    "--t-x": `${spreadX}px`,
+    "--t-r": `${defaultRotate}deg`,
+    "--t-hx": `${hoverX}px`,
+    "--t-hy": `${hoverY}px`,
+    "--t-hr": `${hoverRotate}deg`,
+  } as React.CSSProperties;
+}
 
 export default function FolderCard({ project, colorIndex }: FolderCardProps) {
   const navigate = useNavigate();
@@ -87,40 +107,17 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
     }
   };
 
-  /**
-   * Returns CSS custom properties for each thumbnail that drive default + hover transforms.
-   * We set --thumb-x, --thumb-y, --thumb-r for default and --thumb-hx, --thumb-hy, --thumb-hr for hover.
-   * The actual transition is driven by group-hover via a CSS class in index.css.
-   */
-  const getThumbVars = (count: number, index: number): React.CSSProperties => {
-    // Horizontal offset for fanning
-    let xOffset = 0;
-    if (count === 2) {
-      xOffset = index === 0 ? -16 : 16;
-    } else if (count >= 3) {
-      xOffset = (index - 1) * 24;
-    }
-
-    // Hover fan-out rotation
-    let hoverRotate = 0;
-    if (count === 2) {
-      hoverRotate = index === 0 ? -12 : 12;
-    } else if (count >= 3) {
-      hoverRotate = [-12, 0, 12][index];
-    }
-
-    return {
-      "--thumb-x": `${xOffset}px`,
-      "--thumb-y": "0px",
-      "--thumb-r": "0deg",
-      "--thumb-hx": `${xOffset}px`,
-      "--thumb-hy": "-32px",
-      "--thumb-hr": `${hoverRotate}deg`,
-    } as React.CSSProperties;
-  };
-
   return (
     <>
+      {/* Hidden SVG defs for the clip path — objectBoundingBox scales to any size */}
+      <svg width="0" height="0" className="absolute">
+        <defs>
+          <clipPath id={`folder-clip-${project.id}`} clipPathUnits="objectBoundingBox">
+            <path d={FOLDER_CLIP_PATH} />
+          </clipPath>
+        </defs>
+      </svg>
+
       <div
         className="group/folder relative cursor-pointer outline-none"
         onClick={handleCardClick}
@@ -134,45 +131,46 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
         }}
         data-animate="folder-card"
       >
-        {/* Hover outline container */}
+        {/* Hover outline container — everything stays inside this */}
         <div
-          className="rounded-[20px] p-2 transition-all duration-[var(--duration-normal)] ease-[var(--ease)]
+          className="rounded-[20px] p-[var(--space-inline-gap)] overflow-hidden
+            transition-all duration-[var(--duration-normal)] ease-[var(--ease)]
             border-[1.5px] border-transparent
-            group-hover/folder:border-[rgba(26,28,30,0.06)]
+            group-hover/folder:border-base-05
             group-active/folder:scale-[0.98]"
         >
-          {/* Folder area — contains back panel, thumbnails, front panel */}
-          <div className="relative" style={{ height: 160, perspective: "600px" }}>
-            {/* Back panel */}
+          {/* Folder area */}
+          <div className="relative aspect-[4/3]" style={{ perspective: "800px" }}>
+
+            {/* Back panel — simple rounded rectangle, saturated color */}
             <div
-              className="absolute inset-x-0 top-0 bottom-0 rounded-[var(--radius-card)] noise-texture noise-medium"
+              className="absolute inset-0 rounded-[var(--radius-card)] noise-texture noise-medium"
               style={{ backgroundColor: color.tab }}
             >
-              <span className="relative z-[2]" />
+              <span className="relative z-[var(--z-content)]" />
             </div>
 
-            {/* Thumbnails — sit between back and front panels */}
+            {/* Thumbnails — between back and front, peeking at top */}
             {recentVideos.length > 0 && (
-              <div className="absolute inset-x-0 top-0 bottom-0 flex items-start justify-center z-[3] pointer-events-none">
+              <div className="absolute inset-0 z-[2] pointer-events-none flex items-start justify-center">
                 {recentVideos.map((video, i) => {
                   const gradient = THUMBNAIL_GRADIENTS[i % THUMBNAIL_GRADIENTS.length];
-                  const vars = getThumbVars(recentVideos.length, i);
-
                   return (
                     <div
                       key={video.id}
-                      className="folder-thumbnail absolute top-4 w-16 h-20 rounded-lg overflow-hidden shadow-sm
-                        motion-reduce:!transition-none"
+                      className="folder-thumbnail absolute rounded-[var(--radius-md)] overflow-hidden
+                        shadow-subtle motion-reduce:!transition-none"
                       style={{
                         background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
-                        zIndex: 3 + i,
-                        ...vars,
+                        width: "30%",
+                        aspectRatio: "16/11",
+                        top: "12%",
+                        zIndex: 2 + (recentVideos.length - i),
+                        ...getThumbStyle(recentVideos.length, i),
                       }}
                     >
-                      {/* Play icon overlay */}
                       <div className="absolute inset-0 flex items-center justify-center">
-                        {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white on gradient thumbnail */}
-                        <Play className="w-5 h-5 text-white/80 fill-white/80" />
+                        <Play className="w-4 h-4 fill-white/80 text-white/80 drop-shadow-sm" />
                       </div>
                     </div>
                   );
@@ -180,71 +178,62 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
               </div>
             )}
 
-            {/* Front panel — SVG with folder notch */}
+            {/* Front panel — folder notch shape via clip-path, pastel color */}
             <div
-              className="absolute inset-x-0 bottom-0 z-[5] transition-transform duration-[0.4s] ease-[var(--ease)]
+              className="absolute inset-x-0 bottom-0 z-[5]
+                transition-transform duration-[0.4s] ease-[var(--ease)]
                 origin-bottom
                 group-hover/folder:[transform:rotateX(-14deg)]
                 motion-reduce:group-hover/folder:transform-none"
-              style={{ height: 130 }}
+              style={{
+                height: "82%",
+                clipPath: `url(#folder-clip-${project.id})`,
+                backgroundColor: color.body,
+              }}
             >
-              <svg
-                viewBox="0 0 220 142"
-                className="w-full h-full"
-                preserveAspectRatio="none"
-              >
-                <path
-                  d={FOLDER_NOTCH_PATH}
-                  fill={color.body}
-                />
-              </svg>
-
-              {/* Noise overlay on front panel */}
-              <div
-                className="absolute inset-0 noise-texture noise-light pointer-events-none"
-                style={{ borderRadius: "inherit" }}
-              >
-                <span className="relative z-[2]" />
+              {/* Noise texture — clips naturally to the parent's clip-path */}
+              <div className="absolute inset-0 noise-texture noise-light pointer-events-none">
+                <span className="relative z-[var(--z-content)]" />
               </div>
 
-              {/* Bottom-left icon */}
-              <div className="absolute bottom-3 left-3 w-7 h-7 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: "rgba(26, 28, 30, 0.08)" }}
+              {/* Bottom-left status icon */}
+              <div
+                className="absolute bottom-[var(--space-element-gap)] left-[var(--space-element-gap)]
+                  w-7 h-7 rounded-full flex items-center justify-center z-[var(--z-content)]
+                  bg-interactive-fill"
               >
                 {videoCount === 0 ? (
                   <Plus className="w-3.5 h-3.5 text-text-tertiary" />
                 ) : (
-                  <FolderOpen className="w-3.5 h-3.5 text-text-tertiary" />
+                  <VideoIcon className="w-3.5 h-3.5 text-text-tertiary" />
                 )}
               </div>
 
-              {/* Status badge — on front panel */}
-              {project.status !== "planning" && project.status !== "error" && (
-                <div className="absolute bottom-3 right-3">
+              {/* Status badge */}
+              {project.status !== "planning" && project.status !== "ready" && (
+                <div className="absolute bottom-[var(--space-element-gap)] right-[var(--space-element-gap)] z-[var(--z-content)]">
                   <Badge variant={STATUS_BADGE_VARIANT[project.status]}>
-                    {project.status}
+                    {project.status === "error" ? "Error" : project.status}
                   </Badge>
-                </div>
-              )}
-              {project.status === "error" && (
-                <div className="absolute bottom-3 right-3">
-                  <Badge variant="destructive">Error</Badge>
                 </div>
               )}
             </div>
 
-            {/* Dropdown menu — appears on hover over folder area */}
+            {/* Dropdown menu */}
             <div
               data-dropdown-menu
               onClick={(e) => e.stopPropagation()}
-              className="absolute top-2 right-2 z-[10]
+              className="absolute top-[var(--space-inline-gap)] right-[var(--space-inline-gap)] z-[10]
                 opacity-100 sm:opacity-0 sm:group-hover/folder:opacity-100
                 transition-opacity duration-[var(--duration-micro)]"
             >
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- frosted glass on folder */}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/60 hover:bg-white/80 backdrop-blur-sm rounded-full">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 frosted-glass rounded-full"
+                  >
                     <MoreHorizontal className="h-4 w-4" />
                     <span className="sr-only">Open menu</span>
                   </Button>
@@ -275,7 +264,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
           </div>
 
           {/* Folder meta below */}
-          <div className="mt-3 text-center px-1">
+          <div className="mt-[var(--space-element-gap)] text-center px-[var(--space-tight)]">
             <h3 className="text-h4 truncate">{project.name}</h3>
             <p className="text-label text-text-tertiary mt-0.5">
               {videoCount === 0 ? "No videos" : `${videoCount} video${videoCount !== 1 ? "s" : ""}`}
