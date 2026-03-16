@@ -213,11 +213,15 @@ class ClerkAuth:
                     )
 
             # Verify the token with Clerk's public key
+            # Clerk JWTs have short lifetimes (~60s). For long-running requests
+            # like video uploads (3-10 min), the token may expire mid-transfer.
+            # A 10-minute leeway matches the upload timeout.
             payload = jwt.decode(
                 token,
                 public_keys[kid],
                 algorithms=["RS256"],
-                options={"verify_aud": False}  # Clerk doesn't use standard aud claim
+                options={"verify_aud": False},  # Clerk doesn't use standard aud claim
+                leeway=600,  # 10 minutes grace period for long uploads
             )
 
             # Extract role from metadata or default to 'user'
