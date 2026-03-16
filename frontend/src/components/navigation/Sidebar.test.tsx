@@ -175,11 +175,11 @@ describe("Sidebar", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // 10. Sidebar has correct width class (w-72)
-  it("sidebar aside element has w-72 class", () => {
+  // 10. Sidebar has correct width class using design token
+  it("sidebar aside element uses --space-sidebar-width token", () => {
     const { aside } = renderSidebar();
 
-    expect(aside.className).toContain("w-72");
+    expect(aside.className).toContain("--space-sidebar-width");
   });
 
   // 11. When isOpen=false, sidebar has -translate-x-full class

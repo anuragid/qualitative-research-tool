@@ -52,19 +52,26 @@ export default function Layout({ children }: LayoutProps) {
         <Logo size="sidebar" className="text-foreground ml-3" />
       </header>
 
-      {/* Desktop expand button (visible when sidebar is collapsed) */}
-      {sidebarCollapsed && (
+      {/* Desktop sidebar rail (visible when sidebar is collapsed) */}
+      <aside
+        className={`fixed top-0 left-0 h-full w-[var(--size-touch)] hidden lg:flex flex-col items-center pt-[var(--space-page-gutter)] bg-surface-card border-r border-border z-[var(--z-sticky)] transition-opacity duration-[var(--duration-normal)] ease-[var(--ease)] ${
+          sidebarCollapsed
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+        aria-label="Expand navigation"
+      >
         <button
           onClick={handleToggleCollapse}
-          className="fixed top-4 left-4 hidden lg:flex p-2 rounded-md text-text-tertiary hover:text-foreground hover:bg-interactive-fill bg-surface-card border border-border shadow-sm z-[var(--z-sticky)] items-center justify-center transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
+          className="p-2 rounded-md text-text-tertiary hover:text-foreground hover:bg-interactive-fill transition-[color,background] duration-[var(--duration-micro)] ease-[var(--ease)]"
           aria-label="Expand sidebar"
         >
           <PanelLeft className="h-4 w-4" aria-hidden="true" />
         </button>
-      )}
+      </aside>
 
       {/* Main content area */}
-      <main className={`pt-14 lg:pt-0 min-h-screen transition-[margin] duration-[var(--duration-normal)] ease-[var(--ease)] ${sidebarCollapsed ? "lg:ml-0" : "lg:ml-72"}`}>
+      <main className={`pt-14 lg:pt-0 min-h-screen transition-[margin] duration-[var(--duration-normal)] ease-[var(--ease)] ${sidebarCollapsed ? "lg:ml-[var(--size-touch)]" : "lg:ml-[var(--space-sidebar-width)]"}`}>
         <div className="p-4 sm:p-6">{children}</div>
       </main>
 

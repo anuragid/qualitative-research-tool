@@ -84,7 +84,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: Side
 
       {/* Sidebar panel */}
       <aside
-        className={`fixed top-0 left-0 h-full w-[85vw] max-w-72 lg:w-72 bg-surface-card border-r border-border flex flex-col transition-transform z-[var(--z-sidebar)] duration-[var(--duration-normal)] ease-[var(--ease)] ${
+        className={`fixed top-0 left-0 h-full w-[85vw] max-w-[var(--space-sidebar-width)] lg:w-[var(--space-sidebar-width)] bg-surface-card border-r border-border flex flex-col transition-transform z-[var(--z-sidebar)] duration-[var(--duration-normal)] ease-[var(--ease)] ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } ${isCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"}`}
         aria-label="Main navigation"
