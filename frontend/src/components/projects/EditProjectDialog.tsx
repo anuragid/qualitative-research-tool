@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useUpdateProject } from '../../hooks/useProjects';
 import {
   Dialog,
@@ -33,14 +33,16 @@ export function EditProjectDialog({
   const { mutate: updateProject, isPending, error: mutationError } = useUpdateProject();
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description || '');
+  const prevOpen = useRef(open);
 
-  // Reset form when dialog opens with new project data
+  // Reset form only when dialog first opens, not on every re-render
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpen.current) {
       setName(project.name);
       setDescription(project.description || '');
     }
-  }, [open, project]);
+    prevOpen.current = open;
+  }, [open, project.name, project.description]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
