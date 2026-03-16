@@ -60,19 +60,19 @@ export default function ProjectDetailPage() {
   const crossInsightsDisplay = useAnalysisDisplay("crossInsights");
   const systemPrinciplesDisplay = useAnalysisDisplay("systemPrinciples");
 
-  // Clear triggered state when analysis completes, fails, or enters running state
+  // Clear triggered state when analysis completes, fails, or enters processing state
   useEffect(() => {
     if (projectAnalysis?.status === 'completed' ||
-        projectAnalysis?.status === 'failed' ||
-        projectAnalysis?.status === 'running') {
+        projectAnalysis?.status === 'error' ||
+        projectAnalysis?.status === 'processing') {
       setAnalysisTriggered(false);
     }
   }, [projectAnalysis?.status]);
 
-  // Computed: show loading when mutation pending OR triggered but not yet running/completed
+  // Computed: show loading when mutation pending OR triggered but not yet processing/completed
   const isAnalysisLoading = startProjectAnalysis.isPending ||
     analysisTriggered ||
-    projectAnalysis?.status === 'running';
+    projectAnalysis?.status === 'processing';
 
   // Derive folder color from project ID
   const colorIndex = project?.id ? project.id.charCodeAt(0) % 6 : 0;
@@ -371,7 +371,7 @@ export default function ProjectDetailPage() {
                     </>
                   )}
                 </Button>
-              ) : projectAnalysis.status === 'running' ? (
+              ) : projectAnalysis.status === 'processing' ? (
                 <div className="flex flex-col gap-2">
                   <Badge variant="secondary" className="px-3 py-1.5">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -431,7 +431,7 @@ export default function ProjectDetailPage() {
                       <div className="bg-interactive-focus h-1.5 rounded-full animate-pulse w-full" />
                     </div>
 
-                    {projectAnalysis?.status === 'running' && (
+                    {projectAnalysis?.status === 'processing' && (
                       <div className="text-label text-text-tertiary flex items-center gap-2">
                         <span>Processing:</span>
                         <span>Finding patterns</span>
@@ -447,7 +447,7 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Error state for failed analysis */}
-            {projectAnalysis?.status === 'failed' && (
+            {projectAnalysis?.status === 'error' && (
               <AlertBanner
                 variant="error"
                 title="Cross-video analysis failed"

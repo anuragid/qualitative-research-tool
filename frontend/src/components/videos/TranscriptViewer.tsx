@@ -99,18 +99,42 @@ export function TranscriptViewer({
   }, []);
 
   // Listen to video timeupdate events
+  // Uses retry logic because the video element may not be in the DOM yet
+  // when wordLevelData loads (race condition with playbackUrl fetch)
   useEffect(() => {
-    const video = document.getElementById("main-video-player") as HTMLVideoElement;
-    if (!video || !wordLevelData?.words) return;
+    if (!wordLevelData?.words) return;
+
+    let video: HTMLVideoElement | null = null;
+    let retryTimer: ReturnType<typeof setInterval>;
 
     const handleTimeUpdate = () => {
+      if (!video) return;
       const timeMs = video.currentTime * 1000;
       const index = findCurrentWordIndex(wordLevelData.words, timeMs);
       setCurrentWordIndex(index);
     };
 
-    video.addEventListener("timeupdate", handleTimeUpdate);
-    return () => video.removeEventListener("timeupdate", handleTimeUpdate);
+    const tryAttach = () => {
+      video = document.getElementById("main-video-player") as HTMLVideoElement;
+      if (video) {
+        clearInterval(retryTimer);
+        video.addEventListener("timeupdate", handleTimeUpdate);
+        // Sync to current position immediately
+        handleTimeUpdate();
+      }
+    };
+
+    tryAttach();
+    if (!video) {
+      retryTimer = setInterval(tryAttach, 200);
+    }
+
+    return () => {
+      clearInterval(retryTimer);
+      if (video) {
+        video.removeEventListener("timeupdate", handleTimeUpdate);
+      }
+    };
   }, [wordLevelData, findCurrentWordIndex]);
 
   // Click word to jump video
@@ -202,6 +226,23 @@ export function TranscriptViewer({
       });
     }
   }, [currentMatchWordIndex, wordLevelData]);
+
+  // Auto-scroll to current word during video playback
+  useEffect(() => {
+    if (currentWordIndex < 0 || searchQuery) return; // Don't auto-scroll during search
+
+    const wordElement = document.getElementById(`word-${currentWordIndex}`);
+    if (!wordElement) return;
+
+    // Only scroll if the word is outside the viewport
+    const rect = wordElement.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      wordElement.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [currentWordIndex, searchQuery]);
 
   // Reset match index when search results change
   useEffect(() => {
@@ -359,8 +400,8 @@ export function TranscriptViewer({
                         // Regular search match — subtle gold highlight
                         className += 'bg-brand-pale-gold/40 hover:bg-brand-pale-gold/60';
                       } else if (isCurrentWord) {
-                        // Currently playing word (video sync) — accent blue bg
-                        className += 'bg-interactive-focus-bg font-semibold shadow-sm';
+                        // Currently playing word (video sync) — visible accent blue
+                        className += 'bg-interactive-focus/20 font-semibold shadow-sm';
                       } else {
                         // Normal word
                         className += 'hover:bg-interactive-fill';

@@ -18,7 +18,7 @@ export function useVideoAnalysis(videoId: string | null) {
     refetchInterval: (query) => {
       const analysis = query.state.data;
       // Poll while analysis is running or pending (not for completed/failed)
-      if (analysis && (analysis.status === "running" || analysis.status === "pending")) {
+      if (analysis && (analysis.status === "processing" || analysis.status === "pending")) {
         return 1000; // Poll every 1 second for faster updates
       }
       return false;
@@ -122,7 +122,7 @@ export function useProjectAnalysis(projectId: string | null) {
     refetchInterval: (query) => {
       const analysis = query.state.data;
       // Poll while analysis is running or pending
-      if (analysis && (analysis.status === "running" || analysis.status === "pending")) {
+      if (analysis && (analysis.status === "processing" || analysis.status === "pending")) {
         return 2000; // Poll every 2 seconds for faster updates
       }
       return false;
@@ -137,7 +137,7 @@ export function useStartProjectAnalysis() {
     mutationFn: (projectId: string) =>
       analysisService.startProjectAnalysis(projectId),
     onSuccess: (_, projectId) => {
-      // Force immediate refetch to get the "running" status
+      // Force immediate refetch to get the "processing" status
       queryClient.invalidateQueries({
         queryKey: ["projects", projectId, "analysis"],
       });

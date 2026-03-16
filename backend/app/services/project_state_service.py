@@ -33,7 +33,7 @@ class ProjectStateService:
                     for v in videos
                 )
 
-                if all_completed and project.status == "processing":
+                if all_completed and project.status in ("planning", "processing"):
                     project.status = "completed"
                     db.commit()
                     logger.info(f"Project {project_id} marked as 'completed'")

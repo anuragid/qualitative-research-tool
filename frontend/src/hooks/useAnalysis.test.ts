@@ -126,8 +126,8 @@ describe("useVideoAnalysis", () => {
     expect(mockedService.getVideoAnalysis.mock.calls.length).toBeGreaterThan(1);
   });
 
-  it("polls when analysis status is running", async () => {
-    const analysis = { id: "a1", video_id: "v1", status: "running" };
+  it("polls when analysis status is processing", async () => {
+    const analysis = { id: "a1", video_id: "v1", status: "processing" };
     mockedService.getVideoAnalysis.mockResolvedValue(analysis);
 
     const { result } = renderHook(() => useVideoAnalysis("v1"), {
@@ -135,7 +135,7 @@ describe("useVideoAnalysis", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.status).toBe("running");
+    expect(result.current.data?.status).toBe("processing");
   });
 
   it("polls when analysis status is pending", async () => {
@@ -162,8 +162,8 @@ describe("useVideoAnalysis", () => {
     expect(result.current.data?.status).toBe("completed");
   });
 
-  it("does not poll when analysis status is failed", async () => {
-    const analysis = { id: "a1", video_id: "v1", status: "failed" };
+  it("does not poll when analysis status is error", async () => {
+    const analysis = { id: "a1", video_id: "v1", status: "error" };
     mockedService.getVideoAnalysis.mockResolvedValue(analysis);
 
     const { result } = renderHook(() => useVideoAnalysis("v1"), {
@@ -171,7 +171,7 @@ describe("useVideoAnalysis", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.status).toBe("failed");
+    expect(result.current.data?.status).toBe("error");
   });
 });
 
@@ -383,7 +383,7 @@ describe("useProjectAnalysis", () => {
   });
 
   it("polls when status is running", async () => {
-    const analysis = { id: "pa1", project_id: "p1", status: "running" };
+    const analysis = { id: "pa1", project_id: "p1", status: "processing" };
     mockedService.getProjectAnalysis.mockResolvedValue(analysis);
 
     const { result } = renderHook(() => useProjectAnalysis("p1"), {
@@ -391,7 +391,7 @@ describe("useProjectAnalysis", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.status).toBe("running");
+    expect(result.current.data?.status).toBe("processing");
   });
 
   it("polls when status is pending", async () => {

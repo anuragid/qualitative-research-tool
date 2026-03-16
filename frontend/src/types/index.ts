@@ -123,7 +123,7 @@ export interface VideoAnalysis {
   activate_completed_at: string | null;
 }
 
-export type AnalysisStatus = "pending" | "running" | "completed" | "failed";
+export type AnalysisStatus = "pending" | "processing" | "completed" | "error";
 
 export interface Chunk {
   chunk_id: string;

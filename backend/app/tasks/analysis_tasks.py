@@ -227,6 +227,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
 
             if video:
                 video.status = "error"
+                video.error_message = str(e)
             if video_analysis:
                 video_analysis.status = "error"
                 video_analysis.completed_at = datetime.now(timezone.utc)
@@ -234,7 +235,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
             # Explicitly flush and commit
             self.db.flush()
             self.db.commit()
-            logger.info(f"Video {video_id} status updated to error")
+            logger.info(f"Video {video_id} status updated to error: {e}")
         except Exception as commit_error:
             logger.error(f"Failed to update error status: {commit_error}")
 
@@ -375,6 +376,10 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
             if project_analysis:
                 project_analysis.status = "error"
                 project_analysis.completed_at = datetime.now(timezone.utc)
+
+            project = self.db.query(Project).filter(Project.id == UUID(project_id)).first()
+            if project:
+                project.error_message = str(e)
 
             self.db.commit()
         except Exception as cleanup_error:
