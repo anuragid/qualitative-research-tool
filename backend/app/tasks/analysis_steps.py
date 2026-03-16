@@ -12,7 +12,7 @@ from app.agents.nodes.chunk import chunk_node
 from app.agents.nodes.explain import explain_node
 from app.agents.nodes.infer import infer_node
 from app.agents.nodes.relate import relate_node
-from app.models.database_models import SpeakerLabel, Transcript, User, Video, VideoAnalysis
+from app.models.database_models import SpeakerLabel, Transcript, Video, VideoAnalysis
 from app.services.byok_service import resolve_byok as _resolve_byok
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask

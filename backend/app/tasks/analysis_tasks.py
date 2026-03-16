@@ -26,7 +26,7 @@ from app.agents.nodes import (
     relate_node,
 )
 from app.agents.states import ProjectAnalysisState, VideoAnalysisState
-from app.models.database_models import Project, ProjectAnalysis, SpeakerLabel, Transcript, User, Video, VideoAnalysis
+from app.models.database_models import Project, ProjectAnalysis, SpeakerLabel, Transcript, Video, VideoAnalysis
 from app.services.byok_service import resolve_byok as _resolve_byok
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask
