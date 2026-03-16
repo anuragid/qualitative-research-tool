@@ -2,6 +2,7 @@ import type { Preview } from "@storybook/react-vite";
 import { withThemeByClassName } from "@storybook/addon-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "../src/components/ui/tooltip";
 import "../src/index.css";
 
 const queryClient = new QueryClient({
@@ -35,7 +36,9 @@ const preview: Preview = {
     (Story) => (
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/projects"]}>
-          <Story />
+          <TooltipProvider>
+            <Story />
+          </TooltipProvider>
         </MemoryRouter>
       </QueryClientProvider>
     ),

@@ -735,31 +735,21 @@ export default function VideoDetailPage() {
                   // Complete mode: Show all steps in tabbed accordion sections
                   <Tabs defaultValue="chunks" className="w-full">
                     <TabsList className="overflow-x-auto">
-                      <SimpleTooltip content="Breaking interview into segments">
                         <TabsTrigger value="chunks" className="whitespace-nowrap">
                           1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
                         </TabsTrigger>
-                      </SimpleTooltip>
-                      <SimpleTooltip content="Extracting deeper meaning from segments">
                         <TabsTrigger value="inferences" className="whitespace-nowrap">
                           2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
                         </TabsTrigger>
-                      </SimpleTooltip>
-                      <SimpleTooltip content="Connecting inferences into themes">
                         <TabsTrigger value="patterns" className="whitespace-nowrap">
                           3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
                         </TabsTrigger>
-                      </SimpleTooltip>
-                      <SimpleTooltip content="Generating higher-order explanations">
                         <TabsTrigger value="insights" className="whitespace-nowrap">
                           4. Insights {analysis.insights && `(${analysis.insights.length})`}
                         </TabsTrigger>
-                      </SimpleTooltip>
-                      <SimpleTooltip content="Creating actionable design principles">
                         <TabsTrigger value="principles" className="whitespace-nowrap">
                           5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
                         </TabsTrigger>
-                      </SimpleTooltip>
                     </TabsList>
 
                     <TabsContent value="chunks" className="mt-6">
