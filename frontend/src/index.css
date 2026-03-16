@@ -192,12 +192,27 @@
   --folder-max-w: 20rem;              /* 320px — max card width in grid */
   --folder-front-height: 86%;         /* front panel covers this much of folder area */
   --folder-thumb-width: 31%;          /* thumbnail width relative to folder */
-  --folder-thumb-escape: 1.875rem;    /* 30px — padding-top for thumbnails to fan into */
+  --folder-thumb-escape: 2.5rem;      /* 40px — more room for thumbnails to fan into */
+  --folder-hover-outline-padding: 1rem; /* breathing space between folder and outline */
   --folder-hover-outline-radius: 1.25rem;
   --folder-hover-outline-width: 1.5px;
   --folder-hover-outline-color: var(--color-base-05);
   --folder-front-tilt: -14deg;        /* rotateX on hover */
   --duration-folder: 0.4s;
+
+  /* ===== 19. FOLDER STATUS ICON ===== */
+  --folder-icon-size: 1.625rem;       /* 26px — icon badge diameter */
+  --folder-icon-inner: 0.8125rem;     /* 13px — inner icon size */
+  --folder-icon-bg-static: rgba(0, 0, 0, 0.12);
+  --folder-icon-bg-processing: var(--color-info);
+  --folder-icon-bg-analyzing: var(--color-brand-accent);
+  --folder-icon-bg-success: var(--color-success);
+  --folder-icon-bg-error: var(--color-destructive);
+  --folder-icon-pulse-color: rgba(0, 136, 255, 0.4);
+  --folder-icon-pulse-color-accent: rgba(13, 148, 136, 0.4);
+  --duration-continuous: 2s;          /* looping animations for active states */
+  --duration-spin: 1.2s;
+  --duration-orbit: 8s;
 
   /* ===== COLORS — Accent (kept for backwards compat) ===== */
   --color-accent-blue: rgb(0, 136, 255);
@@ -315,6 +330,9 @@
 
   /* Folder card — dark mode */
   --folder-hover-outline-color: rgba(237, 235, 233, 0.06);
+  --folder-icon-bg-static: rgba(255, 255, 255, 0.12);
+  --folder-icon-pulse-color: rgba(56, 162, 255, 0.4);
+  --folder-icon-pulse-color-accent: rgba(45, 212, 191, 0.4);
 }
 
 /* Dark mode noise texture adjustment */
@@ -491,7 +509,81 @@ body {
   100% { transform: translateX(-100%); }
 }
 
+/* ===== FOLDER STATUS ICON ANIMATIONS ===== */
+@keyframes folder-icon-pulse {
+  0% { box-shadow: 0 0 0 0 var(--pulse-color, var(--folder-icon-pulse-color)); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@keyframes folder-icon-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes folder-icon-wave-1 {
+  0%, 100% { height: 4px; }
+  50% { height: 12px; }
+}
+
+@keyframes folder-icon-wave-2 {
+  0%, 100% { height: 8px; }
+  50% { height: 14px; }
+}
+
+@keyframes folder-icon-wave-3 {
+  0%, 100% { height: 6px; }
+  50% { height: 10px; }
+}
+
+@keyframes folder-icon-connect-pulse {
+  0%, 100% { stroke-opacity: 0.3; }
+  50% { stroke-opacity: 0.9; }
+}
+
+@keyframes folder-icon-node-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes folder-icon-bounce-in {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+@keyframes folder-icon-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  40% { transform: translateX(2px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
 /* ===== FOLDER CARD ===== */
+
+/* Status icon badge — base styles */
+.folder-status-icon {
+  position: absolute;
+  z-index: var(--z-content);
+  bottom: var(--space-element-gap);
+  left: var(--space-element-gap);
+  width: var(--folder-icon-size);
+  height: var(--folder-icon-size);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Disable animations for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .folder-status-icon,
+  .folder-status-icon svg,
+  .folder-status-icon rect {
+    animation: none !important;
+  }
+}
 
 /* Front panel tilt on hover */
 .group\/folder:hover .folder-front-panel {
@@ -508,15 +600,15 @@ body {
 .folder-thumb-3-1 { left: 34%; top: 35%; transform: rotate(1deg); }
 .folder-thumb-3-2 { left: 58%; top: 36%; transform: rotate(3deg); }
 
-/* 3 thumbnails: hover — rise and fan out */
+/* 3 thumbnails: hover — dramatic fan-out matching reference */
 .group\/folder:hover .folder-thumb-3-0 {
-  transform: rotate(-10deg) translateY(-28px) translateX(-6px);
+  transform: rotate(-15deg) translateY(-48px) translateX(-14px);
 }
 .group\/folder:hover .folder-thumb-3-1 {
-  transform: rotate(0deg) translateY(-36px) translateX(0);
+  transform: rotate(0deg) translateY(-58px) translateX(0);
 }
 .group\/folder:hover .folder-thumb-3-2 {
-  transform: rotate(10deg) translateY(-28px) translateX(6px);
+  transform: rotate(15deg) translateY(-48px) translateX(14px);
 }
 
 /* --- 2 thumbnails --- */
@@ -524,17 +616,17 @@ body {
 .folder-thumb-2-1 { left: 49%; top: 36%; transform: rotate(2deg); }
 
 .group\/folder:hover .folder-thumb-2-0 {
-  transform: rotate(-8deg) translateY(-30px) translateX(-4px);
+  transform: rotate(-12deg) translateY(-46px) translateX(-10px);
 }
 .group\/folder:hover .folder-thumb-2-1 {
-  transform: rotate(8deg) translateY(-30px) translateX(4px);
+  transform: rotate(12deg) translateY(-46px) translateX(10px);
 }
 
 /* --- 1 thumbnail --- */
 .folder-thumb-1-0 { left: 34%; top: 36%; transform: rotate(0deg); }
 
 .group\/folder:hover .folder-thumb-1-0 {
-  transform: rotate(0deg) translateY(-32px);
+  transform: rotate(0deg) translateY(-50px);
 }
 
 /* ===== SCROLLBAR HIDE UTILITY ===== */

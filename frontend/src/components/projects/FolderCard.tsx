@@ -10,10 +10,9 @@ import {
   Trash2,
   Archive,
   ArchiveRestore,
-  Plus,
-  Video as VideoIcon,
   Play,
 } from "lucide-react";
+import { FolderStatusIcon } from "./FolderStatusIcon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,7 +110,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
             borderRadius: "var(--folder-hover-outline-radius)",
             borderWidth: "var(--folder-hover-outline-width)",
             borderStyle: "solid",
-            padding: "var(--space-inline-gap)",
+            padding: "var(--folder-hover-outline-padding)",
           }}
         >
           {/*
@@ -210,23 +209,12 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                   </defs>
                 </svg>
 
-                {/* Bottom-left status icon */}
-                <div
-                  className="absolute z-[var(--z-content)] rounded-full flex items-center justify-center"
-                  style={{
-                    bottom: "var(--space-element-gap)",
-                    left: "var(--space-element-gap)",
-                    width: "26px",
-                    height: "26px",
-                    background: "rgba(0,0,0,0.12)",
-                  }}
-                >
-                  {videoCount === 0 ? (
-                    <Plus className="w-[13px] h-[13px] text-white/70" />
-                  ) : (
-                    <VideoIcon className="w-[13px] h-[13px] text-white/70" />
-                  )}
-                </div>
+                {/* Bottom-left status icon — driven by FolderStatusIcon component */}
+                <FolderStatusIcon
+                  status={project.status}
+                  videoCount={videoCount}
+                  videos={project.videos}
+                />
 
                 {/* Status badge */}
                 {project.status !== "planning" && project.status !== "ready" && (
