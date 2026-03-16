@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,14 @@ export function ModelSettingsDialog({
 
   const [apiKey, setApiKey] = useState("");
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+
+  // Reset local state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setApiKey("");
+      setSelectedModel(null);
+    }
+  }, [open]);
 
   const freeModels =
     settings?.available_models.filter((m) => m.tier === "free") ?? [];
