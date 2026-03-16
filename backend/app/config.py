@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # AI APIs - OpenRouter (OpenAI-compatible)
     OPENROUTER_API_KEY: str
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    DEFAULT_MODEL: str = "meta-llama/llama-3.3-70b-instruct"
+    DEFAULT_MODEL: str = "nvidia/nemotron-3-super-120b-a12b:free"
     ASSEMBLYAI_API_KEY: str
 
     # Authentication (Clerk)

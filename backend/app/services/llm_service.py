@@ -31,10 +31,10 @@ OPENROUTER_HEADERS = {
 # Open-source models available to all users via the Methodex key.
 # Ordered by preference. These are paid-but-cheap on OpenRouter.
 FREE_MODEL_FALLBACKS: List[str] = [
-    "meta-llama/llama-3.3-70b-instruct",
-    "mistralai/mistral-small-3.1-24b-instruct",
-    "google/gemma-3-27b-it",
-    "qwen/qwen3-235b-a22b",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "qwen/qwen3.5-flash-02-23",
+    "stepfun/step-3.5-flash:free",
+    "z-ai/glm-5",
 ]
 
 # Set of allowed model IDs when using the Methodex (shared) key.
