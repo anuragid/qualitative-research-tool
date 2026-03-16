@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folder Icon States — V2 (Processing Flow)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --surface-page: #FCF9F7;
+    --text-primary: rgba(26,28,30,0.90);
+    --text-secondary: rgba(26,28,30,0.62);
+    --text-tertiary: rgba(26,28,30,0.55);
+    --text-placeholder: rgba(26,28,30,0.40);
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body: 'Inter', -apple-system, system-ui, sans-serif;
+    --brand-mustard: #D3A848;
+    --brand-pale-gold: #F0DAA7;
+    --success: #5D9F55;
+    --warning: #D3A848;
+    --destructive: rgb(255, 56, 60);
+    --info: rgb(0, 136, 255);
+    --brand-accent: #0D9488;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--surface-page);
+    color: var(--text-primary);
+    padding: 3rem 2rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 { font-family: var(--font-display); font-size: 2rem; font-weight: 400; letter-spacing: -0.04em; margin-bottom: 0.5rem; }
+  .subtitle { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 2.5rem; max-width: 700px; line-height: 1.6; }
+  .section-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-placeholder); margin-bottom: 0.5rem; text-align: center; }
+  .section-desc { font-size: 0.8125rem; color: var(--text-tertiary); text-align: center; margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.5; }
+
+  .grid { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; margin-bottom: 3rem; }
+  .demo-col { display: flex; flex-direction: column; align-items: center; width: 160px; }
+
+  /* Mini folder */
+  .mini-folder { width: 160px; height: 120px; position: relative; margin-bottom: 0.75rem; }
+  .mini-folder .back { position: absolute; inset: 0; border-radius: 12px; background: var(--brand-mustard); }
+  .mini-folder .front { position: absolute; bottom: 0; left: 0; right: 0; height: 100px; }
+  .mini-folder .front svg.shape { width: 100%; height: 100%; }
+
+  .icon-badge {
+    position: absolute; bottom: 8px; left: 10px;
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; z-index: 10;
+  }
+  .icon-badge svg { width: 14px; height: 14px; }
+
+  .state-name { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); text-align: center; margin-bottom: 0.15rem; }
+  .state-desc { font-size: 0.6875rem; color: var(--text-tertiary); text-align: center; line-height: 1.4; max-width: 150px; }
+  .state-status {
+    font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px;
+  }
+
+  /* ============ ANIMATIONS — all active states get animation ============ */
+
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(0, 136, 255, 0.4)); }
+    70% { box-shadow: 0 0 0 8px rgba(0, 136, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 136, 255, 0); }
+  }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  @keyframes draw-check {
+    0% { stroke-dashoffset: 24; }
+    100% { stroke-dashoffset: 0; }
+  }
+
+  @keyframes bounce-in {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-2px); }
+    40% { transform: translateX(2px); }
+    60% { transform: translateX(-2px); }
+    80% { transform: translateX(2px); }
+  }
+
+  /* Orbit animation for synthesizing nodes */
+  @keyframes orbit {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse-node {
+    0%, 100% { opacity: 0.6; r: 2; }
+    50% { opacity: 1; r: 2.5; }
+  }
+
+  @keyframes connect-pulse {
+    0%, 100% { stroke-opacity: 0.3; }
+    50% { stroke-opacity: 0.9; }
+  }
+
+  /* Waveform bounce for transcribing */
+  @keyframes wave-1 { 0%, 100% { height: 4px; } 50% { height: 12px; } }
+  @keyframes wave-2 { 0%, 100% { height: 8px; } 50% { height: 14px; } }
+  @keyframes wave-3 { 0%, 100% { height: 6px; } 50% { height: 10px; } }
+
+  .divider { border: none; border-top: 1px solid rgba(26,28,30,0.06); margin: 1rem 0 2.5rem; }
+
+  /* Flow diagram */
+  .flow { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 3rem; flex-wrap: wrap; }
+  .flow-step {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: white; border: 1px solid rgba(26,28,30,0.08); border-radius: 12px;
+    padding: 0.5rem 1rem; font-size: 0.75rem; font-weight: 500;
+  }
+  .flow-step .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .flow-arrow { color: var(--text-placeholder); font-size: 1.25rem; }
+
+  .answer-box {
+    max-width: 650px; margin: 0 auto 2rem;
+    background: white; border: 1px solid rgba(26,28,30,0.06); border-radius: 16px;
+    padding: 1.5rem;
+  }
+  .answer-box h3 { font-family: var(--font-display); font-size: 1.125rem; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+  .answer-box p { font-size: 0.8125rem; color: var(--text-tertiary); line-height: 1.6; margin-bottom: 0.75rem; }
+  .answer-box p:last-child { margin-bottom: 0; }
+  .answer-box strong { color: var(--text-secondary); }
+  .answer-box code { background: rgba(26,28,30,0.05); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.75rem; }
+
+  .icon-source {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    background: rgba(26,28,30,0.04); padding: 0.2rem 0.5rem; border-radius: 6px;
+    font-size: 0.6875rem; font-weight: 500; color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+
+<h1>Icon States — V2</h1>
+<p class="subtitle">Answering: How do processing sub-states work? Should all active states animate? Where do icons come from?</p>
+
+<!-- ============ Q1: Processing Flow ============ -->
+<div class="answer-box">
+  <h3>How processing sub-states work</h3>
+  <p>The <strong>processing</strong> status is the parent. Within it, the backend reports which pipeline <strong>phase</strong> is active. The icon always shows the <strong>specific phase</strong>, never a generic "processing" spinner:</p>
+  <p><strong>Flow:</strong> <code>planning</code> → <code>ready</code> → <code>processing:transcribing</code> → <code>processing:analyzing</code> → <code>processing:synthesizing</code> → <code>completed</code></p>
+  <p>If the backend can't report the specific phase (edge case), we fall back to a generic animated spinner. But in practice, every processing state maps to a phase.</p>
+</div>
+
+<div class="flow">
+  <div class="flow-step"><div class="dot" style="background: rgba(26,28,30,0.2);"></div> planning</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><div class="dot" style="background: rgba(26,28,30,0.3);"></div> ready</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step" style="border-color: var(--info); background: rgba(0,136,255,0.04);"><div class="dot" style="background: var(--info);"></div> transcribing</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step" style="border-color: var(--brand-accent); background: rgba(13,148,136,0.04);"><div class="dot" style="background: var(--brand-accent);"></div> analyzing</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step" style="border-color: var(--brand-accent); background: rgba(13,148,136,0.04);"><div class="dot" style="background: var(--brand-accent);"></div> synthesizing</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step" style="border-color: var(--success); background: rgba(93,159,85,0.04);"><div class="dot" style="background: var(--success);"></div> completed</div>
+</div>
+
+<hr class="divider">
+
+<!-- ============ Q2: All active states animated ============ -->
+<div class="answer-box">
+  <h3>Animation consistency: all active states animate</h3>
+  <p><strong>Static states:</strong> planning (+), ready (play), completed (check), archived (archive), error (! after initial shake). No gratuitous motion.</p>
+  <p><strong>Animated states:</strong> Every processing phase has continuous animation — spinning, pulsing, orbiting. This immediately communicates "work is happening" at a glance.</p>
+</div>
+
+<div class="section-title">Static States — No Animation</div>
+<div class="grid">
+  <div class="demo-col">
+    <div class="state-status" style="background: rgba(26,28,30,0.06); color: var(--text-tertiary);">planning</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: rgba(0,0,0,0.08);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Planning</div>
+    <div class="state-desc">Plus. Static. <span class="icon-source">lucide: Plus</span></div>
+  </div>
+
+  <div class="demo-col">
+    <div class="state-status" style="background: rgba(26,28,30,0.06); color: var(--text-tertiary);">ready</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: rgba(0,0,0,0.08);">
+          <svg viewBox="0 0 24 24" fill="rgba(0,0,0,0.35)"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Ready</div>
+    <div class="state-desc">Play. Static. <span class="icon-source">lucide: Play</span></div>
+  </div>
+
+  <div class="demo-col">
+    <div class="state-status" style="background: var(--success); color: white;">completed</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: var(--success);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 12 10 16 18 8"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Completed</div>
+    <div class="state-desc">Checkmark. Static. <span class="icon-source">lucide: Check</span></div>
+  </div>
+
+  <div class="demo-col">
+    <div class="state-status" style="background: var(--destructive); color: white;">error</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: var(--destructive);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5" fill="white" stroke="none"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Error</div>
+    <div class="state-desc">Exclamation. Static after shake. <span class="icon-source">lucide: AlertCircle</span></div>
+  </div>
+
+  <div class="demo-col">
+    <div class="state-status" style="background: rgba(26,28,30,0.06); color: var(--text-tertiary);">archived</div>
+    <div class="mini-folder" style="opacity: 0.5;">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: rgba(0,0,0,0.08);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M3 8v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Archived</div>
+    <div class="state-desc">Archive. Folder dims. <span class="icon-source">lucide: Archive</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<div class="section-title">Active States — All Animated</div>
+<div class="section-desc">Every processing phase has continuous animation. This is the only time icons move — when work is actively happening.</div>
+
+<div class="grid">
+
+  <!-- Transcribing — waveform bars -->
+  <div class="demo-col">
+    <div class="state-status" style="background: var(--info); color: white;">transcribing</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: var(--info); animation: pulse-ring 2s infinite; --pulse-color: rgba(0,136,255,0.4);">
+          <!-- Waveform bars -->
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="4" y="10" width="2.5" height="4" rx="1" fill="white" style="animation: wave-1 0.8s ease-in-out infinite;"/>
+            <rect x="8.5" y="7" width="2.5" height="10" rx="1" fill="white" style="animation: wave-2 0.8s ease-in-out 0.1s infinite;"/>
+            <rect x="13" y="8" width="2.5" height="8" rx="1" fill="white" style="animation: wave-3 0.8s ease-in-out 0.2s infinite;"/>
+            <rect x="17.5" y="9" width="2.5" height="6" rx="1" fill="white" style="animation: wave-1 0.8s ease-in-out 0.3s infinite;"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Transcribing</div>
+    <div class="state-desc">Waveform bars bounce. Pulse ring. <span class="icon-source">custom SVG</span></div>
+  </div>
+
+  <!-- Analyzing — spinning sparkle/sun -->
+  <div class="demo-col">
+    <div class="state-status" style="background: var(--brand-accent); color: white;">analyzing</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: var(--brand-accent); animation: pulse-ring 2s infinite; --pulse-color: rgba(13,148,136,0.4);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 3s linear infinite;">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Analyzing</div>
+    <div class="state-desc">Spinning sun. Pulse ring. <span class="icon-source">lucide: Sun (spinning)</span></div>
+  </div>
+
+  <!-- Synthesizing — orbiting nodes with pulsing connections -->
+  <div class="demo-col">
+    <div class="state-status" style="background: var(--brand-accent); color: white;">synthesizing</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: var(--brand-accent); animation: pulse-ring 2s infinite; --pulse-color: rgba(13,148,136,0.4);">
+          <!-- Orbiting network nodes -->
+          <svg viewBox="0 0 24 24" fill="none" style="animation: orbit 8s linear infinite;">
+            <!-- Connections pulse -->
+            <line x1="7" y1="7" x2="12" y2="17" stroke="white" stroke-width="1.5" style="animation: connect-pulse 1.5s ease infinite;"/>
+            <line x1="17" y1="7" x2="12" y2="17" stroke="white" stroke-width="1.5" style="animation: connect-pulse 1.5s ease 0.5s infinite;"/>
+            <line x1="7" y1="7" x2="17" y2="7" stroke="white" stroke-width="1.5" style="animation: connect-pulse 1.5s ease 1s infinite;"/>
+            <!-- Nodes pulse -->
+            <circle cx="7" cy="7" r="2.5" fill="white" style="animation: pulse-node 2s ease infinite;"/>
+            <circle cx="17" cy="7" r="2.5" fill="white" style="animation: pulse-node 2s ease 0.6s infinite;"/>
+            <circle cx="12" cy="17" r="2.5" fill="white" style="animation: pulse-node 2s ease 1.2s infinite;"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Synthesizing</div>
+    <div class="state-desc">Nodes orbit + connections pulse. <span class="icon-source">custom SVG</span></div>
+  </div>
+
+  <!-- Generic fallback -->
+  <div class="demo-col">
+    <div class="state-status" style="background: rgba(0,136,255,0.12); color: var(--info);">fallback</div>
+    <div class="mini-folder">
+      <div class="back"></div>
+      <div class="front">
+        <svg class="shape" viewBox="0 0 160 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18 C4 18,0 22,0 27 L0 88 C0 94,4 100,9 100 L151 100 C157 100,160 94,160 88 L160 27 C160 22,157 18,151 18 L70 18 C65 18,62 15,60 11 L55 4 C53 1,50 0,46 0 L9 0 C4 0,0 4,0 9 L0 27" fill="var(--brand-pale-gold)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        </svg>
+        <div class="icon-badge" style="background: var(--info); animation: pulse-ring 2s infinite;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" style="animation: spin 1.2s linear infinite;">
+            <path d="M12 2a10 10 0 0 1 10 10" />
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="state-name">Fallback</div>
+    <div class="state-desc">Generic spinner if phase unknown. <span class="icon-source">custom SVG arc</span></div>
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ============ Q3: Icon sources ============ -->
+<div class="answer-box">
+  <h3>Where icons come from</h3>
+  <p><strong>Lucide React</strong> (already in the project) handles most icons: <code>Plus</code>, <code>Play</code>, <code>Check</code>, <code>AlertCircle</code>, <code>Archive</code>, <code>Sun</code>. These match the existing icon style throughout the app.</p>
+  <p><strong>Custom inline SVGs</strong> for the two cases lucide doesn't cover well:</p>
+  <p>1. <strong>Transcribing waveform</strong> — 4 animated bars. Lucide has <code>AudioLines</code> but it's static and doesn't animate well. Custom SVG gives us bouncing bars.</p>
+  <p>2. <strong>Synthesizing network</strong> — 3 orbiting nodes with pulsing connections. Lucide has <code>Network</code> but it's too detailed at 14px. Custom SVG is simpler and animates cleanly.</p>
+  <p>Both custom SVGs follow lucide's conventions: 24x24 viewBox, 2px stroke weight, round caps. They'll blend seamlessly.</p>
+</div>
+
+</body>
+</html>

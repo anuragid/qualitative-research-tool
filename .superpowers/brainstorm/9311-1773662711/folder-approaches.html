@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folder Micro-Interaction — Approach Comparison</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --surface-page: #FCF9F7;
+    --surface-card: #FFFFFF;
+    --text-primary: rgba(26,28,30,0.90);
+    --text-secondary: rgba(26,28,30,0.62);
+    --text-tertiary: rgba(26,28,30,0.55);
+    --text-placeholder: rgba(26,28,30,0.40);
+    --brand-mustard: #D3A848;
+    --brand-pale-gold: #F0DAA7;
+    --brand-forest: #5D9F55;
+    --brand-pale-green: #EBF0D6;
+    --brand-maroon: #7D4D54;
+    --brand-lavender: #D7D8E8;
+    --border: rgba(26,28,30,0.09);
+    --shadow-card: 0 8px 24px rgba(0,0,0,0.08), 0 8px 12px -6px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.03);
+    --shadow-hover: 0 20px 25px 4px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    --radius-card: 1rem;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body: 'Inter', -apple-system, system-ui, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--surface-page);
+    color: var(--text-primary);
+    padding: 2rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 400;
+    letter-spacing: -0.04em;
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 2rem;
+    max-width: 600px;
+    line-height: 1.5;
+  }
+
+  .approaches {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  .approach {
+    background: var(--surface-card);
+    border-radius: var(--radius-card);
+    padding: 1.5rem;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    box-shadow: var(--shadow-card);
+  }
+
+  .approach:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+  }
+
+  .approach.selected {
+    border-color: var(--brand-mustard);
+    box-shadow: var(--shadow-hover), 0 0 0 3px rgba(211,168,72,0.2);
+  }
+
+  .approach-label {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-mustard);
+    margin-bottom: 0.75rem;
+  }
+
+  .approach-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+  }
+
+  .approach-desc {
+    font-size: 0.8125rem;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+  }
+
+  .demo-area {
+    background: var(--surface-page);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    position: relative;
+    overflow: visible;
+  }
+
+  /* ============ APPROACH A: CSS 3D Folder ============ */
+  .folder-a {
+    width: 200px;
+    height: 150px;
+    position: relative;
+    perspective: 600px;
+    cursor: pointer;
+  }
+
+  .folder-a .back-panel {
+    position: absolute;
+    inset: 0;
+    background: var(--brand-mustard);
+    border-radius: 0 12px 12px 12px;
+    z-index: 1;
+  }
+
+  .folder-a .tab {
+    position: absolute;
+    top: -14px;
+    left: 0;
+    width: 60px;
+    height: 16px;
+    background: var(--brand-mustard);
+    border-radius: 8px 8px 0 0;
+    z-index: 1;
+  }
+
+  .folder-a .thumbnails {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    width: 160px;
+    height: 100px;
+  }
+
+  .folder-a .thumb {
+    position: absolute;
+    width: 70px;
+    height: 50px;
+    border-radius: 6px;
+    transition: all 0.4s var(--ease);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    overflow: hidden;
+  }
+
+  .folder-a .thumb-1 {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    left: 10px; top: 25px; z-index: 3;
+    transform: rotate(-2deg);
+  }
+  .folder-a .thumb-2 {
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    left: 40px; top: 20px; z-index: 2;
+    transform: rotate(2deg);
+  }
+  .folder-a .thumb-3 {
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    left: 70px; top: 22px; z-index: 1;
+    transform: rotate(5deg);
+  }
+
+  .folder-a .thumb .play-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+  }
+
+  .folder-a .thumb .play-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: white;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+  }
+
+  .folder-a .front-flap {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 75%;
+    background: var(--brand-pale-gold);
+    border-radius: 0 0 12px 12px;
+    z-index: 4;
+    transform-origin: bottom center;
+    transition: transform 0.4s var(--ease);
+  }
+
+  .folder-a:hover .front-flap {
+    transform: perspective(600px) rotateX(25deg);
+  }
+
+  .folder-a:hover .thumb-1 {
+    transform: rotate(-12deg) translateY(-35px) translateX(-15px);
+  }
+  .folder-a:hover .thumb-2 {
+    transform: rotate(0deg) translateY(-45px);
+  }
+  .folder-a:hover .thumb-3 {
+    transform: rotate(12deg) translateY(-35px) translateX(15px);
+  }
+
+  .folder-a .folder-count {
+    position: absolute;
+    bottom: 8px;
+    left: 12px;
+    z-index: 5;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+  }
+
+  /* ============ APPROACH B: Layered Stack ============ */
+  .folder-b {
+    width: 200px;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .folder-b .stack {
+    position: relative;
+    width: 200px;
+    height: 150px;
+  }
+
+  .folder-b .folder-face {
+    position: absolute;
+    inset: 0;
+    background: var(--brand-forest);
+    border-radius: 0 12px 12px 12px;
+    z-index: 4;
+    transition: transform 0.35s var(--ease);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .folder-b .folder-face .tab {
+    position: absolute;
+    top: -14px;
+    left: 0;
+    width: 60px;
+    height: 16px;
+    background: var(--brand-forest);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .folder-b .folder-face .folder-icon {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.8);
+  }
+
+  .folder-b .stack-thumb {
+    position: absolute;
+    width: 70px;
+    height: 50px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.3);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 3;
+    overflow: hidden;
+  }
+
+  .folder-b .stack-thumb-1 {
+    background: linear-gradient(135deg, #a8edea, #fed6e3);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0;
+  }
+  .folder-b .stack-thumb-2 {
+    background: linear-gradient(135deg, #fbc2eb, #a6c1ee);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0;
+  }
+  .folder-b .stack-thumb-3 {
+    background: linear-gradient(135deg, #fddb92, #d1fdff);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0;
+  }
+
+  .folder-b .stack-thumb .play-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+  }
+
+  .folder-b .stack-thumb .play-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: rgba(0,0,0,0.5);
+    filter: drop-shadow(0 1px 2px rgba(255,255,255,0.3));
+  }
+
+  .folder-b:hover .folder-face {
+    transform: translateY(15px) scale(0.95);
+  }
+
+  .folder-b:hover .stack-thumb-1 {
+    opacity: 1;
+    transform: translate(-110%, -80%) rotate(-8deg) scale(1);
+  }
+  .folder-b:hover .stack-thumb-2 {
+    opacity: 1;
+    transform: translate(-50%, -90%) rotate(0deg) scale(1);
+  }
+  .folder-b:hover .stack-thumb-3 {
+    opacity: 1;
+    transform: translate(10%, -80%) rotate(8deg) scale(1);
+  }
+
+  /* ============ APPROACH C: Front-Peek (Image 1 faithful) ============ */
+  .folder-c {
+    width: 200px;
+    height: 160px;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .folder-c .back {
+    position: absolute;
+    inset: 0;
+    background: var(--brand-maroon);
+    border-radius: 0 12px 12px 12px;
+    z-index: 1;
+  }
+
+  .folder-c .back .tab {
+    position: absolute;
+    top: -14px;
+    left: 0;
+    width: 60px;
+    height: 16px;
+    background: var(--brand-maroon);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .folder-c .peek-thumbs {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    width: 170px;
+    height: 80px;
+  }
+
+  .folder-c .peek-thumb {
+    position: absolute;
+    width: 65px;
+    height: 46px;
+    border-radius: 5px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    transition: all 0.35s var(--ease);
+    overflow: hidden;
+    opacity: 0.3;
+  }
+
+  .folder-c .peek-thumb-1 {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    left: 15px; top: 18px; z-index: 3;
+    transform: rotate(-3deg) translateY(0);
+  }
+  .folder-c .peek-thumb-2 {
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    left: 50px; top: 14px; z-index: 2;
+    transform: rotate(1deg) translateY(0);
+  }
+  .folder-c .peek-thumb-3 {
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    left: 85px; top: 16px; z-index: 1;
+    transform: rotate(4deg) translateY(0);
+  }
+
+  .folder-c .peek-thumb .play-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+  }
+
+  .folder-c .peek-thumb .play-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: white;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+  }
+
+  .folder-c .front {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 70%;
+    background: var(--brand-lavender);
+    border-radius: 8px 8px 12px 12px;
+    z-index: 4;
+    transform-origin: bottom center;
+    transition: transform 0.35s var(--ease);
+  }
+
+  .folder-c .front .count {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+  }
+
+  .folder-c:hover .front {
+    transform: perspective(800px) rotateX(18deg);
+  }
+
+  .folder-c:hover .peek-thumb {
+    opacity: 1;
+  }
+
+  .folder-c:hover .peek-thumb-1 {
+    transform: rotate(-10deg) translateY(-25px) translateX(-8px);
+  }
+  .folder-c:hover .peek-thumb-2 {
+    transform: rotate(0deg) translateY(-32px);
+  }
+  .folder-c:hover .peek-thumb-3 {
+    transform: rotate(10deg) translateY(-25px) translateX(8px);
+  }
+
+  /* ============ Meta info below each folder ============ */
+  .folder-meta {
+    text-align: center;
+    margin-top: 1rem;
+  }
+
+  .folder-meta .name {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
+  }
+
+  .folder-meta .count {
+    font-size: 0.75rem;
+    color: var(--text-placeholder);
+    margin-top: 0.25rem;
+  }
+
+  .pros-cons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+  }
+
+  .pros-cons h4 {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.25rem;
+    color: var(--text-secondary);
+  }
+
+  .pros-cons ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .pros-cons li {
+    padding: 0.15rem 0;
+    line-height: 1.4;
+  }
+
+  .pros-cons li::before {
+    margin-right: 0.35rem;
+  }
+
+  .pros li::before { content: "+"; color: #5D9F55; font-weight: 600; }
+  .cons li::before { content: "-"; color: #A11735; font-weight: 600; }
+
+  .recommendation {
+    background: rgba(211,168,72,0.08);
+    border: 1px solid rgba(211,168,72,0.2);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-top: 2rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .recommendation strong {
+    color: var(--text-primary);
+  }
+
+  .play-svg {
+    width: 16px; height: 16px;
+  }
+
+  /* Selection indicator */
+  .selected-indicator {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--brand-mustard);
+    color: white;
+    padding: 0.5rem 1.25rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .selected-indicator.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>Folder Micro-Interaction</h1>
+<p class="subtitle">Three approaches for the hover reveal animation. Each uses your brand colors, shows up to 3 video thumbnails (most recent first), and uses design system tokens. Hover each folder to see the animation.</p>
+
+<div class="approaches">
+  <!-- APPROACH A -->
+  <div class="approach" data-choice="a" onclick="selectApproach(this, 'a')">
+    <div class="approach-label">Approach A — Recommended</div>
+    <div class="approach-title">Front-Flap Lift</div>
+    <div class="approach-desc">Front panel tilts open via CSS perspective, revealing thumbnails that fan upward from inside. Closest to your reference image 1.</div>
+
+    <div class="demo-area">
+      <div>
+        <div class="folder-a">
+          <div class="tab"></div>
+          <div class="back-panel"></div>
+          <div class="thumbnails">
+            <div class="thumb thumb-1"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+            <div class="thumb thumb-2"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+            <div class="thumb thumb-3"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+          </div>
+          <div class="front-flap">
+            <div class="folder-count">5 videos</div>
+          </div>
+        </div>
+        <div class="folder-meta">
+          <div class="name">User Research</div>
+          <div class="count">5 Videos</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Most faithful to reference</li>
+          <li>Physical/tactile feel</li>
+          <li>3D depth via CSS perspective</li>
+          <li>Thumbnails emerge naturally</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>Trade-offs</h4>
+        <ul>
+          <li>Perspective can clip on grid edges</li>
+          <li>Needs overflow:visible on parent</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPROACH B -->
+  <div class="approach" data-choice="b" onclick="selectApproach(this, 'b')">
+    <div class="approach-label">Approach B</div>
+    <div class="approach-title">Pop-Out Stack</div>
+    <div class="approach-desc">Folder slides down while thumbnails pop up and fan out from behind it. Inspired by your Japan 2024 reference.</div>
+
+    <div class="demo-area">
+      <div>
+        <div class="folder-b">
+          <div class="stack">
+            <div class="stack-thumb stack-thumb-1"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+            <div class="stack-thumb stack-thumb-2"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+            <div class="stack-thumb stack-thumb-3"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+            <div class="folder-face">
+              <div class="tab"></div>
+              <div class="folder-icon">5 videos</div>
+            </div>
+          </div>
+          <div class="folder-meta">
+            <div class="name">Onboarding</div>
+            <div class="count">5 Videos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Playful, bouncy motion</li>
+          <li>Clear content preview</li>
+          <li>No 3D perspective needed</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>Trade-offs</h4>
+        <ul>
+          <li>Less faithful to reference</li>
+          <li>Needs more vertical space</li>
+          <li>Folder identity takes backseat</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPROACH C -->
+  <div class="approach" data-choice="c" onclick="selectApproach(this, 'c')">
+    <div class="approach-label">Approach C</div>
+    <div class="approach-title">Gentle Peek</div>
+    <div class="approach-desc">Subtler version: front panel tilts less, thumbnails peek up gently. More restrained, closer to Craft's quiet sophistication.</div>
+
+    <div class="demo-area">
+      <div>
+        <div class="folder-c">
+          <div class="back"><div class="tab"></div></div>
+          <div class="peek-thumbs">
+            <div class="peek-thumb peek-thumb-1"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+            <div class="peek-thumb peek-thumb-2"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+            <div class="peek-thumb peek-thumb-3"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+          </div>
+          <div class="front">
+            <div class="count">5 videos</div>
+          </div>
+        </div>
+        <div class="folder-meta">
+          <div class="name">Prototype Test</div>
+          <div class="count">5 Videos</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Most subtle/restrained</li>
+          <li>Craft-like quiet motion</li>
+          <li>Less layout disruption</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>Trade-offs</h4>
+        <ul>
+          <li>Less dramatic reveal</li>
+          <li>Thumbnails harder to see</li>
+          <li>May feel underwhelming</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="recommendation">
+  <strong>My recommendation: Approach A (Front-Flap Lift).</strong> It's the most faithful to your reference image — the front panel tilts open with CSS 3D perspective, and thumbnails fan upward from inside. It has the strongest "physical folder" feel while keeping things CSS-only (no JS animation libs needed for the core interaction). The brand color becomes the folder's identity, and the noise texture carries through.
+</div>
+
+<div class="selected-indicator" id="indicator">Selected</div>
+
+<script>
+  let selected = null;
+  function selectApproach(el, choice) {
+    document.querySelectorAll('.approach').forEach(a => a.classList.remove('selected'));
+    el.classList.add('selected');
+    selected = choice;
+    const indicator = document.getElementById('indicator');
+    const labels = { a: 'A — Front-Flap Lift', b: 'B — Pop-Out Stack', c: 'C — Gentle Peek' };
+    indicator.textContent = 'Selected: ' + labels[choice];
+    indicator.classList.add('visible');
+    setTimeout(() => indicator.classList.remove('visible'), 2000);
+
+    // Write event for Claude to read
+    const event = JSON.stringify({type:'click', choice, text: labels[choice], timestamp: Date.now()});
+    fetch('/.events', { method: 'POST', body: event }).catch(() => {});
+  }
+</script>
+
+</body>
+</html>
