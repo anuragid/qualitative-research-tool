@@ -19,22 +19,36 @@ vi.mock("../../hooks/useTheme.tsx", () => ({
   }),
 }));
 
+// Mock useProjects to provide test project data
+vi.mock("../../hooks/useProjects", () => ({
+  useProjects: () => ({
+    data: [
+      { id: "p1", name: "My First Project", status: "completed" },
+      { id: "p2", name: "Research Study", status: "planning" },
+    ],
+    isLoading: false,
+  }),
+}));
+
 // Mock ModelSettingsDialog — render a testable element that shows the open prop
 vi.mock("../settings/ModelSettingsDialog", () => ({
   ModelSettingsDialog: ({ open }: { open: boolean }) =>
     open ? <div data-testid="model-settings-dialog">Model Settings Dialog</div> : null,
 }));
 
-function renderSidebar(props: { isOpen?: boolean; onClose?: () => void } = {}) {
-  const defaultProps = {
-    isOpen: true,
-    onClose: vi.fn(),
-    ...props,
-  };
+const defaultProps = {
+  isOpen: true,
+  onClose: vi.fn(),
+  isCollapsed: false,
+  onToggleCollapse: vi.fn(),
+};
+
+function renderSidebar(props: Partial<typeof defaultProps> = {}) {
+  const mergedProps = { ...defaultProps, ...props, onClose: props.onClose ?? vi.fn(), onToggleCollapse: props.onToggleCollapse ?? vi.fn() };
 
   const result = render(
     <MemoryRouter>
-      <Sidebar {...defaultProps} />
+      <Sidebar {...mergedProps} />
     </MemoryRouter>
   );
 
@@ -43,7 +57,7 @@ function renderSidebar(props: { isOpen?: boolean; onClose?: () => void } = {}) {
     'aside[aria-label="Main navigation"]'
   ) as HTMLElement;
 
-  return { ...result, onClose: defaultProps.onClose, aside };
+  return { ...result, onClose: mergedProps.onClose, onToggleCollapse: mergedProps.onToggleCollapse, aside };
 }
 
 describe("Sidebar", () => {
@@ -51,6 +65,8 @@ describe("Sidebar", () => {
     // Reset body overflow between tests (sidebar modifies it)
     document.body.style.overflow = "";
     mockSetTheme.mockReset();
+    defaultProps.onClose = vi.fn();
+    defaultProps.onToggleCollapse = vi.fn();
   });
 
   // 1. Renders methodex typemark via Logo component
@@ -82,16 +98,28 @@ describe("Sidebar", () => {
     expect(link.getAttribute("href")).toBe("/projects");
   });
 
-  // 4. Renders "Settings" section header
-  it('renders "Settings" section header', () => {
+  // 4. Renders project list in sidebar
+  it("renders projects from useProjects hook", () => {
     const { aside } = renderSidebar();
     const scoped = within(aside);
 
-    const header = scoped.getByText("Settings");
-    expect(header).toBeDefined();
+    expect(scoped.getByRole("link", { name: /my first project/i })).toBeDefined();
+    expect(scoped.getByRole("link", { name: /research study/i })).toBeDefined();
   });
 
-  // 5. Renders "Model Settings" button
+  // 5. Project links have correct hrefs
+  it("project links have correct hrefs", () => {
+    const { aside } = renderSidebar();
+    const scoped = within(aside);
+
+    const link1 = scoped.getByRole("link", { name: /my first project/i });
+    expect(link1.getAttribute("href")).toBe("/projects/p1");
+
+    const link2 = scoped.getByRole("link", { name: /research study/i });
+    expect(link2.getAttribute("href")).toBe("/projects/p2");
+  });
+
+  // 6. Renders "Model Settings" button
   it('renders "Model Settings" button', () => {
     const { aside } = renderSidebar();
     const scoped = within(aside);
@@ -100,7 +128,7 @@ describe("Sidebar", () => {
     expect(button).toBeDefined();
   });
 
-  // 6. Close button is visible and calls onClose when clicked
+  // 7. Close button is visible and calls onClose when clicked
   it("close button calls onClose when clicked", async () => {
     const user = userEvent.setup();
     const { aside, onClose } = renderSidebar();
@@ -115,7 +143,7 @@ describe("Sidebar", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // 7. Escape key calls onClose when sidebar is open
+  // 8. Escape key calls onClose when sidebar is open
   it("Escape key calls onClose when sidebar is open", async () => {
     const user = userEvent.setup();
     const { onClose } = renderSidebar({ isOpen: true });
@@ -132,7 +160,7 @@ describe("Sidebar", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // 8. Mobile backdrop renders and calls onClose on click
+  // 9. Mobile backdrop renders and calls onClose on click
   it("mobile backdrop calls onClose on click", async () => {
     const user = userEvent.setup();
     const { container, onClose } = renderSidebar({ isOpen: true });
@@ -147,24 +175,24 @@ describe("Sidebar", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // 9. Sidebar has correct width class (w-72)
+  // 10. Sidebar has correct width class (w-72)
   it("sidebar aside element has w-72 class", () => {
     const { aside } = renderSidebar();
 
     expect(aside.className).toContain("w-72");
   });
 
-  // 10. When isOpen=false, sidebar has -translate-x-full class
+  // 11. When isOpen=false, sidebar has -translate-x-full class
   it("has -translate-x-full class when isOpen is false", () => {
     const { aside } = renderSidebar({ isOpen: false });
 
     expect(aside.className).toContain("-translate-x-full");
-    // Should NOT have standalone translate-x-0 (only lg:translate-x-0 is expected)
+    // Should NOT have standalone translate-x-0 (only lg: prefixed is expected)
     const classes = aside.className.split(/\s+/);
     expect(classes).not.toContain("translate-x-0");
   });
 
-  // 11. When isOpen=true, sidebar has translate-x-0 class
+  // 12. When isOpen=true, sidebar has translate-x-0 class
   it("has translate-x-0 class when isOpen is true", () => {
     const { aside } = renderSidebar({ isOpen: true });
 
@@ -172,66 +200,53 @@ describe("Sidebar", () => {
     expect(aside.className).not.toContain("-translate-x-full");
   });
 
-  // 12. Has lg:translate-x-0 for desktop always-visible behavior
-  it("has lg:translate-x-0 class for desktop always-visible behavior", () => {
-    const { aside } = renderSidebar({ isOpen: false });
+  // 13. Desktop collapsed state uses lg:-translate-x-full
+  it("has lg:-translate-x-full class when isCollapsed is true", () => {
+    const { aside } = renderSidebar({ isCollapsed: true });
+
+    expect(aside.className).toContain("lg:-translate-x-full");
+  });
+
+  // 14. Desktop expanded state uses lg:translate-x-0
+  it("has lg:translate-x-0 class when isCollapsed is false", () => {
+    const { aside } = renderSidebar({ isCollapsed: false });
 
     expect(aside.className).toContain("lg:translate-x-0");
   });
 
-  // 13. Theme toggle: renders light, dark, system toggle items
-  it("renders theme toggle items for light, dark, and system", () => {
+  // 15. Theme cycle button renders with correct label
+  it("renders theme cycle button with current theme label", () => {
     const { aside } = renderSidebar();
     const scoped = within(aside);
 
-    expect(scoped.getByRole("radio", { name: /light theme/i })).toBeDefined();
-    expect(scoped.getByRole("radio", { name: /dark theme/i })).toBeDefined();
-    expect(scoped.getByRole("radio", { name: /system theme/i })).toBeDefined();
+    // Mock returns theme="system", so label should be "Theme: System"
+    const themeBtn = scoped.getByRole("button", { name: /theme: system/i });
+    expect(themeBtn).toBeDefined();
   });
 
-  // 14. Theme toggle: clicking light calls setTheme("light")
-  it('clicking light theme toggle calls setTheme with "light"', async () => {
+  // 16. Theme cycle button cycles to next theme on click
+  it("clicking theme button cycles to next theme", async () => {
     const user = userEvent.setup();
     const { aside } = renderSidebar();
     const scoped = within(aside);
 
-    const lightBtn = scoped.getByRole("radio", { name: /light theme/i });
-    await user.click(lightBtn);
+    // Mock returns theme="system", next should be "light"
+    const themeBtn = scoped.getByRole("button", { name: /theme: system/i });
+    await user.click(themeBtn);
 
     expect(mockSetTheme).toHaveBeenCalledWith("light");
   });
 
-  // 15. Theme toggle: clicking dark calls setTheme("dark")
-  it('clicking dark theme toggle calls setTheme with "dark"', async () => {
+  // 17. Collapse button renders on desktop and calls onToggleCollapse
+  it("collapse button calls onToggleCollapse when clicked", async () => {
     const user = userEvent.setup();
-    const { aside } = renderSidebar();
+    const { aside, onToggleCollapse } = renderSidebar();
     const scoped = within(aside);
 
-    const darkBtn = scoped.getByRole("radio", { name: /dark theme/i });
-    await user.click(darkBtn);
+    const collapseBtn = scoped.getByRole("button", { name: /collapse sidebar/i });
+    await user.click(collapseBtn);
 
-    expect(mockSetTheme).toHaveBeenCalledWith("dark");
-  });
-
-  // 16. Clicking the already-selected theme does not call setTheme (empty value guard)
-  it("does not call setTheme when clicking the already-selected theme toggle", async () => {
-    // The mock returns theme="system" which is the current value.
-    // Clicking system again in a single ToggleGroup sends empty string,
-    // and the handler's `if (value)` guard prevents calling setTheme.
-    const user = userEvent.setup();
-    const { aside } = renderSidebar();
-    const scoped = within(aside);
-
-    await user.click(scoped.getByRole("radio", { name: /system theme/i }));
-    expect(mockSetTheme).not.toHaveBeenCalled();
-  });
-
-  // 17. Renders "Theme" label
-  it('renders "Theme" label text', () => {
-    const { aside } = renderSidebar();
-    const scoped = within(aside);
-
-    expect(scoped.getByText("Theme")).toBeDefined();
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1);
   });
 
   // 18. Model Settings button opens the settings dialog

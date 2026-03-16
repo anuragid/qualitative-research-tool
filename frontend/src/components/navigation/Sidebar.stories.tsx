@@ -14,6 +14,7 @@ const meta = {
   ],
   argTypes: {
     isOpen: { control: "boolean" },
+    isCollapsed: { control: "boolean" },
   },
 } satisfies Meta<typeof Sidebar>;
 
@@ -24,6 +25,8 @@ export const Default: Story = {
   args: {
     isOpen: true,
     onClose: () => {},
+    isCollapsed: false,
+    onToggleCollapse: () => {},
   },
 };
 
@@ -31,5 +34,16 @@ export const Closed: Story = {
   args: {
     isOpen: false,
     onClose: () => {},
+    isCollapsed: false,
+    onToggleCollapse: () => {},
+  },
+};
+
+export const CollapsedDesktop: Story = {
+  args: {
+    isOpen: false,
+    onClose: () => {},
+    isCollapsed: true,
+    onToggleCollapse: () => {},
   },
 };
