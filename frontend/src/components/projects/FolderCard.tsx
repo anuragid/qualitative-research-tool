@@ -1,9 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFolderColor } from "../../lib/noise";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import type { Project, ProjectStatus, Video } from "../../types";
+import type { Project, Video } from "../../types";
 import {
   MoreHorizontal,
   Edit,
@@ -28,15 +27,6 @@ interface FolderCardProps {
   project: Project;
   colorIndex: number;
 }
-
-const STATUS_BADGE_VARIANT: Record<ProjectStatus, "default" | "secondary" | "destructive" | "outline" | "success" | "warning"> = {
-  planning: "secondary",
-  ready: "secondary",
-  processing: "warning",
-  completed: "success",
-  archived: "outline",
-  error: "destructive",
-};
 
 const THUMBNAIL_GRADIENTS = [
   ["#667eea", "#764ba2"],
@@ -216,17 +206,6 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                   videos={project.videos}
                 />
 
-                {/* Status badge */}
-                {project.status !== "planning" && project.status !== "ready" && (
-                  <div
-                    className="absolute z-[var(--z-content)]"
-                    style={{ bottom: "var(--space-element-gap)", right: "var(--space-element-gap)" }}
-                  >
-                    <Badge variant={STATUS_BADGE_VARIANT[project.status]}>
-                      {project.status === "error" ? "Error" : project.status}
-                    </Badge>
-                  </div>
-                )}
               </div>
 
               {/* Dropdown menu — top-right, appears on hover */}
