@@ -184,8 +184,16 @@ class ClerkAuth:
             logger.error(f"Failed to fetch JWKS: {e}")
             return self._cached_keys
 
-    def verify_token(self, token: str) -> Dict[str, Any]:
-        """Verify a Clerk JWT token and return the payload with role information."""
+    def verify_token(self, token: str, leeway: int = 0) -> Dict[str, Any]:
+        """Verify a Clerk JWT token and return the payload with role information.
+
+        Args:
+            token: The JWT token string.
+            leeway: Seconds of clock-skew tolerance for expiry checks.
+                    Use 0 (default) for normal endpoints. Use a larger value
+                    for long-running requests like video uploads where the
+                    token may expire mid-transfer.
+        """
         try:
             # Decode without verification to get the header
             unverified = jwt.get_unverified_header(token)
@@ -213,15 +221,12 @@ class ClerkAuth:
                     )
 
             # Verify the token with Clerk's public key
-            # Clerk JWTs have short lifetimes (~60s). For long-running requests
-            # like video uploads (3-10 min), the token may expire mid-transfer.
-            # A 10-minute leeway matches the upload timeout.
             payload = jwt.decode(
                 token,
                 public_keys[kid],
                 algorithms=["RS256"],
                 options={"verify_aud": False},  # Clerk doesn't use standard aud claim
-                leeway=600,  # 10 minutes grace period for long uploads
+                leeway=leeway,
             )
 
             # Extract role from metadata or default to 'user'
@@ -285,57 +290,71 @@ else:
     clerk_auth = ClerkAuth()
 
 
-async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
-) -> Dict[str, Any]:
-    """
-    Dependency to get the current authenticated user from the JWT token with RBAC info.
+def _make_get_current_user(leeway: int = 0):
+    """Factory for auth dependencies with configurable JWT leeway."""
 
-    In development mode (APP_ENV=development), a dev bypass is available:
-    - No Authorization header at all -> returns dev user
-    - Authorization: Bearer dev-bypass -> returns dev user
-    - A real Clerk JWT is still verified normally
+    async def get_current_user(
+        credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    ) -> Dict[str, Any]:
+        """
+        Dependency to get the current authenticated user from the JWT token with RBAC info.
 
-    Returns:
-        Dict containing user information from the JWT payload including role and permissions
-    """
-    # --- Dev bypass (APP_ENV=development only) ---
-    if _is_dev:
-        # No credentials supplied at all
-        if credentials is None:
-            logger.debug("Dev auth bypass: no credentials provided, returning dev user")
-            return _dev_user_dict()
+        In development mode (APP_ENV=development), a dev bypass is available:
+        - No Authorization header at all -> returns dev user
+        - Authorization: Bearer dev-bypass -> returns dev user
+        - A real Clerk JWT is still verified normally
 
-        # Explicit dev-bypass token
-        if credentials.credentials == DEV_BYPASS_TOKEN:
-            logger.debug("Dev auth bypass: dev-bypass token provided, returning dev user")
-            return _dev_user_dict()
+        Returns:
+            Dict containing user information from the JWT payload including role and permissions
+        """
+        # --- Dev bypass (APP_ENV=development only) ---
+        if _is_dev:
+            # No credentials supplied at all
+            if credentials is None:
+                logger.debug("Dev auth bypass: no credentials provided, returning dev user")
+                return _dev_user_dict()
 
-        # Otherwise fall through to normal Clerk verification so real
-        # tokens still work during local development.
+            # Explicit dev-bypass token
+            if credentials.credentials == DEV_BYPASS_TOKEN:
+                logger.debug("Dev auth bypass: dev-bypass token provided, returning dev user")
+                return _dev_user_dict()
 
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication credentials",
-        )
+            # Otherwise fall through to normal Clerk verification so real
+            # tokens still work during local development.
 
-    token = credentials.credentials
-    user_data = clerk_auth.verify_token(token)
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing authentication credentials",
+            )
 
-    # Extract user info from Clerk JWT with RBAC
-    return {
-        "id": user_data.get("sub"),  # Clerk user ID
-        "email": user_data.get("email"),
-        "email_verified": user_data.get("email_verified"),
-        "first_name": user_data.get("first_name"),
-        "last_name": user_data.get("last_name"),
-        "username": user_data.get("username"),
-        "session_id": user_data.get("sid"),
-        "role": user_data.get("role", "user"),  # User role for RBAC
-        "permissions": user_data.get("permissions", []),  # User permissions
-        "raw_payload": user_data,  # Keep the full payload for reference
-    }
+        token = credentials.credentials
+        user_data = clerk_auth.verify_token(token, leeway=leeway)
+
+        # Extract user info from Clerk JWT with RBAC
+        return {
+            "id": user_data.get("sub"),  # Clerk user ID
+            "email": user_data.get("email"),
+            "email_verified": user_data.get("email_verified"),
+            "first_name": user_data.get("first_name"),
+            "last_name": user_data.get("last_name"),
+            "username": user_data.get("username"),
+            "session_id": user_data.get("sid"),
+            "role": user_data.get("role", "user"),  # User role for RBAC
+            "permissions": user_data.get("permissions", []),  # User permissions
+            "raw_payload": user_data,  # Keep the full payload for reference
+        }
+
+    return get_current_user
+
+
+# Default: strict auth (no leeway) for normal endpoints
+get_current_user = _make_get_current_user(leeway=0)
+
+# Upload auth: 10-minute leeway for long video uploads.
+# Clerk JWTs have ~60s lifetimes. Large uploads (300-450 MB) take 3-5 min,
+# so the token may expire mid-transfer before the server validates it.
+get_current_user_upload = _make_get_current_user(leeway=600)
 
 
 def _dev_user_dict() -> Dict[str, Any]:
@@ -363,6 +382,13 @@ async def get_current_user_id(
     Returns:
         The Clerk user ID as a string
     """
+    return current_user["id"]
+
+
+async def get_current_user_id_upload(
+    current_user: Dict[str, Any] = Security(get_current_user_upload),
+) -> str:
+    """Get user ID with upload-tolerant JWT leeway (10 min)."""
     return current_user["id"]
 
 

@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.auth_bridge import get_current_user_id
+from app.auth_bridge import get_current_user_id, get_current_user_id_upload
 from app.config import settings
 from app.database import get_db
 from app.models.database_models import Project, Transcript, Video, VideoAnalysis
@@ -47,7 +47,7 @@ def _get_video_with_ownership(
 async def upload_video(
     project_id: UUID,
     file: UploadFile = File(...),
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_upload),
     db: Session = Depends(get_db)
 ):
     """
