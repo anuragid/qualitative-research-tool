@@ -190,16 +190,14 @@
 
   /* ===== 18. FOLDER CARD ===== */
   --folder-max-w: 20rem;              /* 320px — max card width in grid */
-  --folder-aspect: 4 / 3;             /* width:height — used via Tailwind aspect-[4/3], not var() (CSS vars don't support / in aspect-ratio) */
-  --folder-front-height: 83%;         /* front panel covers this much of folder area */
-  --folder-thumb-width: 30%;          /* thumbnail width relative to folder */
-  --folder-thumb-aspect: 16 / 11;     /* landscape video thumbnail — used inline as "16/11", not via var() */
-  --folder-thumb-top: 12%;            /* how far down thumbnails sit from top */
-  --folder-hover-outline-radius: 1.25rem; /* 20px — hover container radius */
+  --folder-front-height: 86%;         /* front panel covers this much of folder area */
+  --folder-thumb-width: 31%;          /* thumbnail width relative to folder */
+  --folder-thumb-escape: 1.875rem;    /* 30px — padding-top for thumbnails to fan into */
+  --folder-hover-outline-radius: 1.25rem;
   --folder-hover-outline-width: 1.5px;
   --folder-hover-outline-color: var(--color-base-05);
   --folder-front-tilt: -14deg;        /* rotateX on hover */
-  --duration-folder: 0.4s;            /* folder-specific animation duration */
+  --duration-folder: 0.4s;
 
   /* ===== COLORS — Accent (kept for backwards compat) ===== */
   --color-accent-blue: rgb(0, 136, 255);
@@ -493,18 +491,50 @@ body {
   100% { transform: translateX(-100%); }
 }
 
-/* ===== FOLDER CARD THUMBNAIL ANIMATION ===== */
-.folder-thumbnail {
-  transform: translateX(var(--t-x, 0px)) rotate(var(--t-r, 0deg));
-  transition: transform 0.4s var(--ease);
-}
+/* ===== FOLDER CARD ===== */
 
-.group\/folder:hover .folder-thumbnail {
-  transform: translateX(var(--t-hx, 0px)) translateY(var(--t-hy, 0px)) rotate(var(--t-hr, 0deg));
-}
-
+/* Front panel tilt on hover */
 .group\/folder:hover .folder-front-panel {
   transform: rotateX(var(--folder-front-tilt));
+}
+
+/* Thumbnail transitions */
+.folder-thumb {
+  transition: all var(--duration-folder) var(--ease);
+}
+
+/* --- 3 thumbnails: default positions (tucked, barely peeking) --- */
+.folder-thumb-3-0 { left: 10%; top: 38%; transform: rotate(-2deg); }
+.folder-thumb-3-1 { left: 34%; top: 35%; transform: rotate(1deg); }
+.folder-thumb-3-2 { left: 58%; top: 36%; transform: rotate(3deg); }
+
+/* 3 thumbnails: hover — rise and fan out */
+.group\/folder:hover .folder-thumb-3-0 {
+  transform: rotate(-10deg) translateY(-28px) translateX(-6px);
+}
+.group\/folder:hover .folder-thumb-3-1 {
+  transform: rotate(0deg) translateY(-36px) translateX(0);
+}
+.group\/folder:hover .folder-thumb-3-2 {
+  transform: rotate(10deg) translateY(-28px) translateX(6px);
+}
+
+/* --- 2 thumbnails --- */
+.folder-thumb-2-0 { left: 20%; top: 36%; transform: rotate(-2deg); }
+.folder-thumb-2-1 { left: 49%; top: 36%; transform: rotate(2deg); }
+
+.group\/folder:hover .folder-thumb-2-0 {
+  transform: rotate(-8deg) translateY(-30px) translateX(-4px);
+}
+.group\/folder:hover .folder-thumb-2-1 {
+  transform: rotate(8deg) translateY(-30px) translateX(4px);
+}
+
+/* --- 1 thumbnail --- */
+.folder-thumb-1-0 { left: 34%; top: 36%; transform: rotate(0deg); }
+
+.group\/folder:hover .folder-thumb-1-0 {
+  transform: rotate(0deg) translateY(-32px);
 }
 
 /* ===== SCROLLBAR HIDE UTILITY ===== */
