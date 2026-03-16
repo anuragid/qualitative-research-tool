@@ -120,7 +120,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
           <div
             style={{
               paddingTop: "var(--folder-thumb-escape)",
-              perspective: "1000px",
+              perspective: "var(--folder-perspective)",
             }}
           >
             {/* Folder body — back panel + thumbnails + front panel */}
@@ -131,13 +131,13 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                 className="relative w-full rounded-[var(--radius-card)] noise-texture noise-medium"
                 style={{
                   backgroundColor: color.tab,
-                  aspectRatio: "4/3",
+                  aspectRatio: "var(--folder-aspect-ratio)",
                 }}
               >
                 {/* Inner border for dimension */}
                 <div
                   className="absolute inset-0 rounded-[inherit] pointer-events-none"
-                  style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+                  style={{ border: "var(--folder-inner-border)" }}
                 />
                 <span className="relative z-[var(--z-content)]" />
               </div>
@@ -157,9 +157,9 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                         style={{
                           background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
                           width: "var(--folder-thumb-width)",
-                          aspectRatio: "16/11",
+                          aspectRatio: "var(--folder-thumb-aspect-ratio)",
                           borderRadius: "var(--radius-md)",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.5)",
+                          boxShadow: "var(--folder-thumb-shadow)",
                           zIndex: 2 + (thumbCount - i),
                         }}
                       >
@@ -185,7 +185,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                   viewBox="0 0 220 142"
                   className="w-full h-full block"
                   preserveAspectRatio="xMidYMax slice"
-                  style={{ filter: "drop-shadow(0 -1px 3px rgba(0,0,0,0.05))" }}
+                  style={{ filter: "var(--folder-front-shadow)" }}
                 >
                   <path d={FOLDER_NOTCH_PATH} fill={color.body} />
                 </svg>
