@@ -119,7 +119,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
       </svg>
 
       <div
-        className="group/folder relative cursor-pointer outline-none mx-auto"
+        className="group/folder relative cursor-pointer outline-none w-full mx-auto"
         style={{ maxWidth: "var(--folder-max-w)" }}
         onClick={handleCardClick}
         role="button"

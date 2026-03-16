@@ -42,7 +42,7 @@ export default function ProjectsPage() {
         {isLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="mx-auto p-2" style={{ maxWidth: "var(--folder-max-w)" }}>
+              <div key={i} className="w-full mx-auto p-2" style={{ maxWidth: "var(--folder-max-w)" }}>
                 {/* Skeleton folder */}
                 <Skeleton className="h-40 rounded-[var(--radius-card)]" />
                 {/* Skeleton meta */}
