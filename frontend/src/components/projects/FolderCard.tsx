@@ -174,7 +174,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                 <svg
                   viewBox="0 0 220 142"
                   className="w-full h-full block"
-                  preserveAspectRatio="xMidYMax slice"
+                  preserveAspectRatio="none"
                   style={{ filter: "var(--folder-front-shadow)" }}
                 >
                   <path d={FOLDER_NOTCH_PATH} fill={color.body} />
