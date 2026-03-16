@@ -229,6 +229,17 @@ class LLMService:
                 )
                 last_error = e
                 continue
+            except ValueError as e:
+                # Free models may return null content (e.g. finish_reason: length
+                # with no output). Fall back to next model when using shared key.
+                if api_key is None:
+                    logger.warning(
+                        f"Model {model_name} returned unusable response: {e}. "
+                        f"Trying next fallback model..."
+                    )
+                    last_error = e
+                    continue
+                raise
 
         # All models exhausted - raise the underlying error, not RetryError
         if last_error is not None:
