@@ -145,7 +145,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
           }}
         >
           {/* Folder area */}
-          <div className="relative overflow-hidden" style={{ aspectRatio: "var(--folder-aspect)", perspective: "800px" }}>
+          <div className="relative overflow-hidden aspect-[4/3]" style={{ perspective: "800px" }}>
 
             {/* Back panel — simple rounded rectangle, saturated color */}
             <div
@@ -168,7 +168,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                       style={{
                         background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
                         width: "var(--folder-thumb-width)",
-                        aspectRatio: "var(--folder-thumb-aspect)",
+                        aspectRatio: "16/11",
                         top: "var(--folder-thumb-top)",
                         zIndex: 2 + (recentVideos.length - i),
                         ...getThumbStyle(recentVideos.length, i),

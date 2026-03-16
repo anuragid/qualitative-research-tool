@@ -190,10 +190,10 @@
 
   /* ===== 18. FOLDER CARD ===== */
   --folder-max-w: 20rem;              /* 320px — max card width in grid */
-  --folder-aspect: 4 / 3;             /* width:height ratio of folder area */
+  --folder-aspect: 4 / 3;             /* width:height — used via Tailwind aspect-[4/3], not var() (CSS vars don't support / in aspect-ratio) */
   --folder-front-height: 83%;         /* front panel covers this much of folder area */
   --folder-thumb-width: 30%;          /* thumbnail width relative to folder */
-  --folder-thumb-aspect: 16 / 11;     /* landscape video thumbnail ratio */
+  --folder-thumb-aspect: 16 / 11;     /* landscape video thumbnail — used inline as "16/11", not via var() */
   --folder-thumb-top: 12%;            /* how far down thumbnails sit from top */
   --folder-hover-outline-radius: 1.25rem; /* 20px — hover container radius */
   --folder-hover-outline-width: 1.5px;
