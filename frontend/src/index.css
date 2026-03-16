@@ -503,6 +503,10 @@ body {
   transform: translateX(var(--t-hx, 0px)) translateY(var(--t-hy, 0px)) rotate(var(--t-hr, 0deg));
 }
 
+.group\/folder:hover .folder-front-panel {
+  transform: rotateX(var(--folder-front-tilt));
+}
+
 /* ===== SCROLLBAR HIDE UTILITY ===== */
 @utility scrollbar-hide {
   -ms-overflow-style: none;

@@ -119,7 +119,8 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
       </svg>
 
       <div
-        className="group/folder relative cursor-pointer outline-none max-w-xs mx-auto"
+        className="group/folder relative cursor-pointer outline-none mx-auto"
+        style={{ maxWidth: "var(--folder-max-w)" }}
         onClick={handleCardClick}
         role="button"
         tabIndex={0}
@@ -133,14 +134,18 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
       >
         {/* Hover outline container — everything stays inside this */}
         <div
-          className="rounded-[20px] p-[var(--space-inline-gap)] overflow-hidden
+          className="p-[var(--space-inline-gap)]
             transition-all duration-[var(--duration-normal)] ease-[var(--ease)]
-            border-[1.5px] border-transparent
-            group-hover/folder:border-base-05
+            border-transparent
+            group-hover/folder:border-[var(--folder-hover-outline-color)]
             group-active/folder:scale-[0.98]"
+          style={{
+            borderRadius: "var(--folder-hover-outline-radius)",
+            borderWidth: "var(--folder-hover-outline-width)",
+          }}
         >
           {/* Folder area */}
-          <div className="relative aspect-[4/3] overflow-hidden" style={{ perspective: "800px" }}>
+          <div className="relative overflow-hidden" style={{ aspectRatio: "var(--folder-aspect)", perspective: "800px" }}>
 
             {/* Back panel — simple rounded rectangle, saturated color */}
             <div
@@ -162,9 +167,9 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                         shadow-subtle motion-reduce:!transition-none"
                       style={{
                         background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
-                        width: "30%",
-                        aspectRatio: "16/11",
-                        top: "12%",
+                        width: "var(--folder-thumb-width)",
+                        aspectRatio: "var(--folder-thumb-aspect)",
+                        top: "var(--folder-thumb-top)",
                         zIndex: 2 + (recentVideos.length - i),
                         ...getThumbStyle(recentVideos.length, i),
                       }}
@@ -180,15 +185,15 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
 
             {/* Front panel — folder notch shape via clip-path, pastel color */}
             <div
-              className="absolute inset-x-0 bottom-0 z-[5]
-                transition-transform duration-[0.4s] ease-[var(--ease)]
+              className="folder-front-panel absolute inset-x-0 bottom-0 z-[5]
+                transition-transform ease-[var(--ease)]
                 origin-bottom
-                group-hover/folder:[transform:rotateX(-14deg)]
                 motion-reduce:group-hover/folder:transform-none"
               style={{
-                height: "83%",
+                height: "var(--folder-front-height)",
                 clipPath: `url(#folder-clip-${project.id})`,
                 backgroundColor: color.body,
+                transitionDuration: "var(--duration-folder)",
               }}
             >
               {/* Noise texture — clips naturally to the parent's clip-path */}
