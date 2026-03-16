@@ -41,16 +41,14 @@ export function SimpleTooltip({
   side = "top"
 }: SimpleTooltipProps) {
   return (
-    <TooltipProvider>
-      <Tooltip delayDuration={delayDuration}>
-        <TooltipTrigger asChild>
-          {children}
-        </TooltipTrigger>
-        <TooltipContent side={side}>
-          <p>{content}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip delayDuration={delayDuration}>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side={side}>
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
