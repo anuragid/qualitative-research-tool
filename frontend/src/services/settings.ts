@@ -52,9 +52,12 @@ export const settingsService = {
     return response.data;
   },
 
-  searchModels: async (query: string): Promise<SearchModel[]> => {
+  searchModels: async (query: string, freeOnly?: boolean): Promise<SearchModel[]> => {
     const response = await api.get("/api/models/search", {
-      params: { q: query },
+      params: {
+        q: query,
+        ...(freeOnly !== undefined && { free_only: freeOnly }),
+      },
     });
     return response.data;
   },

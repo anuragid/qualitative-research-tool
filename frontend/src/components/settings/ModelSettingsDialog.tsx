@@ -14,7 +14,7 @@ import { useSettings } from "../../hooks/useSettings";
 import { settingsService } from "../../services/settings";
 import type { SearchModel } from "../../services/settings";
 import { cn } from "@/lib/utils";
-import { CheckIcon, SearchIcon, Loader2Icon, SparklesIcon, ZapIcon, SlidersHorizontalIcon } from "lucide-react";
+import { CheckIcon, SearchIcon, Loader2Icon, SparklesIcon, ZapIcon, SlidersHorizontalIcon, LockIcon } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
 type Tier = "standard" | "advanced" | "custom";
@@ -87,6 +87,10 @@ export function ModelSettingsDialog({
     }
   }, [open, settings, recommended, inferTier, resetUpdateError]);
 
+  // Whether the server has confirmed a stored BYOK key for this user.
+  // Used for search gating — only server-confirmed keys unlock paid models.
+  const hasByokKey = !!settings?.has_api_key;
+
   // Debounced search for Custom tier
   useEffect(() => {
     if (debounceRef.current) {
@@ -104,7 +108,10 @@ export function ModelSettingsDialog({
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const results = await settingsService.searchModels(searchQuery.trim());
+        const results = await settingsService.searchModels(
+          searchQuery.trim(),
+          !hasByokKey,
+        );
         if (!stale) {
           setSearchResults(results);
         }
@@ -125,7 +132,7 @@ export function ModelSettingsDialog({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [searchQuery]);
+  }, [searchQuery, hasByokKey]);
 
   // Resolve the actual model ID that will be saved
   const resolveModelId = (): string | null => {
@@ -216,6 +223,7 @@ export function ModelSettingsDialog({
               title="Advanced"
               subtitle="Premium"
               description={recommended?.advanced.name ?? "Loading..."}
+              locked={!hasKey}
             />
 
             {/* Custom */}
@@ -224,7 +232,7 @@ export function ModelSettingsDialog({
               onClick={() => setActiveTier("custom")}
               icon={<SlidersHorizontalIcon className="size-4" />}
               title="Custom"
-              subtitle="Any model"
+              subtitle={hasByokKey ? "Any model" : "Free models"}
               description={
                 customModelName
                   ? customModelName.length > 20
@@ -327,9 +335,13 @@ export function ModelSettingsDialog({
                                     : ""}
                                 </p>
                               </div>
-                              {model.is_free && (
+                              {model.is_free ? (
                                 <span className="mt-0.5 shrink-0 rounded-sm bg-interactive-fill px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
                                   Free
+                                </span>
+                              ) : (
+                                <span className="mt-0.5 shrink-0 rounded-sm bg-border px-1.5 py-0.5 text-[10px] font-medium text-text-tertiary">
+                                  Paid
                                 </span>
                               )}
                             </button>
@@ -436,6 +448,7 @@ function TierCard({
   title,
   subtitle,
   description,
+  locked = false,
 }: {
   active: boolean;
   onClick: () => void;
@@ -443,6 +456,7 @@ function TierCard({
   title: string;
   subtitle: string;
   description: string;
+  locked?: boolean;
 }) {
   return (
     <button
@@ -455,10 +469,14 @@ function TierCard({
         active
           ? "border-interactive-focus bg-interactive-focus-bg"
           : "border-border hover:bg-interactive-fill",
+        locked && !active && "opacity-60",
       )}
     >
-      {active && (
+      {active && !locked && (
         <CheckIcon className="absolute right-2 top-2 size-3.5 text-interactive-focus" />
+      )}
+      {locked && (
+        <LockIcon className="absolute right-2 top-2 size-3.5 text-text-tertiary" aria-label="Requires API key" />
       )}
       <div className="flex items-center gap-1.5 text-text-secondary">
         {icon}

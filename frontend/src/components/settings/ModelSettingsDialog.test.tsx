@@ -399,6 +399,101 @@ describe("ModelSettingsDialog", () => {
     expect(scoped.getByText("openai/gpt-5.4")).toBeDefined();
   });
 
+  it("non-BYOK Custom search passes freeOnly=true to searchModels", async () => {
+    mockSearchModels.mockResolvedValue([
+      { id: "meta/llama-4:free", name: "Llama 4", provider: "Meta", context_length: 32000, is_free: true },
+    ]);
+    // has_api_key defaults to false in beforeEach
+    const user = userEvent.setup();
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    await user.click(scoped.getByText("Custom"));
+
+    const searchInput = scoped.getByPlaceholderText("Search OpenRouter models...");
+    await user.type(searchInput, "llama");
+
+    // Wait for search to trigger
+    await screen.findByText("Llama 4");
+
+    // Verify searchModels was called with freeOnly=true (second arg)
+    expect(mockSearchModels).toHaveBeenCalledWith("llama", true);
+  });
+
+  it("BYOK Custom search passes freeOnly=false to searchModels", async () => {
+    mockSettings = {
+      ...mockSettings!,
+      has_api_key: true,
+    };
+    mockSearchModels.mockResolvedValue([
+      { id: "openai/gpt-5.4", name: "GPT-5.4", provider: "Openai", context_length: 128000, is_free: false },
+    ]);
+    const user = userEvent.setup();
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    await user.click(scoped.getByText("Custom"));
+
+    const searchInput = scoped.getByPlaceholderText("Search OpenRouter models...");
+    await user.type(searchInput, "gpt");
+
+    await screen.findByText("GPT-5.4");
+
+    // Verify searchModels was called with freeOnly=false (second arg)
+    expect(mockSearchModels).toHaveBeenCalledWith("gpt", false);
+  });
+
+  it("Advanced tier card shows lock icon when no API key", () => {
+    // has_api_key defaults to false in beforeEach
+    renderDialog();
+
+    const dialog = getDialogContent();
+
+    // The lock icon should be present (via aria-label)
+    const lockIcon = within(dialog).getByLabelText("Requires API key");
+    expect(lockIcon).toBeDefined();
+  });
+
+  it("Advanced tier card hides lock icon when BYOK key exists", () => {
+    mockSettings = {
+      ...mockSettings!,
+      has_api_key: true,
+    };
+    renderDialog();
+
+    const dialog = getDialogContent();
+
+    // The lock icon should NOT be present
+    expect(within(dialog).queryByLabelText("Requires API key")).toBeNull();
+  });
+
+  it("Custom card subtitle shows 'Free models' when no BYOK key", () => {
+    // has_api_key defaults to false in beforeEach
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    expect(scoped.getByText("Free models")).toBeDefined();
+  });
+
+  it("Custom card subtitle shows 'Any model' when BYOK key exists", () => {
+    mockSettings = {
+      ...mockSettings!,
+      has_api_key: true,
+    };
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    expect(scoped.getByText("Any model")).toBeDefined();
+  });
+
   it("sends API key to updateSettings on save when key is entered", async () => {
     const onOpenChange = vi.fn();
     const user = userEvent.setup();

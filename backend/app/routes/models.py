@@ -25,11 +25,16 @@ async def get_recommended_models(
 @router.get("/search")
 async def search_models(
     q: str = Query("", min_length=0, max_length=200),
+    free_only: bool = Query(False),
     _current_user: Dict[str, Any] = Depends(get_current_user),
 ):
     """Proxy search to OpenRouter /api/v1/models and return formatted results.
 
     Keeps the server-side OpenRouter API key private and avoids CORS issues.
+
+    When ``free_only=True``, results are restricted to models with zero pricing
+    (prompt and completion both $0).  The frontend should set this for users
+    who have not provided a BYOK API key.
     """
     # Return empty list for empty/whitespace-only queries to avoid returning all models
     if not q or not q.strip():
@@ -79,6 +84,10 @@ async def search_models(
         except (ValueError, TypeError):
             completion_price = 1.0
         is_free = prompt_price == 0 and completion_price == 0
+
+        # Gate: non-BYOK users only see free models
+        if free_only and not is_free:
+            continue
 
         try:
             context_length: Optional[int] = int(m.get("context_length") or 0) or None
