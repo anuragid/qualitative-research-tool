@@ -1,29 +1,57 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ModelSettingsDialog } from "./ModelSettingsDialog";
+
+// Polyfill ResizeObserver for jsdom (required by Radix ScrollArea)
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
 
 // Mock useSettings hook
 const mockUpdateSettings = vi.fn();
 const mockDeleteApiKey = vi.fn();
+const mockResetUpdateError = vi.fn();
 let mockSettings: {
   preferred_model: string | null;
   has_api_key: boolean;
+  key_hint?: string | null;
   available_models: { id: string; name: string; tier: string }[];
+} | undefined = undefined;
+let mockRecommended: {
+  standard: { id: string; name: string; description: string };
+  advanced: { id: string; name: string; description: string };
 } | undefined = undefined;
 let mockIsLoading = false;
 let mockIsUpdating = false;
 let mockIsDeletingKey = false;
+let mockUpdateError: Error | null = null;
 
 vi.mock("../../hooks/useSettings", () => ({
   useSettings: () => ({
     settings: mockSettings,
     isLoading: mockIsLoading,
+    recommended: mockRecommended,
+    isLoadingRecommended: false,
     updateSettings: mockUpdateSettings,
     isUpdating: mockIsUpdating,
+    updateError: mockUpdateError,
+    resetUpdateError: mockResetUpdateError,
     deleteApiKey: mockDeleteApiKey,
     isDeletingKey: mockIsDeletingKey,
   }),
+}));
+
+// Mock settingsService for search
+const mockSearchModels = vi.fn().mockResolvedValue([]);
+vi.mock("../../services/settings", () => ({
+  settingsService: {
+    searchModels: (...args: unknown[]) => mockSearchModels(...args),
+  },
 }));
 
 function renderDialog(props: Partial<{
@@ -49,17 +77,23 @@ describe("ModelSettingsDialog", () => {
   beforeEach(() => {
     mockUpdateSettings.mockReset();
     mockDeleteApiKey.mockReset();
+    mockResetUpdateError.mockReset();
+    // Make updateSettings invoke onSuccess callback for save tests
+    mockUpdateSettings.mockImplementation((_data: unknown, opts?: { onSuccess?: () => void }) => {
+      opts?.onSuccess?.();
+    });
     mockIsLoading = false;
     mockIsUpdating = false;
     mockIsDeletingKey = false;
+    mockUpdateError = null;
     mockSettings = {
-      preferred_model: "free-model-1",
+      preferred_model: null,
       has_api_key: false,
-      available_models: [
-        { id: "free-model-1", name: "Free Model One", tier: "free" },
-        { id: "free-model-2", name: "Free Model Two", tier: "free" },
-        { id: "premium-model-1", name: "Premium Model One", tier: "premium" },
-      ],
+      available_models: [],
+    };
+    mockRecommended = {
+      standard: { id: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nemotron 3 Super 120B", description: "High-quality free model" },
+      advanced: { id: "anthropic/claude-sonnet-4.6", name: "Claude Sonnet 4.6", description: "Premium model" },
     };
   });
 
@@ -75,43 +109,39 @@ describe("ModelSettingsDialog", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("renders dialog with model options when open and loaded", () => {
+  it("renders dialog with tier cards when open and loaded", () => {
     renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
     expect(scoped.getByText("Model Settings")).toBeDefined();
-    expect(scoped.getByText("Free Model One")).toBeDefined();
-    expect(scoped.getByText("Free Model Two")).toBeDefined();
-    expect(scoped.getByText("Premium Model One")).toBeDefined();
+    expect(scoped.getByText("Standard")).toBeDefined();
+    expect(scoped.getByText("Advanced")).toBeDefined();
+    expect(scoped.getByText("Custom")).toBeDefined();
   });
 
-  it("shows free and premium model sections", () => {
+  it("shows recommended model names as tier card descriptions", () => {
     renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    expect(scoped.getByText("Free Models")).toBeDefined();
-    expect(scoped.getByText("Premium Models")).toBeDefined();
+    // The standard model name appears in the tier card and the detail panel
+    expect(scoped.getAllByText("Nemotron 3 Super 120B").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("disables premium model radio when no API key and no key entered", () => {
+  it("defaults to standard tier when no preferred model is set", () => {
     renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    // Premium radio button -- look inside the dialog
-    const premiumLabels = scoped.getAllByText("Premium Model One");
-    // The label contains the text; the radio is a sibling
-    const premiumLabel = premiumLabels[0].closest("label") as HTMLElement;
-    const radio = premiumLabel.querySelector('[role="radio"]') as HTMLButtonElement;
-    expect(radio).toHaveProperty("disabled", true);
+    // The detail panel should show the standard model description
+    expect(scoped.getByText("High-quality free model")).toBeDefined();
   });
 
-  it("calls updateSettings and closes dialog on save", async () => {
+  it("calls updateSettings with standard model and closes dialog on save", async () => {
     const onOpenChange = vi.fn();
     const user = userEvent.setup();
     renderDialog({ onOpenChange });
@@ -121,51 +151,66 @@ describe("ModelSettingsDialog", () => {
 
     await user.click(scoped.getByRole("button", { name: /^save$/i }));
 
-    expect(mockUpdateSettings).toHaveBeenCalledWith({
-      preferred_model: "free-model-1",
-      api_key: undefined,
-    });
+    expect(mockUpdateSettings).toHaveBeenCalledWith(
+      {
+        preferred_model: "nvidia/nemotron-3-super-120b-a12b:free",
+        api_key: undefined,
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("saves with entered API key", async () => {
-    const onOpenChange = vi.fn();
+  it("switches to advanced tier on click and shows advanced detail panel", async () => {
     const user = userEvent.setup();
-    renderDialog({ onOpenChange });
+    renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    // Enter API key
-    const keyInput = scoped.getByPlaceholderText("sk-or-v1-...");
-    await user.type(keyInput, "sk-or-v1-test-key");
+    // Click the Advanced tier card
+    await user.click(scoped.getByText("Advanced"));
 
-    await user.click(scoped.getByRole("button", { name: /^save$/i }));
-
-    expect(mockUpdateSettings).toHaveBeenCalledWith({
-      preferred_model: "free-model-1",
-      api_key: "sk-or-v1-test-key",
-    });
+    // Detail panel should now show advanced model info
+    // "Claude Sonnet 4.6" appears in both the tier card and detail panel
+    expect(scoped.getAllByText("Claude Sonnet 4.6").length).toBeGreaterThanOrEqual(1);
+    expect(scoped.getByText("Premium model")).toBeDefined();
   });
 
-  it("shows 'API key configured' and remove button when has_api_key", () => {
+  it("shows inline API key input when Advanced is selected and no key exists", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    await user.click(scoped.getByText("Advanced"));
+
+    // Should show an API key input in the detail panel
+    const keyInputs = scoped.getAllByPlaceholderText("sk-or-v1-...");
+    expect(keyInputs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows remove button and key hint when has_api_key", () => {
     mockSettings = {
       ...mockSettings!,
       has_api_key: true,
+      key_hint: "ab12",
     };
     renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    expect(scoped.getByText("API key configured")).toBeDefined();
+    expect(scoped.getByText(/\.\.\.ab12/)).toBeDefined();
     expect(scoped.getByRole("button", { name: /remove/i })).toBeDefined();
   });
 
-  it("calls deleteApiKey and resets state when remove is clicked", async () => {
+  it("calls deleteApiKey when remove is clicked", async () => {
     mockSettings = {
       ...mockSettings!,
       has_api_key: true,
+      key_hint: "ab12",
     };
     const user = userEvent.setup();
     renderDialog();
@@ -191,14 +236,14 @@ describe("ModelSettingsDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("shows 'Saving...' when isUpdating", () => {
+  it("shows 'Validating...' when isUpdating", () => {
     mockIsUpdating = true;
     renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    expect(scoped.getByText("Saving...")).toBeDefined();
+    expect(scoped.getByText("Validating...")).toBeDefined();
   });
 
   it("disables save button when isUpdating", () => {
@@ -208,38 +253,8 @@ describe("ModelSettingsDialog", () => {
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    const saveBtn = scoped.getByRole("button", { name: /saving/i }) as HTMLButtonElement;
+    const saveBtn = scoped.getByRole("button", { name: /validating/i }) as HTMLButtonElement;
     expect(saveBtn.disabled).toBe(true);
-  });
-
-  it("shows API key input when no key is configured", () => {
-    renderDialog();
-
-    const dialog = getDialogContent();
-    const scoped = within(dialog);
-
-    expect(scoped.getByPlaceholderText("sk-or-v1-...")).toBeDefined();
-  });
-
-  it("allows selecting a different model", async () => {
-    const onOpenChange = vi.fn();
-    const user = userEvent.setup();
-    renderDialog({ onOpenChange });
-
-    const dialog = getDialogContent();
-    const scoped = within(dialog);
-
-    // Click on the second free model label
-    const freeModel2Label = scoped.getByText("Free Model Two").closest("label") as HTMLElement;
-    const radio = freeModel2Label.querySelector('[role="radio"]') as HTMLElement;
-    await user.click(radio);
-
-    await user.click(scoped.getByRole("button", { name: /^save$/i }));
-
-    expect(mockUpdateSettings).toHaveBeenCalledWith({
-      preferred_model: "free-model-2",
-      api_key: undefined,
-    });
   });
 
   it("renders OpenRouter link", () => {
@@ -253,12 +268,8 @@ describe("ModelSettingsDialog", () => {
     expect(link.target).toBe("_blank");
   });
 
-  it("handles settings with no available models", () => {
-    mockSettings = {
-      preferred_model: null,
-      has_api_key: false,
-      available_models: [],
-    };
+  it("handles missing recommended models gracefully", () => {
+    mockRecommended = undefined;
     renderDialog();
 
     const dialog = getDialogContent();
@@ -266,24 +277,156 @@ describe("ModelSettingsDialog", () => {
 
     // Should still render without crashing
     expect(scoped.getByText("Model Settings")).toBeDefined();
+    // Loading placeholder shown for model names
+    expect(scoped.getAllByText("Loading...").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("uses first free model as default when no preferred_model and selectedModel is null", () => {
+  it("selects custom tier and shows search input", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    await user.click(scoped.getByText("Custom"));
+
+    expect(scoped.getByPlaceholderText("Search OpenRouter models...")).toBeDefined();
+  });
+
+  it("disables save when custom tier is selected but no model is picked", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    await user.click(scoped.getByText("Custom"));
+
+    const saveBtn = scoped.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(true);
+  });
+
+  it("infers advanced tier when preferred model matches advanced recommendation", () => {
     mockSettings = {
-      preferred_model: null,
-      has_api_key: false,
-      available_models: [
-        { id: "default-free", name: "Default Free", tier: "free" },
-      ],
+      ...mockSettings!,
+      preferred_model: "anthropic/claude-sonnet-4.6",
+      has_api_key: true,
     };
     renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    const label = scoped.getByText("Default Free").closest("label") as HTMLElement;
-    const radio = label.querySelector('[role="radio"]') as HTMLElement;
-    // The radio should be checked (default selection)
-    expect(radio.getAttribute("data-state")).toBe("checked");
+    // Detail panel should show advanced model info since that tier is active
+    expect(scoped.getByText("Premium model")).toBeDefined();
+  });
+
+  it("infers custom tier when preferred model is not a recommended model", () => {
+    mockSettings = {
+      ...mockSettings!,
+      preferred_model: "openai/gpt-5.4",
+      has_api_key: true,
+    };
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    // Custom tier should be active; the model ID should appear in the selected model panel and the tier card
+    expect(scoped.getAllByText("openai/gpt-5.4").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders error banner when updateError is set", () => {
+    mockUpdateError = new Error("Invalid API key or insufficient credits.");
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    expect(scoped.getByText("Invalid API key or insufficient credits.")).toBeDefined();
+  });
+
+  it("handleRemoveKey resets tier to standard via onSuccess callback", async () => {
+    mockSettings = {
+      ...mockSettings!,
+      preferred_model: "anthropic/claude-sonnet-4.6",
+      has_api_key: true,
+      key_hint: "ab12",
+    };
+    // Make deleteApiKey invoke onSuccess callback
+    mockDeleteApiKey.mockImplementation((_data: unknown, opts?: { onSuccess?: () => void }) => {
+      opts?.onSuccess?.();
+    });
+    const user = userEvent.setup();
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    await user.click(scoped.getByRole("button", { name: /remove/i }));
+
+    expect(mockDeleteApiKey).toHaveBeenCalled();
+    // After onSuccess, the standard tier detail panel should be shown
+    expect(scoped.getByText("High-quality free model")).toBeDefined();
+  });
+
+  it("renders search results and selects a model", async () => {
+    mockSearchModels.mockResolvedValue([
+      { id: "openai/gpt-5.4", name: "GPT-5.4", provider: "Openai", context_length: 128000, is_free: false },
+      { id: "meta/llama-4:free", name: "Llama 4", provider: "Meta", context_length: 32000, is_free: true },
+    ]);
+    const user = userEvent.setup();
+    renderDialog();
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    // Switch to Custom tier
+    await user.click(scoped.getByText("Custom"));
+
+    // Type in search box (debounce is 350ms)
+    const searchInput = scoped.getByPlaceholderText("Search OpenRouter models...");
+    await user.type(searchInput, "gpt");
+
+    // Wait for search results to appear
+    const result = await screen.findByText("GPT-5.4");
+    expect(result).toBeDefined();
+
+    // Click on the result to select it
+    await user.click(result);
+
+    // After selection, the selected model panel should show and search results should be gone
+    expect(scoped.getByText("openai/gpt-5.4")).toBeDefined();
+  });
+
+  it("sends API key to updateSettings on save when key is entered", async () => {
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    renderDialog({ onOpenChange });
+
+    const dialog = getDialogContent();
+    const scoped = within(dialog);
+
+    // Switch to Advanced tier to reveal the API key input
+    await user.click(scoped.getByText("Advanced"));
+
+    // Enter an API key using fireEvent.change (not user.type) because the
+    // inline key input conditionally renders based on apiKey being empty --
+    // user.type types one char at a time, making the input disappear after
+    // the first keystroke sets apiKey to a truthy value.
+    const keyInput = scoped.getAllByPlaceholderText("sk-or-v1-...")[0];
+    fireEvent.change(keyInput, { target: { value: "sk-or-v1-testkey123" } });
+
+    // Click Save
+    await user.click(scoped.getByRole("button", { name: /^save$/i }));
+
+    expect(mockUpdateSettings).toHaveBeenCalledWith(
+      {
+        preferred_model: "anthropic/claude-sonnet-4.6",
+        api_key: "sk-or-v1-testkey123",
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

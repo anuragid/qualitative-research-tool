@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
+from app.constants import AVAILABLE_MODELS, FREE_MODEL_IDS, RECOMMENDED_MODELS
 from app.database import get_db
 from app.models import database_models
 from app.models.schemas import UserResponse, UserSettingsResponse, UserSettingsUpdate
@@ -15,20 +16,6 @@ from app.services.encryption_service import encryption_service
 from app.services.openrouter_validation import validate_openrouter_key
 
 router = APIRouter()
-
-# Available models exposed by GET/PUT /settings
-AVAILABLE_MODELS = [
-    {"id": "nvidia/nemotron-3-super-120b-a12b:free", "name": "Nemotron 3 Super 120B", "tier": "free"},
-    {"id": "qwen/qwen3.5-flash-02-23", "name": "Qwen 3.5 Flash", "tier": "free"},
-    {"id": "stepfun/step-3.5-flash:free", "name": "Step 3.5 Flash", "tier": "free"},
-    {"id": "z-ai/glm-5", "name": "GLM-5", "tier": "free"},
-    {"id": "anthropic/claude-sonnet-4.6", "name": "Claude Sonnet 4.6", "tier": "premium"},
-    {"id": "anthropic/claude-opus-4.6", "name": "Claude Opus 4.6", "tier": "premium"},
-    {"id": "openai/gpt-5.4", "name": "GPT-5.4", "tier": "premium"},
-    {"id": "google/gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "tier": "premium"},
-]
-
-FREE_MODEL_IDS = {m["id"] for m in AVAILABLE_MODELS if m["tier"] == "free"}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -209,17 +196,25 @@ async def update_user_settings(
                 detail="Invalid API key or insufficient credits. Check your key on the OpenRouter dashboard.",
             )
         db_user.encrypted_api_key = encryption_service.encrypt(settings.api_key)
-        db_user.key_hint = settings.api_key[-4:]
+        db_user.key_hint = settings.api_key[-4:] if len(settings.api_key) > 8 else "****"
         db_user.key_validated_at = datetime.now(timezone.utc)
 
-    # Enforce model tier: non-BYOK users can only select free-tier models
+    # Enforce model tier:
+    # - BYOK users: allow ANY model ID (they're paying with their own key)
+    # - Non-BYOK users: allow free models from our curated list, the recommended
+    #   standard model, OR any model whose ID ends with ":free" (OpenRouter convention)
     if settings.preferred_model is not None:
         has_key = bool(db_user.encrypted_api_key)
-        if not has_key and settings.preferred_model not in FREE_MODEL_IDS:
-            raise HTTPException(
-                status_code=403,
-                detail="Add your OpenRouter API key in Settings to unlock premium models.",
-            )
+        if not has_key:
+            standard_id = RECOMMENDED_MODELS["standard"]["id"]
+            is_known_free = settings.preferred_model in FREE_MODEL_IDS
+            is_standard = settings.preferred_model == standard_id
+            is_openrouter_free = settings.preferred_model.endswith(":free")
+            if not (is_known_free or is_standard or is_openrouter_free):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Add your OpenRouter API key in Settings to unlock premium models.",
+                )
         db_user.preferred_model = settings.preferred_model
 
     db.commit()

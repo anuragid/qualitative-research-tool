@@ -10,6 +10,12 @@ export function useSettings() {
     queryFn: settingsService.getSettings,
   });
 
+  const recommendedQuery = useQuery({
+    queryKey: ["recommended-models"],
+    queryFn: settingsService.getRecommendedModels,
+    staleTime: 5 * 60 * 1000, // 5 minutes — these rarely change
+  });
+
   const updateMutation = useMutation({
     mutationFn: (settings: UserSettingsUpdate) =>
       settingsService.updateSettings(settings),
@@ -28,9 +34,12 @@ export function useSettings() {
   return {
     settings: settingsQuery.data,
     isLoading: settingsQuery.isLoading,
+    recommended: recommendedQuery.data,
+    isLoadingRecommended: recommendedQuery.isLoading,
     updateSettings: updateMutation.mutate,
     isUpdating: updateMutation.isPending,
     updateError: updateMutation.error,
+    resetUpdateError: updateMutation.reset,
     deleteApiKey: deleteKeyMutation.mutate,
     isDeletingKey: deleteKeyMutation.isPending,
   };

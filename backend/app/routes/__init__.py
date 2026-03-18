@@ -1,5 +1,5 @@
 """API routes package."""
 
-from app.routes import projects, transcriptions, users, videos
+from app.routes import models, projects, transcriptions, users, videos
 
-__all__ = ["projects", "videos", "transcriptions", "users"]
+__all__ = ["models", "projects", "videos", "transcriptions", "users"]

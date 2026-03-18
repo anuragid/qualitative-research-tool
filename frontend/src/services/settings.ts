@@ -13,6 +13,25 @@ export interface UserSettingsUpdate {
   api_key?: string | null;
 }
 
+export interface RecommendedModel {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface RecommendedModels {
+  standard: RecommendedModel;
+  advanced: RecommendedModel;
+}
+
+export interface SearchModel {
+  id: string;
+  name: string;
+  provider: string;
+  context_length: number | null;
+  is_free: boolean;
+}
+
 export const settingsService = {
   getSettings: async (): Promise<UserSettings> => {
     const response = await api.get("/api/users/settings");
@@ -26,5 +45,17 @@ export const settingsService = {
 
   deleteApiKey: async (): Promise<void> => {
     await api.delete("/api/users/settings/api-key");
+  },
+
+  getRecommendedModels: async (): Promise<RecommendedModels> => {
+    const response = await api.get("/api/models/recommended");
+    return response.data;
+  },
+
+  searchModels: async (query: string): Promise<SearchModel[]> => {
+    const response = await api.get("/api/models/search", {
+      params: { q: query },
+    });
+    return response.data;
   },
 };

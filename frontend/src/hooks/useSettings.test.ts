@@ -10,6 +10,11 @@ vi.mock("../services/settings", () => ({
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
     deleteApiKey: vi.fn(),
+    getRecommendedModels: vi.fn().mockResolvedValue({
+      standard: { id: "test-free", name: "Test Free", description: "Free model" },
+      advanced: { id: "test-premium", name: "Test Premium", description: "Premium model" },
+    }),
+    searchModels: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -19,6 +24,8 @@ const mockedService = settingsService as {
   getSettings: ReturnType<typeof vi.fn>;
   updateSettings: ReturnType<typeof vi.fn>;
   deleteApiKey: ReturnType<typeof vi.fn>;
+  getRecommendedModels: ReturnType<typeof vi.fn>;
+  searchModels: ReturnType<typeof vi.fn>;
 };
 
 function createWrapper() {

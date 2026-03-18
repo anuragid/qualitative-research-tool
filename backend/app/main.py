@@ -156,7 +156,7 @@ async def clerk_proxy(path: str, request: Request):
 
 
 # Import and include routers
-from app.routes import projects, transcriptions, users, videos
+from app.routes import models, projects, transcriptions, users, videos
 
 # Register routers with API prefix and tags
 app.include_router(
@@ -181,5 +181,11 @@ app.include_router(
     transcriptions.router,
     prefix=f"{settings.API_V1_PREFIX}/transcripts",
     tags=["transcripts"]
+)
+
+app.include_router(
+    models.router,
+    prefix=f"{settings.API_V1_PREFIX}/models",
+    tags=["models"]
 )
 
