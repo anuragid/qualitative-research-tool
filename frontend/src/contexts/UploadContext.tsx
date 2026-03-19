@@ -127,7 +127,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
               ...u,
               status: 'processing' as const,
               progress: 100,
-              processingMessage: 'Processing video on server...',
+              processingMessage: 'Processing file on server...',
               processingStartTime: Date.now()
             }
           : u

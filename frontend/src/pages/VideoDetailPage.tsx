@@ -219,8 +219,8 @@ export default function VideoDetailPage() {
       <Layout>
         <EmptyState
           icon={AlertCircle}
-          heading="Video Not Found"
-          description="The video you're looking for doesn't exist or has been removed."
+          heading="File Not Found"
+          description="The file you're looking for doesn't exist or has been removed."
           action={
             <Link to="/projects">
               <Button>Go to Projects</Button>
@@ -357,22 +357,40 @@ export default function VideoDetailPage() {
             </AlertBanner>
           )}
 
-          {/* Video Player — elevated white card */}
+          {/* Media Player — elevated white card */}
           {playbackUrl && (
             <div className="bg-card rounded-2xl shadow-card overflow-hidden">
-              <video
-                id="main-video-player"
-                key={playbackUrl}
-                controls
-                // eslint-disable-next-line design-system/no-raw-tailwind-colors -- Video player needs true black background for letterboxing
-                className="w-full bg-black max-h-[60vh] sm:max-h-[37.5rem]"
-                preload="metadata"
-              >
-                <source src={playbackUrl} type="video/mp4" />
-                <source src={playbackUrl} type="video/quicktime" />
-                <source src={playbackUrl} type="video/x-msvideo" />
-                Your browser does not support the video tag.
-              </video>
+              {video.filename.match(/\.(mp3|wav|m4a|ogg|flac|aac)$/i) ? (
+                <audio
+                  id="main-video-player"
+                  key={playbackUrl}
+                  controls
+                  className="w-full p-4"
+                  preload="metadata"
+                >
+                  <source src={playbackUrl} type="audio/mpeg" />
+                  <source src={playbackUrl} type="audio/wav" />
+                  <source src={playbackUrl} type="audio/mp4" />
+                  <source src={playbackUrl} type="audio/ogg" />
+                  <source src={playbackUrl} type="audio/flac" />
+                  <source src={playbackUrl} type="audio/aac" />
+                  Your browser does not support the audio tag.
+                </audio>
+              ) : (
+                <video
+                  id="main-video-player"
+                  key={playbackUrl}
+                  controls
+                  // eslint-disable-next-line design-system/no-raw-tailwind-colors -- Video player needs true black background for letterboxing
+                  className="w-full bg-black max-h-[60vh] sm:max-h-[37.5rem]"
+                  preload="metadata"
+                >
+                  <source src={playbackUrl} type="video/mp4" />
+                  <source src={playbackUrl} type="video/quicktime" />
+                  <source src={playbackUrl} type="video/x-msvideo" />
+                  Your browser does not support the video tag.
+                </video>
+              )}
             </div>
           )}
 
@@ -411,10 +429,10 @@ export default function VideoDetailPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-text-primary">1. Upload Video</h3>
+                      <h3 className="font-semibold text-text-primary">1. Upload File</h3>
                       <Badge variant="success" className="text-xs">Complete</Badge>
                     </div>
-                    <p className="text-sm text-text-tertiary mt-1">Your video has been uploaded successfully.</p>
+                    <p className="text-sm text-text-tertiary mt-1">Your file has been uploaded successfully.</p>
                   </div>
                 </div>
 
@@ -456,7 +474,7 @@ export default function VideoDetailPage() {
                       </SimpleTooltip>
                     </div>
                     <p className="text-sm text-text-tertiary mt-1">
-                      <strong>Critical:</strong> Identify who is the interviewer vs. participant in your video.
+                      <strong>Critical:</strong> Identify who is the interviewer vs. participant in your recording.
                     </p>
 
                     {/* Why this matters */}

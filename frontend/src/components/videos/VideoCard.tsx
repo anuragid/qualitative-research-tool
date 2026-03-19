@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { formatFileSize, formatDuration, formatDate } from "../../lib/utils";
 import {
   FileVideo,
+  FileAudio,
   Clock,
   Trash2,
   MoreVertical,
@@ -51,6 +52,9 @@ export default function VideoCard({ video }: VideoCardProps) {
   const startAnalysis = useStartVideoAnalysis();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const isAudio = video.filename.match(/\.(mp3|wav|m4a|ogg|flac|aac)$/i);
+  const FileIcon = isAudio ? FileAudio : FileVideo;
+
   const handleRetryAnalysis = (e: React.MouseEvent) => {
     e.stopPropagation();
     startAnalysis.mutate(video.id);
@@ -88,7 +92,7 @@ export default function VideoCard({ video }: VideoCardProps) {
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <FileVideo className="h-10 w-10 text-text-placeholder flex-shrink-0 mt-1" />
+              <FileIcon className="h-10 w-10 text-text-placeholder flex-shrink-0 mt-1" />
               <div className="flex-1 min-w-0">
                 <CardTitle className="text-lg truncate text-text-primary">
                   {video.filename}
@@ -181,7 +185,7 @@ export default function VideoCard({ video }: VideoCardProps) {
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Video</DialogTitle>
+            <DialogTitle>Delete File</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete "{video.filename}"? This action
               cannot be undone and will remove all associated transcripts and

@@ -95,17 +95,17 @@ export default function ProjectDetailPage() {
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const videoFiles = files.filter((file) => file.type.startsWith("video/"));
-    const skippedCount = files.length - videoFiles.length;
+    const mediaFiles = files.filter((file) => file.type.startsWith("video/") || file.type.startsWith("audio/"));
+    const skippedCount = files.length - mediaFiles.length;
 
     if (skippedCount > 0) {
       toast.warning(
-        `Only video files are supported. ${skippedCount} file${skippedCount > 1 ? "s were" : " was"} skipped.`
+        `Only video and audio files are supported. ${skippedCount} file${skippedCount > 1 ? "s were" : " was"} skipped.`
       );
     }
 
-    if (videoFiles.length > 0) {
-      setDroppedFiles(videoFiles);
+    if (mediaFiles.length > 0) {
+      setDroppedFiles(mediaFiles);
       setUploadDialogOpen(true);
     }
   };
@@ -224,7 +224,7 @@ export default function ProjectDetailPage() {
           <div className="flex items-center gap-2 shrink-0">
             <Button onClick={() => setUploadDialogOpen(true)}>
               <Upload className="h-4 w-4" />
-              Upload Video
+              Upload Media
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -261,7 +261,7 @@ export default function ProjectDetailPage() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <VideoIcon className="h-5 w-5 text-text-secondary" />
-            <h2 className="text-h4">Videos</h2>
+            <h2 className="text-h4">Media</h2>
             <span className="text-label text-text-placeholder">
               ({videos?.length || 0})
             </span>
@@ -286,7 +286,7 @@ export default function ProjectDetailPage() {
                 <div className="absolute inset-0 flex items-center justify-center bg-interactive-focus-bg bg-opacity-90 rounded-2xl z-10">
                   <div className="text-center">
                     <Upload className="h-12 w-12 text-interactive-focus mx-auto mb-2" />
-                    <p className="text-interactive-focus font-medium">Drop videos here to upload</p>
+                    <p className="text-interactive-focus font-medium">Drop files here to upload</p>
                   </div>
                 </div>
               )}
@@ -307,24 +307,24 @@ export default function ProjectDetailPage() {
                 <>
                   <Upload className="h-12 w-12 text-interactive-focus mx-auto mb-4 animate-bounce" />
                   <h3 className="text-h4 mb-2">
-                    Drop videos here
+                    Drop files here
                   </h3>
                   <p className="text-interactive-focus">
-                    Release to upload your video files
+                    Release to upload your media files
                   </p>
                 </>
               ) : (
                 <>
                   <VideoIcon className="h-12 w-12 text-text-placeholder mx-auto mb-4" />
                   <h3 className="text-h4 mb-2">
-                    No videos yet
+                    No files yet
                   </h3>
                   <p className="text-text-tertiary mb-4">
-                    Drag and drop video files here, or click to upload
+                    Drag and drop video or audio files here, or click to upload
                   </p>
                   <Button onClick={() => setUploadDialogOpen(true)}>
                     <Upload className="h-4 w-4" />
-                    Upload Video
+                    Upload Media
                   </Button>
                 </>
               )}

@@ -257,7 +257,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
           <div className="mt-[var(--space-element-gap)] text-center px-[var(--space-tight)]">
             <h3 className="text-h4 truncate">{project.name}</h3>
             <p className="text-label text-text-tertiary mt-0.5">
-              {videoCount === 0 ? "No videos" : `${videoCount} video${videoCount !== 1 ? "s" : ""}`}
+              {videoCount === 0 ? "No files" : `${videoCount} file${videoCount !== 1 ? "s" : ""}`}
             </p>
           </div>
         </div>

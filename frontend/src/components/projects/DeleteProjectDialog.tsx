@@ -66,7 +66,7 @@ export function DeleteProjectDialog({
               <li>The project and all its settings</li>
               {project.videoCount && project.videoCount > 0 && (
                 <>
-                  <li>{project.videoCount} video{project.videoCount > 1 ? 's' : ''}</li>
+                  <li>{project.videoCount} file{project.videoCount > 1 ? 's' : ''}</li>
                   <li>All associated transcripts</li>
                   <li>All analysis data</li>
                 </>
