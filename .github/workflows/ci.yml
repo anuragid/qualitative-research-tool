@@ -95,6 +95,13 @@ jobs:
             exit 1
           fi
 
+      - name: Verify no dev bypass in build
+        run: |
+          if grep -r 'dev-bypass' dist/; then
+            echo "ERROR: Build contains dev-bypass token!"
+            exit 1
+          fi
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

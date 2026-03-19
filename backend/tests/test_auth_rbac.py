@@ -3,11 +3,10 @@
 Covers findings: P1-1, P3-1, P3-2
 """
 
-import pytest
 
 from app.auth import (
-    Permission,
     ROLE_PERMISSIONS,
+    Permission,
     UserRole,
     _dev_user_dict,
 )
@@ -77,7 +76,7 @@ class TestRolePermissions:
 class TestUploadLeeway:
     def test_upload_leeway_is_300(self):
         """P3-1: Upload JWT leeway should be 300s (5 min), not 600s."""
-        from app.auth import get_current_user_upload, _make_get_current_user
+        from app.auth import _make_get_current_user, get_current_user_upload
 
         # Verify that the upload auth dependency exists and was created
         assert get_current_user_upload is not None

@@ -6,8 +6,6 @@ Covers findings: P2-4, P2-5, P3-9
 import re
 from pathlib import Path
 
-import pytest
-
 
 class TestFilenameSanitization:
     """P3-9: Filename sanitization for uploads."""

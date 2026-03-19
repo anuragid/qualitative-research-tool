@@ -4,9 +4,8 @@ Covers finding: P2-1
 """
 
 import os
-
-import pytest
 from unittest.mock import patch
+
 from cryptography.fernet import Fernet
 
 

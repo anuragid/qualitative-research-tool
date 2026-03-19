@@ -6,7 +6,7 @@ Covers finding: P1-3
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.main import app, _CLERK_PROXY_ALLOWED_PATHS, _CLERK_PROXY_ALLOWED_HEADERS
+from app.main import _CLERK_PROXY_ALLOWED_HEADERS, _CLERK_PROXY_ALLOWED_PATHS, app
 
 
 class TestClerkProxyWhitelists:

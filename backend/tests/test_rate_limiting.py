@@ -3,7 +3,6 @@
 Covers finding: P1-2
 """
 
-import pytest
 
 
 def test_rate_limiter_configured():
@@ -37,7 +36,8 @@ def test_rate_limit_auth_setting():
 
 def test_limiter_uses_remote_address():
     """Rate limiter should key on remote address."""
-    from app.main import limiter
     from slowapi.util import get_remote_address
+
+    from app.main import limiter
 
     assert limiter._key_func is get_remote_address

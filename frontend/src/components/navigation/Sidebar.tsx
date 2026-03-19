@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { FolderOpen, Folder, Settings, Sun, Moon, Monitor, X, PanelLeftClose } from "lucide-react";
 import { UserButton } from "@clerk/react";
+
+const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
 import { ModelSettingsDialog } from "../settings/ModelSettingsDialog";
 import { Logo } from "../ui/logo";
 import { SimpleTooltip } from "../ui/tooltip";
@@ -167,14 +169,22 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: Side
               </button>
             </SimpleTooltip>
 
-            <UserButton
-              appearance={{
-                elements: {
-                  rootBox: "flex items-center",
-                  userButtonTrigger: "focus:outline-none focus-visible:outline-2 focus-visible:outline-interactive-focus focus-visible:outline-offset-2",
-                },
-              }}
-            />
+            {DEV_BYPASS ? (
+              <SimpleTooltip content="Dev User" side="top">
+                <div className="w-7 h-7 rounded-full bg-interactive-fill flex items-center justify-center text-xs font-medium text-foreground border border-border">
+                  D
+                </div>
+              </SimpleTooltip>
+            ) : (
+              <UserButton
+                appearance={{
+                  elements: {
+                    rootBox: "flex items-center",
+                    userButtonTrigger: "focus:outline-none focus-visible:outline-2 focus-visible:outline-interactive-focus focus-visible:outline-offset-2",
+                  },
+                }}
+              />
+            )}
 
             <SimpleTooltip content="Model Settings" side="top">
               <button

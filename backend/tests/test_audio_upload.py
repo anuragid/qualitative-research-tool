@@ -6,12 +6,9 @@ transcription flow.
 """
 
 import io
-import re
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # 1. Config: ALLOWED_AUDIO_EXTENSIONS exists and contains expected formats

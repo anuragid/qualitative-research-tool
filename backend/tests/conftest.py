@@ -19,9 +19,9 @@ os.environ.setdefault("OPENROUTER_API_KEY", "test-openrouter-key")
 os.environ.setdefault("ASSEMBLYAI_API_KEY", "test-assemblyai-key")
 os.environ.setdefault("ENCRYPTION_KEY", "9px3YGa-Z2bljdtUKpLhqzl9IaGdf2RgrCI-zOTrUug=")
 
-import pytest  # noqa: E402
 from unittest.mock import patch  # noqa: E402
 
+import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 
@@ -38,27 +38,25 @@ async def client(tmp_path):
     requests without an Authorization header authenticate as dev_user_local
     with USER role permissions.
     """
-    from sqlalchemy import create_engine, JSON
+    from sqlalchemy import JSON, create_engine
     from sqlalchemy.orm import sessionmaker
 
     db_path = tmp_path / "test.db"
     test_engine = create_engine(f"sqlite:///{db_path}")
 
     # Import models to register them with Base
-    import app.models.database_models  # noqa: F401
-    from app.database import Base
-
-    # Render PostgreSQL types as SQLite-compatible types
-    from sqlalchemy.dialects.postgresql import UUID as PgUUID
 
     # Create tables using raw SQL to work around type issues
-    from sqlalchemy import MetaData, Table, Column, String, Text, Integer, DateTime, ForeignKey
+    from sqlalchemy import Column, DateTime, ForeignKey, Integer, MetaData, String, Table, Text
+
+    # Render PostgreSQL types as SQLite-compatible types
     from sqlalchemy.sql import func
-    import uuid
+
+    import app.models.database_models  # noqa: F401
 
     meta = MetaData()
 
-    users = Table("users", meta,
+    _users = Table("users", meta,
         Column("id", String(255), primary_key=True),
         Column("email", String(255)),
         Column("first_name", String(255)),
@@ -74,7 +72,7 @@ async def client(tmp_path):
         Column("last_seen", DateTime),
     )
 
-    projects = Table("projects", meta,
+    _projects = Table("projects", meta,
         Column("id", String(36), primary_key=True),
         Column("user_id", String(255), ForeignKey("users.id"), nullable=False),
         Column("name", String(255), nullable=False),
@@ -85,7 +83,7 @@ async def client(tmp_path):
         Column("updated_at", DateTime, server_default=func.now()),
     )
 
-    videos = Table("videos", meta,
+    _videos = Table("videos", meta,
         Column("id", String(36), primary_key=True),
         Column("project_id", String(36), ForeignKey("projects.id"), nullable=False),
         Column("filename", String(255), nullable=False),
@@ -98,7 +96,7 @@ async def client(tmp_path):
         Column("error_message", Text),
     )
 
-    transcripts = Table("transcripts", meta,
+    _transcripts = Table("transcripts", meta,
         Column("id", String(36), primary_key=True),
         Column("video_id", String(36), ForeignKey("videos.id"), nullable=False),
         Column("assemblyai_id", String(255)),
@@ -108,7 +106,7 @@ async def client(tmp_path):
         Column("created_at", DateTime, server_default=func.now()),
     )
 
-    speaker_labels = Table("speaker_labels", meta,
+    _speaker_labels = Table("speaker_labels", meta,
         Column("id", String(36), primary_key=True),
         Column("transcript_id", String(36), ForeignKey("transcripts.id"), nullable=False),
         Column("speaker_label", String(50), nullable=False),
@@ -116,7 +114,7 @@ async def client(tmp_path):
         Column("role", String(100)),
     )
 
-    video_analyses = Table("video_analyses", meta,
+    _video_analyses = Table("video_analyses", meta,
         Column("id", String(36), primary_key=True),
         Column("video_id", String(36), ForeignKey("videos.id"), nullable=False),
         Column("chunks", JSON),
@@ -136,7 +134,7 @@ async def client(tmp_path):
         Column("activate_completed_at", DateTime),
     )
 
-    project_analyses = Table("project_analyses", meta,
+    _project_analyses = Table("project_analyses", meta,
         Column("id", String(36), primary_key=True),
         Column("project_id", String(36), ForeignKey("projects.id"), nullable=False),
         Column("video_ids", JSON),

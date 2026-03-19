@@ -19,13 +19,20 @@ export const api = axios.create({
   timeout: 30000, // 30 seconds
 });
 
-// Request interceptor — inject Clerk auth token
+// Request interceptor — inject auth token
+const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
+
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await window.Clerk?.session?.getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      if (DEV_BYPASS) {
+        // Dev mode: use backend's dev-bypass token → dev_user_local
+        config.headers.Authorization = "Bearer dev-bypass";
+      } else {
+        const token = await window.Clerk?.session?.getToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
     } catch {
       // Auth token unavailable -- proceed without auth
