@@ -81,17 +81,21 @@ async def upload_video(
         if video_count >= 20:
             raise HTTPException(status_code=429, detail="Maximum of 20 videos per project")
 
-        # Validate file extension
+        # Validate file extension (video or audio)
         file_extension = Path(file.filename).suffix.lower()
-        if file_extension not in settings.ALLOWED_VIDEO_EXTENSIONS:
+        allowed_extensions = settings.ALLOWED_VIDEO_EXTENSIONS + settings.ALLOWED_AUDIO_EXTENSIONS
+        if file_extension not in allowed_extensions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid file type. Allowed types: {', '.join(settings.ALLOWED_VIDEO_EXTENSIONS)}"
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}"
             )
 
         # Validate MIME content type matches extension
         _ALLOWED_CONTENT_TYPES = {
+            # Video
             "video/mp4", "video/quicktime", "video/webm", "video/x-msvideo",
+            # Audio
+            "audio/mpeg", "audio/wav", "audio/mp4", "audio/ogg", "audio/flac", "audio/aac",
         }
         if file.content_type and file.content_type not in _ALLOWED_CONTENT_TYPES:
             raise HTTPException(
@@ -113,19 +117,34 @@ async def upload_video(
         # Validate file content by magic bytes
         header = await file.read(12)
         await file.seek(0)  # Reset file position
-        if len(header) < 4:
-            raise HTTPException(status_code=400, detail="File too small to be a valid video")
+        if len(header) < 2:
+            raise HTTPException(status_code=400, detail="File too small to be a valid media file")
 
-        # Check for known video file signatures
+        # Check for known video/audio file signatures
         is_valid_magic = False
-        if len(header) >= 8 and header[4:8] == b'ftyp':  # MP4/MOV
+        # Video: MP4/MOV/M4A (ftyp box)
+        if len(header) >= 8 and header[4:8] == b'ftyp':
             is_valid_magic = True
-        elif len(header) >= 4 and header[:4] == b'\x1a\x45\xdf\xa3':  # WebM/MKV (EBML)
+        # Video: WebM/MKV (EBML)
+        elif header[:4] == b'\x1a\x45\xdf\xa3':
             is_valid_magic = True
-        elif len(header) >= 4 and header[:4] == b'RIFF':  # AVI
+        # Video: AVI / Audio: WAV (both RIFF-based)
+        elif header[:4] == b'RIFF':
+            is_valid_magic = True
+        # Audio: MP3 with ID3v2 tag
+        elif header[:3] == b'ID3':
+            is_valid_magic = True
+        # Audio: MP3 frame sync / AAC ADTS (0xFFE0+)
+        elif len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
+            is_valid_magic = True
+        # Audio: OGG Vorbis/Opus
+        elif header[:4] == b'OggS':
+            is_valid_magic = True
+        # Audio: FLAC
+        elif header[:4] == b'fLaC':
             is_valid_magic = True
         if not is_valid_magic:
-            raise HTTPException(status_code=400, detail="File does not appear to be a valid video")
+            raise HTTPException(status_code=400, detail="File does not appear to be a valid media file")
 
         # Get file size
         file_size = file.size if file.size else 0

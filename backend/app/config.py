@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     # File Upload Settings
     MAX_FILE_SIZE_MB: int = 500
     ALLOWED_VIDEO_EXTENSIONS: List[str] = [".mp4", ".mov", ".webm", ".avi"]
+    ALLOWED_AUDIO_EXTENSIONS: List[str] = [".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac"]
 
     # Rate Limiting
     RATE_LIMIT_DEFAULT: str = "60/minute"

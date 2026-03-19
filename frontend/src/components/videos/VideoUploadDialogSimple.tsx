@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Upload, X, FileVideo, AlertTriangle } from "lucide-react";
+import { Upload, X, FileVideo, FileAudio, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { formatFileSize } from "../../lib/utils";
 import {
@@ -22,15 +22,19 @@ interface VideoUploadDialogProps {
   initialFiles?: File[];
 }
 
+function isMediaFile(file: File): boolean {
+  return file.type.startsWith("video/") || file.type.startsWith("audio/");
+}
+
 function filterAndNotify(files: File[]): File[] {
-  const videoFiles = files.filter((file) => file.type.startsWith("video/"));
-  const skippedCount = files.length - videoFiles.length;
+  const mediaFiles = files.filter(isMediaFile);
+  const skippedCount = files.length - mediaFiles.length;
   if (skippedCount > 0) {
     toast.warning(
-      `Only video files are supported. ${skippedCount} file${skippedCount > 1 ? "s were" : " was"} skipped.`
+      `Only video and audio files are supported. ${skippedCount} file${skippedCount > 1 ? "s were" : " was"} skipped.`
     );
   }
-  return videoFiles;
+  return mediaFiles;
 }
 
 export default function VideoUploadDialog({
@@ -119,9 +123,9 @@ export default function VideoUploadDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Select Videos to Upload</DialogTitle>
+          <DialogTitle>Select Files to Upload</DialogTitle>
           <DialogDescription>
-            Choose video files to upload (max 2 GB each). They'll continue uploading in the background.
+            Choose video or audio files to upload (max 2 GB each). They'll continue uploading in the background.
           </DialogDescription>
         </DialogHeader>
 
@@ -139,14 +143,14 @@ export default function VideoUploadDialog({
             >
               <Upload className="mx-auto h-12 w-12 text-text-tertiary mb-4" />
               <p className="text-sm text-text-tertiary mb-2">
-                Drag and drop video files here, or click to browse
+                Drag and drop video or audio files here, or click to browse
               </p>
               <p className="text-xs text-text-tertiary mb-4">
                 You can select multiple files at once
               </p>
               <input
                 type="file"
-                accept="video/*"
+                accept="video/*,audio/*"
                 multiple
                 onChange={handleFileSelect}
                 className="hidden"
@@ -156,7 +160,7 @@ export default function VideoUploadDialog({
                 variant="outline"
                 onClick={() => document.getElementById('video-upload-input')?.click()}
               >
-                Select Videos
+                Select Files
               </Button>
             </div>
           ) : (
@@ -165,6 +169,8 @@ export default function VideoUploadDialog({
               <div className="max-h-72 overflow-y-auto space-y-2 pr-2">
                 {selectedFiles.map((file, index) => {
                   const isOversized = file.size > MAX_FILE_SIZE;
+                  const isAudio = file.type.startsWith("audio/");
+                  const FileIcon = isAudio ? FileAudio : FileVideo;
                   return (
                     <div
                       key={`${file.name}-${index}`}
@@ -172,7 +178,7 @@ export default function VideoUploadDialog({
                         isOversized ? "border-destructive/50" : "border-border"
                       }`}
                     >
-                      <FileVideo className={`h-5 w-5 flex-shrink-0 ${isOversized ? "text-destructive" : "text-text-tertiary"}`} />
+                      <FileIcon className={`h-5 w-5 flex-shrink-0 ${isOversized ? "text-destructive" : "text-text-tertiary"}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">
                           {file.name}
@@ -215,7 +221,7 @@ export default function VideoUploadDialog({
                 </p>
                 <input
                   type="file"
-                  accept="video/*"
+                  accept="video/*,audio/*"
                   multiple
                   onChange={handleFileSelect}
                   className="hidden"

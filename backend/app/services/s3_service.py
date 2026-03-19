@@ -148,12 +148,20 @@ class S3Service:
 
     @staticmethod
     def _get_content_type(file_extension: str) -> str:
-        """Get MIME type for video file extension."""
+        """Get MIME type for video or audio file extension."""
         content_types = {
+            # Video
             ".mp4": "video/mp4",
             ".mov": "video/quicktime",
             ".webm": "video/webm",
             ".avi": "video/x-msvideo",
+            # Audio
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".m4a": "audio/mp4",
+            ".ogg": "audio/ogg",
+            ".flac": "audio/flac",
+            ".aac": "audio/aac",
         }
         return content_types.get(file_extension.lower(), "application/octet-stream")
 

@@ -198,7 +198,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           errorMessage = 'File too large. Maximum size is 5GB.';
           errorType = 'validation';
         } else if (error?.response?.status === 415) {
-          errorMessage = 'Invalid file type. Only video files are accepted.';
+          errorMessage = 'Invalid file type. Only video and audio files are accepted.';
           errorType = 'validation';
         } else if (error?.response?.status >= 500) {
           errorMessage = 'Server error. Please try again in a few moments.';
