@@ -7,8 +7,6 @@ const mockVideo = (overrides: Partial<Video> = {}): Video => ({
   id: `v-${Math.random().toString(36).slice(2, 8)}`,
   project_id: "1",
   filename: "interview.mp4",
-  s3_key: "videos/interview.mp4",
-  s3_url: "https://example.com/interview.mp4",
   file_size_bytes: 50_000_000,
   duration_seconds: 1800,
   uploaded_at: "2025-04-08T00:00:00Z",

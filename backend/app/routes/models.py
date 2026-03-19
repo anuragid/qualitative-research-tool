@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from fastapi import APIRouter, Depends, Query
 
-from app.auth_bridge import get_current_user
+from app.auth_bridge import Permission, require_permissions
 from app.config import settings
 from app.constants import RECOMMENDED_MODELS
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/recommended")
 async def get_recommended_models(
-    _current_user: Dict[str, Any] = Depends(get_current_user),
+    _current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
 ):
     """Return the currently recommended standard and advanced models."""
     return RECOMMENDED_MODELS
@@ -26,7 +26,7 @@ async def get_recommended_models(
 async def search_models(
     q: str = Query("", min_length=0, max_length=200),
     free_only: bool = Query(False),
-    _current_user: Dict[str, Any] = Depends(get_current_user),
+    _current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
 ):
     """Proxy search to OpenRouter /api/v1/models and return formatted results.
 

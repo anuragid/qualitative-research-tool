@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 500
     ALLOWED_VIDEO_EXTENSIONS: List[str] = [".mp4", ".mov", ".webm", ".avi"]
 
+    # Rate Limiting
+    RATE_LIMIT_DEFAULT: str = "60/minute"
+    RATE_LIMIT_UPLOAD: str = "10/minute"
+    RATE_LIMIT_AUTH: str = "20/minute"
+
     # Celery Settings
     CELERY_BROKER_URL: str = ""
     CELERY_RESULT_BACKEND: str = ""

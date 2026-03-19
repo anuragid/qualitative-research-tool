@@ -30,7 +30,7 @@ celery_app.conf.update(
     enable_utc=True,
 
     # Result backend settings
-    result_expires=3600,  # Results expire after 1 hour
+    result_expires=600,  # Results expire after 10 minutes (short-lived to limit data exposure)
     result_persistent=True,
 
     # Task execution settings

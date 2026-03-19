@@ -1,13 +1,13 @@
 """Transcription and speaker labeling API routes."""
 
 import logging
-from typing import List
+from typing import Any, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth_bridge import get_current_user_id
+from app.auth_bridge import Permission, require_permissions
 from app.database import get_db
 from app.models.database_models import Project, SpeakerLabel, Transcript, Video
 from app.models.schemas import SpeakerLabelCreate, SpeakerLabelResponse, SpeakerLabelUpdate, TranscriptResponse
@@ -45,12 +45,13 @@ def _get_transcript_with_ownership(
 @router.get("/{transcript_id}", response_model=TranscriptResponse)
 async def get_transcript(
     transcript_id: UUID,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
 ):
     """
     Get a specific transcript by ID (must be owned by the current user).
     """
+    current_user_id = current_user["id"]
     try:
         transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
         logger.info(f"Retrieved transcript: {transcript_id}")
@@ -69,12 +70,13 @@ async def get_transcript(
 @router.get("/{transcript_id}/speakers", response_model=List[SpeakerLabelResponse])
 async def get_speaker_labels(
     transcript_id: UUID,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
 ):
     """
     Get all speaker labels for a transcript (must be owned by the current user).
     """
+    current_user_id = current_user["id"]
     try:
         _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
@@ -101,12 +103,13 @@ async def get_speaker_labels(
 async def save_speaker_labels(
     transcript_id: UUID,
     speaker_labels: List[SpeakerLabelCreate],
-    current_user_id: str = Depends(get_current_user_id),
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_UPDATE)),
     db: Session = Depends(get_db)
 ):
     """
     Save or update speaker labels for a transcript (must be owned by the current user).
     """
+    current_user_id = current_user["id"]
     try:
         transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
@@ -169,12 +172,13 @@ async def update_speaker_label(
     transcript_id: UUID,
     speaker_label_id: UUID,
     update_data: SpeakerLabelUpdate,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_UPDATE)),
     db: Session = Depends(get_db)
 ):
     """
     Update a specific speaker label (must be owned by the current user).
     """
+    current_user_id = current_user["id"]
     try:
         _get_transcript_with_ownership(transcript_id, current_user_id, db)
 
@@ -217,12 +221,13 @@ async def update_speaker_label(
 async def delete_speaker_label(
     transcript_id: UUID,
     speaker_label_id: UUID,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_UPDATE)),
     db: Session = Depends(get_db)
 ):
     """
     Delete a speaker label (must be owned by the current user).
     """
+    current_user_id = current_user["id"]
     try:
         _get_transcript_with_ownership(transcript_id, current_user_id, db)
 

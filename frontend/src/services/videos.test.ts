@@ -19,8 +19,6 @@ const mockVideo: Video = {
   id: "vid-1",
   project_id: "proj-1",
   filename: "interview.mp4",
-  s3_key: "videos/interview.mp4",
-  s3_url: "https://bucket.s3.amazonaws.com/videos/interview.mp4",
   file_size_bytes: 104857600,
   duration_seconds: 3600,
   uploaded_at: "2026-01-01T00:00:00Z",

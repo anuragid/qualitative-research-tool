@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FolderCard from "./FolderCard";
-import { FOLDER_COLORS } from "../../lib/noise";
+import { FOLDER_COLORS, getFolderColor } from "../../lib/noise";
 import type { Project } from "../../types";
 
 // ---- Mocks ----
@@ -50,8 +50,6 @@ function makeVideo(id: string, projectId = "proj-1") {
     id,
     project_id: projectId,
     filename: `${id}.mp4`,
-    s3_key: `key-${id}`,
-    s3_url: `url-${id}`,
     file_size_bytes: 1000,
     duration_seconds: 60,
     uploaded_at: "2025-06-15T00:00:00Z",
@@ -100,102 +98,79 @@ describe("FolderCard", () => {
     expect(screen.getByText("My Cool Project")).toBeDefined();
   });
 
-  // 2. Renders formatted date
-  it("renders the created_at date formatted correctly", () => {
-    renderCard(createProject({ created_at: "2025-06-15T14:30:00Z" }));
-    // formatDate uses en-US with short month, numeric day, numeric year, 2-digit hour/minute
-    expect(screen.getByText(/Jun 15, 2025/)).toBeDefined();
-  });
-
-  // 3. Renders video count when videos exist
+  // 2. Renders video count text when videos exist
   it("renders video count when the project has videos", () => {
     const project = createProject({
       videos: [makeVideo("v1"), makeVideo("v2")],
     });
     renderCard(project);
-    expect(screen.getByText("2")).toBeDefined();
+    expect(screen.getByText("2 videos")).toBeDefined();
   });
 
-  it("does not render video count when there are no videos", () => {
+  it("renders singular 'video' for one video", () => {
+    const project = createProject({
+      videos: [makeVideo("v1")],
+    });
+    renderCard(project);
+    expect(screen.getByText("1 video")).toBeDefined();
+  });
+
+  it('renders "No videos" when there are no videos', () => {
     renderCard(createProject({ videos: [] }));
-    expect(screen.queryByText("0")).toBeNull();
+    expect(screen.getByText("No videos")).toBeDefined();
   });
 
-  // 4. Renders status indicator for non-planning statuses
-  it.each(["ready", "processing", "completed", "archived"] as const)(
-    'renders a badge for status "%s"',
-    (status) => {
-      renderCard(createProject({ status }));
-      expect(screen.getByText(status)).toBeDefined();
-    },
-  );
-
-  it('renders an error indicator for status "error"', () => {
-    renderCard(createProject({ status: "error" }));
-    expect(screen.getByText("Error")).toBeDefined();
+  // 3. Renders FolderStatusIcon for various statuses
+  it("renders a folder-status-icon for each status", () => {
+    const { container } = renderCard(createProject({ status: "completed" }));
+    expect(container.querySelector(".folder-status-icon")).not.toBeNull();
   });
 
-  it('does not render a status badge when status is "planning"', () => {
-    renderCard(createProject({ status: "planning" }));
-    expect(screen.queryByText("planning")).toBeNull();
+  it("renders a folder-status-icon for error status", () => {
+    const { container } = renderCard(createProject({ status: "error" }));
+    expect(container.querySelector(".folder-status-icon")).not.toBeNull();
   });
 
-  // 5. Renders error message when status is "error"
-  it("renders error message when status is error and error_message is set", () => {
-    renderCard(
-      createProject({
-        status: "error",
-        error_message: "Transcription failed unexpectedly",
-      }),
-    );
-    expect(screen.getByText("Transcription failed unexpectedly")).toBeDefined();
+  it("renders a folder-status-icon for planning status", () => {
+    const { container } = renderCard(createProject({ status: "planning" }));
+    expect(container.querySelector(".folder-status-icon")).not.toBeNull();
   });
 
-  it("does not render error box when status is error but no error_message", () => {
-    const { container } = renderCard(
-      createProject({ status: "error", error_message: null }),
-    );
-    // The error box has a specific class; it should not be present
-    expect(container.querySelector(".border-l-2")).toBeNull();
-  });
-
-  // 6. Uses correct folder color based on colorIndex (0-5 cycling)
+  // 4. Uses correct folder color based on colorIndex (CSS variables)
   it.each([0, 1, 2, 3, 4, 5])("applies folder color for colorIndex %i", (idx) => {
     const { container } = renderCard(createProject(), idx);
-    const expectedColor = FOLDER_COLORS[idx % FOLDER_COLORS.length];
+    const expectedColor = getFolderColor(idx);
 
-    // The folder tab div
-    const tabDiv = container.querySelector(".rounded-t-sm") as HTMLElement;
-    expect(tabDiv).not.toBeNull();
-    expect(tabDiv.style.backgroundColor).toBe(expectedColor.tab);
+    // The back panel div has the tab color as backgroundColor
+    const backPanel = container.querySelector(".noise-texture") as HTMLElement;
+    expect(backPanel).not.toBeNull();
+    expect(backPanel.style.backgroundColor).toBe(expectedColor.tab);
 
-    // The folder body div
-    const bodyDiv = container.querySelector(".rounded-2xl") as HTMLElement;
-    expect(bodyDiv).not.toBeNull();
-    expect(bodyDiv.style.backgroundColor).toBe(expectedColor.body);
+    // The front panel SVG path has the body color as fill
+    const svgPath = container.querySelector("path") as SVGPathElement;
+    expect(svgPath).not.toBeNull();
+    expect(svgPath.getAttribute("fill")).toBe(expectedColor.body);
   });
 
   it("cycles colors for colorIndex >= 6", () => {
     const { container } = renderCard(createProject(), 7);
-    const expectedColor = FOLDER_COLORS[7 % FOLDER_COLORS.length]; // index 1
-    const tabDiv = container.querySelector(".rounded-t-sm") as HTMLElement;
-    expect(tabDiv.style.backgroundColor).toBe(expectedColor.tab);
+    const expectedColor = FOLDER_COLORS[7 % FOLDER_COLORS.length];
+    const backPanel = container.querySelector(".noise-texture") as HTMLElement;
+    expect(backPanel.style.backgroundColor).toBe(expectedColor.tab);
   });
 
-  // 7. Menu button has responsive opacity classes (hidden on desktop, visible on hover)
+  // 5. Menu button has responsive opacity classes (hidden on desktop, visible on hover)
   it("menu button has correct opacity classes for hover-reveal behavior", () => {
     const { container } = renderCard(createProject());
     const menuWrapper = container.querySelector("[data-dropdown-menu]") as HTMLElement;
     expect(menuWrapper).not.toBeNull();
 
-    // Always visible on mobile (opacity-100), hidden on desktop (sm:opacity-0),
-    // revealed on group hover (sm:group-hover:opacity-100)
     expect(menuWrapper.className).toContain("opacity-100");
     expect(menuWrapper.className).toContain("sm:opacity-0");
-    expect(menuWrapper.className).toContain("sm:group-hover:opacity-100");
+    expect(menuWrapper.className).toContain("sm:group-hover/folder:opacity-100");
   });
 
-  // 8. Navigates to /projects/:id on click
+  // 6. Navigates to /projects/:id on click
   it("navigates to the project page on click", () => {
     const { container } = renderCard(createProject({ id: "abc-123" }));
     const card = container.querySelector('[role="button"]') as HTMLElement;
@@ -203,7 +178,7 @@ describe("FolderCard", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/projects/abc-123");
   });
 
-  // 9. Keyboard accessibility: Enter and Space trigger navigation
+  // 7. Keyboard accessibility: Enter and Space trigger navigation
   it("navigates on Enter key press", () => {
     const { container } = renderCard(createProject({ id: "kb-1" }));
     const card = container.querySelector('[role="button"]') as HTMLElement;
@@ -218,7 +193,7 @@ describe("FolderCard", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/projects/kb-2");
   });
 
-  // 10. Menu dropdown has Edit, Archive, Delete options
+  // 8. Menu dropdown has Edit, Archive, Delete options
   it("shows Edit, Archive, and Delete in the dropdown menu", async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ status: "ready" }));
@@ -231,7 +206,7 @@ describe("FolderCard", () => {
     expect(screen.getByText("Delete")).toBeDefined();
   });
 
-  // 11. Archived project shows "Unarchive" instead of "Archive"
+  // 9. Archived project shows "Unarchive" instead of "Archive"
   it('shows "Unarchive" for archived projects', async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ status: "archived" }));
@@ -243,26 +218,17 @@ describe("FolderCard", () => {
     expect(screen.queryByText("Archive")).toBeNull();
   });
 
-  // 12. Has active:scale-[0.98] class for click feedback
-  it("has active:scale-[0.98] class for click feedback", () => {
+  // 10. Card has click feedback via inner div
+  it("has group-active scale class for click feedback", () => {
     const { container } = renderCard(createProject());
     const card = container.querySelector('[role="button"]') as HTMLElement;
-    expect(card.className).toContain("active:scale-[0.98]");
+    // The scale effect is on the inner hover-outline div, accessed via group-active
+    const innerDiv = card.querySelector("div") as HTMLElement;
+    expect(innerDiv).not.toBeNull();
+    expect(innerDiv.className).toContain("group-active/folder:scale-[0.98]");
   });
 
-  // Additional: description rendering
-  it("renders project description when provided", () => {
-    renderCard(createProject({ description: "An important study" }));
-    expect(screen.getByText("An important study")).toBeDefined();
-  });
-
-  it("does not render description paragraph when description is empty", () => {
-    const { container } = renderCard(createProject({ description: "" }));
-    // The description is rendered in a <p> with class text-sm; it should not exist
-    expect(container.querySelector("p.text-sm")).toBeNull();
-  });
-
-  // Additional: archive toggle calls updateProject correctly
+  // 11. Archive toggle calls updateProject correctly
   it("calls updateProject to archive a non-archived project", async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ id: "p-arch", status: "ready" }));
@@ -312,7 +278,7 @@ describe("FolderCard", () => {
     });
   });
 
-  // Additional: card has role="button" and tabIndex for accessibility
+  // 12. Card has role="button" and tabIndex for accessibility
   it('has role="button" and tabIndex=0 for accessibility', () => {
     const { container } = renderCard(createProject());
     const card = container.querySelector('[role="button"]') as HTMLElement;
@@ -320,7 +286,7 @@ describe("FolderCard", () => {
     expect(card.tabIndex).toBe(0);
   });
 
-  // Additional: clicking dropdown area does not navigate
+  // 13. Clicking dropdown area does not navigate
   it("does not navigate when clicking the dropdown menu area", async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ id: "no-nav" }));
@@ -331,7 +297,7 @@ describe("FolderCard", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  // 13. Clicking "Edit" in dropdown opens the edit dialog
+  // 14. Clicking "Edit" in dropdown opens the edit dialog
   it("opens the edit dialog when Edit is clicked from dropdown", async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ id: "edit-test" }));
@@ -343,7 +309,7 @@ describe("FolderCard", () => {
     expect(screen.getByTestId("edit-dialog")).toBeDefined();
   });
 
-  // 14. Clicking "Delete" in dropdown opens the delete dialog
+  // 15. Clicking "Delete" in dropdown opens the delete dialog
   it("opens the delete dialog when Delete is clicked from dropdown", async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ id: "delete-test" }));
@@ -355,7 +321,7 @@ describe("FolderCard", () => {
     expect(screen.getByTestId("delete-dialog")).toBeDefined();
   });
 
-  // 15. Clicking Edit does not navigate
+  // 16. Clicking Edit does not navigate
   it("clicking Edit in dropdown does not navigate", async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ id: "no-nav-edit" }));
@@ -367,7 +333,7 @@ describe("FolderCard", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  // 16. Clicking Delete does not navigate
+  // 17. Clicking Delete does not navigate
   it("clicking Delete in dropdown does not navigate", async () => {
     const user = userEvent.setup();
     const { container } = renderCard(createProject({ id: "no-nav-del" }));

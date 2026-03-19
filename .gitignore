@@ -1,6 +1,10 @@
 # Code review reports (internal audit artifacts)
 code-review-reports/
 
+# Penetration testing reports (local security audit artifacts)
+PENTEST-REPORT.md
+pentest-reports/
+
 # Environment variables (specific paths for clarity; catch-all below covers the rest)
 .env
 .env.local

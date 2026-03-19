@@ -1,3 +1,6 @@
+# SECURITY NOTE: In production (Railway), database and Redis should use
+# private networking (*.railway.internal) to prevent public exposure.
+# The ports exposed here are for local development only.
 services:
   # PostgreSQL - local dev (mirrors Railway Postgres)
   postgres:
@@ -23,12 +26,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: qualitative-research-redis
+    command: redis-server --requirepass devredispass
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "devredispass", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -65,7 +69,7 @@ services:
     environment:
       - SERVICE_TYPE=api
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/qualitative_research
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:devredispass@redis:6379/0
 
   # Celery Worker
   worker:
@@ -89,7 +93,7 @@ services:
     environment:
       - SERVICE_TYPE=worker
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/qualitative_research
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:devredispass@redis:6379/0
     command: ["worker"]
 
 networks:

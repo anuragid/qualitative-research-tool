@@ -243,7 +243,7 @@ describe("EditProjectDialog", () => {
     const scoped = within(dialog);
 
     // Description should default to empty string
-    const descInput = scoped.getByPlaceholderText(/enter project description/i) as HTMLTextAreaElement;
+    const descInput = scoped.getByPlaceholderText(/what is this research about/i) as HTMLTextAreaElement;
     expect(descInput.value).toBe("");
   });
 

@@ -1,10 +1,20 @@
 """Pydantic schemas for request/response validation."""
 
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# Matches Unicode control characters except tab (\x09), newline (\x0a), carriage return (\x0d)
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]')
+
+
+def _strip_control_chars(v: str) -> str:
+    """Remove Unicode control characters (except tab, newline, carriage return)."""
+    return _CONTROL_CHAR_RE.sub('', v)
 
 # ========== User Schemas ==========
 
@@ -27,7 +37,21 @@ class UserResponse(BaseModel):
 class UserSettingsUpdate(BaseModel):
     """Schema for updating user LLM settings."""
     preferred_model: Optional[str] = Field(default=None, max_length=255)
-    api_key: Optional[str] = Field(default=None, max_length=500)  # Raw key, will be encrypted before storage
+    api_key: Optional[str] = Field(default=None, min_length=10, max_length=500)  # Raw key, will be encrypted before storage
+
+    @field_validator("api_key")
+    @classmethod
+    def validate_api_key(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("API key cannot be blank or whitespace-only")
+        return v
+
+    @field_validator("preferred_model")
+    @classmethod
+    def validate_preferred_model(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = _strip_control_chars(v)
+        return v
 
 
 class UserSettingsResponse(BaseModel):
@@ -50,6 +74,21 @@ class ProjectBase(BaseModel):
     description: Optional[str] = Field(default=None, max_length=2000)
     status: Optional[str] = "planning"
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Project name cannot be blank")
+        return _strip_control_chars(v)
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = _strip_control_chars(v)
+        return v
+
     @field_validator("status")
     @classmethod
     def validate_status(cls, v: Optional[str]) -> Optional[str]:
@@ -67,13 +106,22 @@ class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     description: Optional[str] = Field(default=None, max_length=2000)
-    status: Optional[str] = None
 
-    @field_validator("status")
+    @field_validator("name")
     @classmethod
-    def validate_status(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in _VALID_PROJECT_STATUSES:
-            raise ValueError(f"Invalid status. Must be one of: {', '.join(sorted(_VALID_PROJECT_STATUSES))}")
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                raise ValueError("Project name cannot be blank")
+            v = _strip_control_chars(v)
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = _strip_control_chars(v)
         return v
 
 
@@ -95,6 +143,14 @@ class VideoBase(BaseModel):
     """Base video schema."""
     filename: str
 
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, v: str) -> str:
+        if len(v) > 255:
+            ext = Path(v).suffix
+            v = v[:255 - len(ext)] + ext
+        return v
+
 
 class VideoUploadResponse(BaseModel):
     """Schema for video upload response."""
@@ -103,8 +159,6 @@ class VideoUploadResponse(BaseModel):
     id: UUID
     project_id: UUID
     filename: str
-    s3_key: str
-    s3_url: str
     file_size_bytes: Optional[int] = None
     duration_seconds: Optional[int] = None
     uploaded_at: datetime
@@ -118,8 +172,6 @@ class VideoResponse(VideoBase):
 
     id: UUID
     project_id: UUID
-    s3_key: str
-    s3_url: str
     file_size_bytes: Optional[int] = None
     duration_seconds: Optional[int] = None
     uploaded_at: datetime
@@ -151,11 +203,44 @@ class SpeakerLabelCreate(BaseModel):
     assigned_name: Optional[str] = Field(default=None, max_length=255)
     role: Optional[str] = Field(default=None, max_length=100)
 
+    @field_validator("speaker_label")
+    @classmethod
+    def validate_speaker_label(cls, v: str) -> str:
+        return _strip_control_chars(v)
+
+    @field_validator("assigned_name")
+    @classmethod
+    def validate_assigned_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = _strip_control_chars(v)
+        return v
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = _strip_control_chars(v)
+        return v
+
 
 class SpeakerLabelUpdate(BaseModel):
     """Schema for updating speaker label."""
     assigned_name: Optional[str] = Field(default=None, max_length=255)
     role: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator("assigned_name")
+    @classmethod
+    def validate_assigned_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = _strip_control_chars(v)
+        return v
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = _strip_control_chars(v)
+        return v
 
 
 class SpeakerLabelResponse(BaseModel):

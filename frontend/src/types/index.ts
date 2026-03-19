@@ -36,8 +36,6 @@ export interface Video {
   id: string;
   project_id: string;
   filename: string;
-  s3_key: string;
-  s3_url: string;
   file_size_bytes: number;
   duration_seconds: number | null;
   uploaded_at: string;

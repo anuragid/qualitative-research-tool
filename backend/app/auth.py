@@ -78,6 +78,8 @@ class ClerkAuth:
 
     # TTL for JWKS cache: 1 hour
     JWKS_CACHE_TTL = 3600
+    # Maximum age for stale cache before rejecting (24 hours)
+    JWKS_MAX_STALE_AGE = 86400
 
     def __init__(self):
         self.secret_key = settings.CLERK_SECRET_KEY
@@ -176,12 +178,27 @@ class ClerkAuth:
             return keys
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP {e.response.status_code} fetching JWKS from {self.jwks_url}")
-            return self._cached_keys  # Return stale cache if available
+            if self._cached_keys is not None:
+                stale_age = now - self._keys_fetched_at
+                if stale_age > self.JWKS_MAX_STALE_AGE:
+                    logger.error("JWKS cache is too stale, rejecting")
+                    return None
+            return self._cached_keys
         except httpx.TimeoutException:
             logger.error(f"Timeout fetching JWKS from {self.jwks_url}")
+            if self._cached_keys is not None:
+                stale_age = now - self._keys_fetched_at
+                if stale_age > self.JWKS_MAX_STALE_AGE:
+                    logger.error("JWKS cache is too stale, rejecting")
+                    return None
             return self._cached_keys
         except Exception as e:
             logger.error(f"Failed to fetch JWKS: {e}")
+            if self._cached_keys is not None:
+                stale_age = now - self._keys_fetched_at
+                if stale_age > self.JWKS_MAX_STALE_AGE:
+                    logger.error("JWKS cache is too stale, rejecting")
+                    return None
             return self._cached_keys
 
     def verify_token(self, token: str, leeway: int = 0) -> Dict[str, Any]:
@@ -351,10 +368,10 @@ def _make_get_current_user(leeway: int = 0):
 # Default: strict auth (no leeway) for normal endpoints
 get_current_user = _make_get_current_user(leeway=0)
 
-# Upload auth: 10-minute leeway for long video uploads.
+# Upload auth: 5-minute leeway for long video uploads.
 # Clerk JWTs have ~60s lifetimes. Large uploads (300-450 MB) take 3-5 min,
 # so the token may expire mid-transfer before the server validates it.
-get_current_user_upload = _make_get_current_user(leeway=600)
+get_current_user_upload = _make_get_current_user(leeway=300)
 
 
 def _dev_user_dict() -> Dict[str, Any]:
@@ -367,8 +384,8 @@ def _dev_user_dict() -> Dict[str, Any]:
         "last_name": "User",
         "username": "dev",
         "session_id": "dev_session",
-        "role": UserRole.ADMIN.value,
-        "permissions": [p.value for p in Permission],
+        "role": UserRole.USER.value,
+        "permissions": [p.value for p in ROLE_PERMISSIONS[UserRole.USER]],
         "raw_payload": {},
     }
 
@@ -388,7 +405,40 @@ async def get_current_user_id(
 async def get_current_user_id_upload(
     current_user: Dict[str, Any] = Security(get_current_user_upload),
 ) -> str:
-    """Get user ID with upload-tolerant JWT leeway (10 min)."""
+    """Get user ID with upload-tolerant JWT leeway (5 min)."""
     return current_user["id"]
+
+
+def require_permissions(*required_perms: Permission):
+    """Factory for route dependencies that enforce RBAC permissions."""
+    async def _check_permissions(
+        current_user: Dict[str, Any] = Security(get_current_user),
+    ) -> Dict[str, Any]:
+        user_perms = set(current_user.get("permissions", []))
+        missing = {p.value for p in required_perms} - user_perms
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
+        return current_user
+    return _check_permissions
+
+
+def require_permissions_upload(*required_perms: Permission):
+    """Like require_permissions but with upload-tolerant JWT leeway."""
+    get_current_user_upl = _make_get_current_user(leeway=300)
+    async def _check_permissions(
+        current_user: Dict[str, Any] = Security(get_current_user_upl),
+    ) -> Dict[str, Any]:
+        user_perms = set(current_user.get("permissions", []))
+        missing = {p.value for p in required_perms} - user_perms
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
+        return current_user
+    return _check_permissions
 
 

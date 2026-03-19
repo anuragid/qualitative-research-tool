@@ -5,7 +5,12 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.config import settings
 from app.database import Base, engine
@@ -19,6 +24,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _DEFAULT_LOCALHOST_ORIGINS = "http://localhost:5173,http://localhost:3000"
+
+# Rate limiter — uses settings for default limit
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[settings.RATE_LIMIT_DEFAULT],
+)
 
 
 def _validate_production_config() -> None:
@@ -85,6 +96,10 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.DEBUG else None,
 )
 
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 # Security headers middleware — runs before CORS so headers are set on every response.
 @app.middleware("http")
@@ -94,7 +109,22 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
     return response
+
+
+# Pre-CORS origin validation — reject OPTIONS from unknown origins before CORS
+# can attach permissive headers.  Registered after security headers so it runs
+# before them (LIFO order), which means bad origins are rejected early.
+@app.middleware("http")
+async def reject_unknown_origins(request: Request, call_next):
+    if request.method == "OPTIONS":
+        origin = request.headers.get("origin", "")
+        if origin and origin not in settings.allowed_origins_list:
+            return Response(status_code=403, content="Forbidden")
+    return await call_next(request)
 
 
 # Configure CORS - restrict methods and headers
@@ -107,23 +137,28 @@ app.add_middleware(
 )
 
 
+# Custom exception handlers — hide internal details from clients
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content={"detail": "Invalid request data"})
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {
-        "name": settings.PROJECT_NAME,
-        "version": "1.0.0",
-        "status": "running",
-    }
+    return {"status": "ok"}
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "environment": settings.APP_ENV,
-    }
+    return {"status": "healthy"}
 
 
 # Clerk Frontend API proxy — used by Cloudflare Pages Function to avoid
@@ -131,6 +166,15 @@ async def health_check():
 # Flow: Browser → Pages Function (methodex.ai/__clerk) → Railway → Clerk
 # Origin-validated: only requests from ALLOWED_ORIGINS are accepted.
 _clerk_client = httpx.AsyncClient(base_url="https://frontend-api.clerk.dev", timeout=15.0)
+
+# Whitelist of headers safe to forward to Clerk
+_CLERK_PROXY_ALLOWED_HEADERS = {
+    "content-type", "accept", "accept-language", "user-agent",
+    "x-forwarded-for", "cf-connecting-ip",
+}
+
+# Whitelist of Clerk API path prefixes we actually need
+_CLERK_PROXY_ALLOWED_PATHS = {"v1/client", "v1/environment"}
 
 
 @app.api_route("/__clerk_fwd/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
@@ -140,15 +184,22 @@ async def clerk_proxy(path: str, request: Request):
     if origin not in settings.allowed_origins_list:
         return Response(content=b"Forbidden", status_code=403)
 
-    headers = dict(request.headers)
-    headers.pop("host", None)
-    headers["Clerk-Secret-Key"] = settings.CLERK_SECRET_KEY or ""
+    # Validate path against whitelist
+    if not any(path.startswith(prefix) for prefix in _CLERK_PROXY_ALLOWED_PATHS):
+        return Response(content=b"Not Found", status_code=404)
+
+    # Filter headers — only forward whitelisted ones
+    filtered_headers = {
+        k: v for k, v in request.headers.items()
+        if k.lower() in _CLERK_PROXY_ALLOWED_HEADERS
+    }
+    filtered_headers["Clerk-Secret-Key"] = settings.CLERK_SECRET_KEY or ""
 
     body = await request.body()
     resp = await _clerk_client.request(
         method=request.method,
         url=f"/{path}",
-        headers=headers,
+        headers=filtered_headers,
         params=dict(request.query_params),
         content=body if body else None,
     )

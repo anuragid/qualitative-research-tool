@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "../ui/tooltip";
 import { Sidebar } from "./Sidebar";
 
 // Mock Clerk's UserButton — it requires ClerkProvider which we don't have in tests
@@ -47,9 +48,11 @@ function renderSidebar(props: Partial<typeof defaultProps> = {}) {
   const mergedProps = { ...defaultProps, ...props, onClose: props.onClose ?? vi.fn(), onToggleCollapse: props.onToggleCollapse ?? vi.fn() };
 
   const result = render(
-    <MemoryRouter>
-      <Sidebar {...mergedProps} />
-    </MemoryRouter>
+    <TooltipProvider>
+      <MemoryRouter>
+        <Sidebar {...mergedProps} />
+      </MemoryRouter>
+    </TooltipProvider>
   );
 
   // Scope queries to the aside element to avoid duplicates from React Router v7
