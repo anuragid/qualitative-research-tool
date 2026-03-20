@@ -29,6 +29,6 @@ Historical documents preserved in [archive/](./archive/) folder:
 | Resource | URL |
 |----------|-----|
 | **Frontend** | https://methodex.ai |
-| **API** | https://backend-production-e9e2.up.railway.app |
-| **Health Check** | https://backend-production-e9e2.up.railway.app/health |
+| **API** | https://api.methodex.ai |
+| **Health Check** | https://api.methodex.ai/health |
 | **GitHub** | https://github.com/anuragid/qualitative-research-tool |

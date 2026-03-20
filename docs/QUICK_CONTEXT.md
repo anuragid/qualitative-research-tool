@@ -5,7 +5,7 @@
 - **What**: AI-powered qualitative research tool -- analyzes video interviews using a 5D LLM pipeline (CHUNK, INFER, RELATE, EXPLAIN, ACTIVATE) plus 3 cross-video synthesis nodes
 - **Status**: LIVE -- deployed and operational
 - **Domain**: [methodex.ai](https://methodex.ai)
-- **Backend**: https://backend-production-e9e2.up.railway.app
+- **Backend**: https://api.methodex.ai
 - **Frontend**: Cloudflare Pages
 
 ## Current Stack

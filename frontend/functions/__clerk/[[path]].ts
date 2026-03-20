@@ -5,7 +5,7 @@
 
 interface Env {
   CLERK_SECRET_KEY: string;
-  CLERK_BACKEND_URL: string; // e.g. https://api-production-df43.up.railway.app
+  CLERK_BACKEND_URL: string; // e.g. https://api.methodex.ai
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -50,7 +50,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   // Fallback: proxy through Railway backend (not on Cloudflare)
-  const backendBase = env.CLERK_BACKEND_URL || "https://api-production-df43.up.railway.app";
+  const backendBase = env.CLERK_BACKEND_URL || "https://api.methodex.ai";
   const fallbackUrl = new URL(`${backendBase}/__clerk_fwd/${path}`);
   fallbackUrl.search = url.search;
 

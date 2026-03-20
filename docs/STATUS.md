@@ -9,8 +9,8 @@
 ## Production URLs
 
 - **Frontend**: https://methodex.ai (Cloudflare Pages)
-- **Backend API**: https://backend-production-e9e2.up.railway.app
-- **Health Check**: https://backend-production-e9e2.up.railway.app/health
+- **Backend API**: https://api.methodex.ai
+- **Health Check**: https://api.methodex.ai/health
 
 ## Infrastructure
 
