@@ -24,7 +24,7 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "inline-flex items-center justify-center bg-transparent gap-1 overflow-x-auto max-w-full scrollbar-hide",
+        "inline-flex items-center gap-0.5 rounded-lg bg-interactive-fill p-0.5 overflow-x-auto max-w-full scrollbar-hide",
         className
       )}
       {...props}
@@ -40,7 +40,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap text-ui font-medium text-text-placeholder rounded-lg px-3 py-1.5 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease-standard)] focus-visible:outline-2 focus-visible:outline-interactive-focus focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:font-semibold data-[state=active]:text-text-primary data-[state=active]:bg-interactive-hover [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap text-ui font-medium text-text-placeholder rounded-control px-3 py-1.5 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease-standard)] focus-visible:outline-2 focus-visible:outline-interactive-focus focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:font-semibold data-[state=active]:text-white data-[state=active]:bg-brand-accent data-[state=active]:shadow-subtle [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
