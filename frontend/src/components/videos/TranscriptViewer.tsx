@@ -13,6 +13,8 @@ interface TranscriptViewerProps {
   speakerLabels?: SpeakerLabel[];
   onLabelSpeaker?: (speakerLabel: string, name: string, role?: string) => void;
   videoId: string;
+  /** Compact mode for sidebar panel — vertical stacking, smaller text, dividers */
+  compact?: boolean;
 }
 
 // Brand palette colors for speaker labels — cycles through these
@@ -30,6 +32,7 @@ export function TranscriptViewer({
   speakerLabels = [],
   onLabelSpeaker: _onLabelSpeaker,
   videoId,
+  compact = false,
 }: TranscriptViewerProps) {
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -322,6 +325,125 @@ export function TranscriptViewer({
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [searchQuery, navigateToNext, navigateToPrevious, clearSearch]);
 
+  // Render a single utterance's word-level text
+  const renderWords = (utterance: { start: number; end: number; text: string }) => {
+    if (!wordLevelData) return utterance.text;
+
+    return getWordsForUtterance(utterance.start, utterance.end).map(({ word, globalIndex }) => {
+      const isCurrentWord = globalIndex === currentWordIndex;
+      const isSearchMatch = searchMatchIndexes.has(globalIndex);
+      const isCurrentMatch = globalIndex === currentMatchWordIndex;
+
+      let cls = 'cursor-pointer px-0.5 rounded transition-all duration-100 ';
+      if (isCurrentMatch) {
+        cls += 'bg-brand-pale-gold font-semibold shadow-sm';
+      } else if (isSearchMatch) {
+        cls += 'bg-brand-pale-gold/40 hover:bg-brand-pale-gold/60';
+      } else if (isCurrentWord) {
+        cls += 'bg-interactive-focus/20 font-semibold shadow-sm';
+      } else {
+        cls += 'hover:bg-interactive-fill';
+      }
+
+      return (
+        <span
+          key={globalIndex}
+          id={`word-${globalIndex}`}
+          onClick={() => handleWordClick(globalIndex)}
+          className={cls}
+          title={`Click to jump to ${(word.start / 1000).toFixed(1)}s`}
+        >
+          {word.text}{" "}
+        </span>
+      );
+    });
+  };
+
+  // --- COMPACT (sidebar) layout ---
+  if (compact) {
+    return (
+      <div className="overflow-hidden">
+        {/* Compact search bar — no heading, panel header already shows "Transcript" */}
+        <div className="sticky top-0 z-10 frosted-glass border-b border-border px-3 py-2">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-text-placeholder" />
+              <Input
+                id="transcript-search-input"
+                type="text"
+                placeholder="Search transcript..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-7 text-xs pl-7 pr-2"
+              />
+            </div>
+            {searchQuery && (
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                {sortedMatchIndexes.length > 0 && (
+                  <span className="text-[10px] text-text-tertiary whitespace-nowrap">
+                    {currentMatchIndex + 1}/{sortedMatchIndexes.length}
+                  </span>
+                )}
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={navigateToPrevious}>
+                  <ChevronUp className="h-2.5 w-2.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={navigateToNext}>
+                  <ChevronDown className="h-2.5 w-2.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={clearSearch}>
+                  <X className="h-2.5 w-2.5" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Compact utterances — vertical stacking with dividers */}
+        <div ref={transcriptContainerRef} className="divide-y divide-border">
+          {transcript.processed_transcript?.utterances?.map((utterance, index) => {
+            const colorSet = speakerColorMap.get(utterance.speaker) || speakerColors[0];
+
+            return (
+              <div
+                key={index}
+                className="px-3 py-2.5 hover:bg-interactive-fill transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
+              >
+                {/* Top row: speaker + timestamp */}
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${colorSet.bg} ${colorSet.text}`}>
+                      {getSpeakerLabel(utterance.speaker)}
+                    </span>
+                    {getSpeakerRole(utterance.speaker) && (
+                      <span className="text-[10px] text-text-placeholder truncate">
+                        {getSpeakerRole(utterance.speaker)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-text-placeholder flex-shrink-0 ml-1">
+                    {formatTimestamp(utterance.start / 1000)}
+                  </span>
+                </div>
+
+                {/* Text content — smaller, tighter leading */}
+                <div className="text-xs text-text-primary leading-snug [overflow-wrap:break-word]">
+                  {renderWords(utterance)}
+                </div>
+
+                {utterance.confidence < 0.8 && (
+                  <div className="mt-0.5 text-[10px] text-brand-mustard">
+                    Low confidence: {Math.round(utterance.confidence * 100)}%
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // --- FULL-WIDTH (original) layout ---
   return (
     <div className="bg-card rounded-2xl shadow-card overflow-hidden">
       {/* Search Bar — frosted glass style header */}
@@ -344,12 +466,10 @@ export function TranscriptViewer({
             {/* Search Results & Navigation inside the input */}
             {searchQuery && (
               <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                {/* No results found state */}
                 {debouncedSearchQuery && !searchLoading && sortedMatchIndexes.length === 0 && (
                   <span className="text-label text-text-placeholder px-2">No results</span>
                 )}
 
-                {/* Navigation controls when matches found */}
                 {sortedMatchIndexes.length > 0 && (
                   <div className="flex items-center gap-0.5 px-1">
                     <span className="text-label font-medium text-text-tertiary">
@@ -378,7 +498,6 @@ export function TranscriptViewer({
                   </div>
                 )}
 
-                {/* Clear button */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -424,48 +543,9 @@ export function TranscriptViewer({
 
                 {/* Word-level transcript text */}
                 <div className="text-text-primary leading-relaxed">
-                  {wordLevelData ? (
-                    // Render words with highlighting
-                    getWordsForUtterance(utterance.start, utterance.end).map(({ word, globalIndex }) => {
-                      const isCurrentWord = globalIndex === currentWordIndex;
-                      const isSearchMatch = searchMatchIndexes.has(globalIndex);
-                      const isCurrentMatch = globalIndex === currentMatchWordIndex;
-
-                      // Determine highlight style using design tokens
-                      let className = 'cursor-pointer px-0.5 rounded transition-all duration-100 ';
-                      if (isCurrentMatch) {
-                        // Current search match — active highlight (pale gold, prominent)
-                        className += 'bg-brand-pale-gold font-semibold shadow-sm';
-                      } else if (isSearchMatch) {
-                        // Regular search match — subtle gold highlight
-                        className += 'bg-brand-pale-gold/40 hover:bg-brand-pale-gold/60';
-                      } else if (isCurrentWord) {
-                        // Currently playing word (video sync) — visible accent blue
-                        className += 'bg-interactive-focus/20 font-semibold shadow-sm';
-                      } else {
-                        // Normal word
-                        className += 'hover:bg-interactive-fill';
-                      }
-
-                      return (
-                        <span
-                          key={globalIndex}
-                          id={`word-${globalIndex}`}
-                          onClick={() => handleWordClick(globalIndex)}
-                          className={className}
-                          title={`Click to jump to ${(word.start / 1000).toFixed(1)}s`}
-                        >
-                          {word.text}{" "}
-                        </span>
-                      );
-                    })
-                  ) : (
-                    // Fallback to plain text if word-level data isn't available
-                    utterance.text
-                  )}
+                  {renderWords(utterance)}
                 </div>
 
-                {/* Low confidence warning */}
                 {utterance.confidence < 0.8 && (
                   <div className="mt-1 text-label text-brand-mustard">
                     Low confidence: {Math.round(utterance.confidence * 100)}%

@@ -1,0 +1,406 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { TooltipProvider } from "../ui/tooltip";
+import { AnalysisSection } from "./AnalysisSection";
+import type { VideoAnalysis } from "../../types";
+
+// ---- Mocks ----
+
+vi.mock("./ChunksList", () => ({
+  ChunksList: () => <div data-testid="chunks-list">Chunks</div>,
+}));
+vi.mock("./InferencesList", () => ({
+  InferencesList: () => <div data-testid="inferences-list">Inferences</div>,
+}));
+vi.mock("./PatternsList", () => ({
+  PatternsList: () => <div data-testid="patterns-list">Patterns</div>,
+}));
+vi.mock("./InsightsList", () => ({
+  InsightsList: () => <div data-testid="insights-list">Insights</div>,
+}));
+vi.mock("./PrinciplesList", () => ({
+  PrinciplesList: () => <div data-testid="principles-list">Principles</div>,
+}));
+vi.mock("./ContinueStepButton", () => ({
+  ContinueStepButton: ({ onClick, nextStepLabel }: { onClick: () => void; nextStepLabel: string }) => (
+    <button data-testid="continue-step-button" onClick={onClick}>
+      {nextStepLabel}
+    </button>
+  ),
+}));
+vi.mock("./display/AnalysisToolbar", () => ({
+  AnalysisToolbar: () => <div data-testid="analysis-toolbar">Toolbar</div>,
+}));
+
+// ---- Helpers ----
+
+function createMockDisplay() {
+  return {
+    viewMode: "list" as const,
+    setViewMode: vi.fn(),
+    sort: "default" as string,
+    setSort: vi.fn(),
+    filter: null as string | null,
+    setFilter: vi.fn(),
+    search: "",
+    setSearch: vi.fn(),
+    processData: vi.fn((data: unknown[]) => data),
+    totalCount: 0,
+    filteredCount: 0,
+    filterOptions: [],
+  };
+}
+
+function createCompletedAnalysis(overrides: Partial<VideoAnalysis> = {}): VideoAnalysis {
+  return {
+    id: "a-1",
+    video_id: "v-1",
+    chunks: [
+      { chunk_id: "c1", speaker: "Alice", timestamp: "0:00", text: "Hello", type: "quote" },
+      { chunk_id: "c2", speaker: "Bob", timestamp: "0:05", text: "Hi there", type: "observation" },
+    ],
+    chunks_completed_at: "2025-06-15T00:01:00Z",
+    inferences: [
+      { chunk_id: "c1", inferences: [{ inference_id: "i1", meaning: "Greeting", importance: "low", context: "start" }] },
+    ],
+    inferences_completed_at: "2025-06-15T00:02:00Z",
+    patterns: [
+      { pattern_id: "p1", pattern_name: "Friendly opening", description: "Consistent", related_inferences: ["i1"], relationship_type: "convergent", frequency: "high", significance: "Important" },
+    ],
+    patterns_completed_at: "2025-06-15T00:03:00Z",
+    insights: [
+      { insight_id: "ins1", headline: "Social norms", explanation: "People greet", supporting_patterns: ["p1"], evidence: ["e1"], type: "revealing", implications: "High", confidence: "high" },
+    ],
+    insights_completed_at: "2025-06-15T00:04:00Z",
+    design_principles: [
+      { principle_id: "dp1", insight_id: "ins1", principle: "Be welcoming", rationale: "First impressions matter", how_might_we: ["HMW be more welcoming?"], priority: "high" },
+    ],
+    principles_completed_at: "2025-06-15T00:05:00Z",
+    status: "completed",
+    started_at: "2025-06-15T00:00:00Z",
+    completed_at: "2025-06-15T00:05:00Z",
+    error_message: null,
+    current_step: null,
+    step_status: null,
+    chunk_completed_at: "2025-06-15T00:01:00Z",
+    infer_completed_at: "2025-06-15T00:02:00Z",
+    relate_completed_at: "2025-06-15T00:03:00Z",
+    explain_completed_at: "2025-06-15T00:04:00Z",
+    activate_completed_at: "2025-06-15T00:05:00Z",
+    ...overrides,
+  };
+}
+
+function createStepByStepAnalysis(currentStep: string): VideoAnalysis {
+  return {
+    id: "a-2",
+    video_id: "v-1",
+    chunks: [
+      { chunk_id: "c1", speaker: "Alice", timestamp: "0:00", text: "Hello", type: "quote" },
+    ],
+    chunks_completed_at: "2025-06-15T00:01:00Z",
+    inferences: null,
+    inferences_completed_at: null,
+    patterns: null,
+    patterns_completed_at: null,
+    insights: null,
+    insights_completed_at: null,
+    design_principles: null,
+    principles_completed_at: null,
+    status: "processing",
+    started_at: "2025-06-15T00:00:00Z",
+    completed_at: null,
+    error_message: null,
+    current_step: currentStep,
+    step_status: {
+      chunk: "completed",
+      infer: "pending",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    },
+    chunk_completed_at: "2025-06-15T00:01:00Z",
+    infer_completed_at: null,
+    relate_completed_at: null,
+    explain_completed_at: null,
+    activate_completed_at: null,
+  };
+}
+
+const defaultProps = {
+  analysis: undefined as VideoAnalysis | undefined,
+  analysisLoading: false,
+  hasTranscript: true,
+  canStartAnalysis: true,
+  workflowBlockerMessage: null as string | null,
+  onStartChunkStep: vi.fn(),
+  onStartFullAnalysis: vi.fn(),
+  startChunkStepPending: false,
+  startFullAnalysisPending: false,
+  activeStepTab: "chunks",
+  setActiveStepTab: vi.fn(),
+  stepInfo: null as {
+    name: string;
+    number: number;
+    nextStep: string | null;
+    handler: () => void;
+  } | null,
+  canContinueCurrentStep: false,
+  isAnyStepPending: false,
+  isCurrentStepProcessing: false,
+  getNextStepLabel: vi.fn((step: string) => `Continue to ${step}`),
+  startInferStepPending: false,
+  startRelateStepPending: false,
+  startExplainStepPending: false,
+  startActivateStepPending: false,
+  chunksDisplay: createMockDisplay(),
+  inferencesDisplay: createMockDisplay(),
+  patternsDisplay: createMockDisplay(),
+  insightsDisplay: createMockDisplay(),
+  principlesDisplay: createMockDisplay(),
+};
+
+function renderSection(overrides: Partial<typeof defaultProps> = {}) {
+  const props = {
+    ...defaultProps,
+    onStartChunkStep: overrides.onStartChunkStep ?? vi.fn(),
+    onStartFullAnalysis: overrides.onStartFullAnalysis ?? vi.fn(),
+    setActiveStepTab: overrides.setActiveStepTab ?? vi.fn(),
+    getNextStepLabel: overrides.getNextStepLabel ?? vi.fn((step: string) => `Continue to ${step}`),
+    chunksDisplay: overrides.chunksDisplay ?? createMockDisplay(),
+    inferencesDisplay: overrides.inferencesDisplay ?? createMockDisplay(),
+    patternsDisplay: overrides.patternsDisplay ?? createMockDisplay(),
+    insightsDisplay: overrides.insightsDisplay ?? createMockDisplay(),
+    principlesDisplay: overrides.principlesDisplay ?? createMockDisplay(),
+    ...overrides,
+  };
+  return render(
+    <TooltipProvider>
+      <AnalysisSection {...props} />
+    </TooltipProvider>
+  );
+}
+
+// ---- Tests ----
+
+describe("AnalysisSection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // 1. Renders "Analysis" heading
+  it('renders "Analysis" heading', () => {
+    const { container } = renderSection();
+    const heading = container.querySelector("h2");
+    expect(heading).not.toBeNull();
+    expect(heading!.textContent).toBe("Analysis");
+  });
+
+  // 2. Renders nothing when hasTranscript is false
+  it("renders nothing when hasTranscript is false", () => {
+    const { container } = renderSection({ hasTranscript: false });
+    expect(container.querySelector("h2")).toBeNull();
+  });
+
+  // 3. Shows prerequisite warning when workflowBlockerMessage is set and no analysis
+  it("shows prerequisite warning when roles not assigned", () => {
+    const { container } = renderSection({
+      workflowBlockerMessage: "Please assign roles to all speakers before starting analysis.",
+      canStartAnalysis: false,
+      analysis: undefined,
+    });
+
+    const alertBanner = container.querySelector('[data-slot="alert-banner"]');
+    expect(alertBanner).not.toBeNull();
+    expect(alertBanner!.textContent).toContain("Speaker roles required");
+    expect(alertBanner!.textContent).toContain("Please assign roles to all speakers");
+  });
+
+  // 4. Does NOT show prerequisite warning when analysis exists
+  it("does not show prerequisite warning when analysis already exists", () => {
+    const { container } = renderSection({
+      workflowBlockerMessage: "Please assign roles to all speakers before starting analysis.",
+      analysis: createCompletedAnalysis(),
+    });
+
+    const alertBanner = container.querySelector('[data-slot="alert-banner"]');
+    expect(alertBanner).toBeNull();
+  });
+
+  // 5. Shows Start Analysis button when canStartAnalysis is true
+  it("shows Start Analysis button when canStartAnalysis is true and no analysis", () => {
+    const { container } = renderSection({
+      canStartAnalysis: true,
+      analysis: undefined,
+    });
+
+    const buttons = container.querySelectorAll("button");
+    const startButton = Array.from(buttons).find(
+      (btn) => btn.textContent?.includes("Start Analysis")
+    );
+    expect(startButton).toBeDefined();
+  });
+
+  // 6. Start Analysis button is disabled when canStartAnalysis is false
+  it("Start Analysis button is disabled when canStartAnalysis is false", () => {
+    const { container } = renderSection({
+      canStartAnalysis: false,
+      analysis: undefined,
+    });
+
+    const buttons = container.querySelectorAll("button");
+    const startButton = Array.from(buttons).find(
+      (btn) => btn.textContent?.includes("Start Analysis")
+    );
+    expect(startButton).toBeDefined();
+    expect(startButton!.disabled).toBe(true);
+  });
+
+  // 7. Clicking Start Analysis calls onStartChunkStep
+  it("clicking Start Analysis calls onStartChunkStep", async () => {
+    const user = userEvent.setup();
+    const onStartChunkStep = vi.fn();
+
+    const { container } = renderSection({
+      canStartAnalysis: true,
+      analysis: undefined,
+      onStartChunkStep,
+    });
+
+    const buttons = container.querySelectorAll("button");
+    const startButton = Array.from(buttons).find(
+      (btn) => btn.textContent?.includes("Start Analysis")
+    ) as HTMLButtonElement;
+    expect(startButton).toBeDefined();
+    await user.click(startButton);
+    expect(onStartChunkStep).toHaveBeenCalledTimes(1);
+  });
+
+  // 8. Does not show Start Analysis button when analysis exists
+  it("does not show Start Analysis button when analysis exists", () => {
+    const { container } = renderSection({ analysis: createCompletedAnalysis() });
+    const buttons = container.querySelectorAll("button");
+    const startButton = Array.from(buttons).find(
+      (btn) => btn.textContent?.includes("Start Analysis")
+    );
+    expect(startButton).toBeUndefined();
+  });
+
+  // 9. Renders 5 step tabs in completed mode
+  it("renders 5 step tabs when analysis is completed", () => {
+    const { container } = renderSection({ analysis: createCompletedAnalysis() });
+
+    // Find the tablist element and count tabs within it
+    const tablist = container.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+    const tabs = tablist!.querySelectorAll('[role="tab"]');
+    expect(tabs.length).toBe(5);
+  });
+
+  // 10. Tab content shows item counts
+  it("shows item counts in completed tab triggers", () => {
+    const { container } = renderSection({ analysis: createCompletedAnalysis() });
+
+    const tablist = container.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+    expect(tablist!.textContent).toContain("1. Chunks (2)");
+    expect(tablist!.textContent).toContain("2. Inferences (1)");
+    expect(tablist!.textContent).toContain("3. Patterns (1)");
+    expect(tablist!.textContent).toContain("4. Insights (1)");
+    expect(tablist!.textContent).toContain("5. Principles (1)");
+  });
+
+  // 11. Shows progress indicator in step-by-step mode
+  it("shows progress indicator in step-by-step mode", () => {
+    const { container } = renderSection({
+      analysis: createStepByStepAnalysis("chunk"),
+      stepInfo: { name: "Chunk", number: 1, nextStep: "infer", handler: vi.fn() },
+    });
+
+    const progressBar = container.querySelector('[role="progressbar"]');
+    expect(progressBar).not.toBeNull();
+  });
+
+  // 12. Step-by-step tabs render
+  it("renders 5 step tabs in step-by-step mode", () => {
+    const { container } = renderSection({
+      analysis: createStepByStepAnalysis("chunk"),
+      stepInfo: { name: "Chunk", number: 1, nextStep: "infer", handler: vi.fn() },
+    });
+
+    const tablist = container.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+    const tabs = tablist!.querySelectorAll('[role="tab"]');
+    expect(tabs.length).toBe(5);
+  });
+
+  // 13. Verifies tab structure in step-by-step mode
+  it("renders tab elements with expected text content", () => {
+    const { container } = renderSection({
+      analysis: createStepByStepAnalysis("chunk"),
+      stepInfo: { name: "Chunk", number: 1, nextStep: "infer", handler: vi.fn() },
+      activeStepTab: "chunks",
+    });
+
+    const tablist = container.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+    expect(tablist!.textContent).toContain("1. Chunks");
+  });
+
+  // 14. Shows loading state when analysisLoading is true
+  it("shows loading state when analysisLoading is true", () => {
+    const { container } = renderSection({ analysisLoading: true });
+    const loadingState = container.querySelector('[data-slot="loading-state"]');
+    expect(loadingState).not.toBeNull();
+    expect(loadingState!.textContent).toContain("Loading analysis...");
+  });
+
+  // 15. Shows empty state when no analysis and not loading
+  it("shows empty state when no analysis exists and not loading", () => {
+    const { container } = renderSection({
+      analysis: undefined,
+      analysisLoading: false,
+    });
+
+    const emptyState = container.querySelector('[data-slot="empty-state"]');
+    expect(emptyState).not.toBeNull();
+    expect(emptyState!.textContent).toContain("No analysis yet");
+  });
+
+  // 16. Shows ContinueStepButton in header during step-by-step mode
+  it("shows continue step button in header when in step-by-step mode with nextStep", () => {
+    const handler = vi.fn();
+    const { container } = renderSection({
+      analysis: createStepByStepAnalysis("chunk"),
+      stepInfo: { name: "Chunk", number: 1, nextStep: "infer", handler },
+      getNextStepLabel: vi.fn(() => "Continue to Infer"),
+    });
+
+    const continueBtn = container.querySelector('[data-testid="continue-step-button"]');
+    expect(continueBtn).not.toBeNull();
+    expect(continueBtn!.textContent).toContain("Continue to Infer");
+  });
+
+  // 17. Shows "Starting..." text when startChunkStepPending is true
+  it('shows "Starting..." text when startChunkStepPending is true', () => {
+    const { container } = renderSection({
+      canStartAnalysis: true,
+      analysis: undefined,
+      startChunkStepPending: true,
+    });
+
+    const buttons = container.querySelectorAll("button");
+    const startingButton = Array.from(buttons).find(
+      (btn) => btn.textContent?.includes("Starting...")
+    );
+    expect(startingButton).toBeDefined();
+  });
+
+  // 18. Completed analysis renders ChunksList in first tab
+  it("renders ChunksList inside completed analysis first tab", () => {
+    const { container } = renderSection({ analysis: createCompletedAnalysis() });
+    const chunksList = container.querySelector('[data-testid="chunks-list"]');
+    expect(chunksList).not.toBeNull();
+  });
+});
