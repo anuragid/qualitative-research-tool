@@ -3,9 +3,9 @@
 # ── Recommended model tiers (easy to update in one place) ────────────────
 RECOMMENDED_MODELS = {
     "standard": {
-        "id": "nvidia/nemotron-3-super-120b-a12b:free",
-        "name": "Nemotron 3 Super 120B",
-        "description": "High-quality free model -- no API key needed",
+        "id": "meta-llama/llama-4-scout",
+        "name": "Llama 4 Scout",
+        "description": "Included model -- no API key needed",
     },
     "advanced": {
         "id": "anthropic/claude-sonnet-4.6",
@@ -14,16 +14,16 @@ RECOMMENDED_MODELS = {
     },
 }
 
-# ── Available models exposed by GET/PUT /settings ────────────────────────
+# ── Standard models (included, paid by Methodex shared key) ──────────────
+# These are cheap open-source models that don't require students to pay.
+# Llama family: best cost/quality ratio for qualitative research analysis.
 AVAILABLE_MODELS = [
-    {"id": "nvidia/nemotron-3-super-120b-a12b:free", "name": "Nemotron 3 Super 120B", "tier": "free"},
-    {"id": "qwen/qwen3.5-flash-02-23", "name": "Qwen 3.5 Flash", "tier": "free"},
-    {"id": "stepfun/step-3.5-flash:free", "name": "Step 3.5 Flash", "tier": "free"},
-    {"id": "z-ai/glm-5", "name": "GLM-5", "tier": "free"},
+    {"id": "meta-llama/llama-4-scout", "name": "Llama 4 Scout", "tier": "standard"},
+    {"id": "meta-llama/llama-3.3-70b-instruct", "name": "Llama 3.3 70B", "tier": "standard"},
     {"id": "anthropic/claude-sonnet-4.6", "name": "Claude Sonnet 4.6", "tier": "premium"},
     {"id": "anthropic/claude-opus-4.6", "name": "Claude Opus 4.6", "tier": "premium"},
     {"id": "openai/gpt-5.4", "name": "GPT-5.4", "tier": "premium"},
     {"id": "google/gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "tier": "premium"},
 ]
 
-FREE_MODEL_IDS = {m["id"] for m in AVAILABLE_MODELS if m["tier"] == "free"}
+STANDARD_MODEL_IDS = {m["id"] for m in AVAILABLE_MODELS if m["tier"] == "standard"}

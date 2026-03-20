@@ -190,8 +190,8 @@ export function ModelSettingsDialog({
         <DialogHeader>
           <DialogTitle>Model Settings</DialogTitle>
           <DialogDescription>
-            Choose your AI model tier. Use the free model, upgrade with your own
-            API key, or pick any model from OpenRouter.
+            Choose your AI model tier. Standard is included, or bring your own
+            OpenRouter API key for premium and custom models.
           </DialogDescription>
         </DialogHeader>
 
@@ -211,7 +211,7 @@ export function ModelSettingsDialog({
               onClick={() => setActiveTier("standard")}
               icon={<ZapIcon className="size-4" />}
               title="Standard"
-              subtitle="Free"
+              subtitle="Included"
               description={recommended?.standard.name ?? "Loading..."}
             />
 
@@ -232,7 +232,7 @@ export function ModelSettingsDialog({
               onClick={() => setActiveTier("custom")}
               icon={<SlidersHorizontalIcon className="size-4" />}
               title="Custom"
-              subtitle={hasByokKey ? "Any model" : "Free models"}
+              subtitle={hasByokKey ? "Any model" : "Included models"}
               description={
                 customModelName
                   ? customModelName.length > 20
@@ -337,11 +337,11 @@ export function ModelSettingsDialog({
                               </div>
                               {model.is_free ? (
                                 <span className="mt-0.5 shrink-0 rounded-sm bg-interactive-fill px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
-                                  Free
+                                  Included
                                 </span>
                               ) : (
                                 <span className="mt-0.5 shrink-0 rounded-sm bg-border px-1.5 py-0.5 text-[10px] font-medium text-text-tertiary">
-                                  Paid
+                                  BYOK
                                 </span>
                               )}
                             </button>
@@ -398,7 +398,7 @@ export function ModelSettingsDialog({
                 No key set.{" "}
                 {activeTier === "standard"
                   ? "Not needed for the Standard tier."
-                  : "Enter a key above or select Standard for free usage."}
+                  : "Enter a key above or select Standard (included)."}
               </p>
             ) : (
               <p className="mt-1 text-xs text-text-tertiary">

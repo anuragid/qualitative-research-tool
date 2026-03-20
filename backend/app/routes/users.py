@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
-from app.constants import AVAILABLE_MODELS, FREE_MODEL_IDS, RECOMMENDED_MODELS
+from app.constants import AVAILABLE_MODELS, STANDARD_MODEL_IDS, RECOMMENDED_MODELS
 from app.database import get_db
 from app.models import database_models
 from app.models.schemas import UserResponse, UserSettingsResponse, UserSettingsUpdate
@@ -207,7 +207,7 @@ async def update_user_settings(
         has_key = bool(db_user.encrypted_api_key)
         if not has_key:
             standard_id = RECOMMENDED_MODELS["standard"]["id"]
-            is_known_free = settings.preferred_model in FREE_MODEL_IDS
+            is_known_free = settings.preferred_model in STANDARD_MODEL_IDS
             is_standard = settings.preferred_model == standard_id
             is_openrouter_free = settings.preferred_model.endswith(":free")
             if not (is_known_free or is_standard or is_openrouter_free):

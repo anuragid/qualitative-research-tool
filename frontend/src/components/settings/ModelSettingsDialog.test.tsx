@@ -92,7 +92,7 @@ describe("ModelSettingsDialog", () => {
       available_models: [],
     };
     mockRecommended = {
-      standard: { id: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nemotron 3 Super 120B", description: "High-quality free model" },
+      standard: { id: "meta-llama/llama-4-scout", name: "Llama 4 Scout", description: "Included model -- no API key needed" },
       advanced: { id: "anthropic/claude-sonnet-4.6", name: "Claude Sonnet 4.6", description: "Premium model" },
     };
   });
@@ -128,7 +128,7 @@ describe("ModelSettingsDialog", () => {
     const scoped = within(dialog);
 
     // The standard model name appears in the tier card and the detail panel
-    expect(scoped.getAllByText("Nemotron 3 Super 120B").length).toBeGreaterThanOrEqual(1);
+    expect(scoped.getAllByText("Llama 4 Scout").length).toBeGreaterThanOrEqual(1);
   });
 
   it("defaults to standard tier when no preferred model is set", () => {
@@ -138,7 +138,7 @@ describe("ModelSettingsDialog", () => {
     const scoped = within(dialog);
 
     // The detail panel should show the standard model description
-    expect(scoped.getByText("High-quality free model")).toBeDefined();
+    expect(scoped.getByText("Included model -- no API key needed")).toBeDefined();
   });
 
   it("calls updateSettings with standard model and closes dialog on save", async () => {
@@ -153,7 +153,7 @@ describe("ModelSettingsDialog", () => {
 
     expect(mockUpdateSettings).toHaveBeenCalledWith(
       {
-        preferred_model: "nvidia/nemotron-3-super-120b-a12b:free",
+        preferred_model: "meta-llama/llama-4-scout",
         api_key: undefined,
       },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
@@ -367,7 +367,7 @@ describe("ModelSettingsDialog", () => {
 
     expect(mockDeleteApiKey).toHaveBeenCalled();
     // After onSuccess, the standard tier detail panel should be shown
-    expect(scoped.getByText("High-quality free model")).toBeDefined();
+    expect(scoped.getByText("Included model -- no API key needed")).toBeDefined();
   });
 
   it("renders search results and selects a model", async () => {
@@ -471,14 +471,14 @@ describe("ModelSettingsDialog", () => {
     expect(within(dialog).queryByLabelText("Requires API key")).toBeNull();
   });
 
-  it("Custom card subtitle shows 'Free models' when no BYOK key", () => {
+  it("Custom card subtitle shows 'Included models' when no BYOK key", () => {
     // has_api_key defaults to false in beforeEach
     renderDialog();
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    expect(scoped.getByText("Free models")).toBeDefined();
+    expect(scoped.getByText("Included models")).toBeDefined();
   });
 
   it("Custom card subtitle shows 'Any model' when BYOK key exists", () => {
