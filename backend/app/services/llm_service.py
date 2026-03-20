@@ -29,10 +29,12 @@ OPENROUTER_HEADERS = {
 }
 
 # Standard models available to all users via the Methodex shared key.
-# Ordered by preference. These are cheap open-source models on OpenRouter.
+# Ordered by preference: if the primary model is rate-limited, try the next.
 FREE_MODEL_FALLBACKS: List[str] = [
     "meta-llama/llama-4-scout",
-    "meta-llama/llama-3.3-70b-instruct",
+    "nvidia/nemotron-3-super-120b-a12b",
+    "mistralai/ministral-8b",
+    "deepseek/deepseek-chat-v3-0324",
 ]
 
 # Set of allowed model IDs when using the Methodex (shared) key.

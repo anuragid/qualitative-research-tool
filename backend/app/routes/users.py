@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
-from app.constants import AVAILABLE_MODELS, RECOMMENDED_MODELS, STANDARD_MODEL_IDS
+from app.constants import RECOMMENDED_MODELS, STANDARD_MODEL_IDS, STANDARD_MODELS
 from app.database import get_db
 from app.models import database_models
 from app.models.schemas import UserResponse, UserSettingsResponse, UserSettingsUpdate
@@ -168,7 +168,7 @@ async def get_user_settings(
         has_api_key=bool(db_user.encrypted_api_key),
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
-        available_models=AVAILABLE_MODELS,
+        available_models=STANDARD_MODELS,
     )
 
 
@@ -224,7 +224,7 @@ async def update_user_settings(
         has_api_key=bool(db_user.encrypted_api_key),
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
-        available_models=AVAILABLE_MODELS,
+        available_models=STANDARD_MODELS,
     )
 
 
