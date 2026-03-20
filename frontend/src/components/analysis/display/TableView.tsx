@@ -18,10 +18,11 @@ interface TableViewProps<T> {
   sort: SortConfig | null;
   onSort: (config: SortConfig | null) => void;
   onRowClick?: (item: T) => void;
+  getRowKey?: (item: T, index: number) => string;
 }
 
 export function TableView<T extends object>({
-  data, columns, sort, onSort, onRowClick,
+  data, columns, sort, onSort, onRowClick, getRowKey,
 }: TableViewProps<T>) {
   const handleHeaderClick = (col: TableColumn<T>) => {
     if (!col.sortable) return;
@@ -58,7 +59,7 @@ export function TableView<T extends object>({
         <TableBody>
           {data.map((item, i) => (
             <TableRow
-              key={i}
+              key={getRowKey ? getRowKey(item, i) : i}
               className={onRowClick ? "cursor-pointer hover:bg-interactive-fill" : ""}
               onClick={() => onRowClick?.(item)}
             >

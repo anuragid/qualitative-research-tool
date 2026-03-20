@@ -46,6 +46,7 @@ export function ChunksList({ chunks, viewMode = "list", sort, onSort }: ChunksLi
         columns={chunkColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(c) => c.chunk_id}
       />
     );
   }

@@ -53,6 +53,7 @@ export function InsightsList({ insights, viewMode = "list", sort, onSort }: Insi
         columns={insightColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(ins) => ins.insight_id}
       />
     );
   }

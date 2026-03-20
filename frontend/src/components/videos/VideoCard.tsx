@@ -62,7 +62,7 @@ export default function VideoCard({ video }: VideoCardProps) {
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't navigate when clicking the dropdown menu
-    if ((e.target as HTMLElement).closest("[data-dropdown-menu]")) return;
+    if (e.target instanceof Element && e.target.closest("[data-dropdown-menu]")) return;
     navigate(`/videos/${video.id}`);
   };
 

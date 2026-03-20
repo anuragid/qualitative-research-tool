@@ -71,6 +71,7 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
         columns={columns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(inf) => inf.chunk_id}
       />
     );
   }

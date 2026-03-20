@@ -5,7 +5,7 @@ export interface UserSettings {
   has_api_key: boolean;
   key_hint: string | null;
   key_validated_at: string | null;
-  available_models: { id: string; name: string; tier: string }[];
+  available_models: { id: string; name: string; tier: string; provider?: string }[];
 }
 
 export interface UserSettingsUpdate {

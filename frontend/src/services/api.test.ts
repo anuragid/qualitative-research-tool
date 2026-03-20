@@ -160,7 +160,7 @@ describe("api module", () => {
           config: { url: "/api/projects/" },
         };
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: 401,
           message: "Unauthorized",
           data: { detail: "Unauthorized" },
@@ -176,7 +176,7 @@ describe("api module", () => {
           config: { url: "/api/projects/" },
         };
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: 500,
           message: "Internal Server Error",
           data: { detail: "Internal Server Error" },
@@ -192,7 +192,7 @@ describe("api module", () => {
           config: { url: "/api/test" },
         };
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: 400,
           message: "Bad Request",
           data: { message: "Bad Request" },
@@ -208,7 +208,7 @@ describe("api module", () => {
           config: { url: "/api/test" },
         };
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: 400,
           message: "An error occurred",
           data: {},
@@ -225,7 +225,7 @@ describe("api module", () => {
         };
 
         // With no config, url will be '' (from error.config?.url || '')
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: 404,
           message: "Not found",
           data: { detail: "Not found" },
@@ -251,7 +251,7 @@ describe("api module", () => {
               config: { url },
             };
 
-            await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+            await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
               status: 404,
               message: "Analysis not found",
               data: { detail: "Not found" },
@@ -270,7 +270,7 @@ describe("api module", () => {
           config: { url: "/api/projects/123/" },
         };
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: 404,
           message: "Project not found",
           data: { detail: "Project not found" },
@@ -284,7 +284,7 @@ describe("api module", () => {
           request: new XMLHttpRequest(),
         };
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: 0,
           message: "No response from server. Please check your connection.",
         });
@@ -297,7 +297,7 @@ describe("api module", () => {
           message: "Network Error",
         };
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: -1,
           message: "Network Error",
         });
@@ -306,7 +306,7 @@ describe("api module", () => {
       it("rejects with fallback message when error.message is not available", async () => {
         const error = {};
 
-        await expect(responseInterceptor.rejected(error)).rejects.toEqual({
+        await expect(responseInterceptor.rejected(error)).rejects.toMatchObject({
           status: -1,
           message: "An unexpected error occurred",
         });

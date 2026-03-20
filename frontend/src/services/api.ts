@@ -1,5 +1,19 @@
 import axios from "axios";
 
+export class ApiError extends Error {
+  status: number;
+  data?: unknown;
+  silent?: boolean;
+
+  constructor(status: number, message: string, data?: unknown, silent?: boolean) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    this.silent = silent;
+  }
+}
+
 declare global {
   interface Window {
     Clerk?: {
@@ -34,8 +48,8 @@ api.interceptors.request.use(
           config.headers.Authorization = `Bearer ${token}`;
         }
       }
-    } catch {
-      // Auth token unavailable -- proceed without auth
+    } catch (error) {
+      console.debug("Auth token unavailable, proceeding without auth:", error);
     }
     return config;
   },
@@ -70,35 +84,20 @@ api.interceptors.response.use(
         }
         // Silently handle 404s for analysis endpoints
         if (isAnalysisEndpoint) {
-          return Promise.reject({
-            status: 404,
-            message: "Analysis not found",
-            data,
-            silent: true
-          });
+          return Promise.reject(new ApiError(404, "Analysis not found", data, true));
         }
       } else if (status === 500) {
         // Server error
       }
 
       // Return error with more context
-      return Promise.reject({
-        status,
-        message: data.detail || data.message || "An error occurred",
-        data,
-      });
+      return Promise.reject(new ApiError(status, data?.detail || data?.message || "An error occurred", data));
     } else if (error.request) {
       // Request made but no response
-      return Promise.reject({
-        status: 0,
-        message: "No response from server. Please check your connection.",
-      });
+      return Promise.reject(new ApiError(0, "No response from server. Please check your connection."));
     } else {
       // Something else happened
-      return Promise.reject({
-        status: -1,
-        message: error.message || "An unexpected error occurred",
-      });
+      return Promise.reject(new ApiError(-1, error.message || "An unexpected error occurred"));
     }
   }
 );

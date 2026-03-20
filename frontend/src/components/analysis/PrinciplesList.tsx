@@ -52,6 +52,7 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
         columns={principleColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(p) => p.principle_id}
       />
     );
   }

@@ -62,7 +62,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
   const thumbCount = recentVideos.length;
 
   const handleCardClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("[data-dropdown-menu]")) return;
+    if (e.target instanceof Element && e.target.closest("[data-dropdown-menu]")) return;
     navigate(`/projects/${project.id}`);
   };
 

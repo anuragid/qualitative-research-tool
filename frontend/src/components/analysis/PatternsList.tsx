@@ -55,6 +55,7 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
         columns={patternColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(p) => p.pattern_id}
       />
     );
   }
