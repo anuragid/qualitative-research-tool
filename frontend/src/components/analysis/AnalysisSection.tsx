@@ -211,19 +211,19 @@ export function AnalysisSection({
       <Tabs defaultValue="chunks" className="w-full">
         <TabsList className="overflow-x-auto">
           <TabsTrigger value="chunks" className="whitespace-nowrap">
-            1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
+            Chunks {analysis.chunks && <span className="opacity-50 font-normal">{analysis.chunks.length}</span>}
           </TabsTrigger>
           <TabsTrigger value="inferences" className="whitespace-nowrap">
-            2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
+            Inferences {analysis.inferences && <span className="opacity-50 font-normal">{analysis.inferences.length}</span>}
           </TabsTrigger>
           <TabsTrigger value="patterns" className="whitespace-nowrap">
-            3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
+            Patterns {analysis.patterns && <span className="opacity-50 font-normal">{analysis.patterns.length}</span>}
           </TabsTrigger>
           <TabsTrigger value="insights" className="whitespace-nowrap">
-            4. Insights {analysis.insights && `(${analysis.insights.length})`}
+            Insights {analysis.insights && <span className="opacity-50 font-normal">{analysis.insights.length}</span>}
           </TabsTrigger>
           <TabsTrigger value="principles" className="whitespace-nowrap">
-            5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
+            Principles {analysis.design_principles && <span className="opacity-50 font-normal">{analysis.design_principles.length}</span>}
           </TabsTrigger>
         </TabsList>
 
@@ -318,7 +318,7 @@ export function AnalysisSection({
             {analysis.step_status?.chunk === "processing" && (
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             )}
-            1. Chunks {analysis.chunks && `(${analysis.chunks.length})`}
+            Chunks {analysis.chunks && <span className="opacity-50 font-normal">{analysis.chunks.length}</span>}
           </TabsTrigger>
           <TabsTrigger
             value="inferences"
@@ -334,7 +334,7 @@ export function AnalysisSection({
             {analysis.step_status?.infer === "error" && (
               <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
             )}
-            2. Inferences {analysis.inferences && `(${analysis.inferences.length})`}
+            Inferences {analysis.inferences && <span className="opacity-50 font-normal">{analysis.inferences.length}</span>}
           </TabsTrigger>
           <TabsTrigger
             value="patterns"
@@ -350,7 +350,7 @@ export function AnalysisSection({
             {analysis.step_status?.relate === "error" && (
               <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
             )}
-            3. Patterns {analysis.patterns && `(${analysis.patterns.length})`}
+            Patterns {analysis.patterns && <span className="opacity-50 font-normal">{analysis.patterns.length}</span>}
           </TabsTrigger>
           <TabsTrigger
             value="insights"
@@ -366,7 +366,7 @@ export function AnalysisSection({
             {analysis.step_status?.explain === "error" && (
               <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
             )}
-            4. Insights {analysis.insights && `(${analysis.insights.length})`}
+            Insights {analysis.insights && <span className="opacity-50 font-normal">{analysis.insights.length}</span>}
           </TabsTrigger>
           <TabsTrigger
             value="principles"
@@ -382,7 +382,7 @@ export function AnalysisSection({
             {analysis.step_status?.activate === "error" && (
               <AlertCircle className="h-3 w-3 mr-1 text-destructive" />
             )}
-            5. Principles {analysis.design_principles && `(${analysis.design_principles.length})`}
+            Principles {analysis.design_principles && <span className="opacity-50 font-normal">{analysis.design_principles.length}</span>}
           </TabsTrigger>
         </TabsList>
 
