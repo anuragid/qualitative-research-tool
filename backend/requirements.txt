@@ -9,9 +9,9 @@ alembic==1.12.1
 psycopg2-binary==2.9.9
 
 # AI & LangGraph
-openai
-json-repair
-langgraph
+openai==2.7.1
+json-repair==0.58.6
+langgraph==1.0.3
 
 # AssemblyAI
 assemblyai==0.17.0
@@ -42,4 +42,4 @@ PyJWT[crypto]==2.9.0
 cryptography==45.0.0
 
 # Rate Limiting
-slowapi>=0.1.9
+slowapi==0.1.9

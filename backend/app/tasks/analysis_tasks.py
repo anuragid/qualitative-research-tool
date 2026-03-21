@@ -12,6 +12,7 @@ same pipeline semantics with reliable timeout / error handling.
 """
 
 import logging
+import re
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -33,6 +34,20 @@ from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+# Pattern matches common API key formats (OpenRouter sk-or-*, generic long tokens)
+_API_KEY_PATTERN = re.compile(
+    r"(sk-or-v1-[A-Za-z0-9]{4})[A-Za-z0-9]{20,}"  # OpenRouter keys
+    r"|"
+    r"(sk-[A-Za-z0-9]{4})[A-Za-z0-9]{20,}"  # OpenAI-style keys
+    r"|"
+    r"(Bearer\s+)[A-Za-z0-9_\-]{20,}"  # Bearer tokens in error messages
+)
+
+
+def _sanitize_error(message: str) -> str:
+    """Strip potential API key material from error messages before storage."""
+    return _API_KEY_PATTERN.sub(lambda m: (m.group(1) or m.group(2) or m.group(3)) + "***REDACTED***", message)
 
 
 def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
@@ -220,7 +235,8 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        logger.error(f"Video analysis failed for video {video_id}: {e}")
+        safe_msg = _sanitize_error(str(e))
+        logger.error(f"Video analysis failed for video {video_id}: {safe_msg}")
 
         # Update status to error
         try:
@@ -232,7 +248,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
 
             if video:
                 video.status = "error"
-                video.error_message = str(e)
+                video.error_message = safe_msg
             if video_analysis:
                 video_analysis.status = "error"
                 video_analysis.completed_at = datetime.now(timezone.utc)
@@ -240,7 +256,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
             # Explicitly flush and commit
             self.db.flush()
             self.db.commit()
-            logger.info(f"Video {video_id} status updated to error: {e}")
+            logger.info(f"Video {video_id} status updated to error")
         except Exception as commit_error:
             logger.error(f"Failed to update error status: {commit_error}")
 
@@ -369,7 +385,8 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        logger.error(f"Project analysis failed for project {project_id}: {e}")
+        safe_msg = _sanitize_error(str(e))
+        logger.error(f"Project analysis failed for project {project_id}: {safe_msg}")
 
         # Update status to error
         try:
@@ -384,7 +401,7 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
 
             project = self.db.query(Project).filter(Project.id == UUID(project_id)).first()
             if project:
-                project.error_message = str(e)
+                project.error_message = safe_msg
 
             self.db.commit()
         except Exception as cleanup_error:

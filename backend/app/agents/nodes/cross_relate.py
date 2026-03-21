@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import CROSS_RELATE_SYSTEM_PROMPT
 from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.output_validator import OutputValidationError, validate_meta_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -48,15 +49,31 @@ VIDEO PATTERNS:
 Find patterns that transcend individual videos and reveal system-level themes."""
 
         # Call LLM with retry logic (pass BYOK overrides if present)
-        cross_patterns = llm_service.call_with_json_list_response(
+        llm_kwargs = dict(
             system_prompt=CROSS_RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
+        cross_patterns = llm_service.call_with_json_list_response(**llm_kwargs)
 
-        # Validate response
+        # Validate response structure (retry once on failure)
+        try:
+            validate_meta_patterns(cross_patterns)
+        except OutputValidationError as ve:
+            logger.warning(f"[CROSS_RELATE] Output validation failed, retrying: {ve}")
+            cross_patterns = llm_service.call_with_json_list_response(**llm_kwargs)
+            try:
+                validate_meta_patterns(cross_patterns)
+            except OutputValidationError as ve2:
+                logger.error(f"[CROSS_RELATE] Output validation failed after retry: {ve2}")
+                return {
+                    **state,
+                    "cross_video_patterns": None,
+                    "current_step": "cross_relate",
+                    "error": f"Output validation failed: {ve2}",
+                }
 
         logger.info(f"[CROSS_RELATE] Identified {len(cross_patterns)} meta-patterns across videos")
 

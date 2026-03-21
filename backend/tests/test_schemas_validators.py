@@ -76,7 +76,7 @@ class TestProjectSchemas:
     def test_description_max_length(self):
         """Description exceeding max_length should be rejected."""
         with pytest.raises(ValidationError):
-            ProjectCreate(name="Test", description="a" * 2001)
+            ProjectCreate(name="Test", description="a" * 5001)
 
 
 class TestUserSettingsSchemas:

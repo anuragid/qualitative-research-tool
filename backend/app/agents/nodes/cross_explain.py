@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import CROSS_EXPLAIN_SYSTEM_PROMPT
 from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.output_validator import OutputValidationError, validate_cross_insights
 
 logger = logging.getLogger(__name__)
 
@@ -54,15 +55,31 @@ INDIVIDUAL VIDEO INSIGHTS (for context):
 Generate insights that reveal truths about the system as a whole, not just individual experiences."""
 
         # Call LLM with retry logic (pass BYOK overrides if present)
-        cross_insights = llm_service.call_with_json_list_response(
+        llm_kwargs = dict(
             system_prompt=CROSS_EXPLAIN_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
+        cross_insights = llm_service.call_with_json_list_response(**llm_kwargs)
 
-        # Validate response
+        # Validate response structure (retry once on failure)
+        try:
+            validate_cross_insights(cross_insights)
+        except OutputValidationError as ve:
+            logger.warning(f"[CROSS_EXPLAIN] Output validation failed, retrying: {ve}")
+            cross_insights = llm_service.call_with_json_list_response(**llm_kwargs)
+            try:
+                validate_cross_insights(cross_insights)
+            except OutputValidationError as ve2:
+                logger.error(f"[CROSS_EXPLAIN] Output validation failed after retry: {ve2}")
+                return {
+                    **state,
+                    "cross_video_insights": None,
+                    "current_step": "cross_explain",
+                    "error": f"Output validation failed: {ve2}",
+                }
 
         logger.info(f"[CROSS_EXPLAIN] Generated {len(cross_insights)} cross-video insights")
 

@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import ACTIVATE_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.output_validator import OutputValidationError, validate_design_principles
 
 logger = logging.getLogger(__name__)
 
@@ -47,15 +48,31 @@ INSIGHTS:
 For each insight, create one or more design principles that provide strategic direction."""
 
         # Call LLM with retry logic (pass BYOK overrides if present)
-        design_principles = llm_service.call_with_json_list_response(
+        llm_kwargs = dict(
             system_prompt=ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
+        design_principles = llm_service.call_with_json_list_response(**llm_kwargs)
 
-        # Validate response
+        # Validate response structure (retry once on failure)
+        try:
+            validate_design_principles(design_principles)
+        except OutputValidationError as ve:
+            logger.warning(f"[ACTIVATE] Output validation failed, retrying: {ve}")
+            design_principles = llm_service.call_with_json_list_response(**llm_kwargs)
+            try:
+                validate_design_principles(design_principles)
+            except OutputValidationError as ve2:
+                logger.error(f"[ACTIVATE] Output validation failed after retry: {ve2}")
+                return {
+                    **state,
+                    "design_principles": None,
+                    "current_step": "activate",
+                    "error": f"Output validation failed: {ve2}",
+                }
 
         logger.info(f"[ACTIVATE] Generated {len(design_principles)} design principles")
         logger.info(f"[ACTIVATE] Video {state['video_id']} analysis complete!")

@@ -630,7 +630,7 @@ async def search_transcript_words(
             )
 
         if response.status_code != 200:
-            logger.error(f"AssemblyAI Word Search API error: {response.text}")
+            logger.error(f"AssemblyAI Word Search API error (HTTP {response.status_code}): {response.text[:200]}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to search transcript"

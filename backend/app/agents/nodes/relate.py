@@ -7,6 +7,8 @@ from typing import Any, Dict
 from app.agents.prompts import RELATE_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.input_sanitizer import sanitize_for_prompt
+from app.utils.output_validator import OutputValidationError, validate_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +39,10 @@ def relate_node(state: VideoAnalysisState) -> Dict[str, Any]:
         # Build research context if available
         research_context = ""
         if state.get("project_description"):
+            safe_description = sanitize_for_prompt(state["project_description"], max_length=5000)
             research_context = f"""
 RESEARCH CONTEXT:
-{state['project_description']}
+<research_context>{safe_description}</research_context>
 Focus on patterns that are relevant to this research context.
 """
 
@@ -56,15 +59,31 @@ INFERENCES:
 Group related inferences into patterns and explain what each pattern represents."""
 
         # Call LLM with retry logic (pass BYOK overrides if present)
-        patterns = llm_service.call_with_json_list_response(
+        llm_kwargs = dict(
             system_prompt=RELATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for many inferences
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
+        patterns = llm_service.call_with_json_list_response(**llm_kwargs)
 
-        # Validate response
+        # Validate response structure (retry once on failure)
+        try:
+            validate_patterns(patterns)
+        except OutputValidationError as ve:
+            logger.warning(f"[RELATE] Output validation failed, retrying: {ve}")
+            patterns = llm_service.call_with_json_list_response(**llm_kwargs)
+            try:
+                validate_patterns(patterns)
+            except OutputValidationError as ve2:
+                logger.error(f"[RELATE] Output validation failed after retry: {ve2}")
+                return {
+                    **state,
+                    "patterns": None,
+                    "current_step": "relate",
+                    "error": f"Output validation failed: {ve2}",
+                }
 
         logger.info(f"[RELATE] Identified {len(patterns)} patterns")
 

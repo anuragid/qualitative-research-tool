@@ -6,6 +6,8 @@ from typing import Any, Dict
 from app.agents.prompts import CHUNK_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.input_sanitizer import sanitize_for_prompt
+from app.utils.output_validator import OutputValidationError, validate_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -62,15 +64,18 @@ def chunk_node(state: VideoAnalysisState) -> Dict[str, Any]:
         # Include speaker mapping with roles in the message
         speaker_mapping_text = "SPEAKER MAPPING WITH ROLES:\n"
         for speaker_id, speaker_name in speaker_labels.items():
+            safe_name = sanitize_for_prompt(speaker_name, max_length=100)
             role = speaker_roles.get(speaker_id, "unknown")
-            speaker_mapping_text += f"- {speaker_id} = {speaker_name} (Role: {role})\n"
+            safe_role = sanitize_for_prompt(role, max_length=100)
+            speaker_mapping_text += f"- {speaker_id} = <speaker_label>{safe_name}</speaker_label> (Role: <speaker_label>{safe_role}</speaker_label>)\n"
 
         # Build research context if available
         research_context = ""
         if state.get("project_description"):
+            safe_description = sanitize_for_prompt(state["project_description"], max_length=5000)
             research_context = f"""
 RESEARCH CONTEXT:
-{state['project_description']}
+<research_context>{safe_description}</research_context>
 Focus on extracting chunks that are relevant to this research context. Ignore small talk and conversation that is not related to the research topic.
 """
 
@@ -81,10 +86,10 @@ IMPORTANT: You should ONLY create chunks from PARTICIPANT responses. Interviewer
 {speaker_mapping_text}
 {research_context}
 FULL TRANSCRIPT (for context):
-{full_transcript_text}
+<transcript>{full_transcript_text}</transcript>
 
 PARTICIPANT RESPONSES TO CHUNK:
-{participant_transcript_text}
+<transcript>{participant_transcript_text}</transcript>
 
 Remember:
 - ONLY chunk the participant responses shown above
@@ -94,15 +99,31 @@ Remember:
 - Use the actual speaker names (not A, B, C) as shown in the transcript"""
 
         # Call LLM with retry logic (pass BYOK overrides if present)
-        chunks = llm_service.call_with_json_list_response(
+        llm_kwargs = dict(
             system_prompt=CHUNK_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for long transcripts
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
+        chunks = llm_service.call_with_json_list_response(**llm_kwargs)
 
-        # Validate response
+        # Validate response structure (retry once on failure)
+        try:
+            validate_chunks(chunks)
+        except OutputValidationError as ve:
+            logger.warning(f"[CHUNK] Output validation failed, retrying: {ve}")
+            chunks = llm_service.call_with_json_list_response(**llm_kwargs)
+            try:
+                validate_chunks(chunks)
+            except OutputValidationError as ve2:
+                logger.error(f"[CHUNK] Output validation failed after retry: {ve2}")
+                return {
+                    **state,
+                    "chunks": None,
+                    "current_step": "chunk",
+                    "error": f"Output validation failed: {ve2}",
+                }
 
         # Debug: Log chunk types
         chunk_types = {}

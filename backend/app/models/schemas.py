@@ -71,7 +71,7 @@ _VALID_PROJECT_STATUSES = {"planning", "ready", "processing", "completed", "arch
 class ProjectBase(BaseModel):
     """Base project schema."""
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: Optional[str] = Field(default=None, max_length=5000)
     status: Optional[str] = "planning"
 
     @field_validator("name")
@@ -105,7 +105,7 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: Optional[str] = Field(default=None, max_length=5000)
 
     @field_validator("name")
     @classmethod
@@ -200,7 +200,7 @@ class TranscriptResponse(BaseModel):
 class SpeakerLabelCreate(BaseModel):
     """Schema for creating speaker label."""
     speaker_label: str = Field(..., min_length=1, max_length=50)
-    assigned_name: Optional[str] = Field(default=None, max_length=255)
+    assigned_name: Optional[str] = Field(default=None, max_length=100)
     role: Optional[str] = Field(default=None, max_length=100)
 
     @field_validator("speaker_label")
@@ -225,7 +225,7 @@ class SpeakerLabelCreate(BaseModel):
 
 class SpeakerLabelUpdate(BaseModel):
     """Schema for updating speaker label."""
-    assigned_name: Optional[str] = Field(default=None, max_length=255)
+    assigned_name: Optional[str] = Field(default=None, max_length=100)
     role: Optional[str] = Field(default=None, max_length=100)
 
     @field_validator("assigned_name")

@@ -1,6 +1,9 @@
 """FastAPI main application."""
 
+import base64
+import json
 import logging
+import re
 from contextlib import asynccontextmanager
 
 import httpx
@@ -14,6 +17,7 @@ from slowapi.util import get_remote_address
 
 from app.config import settings
 from app.database import Base, engine
+from app.utils.logging_utils import redact_paths
 
 # Configure logging
 logging.basicConfig(
@@ -25,15 +29,52 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_LOCALHOST_ORIGINS = "http://localhost:5173,http://localhost:3000"
 
+
+def _get_rate_limit_key(request: Request) -> str:
+    """Extract a rate-limit key from the request.
+
+    For authenticated requests, use the user's ID (``sub`` claim from the JWT)
+    so rate limits are per-user rather than per-IP.  This prevents all users
+    behind a shared proxy/CDN (e.g. Cloudflare) from sharing one bucket.
+
+    For unauthenticated endpoints (health, Clerk proxy), fall back to IP.
+
+    This function intentionally does *not* verify the JWT signature -- it only
+    base64-decodes the payload to read the ``sub`` claim.  This is acceptable
+    because rate limiting is a best-effort defense, not an auth mechanism.
+    """
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        try:
+            # JWT structure: header.payload.signature
+            parts = token.split(".")
+            if len(parts) == 3:
+                payload_b64 = parts[1]
+                # Add padding for base64
+                padding = 4 - len(payload_b64) % 4
+                if padding != 4:
+                    payload_b64 += "=" * padding
+                payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+                sub = payload.get("sub")
+                if sub and isinstance(sub, str):
+                    return f"user:{sub}"
+        except Exception:
+            # Any decode error -- fall back to IP silently.
+            pass
+
+    return get_remote_address(request)
+
+
 # Rate limiter — uses settings for default limit
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_get_rate_limit_key,
     default_limits=[settings.RATE_LIMIT_DEFAULT],
 )
 
 
 def _validate_production_config() -> None:
-    """Log warnings if critical env vars look wrong for production."""
+    """Validate critical env vars for production. Raises on fatal misconfig."""
     if settings.APP_ENV != "production":
         return
 
@@ -43,10 +84,23 @@ def _validate_production_config() -> None:
             "Clerk auth may not work correctly in production."
         )
 
+    # ENCRYPTION_KEY is required in production — without it BYOK keys
+    # would be stored unprotected. This is a hard failure, not a warning.
     if not settings.ENCRYPTION_KEY:
-        logger.warning(
-            "SECURITY: ENCRYPTION_KEY is not set — "
-            "BYOK API keys cannot be encrypted. Set a Fernet key."
+        raise RuntimeError(
+            "FATAL: ENCRYPTION_KEY is not set in production. "
+            "BYOK API keys cannot be encrypted without it. "
+            "Generate one with: python -c "
+            "'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+        )
+
+    # Dev auth bypass must never be reachable in production.
+    from app.auth import _is_dev
+    if _is_dev:
+        raise RuntimeError(
+            "FATAL: Dev auth bypass is active but APP_ENV is 'production'. "
+            "This should never happen — _is_dev should be False when "
+            "APP_ENV='production'. Check for APP_ENV override or import order issues."
         )
 
     if settings.ALLOWED_ORIGINS == _DEFAULT_LOCALHOST_ORIGINS:
@@ -66,12 +120,19 @@ async def lifespan(app: FastAPI):
 
     _validate_production_config()
 
-    if settings.APP_ENV == "development":
+    # Log the active auth mode so operators can verify at a glance.
+    from app.auth import _is_dev as _auth_is_dev
+    if _auth_is_dev:
         logger.warning(
-            "DEV AUTH BYPASS is ACTIVE. Requests without an Authorization header "
+            "Auth mode: DEVELOPMENT (bypass enabled). "
+            "Requests without an Authorization header "
             "(or with 'Bearer dev-bypass') will authenticate as dev_user_local. "
             "Do NOT use APP_ENV=development in production."
         )
+    else:
+        logger.info("Auth mode: PRODUCTION (Clerk JWT verification)")
+
+    logger.info(f"OpenAPI docs: {'enabled' if settings.DEBUG else 'disabled'}")
 
     # Create database tables (in production, use Alembic migrations instead)
     if settings.DEBUG:
@@ -146,7 +207,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    # Safety net: if the error message accidentally contains file paths,
+    # redact them before sending to the client.  The full detail is already
+    # logged server-side above.
+    detail = "Internal server error"
+    exc_msg = str(exc)
+    if re.search(r"(/app/|/Users/|/home/|/var/|/tmp/|/opt/|/usr/|\.py\b)", exc_msg):
+        # Error contains internal path info -- use generic message
+        detail = "Internal server error"
+    return JSONResponse(status_code=500, content={"detail": detail})
 
 
 @app.get("/")
@@ -189,11 +258,13 @@ async def clerk_proxy(path: str, request: Request):
         return Response(content=b"Not Found", status_code=404)
 
     # Filter headers — only forward whitelisted ones
+    # NOTE: The Clerk Frontend API authenticates via the publishable key
+    # (sent by the Clerk SDK in its requests). The secret key must NOT be
+    # forwarded — it grants admin-level access and is not needed here.
     filtered_headers = {
         k: v for k, v in request.headers.items()
         if k.lower() in _CLERK_PROXY_ALLOWED_HEADERS
     }
-    filtered_headers["Clerk-Secret-Key"] = settings.CLERK_SECRET_KEY or ""
 
     body = await request.body()
     resp = await _clerk_client.request(

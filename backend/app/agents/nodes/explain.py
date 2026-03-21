@@ -8,6 +8,8 @@ from typing import Any, Dict
 from app.agents.prompts import EXPLAIN_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.input_sanitizer import sanitize_for_prompt
+from app.utils.output_validator import OutputValidationError, validate_insights
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +45,10 @@ def explain_node(state: VideoAnalysisState) -> Dict[str, Any]:
         # Build research context if available
         research_context = ""
         if state.get("project_description"):
+            safe_description = sanitize_for_prompt(state["project_description"], max_length=5000)
             research_context = f"""
 RESEARCH CONTEXT:
-{state['project_description']}
+<research_context>{safe_description}</research_context>
 Generate insights that are relevant to this research context.
 """
 
@@ -65,15 +68,31 @@ ORIGINAL CHUNKS (for evidence):
 Generate non-consensus insights that challenge assumptions and reveal fundamental truths. Write each insight as a short, punchy headline."""
 
         # Call LLM with retry logic (pass BYOK overrides if present)
-        insights = llm_service.call_with_json_list_response(
+        llm_kwargs = dict(
             system_prompt=EXPLAIN_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=16384,  # Increased for many patterns
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
+        insights = llm_service.call_with_json_list_response(**llm_kwargs)
 
-        # Validate response
+        # Validate response structure (retry once on failure)
+        try:
+            validate_insights(insights)
+        except OutputValidationError as ve:
+            logger.warning(f"[EXPLAIN] Output validation failed, retrying: {ve}")
+            insights = llm_service.call_with_json_list_response(**llm_kwargs)
+            try:
+                validate_insights(insights)
+            except OutputValidationError as ve2:
+                logger.error(f"[EXPLAIN] Output validation failed after retry: {ve2}")
+                return {
+                    **state,
+                    "insights": None,
+                    "current_step": "explain",
+                    "error": f"Output validation failed: {ve2}",
+                }
 
         logger.info(f"[EXPLAIN] Generated {len(insights)} insights")
 

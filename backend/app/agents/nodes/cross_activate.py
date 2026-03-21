@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import CROSS_ACTIVATE_SYSTEM_PROMPT
 from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.output_validator import OutputValidationError, validate_system_principles
 
 logger = logging.getLogger(__name__)
 
@@ -48,15 +49,31 @@ CROSS-VIDEO INSIGHTS:
 Create design principles that provide strategic direction for the entire system."""
 
         # Call LLM with retry logic (pass BYOK overrides if present)
-        system_principles = llm_service.call_with_json_list_response(
+        llm_kwargs = dict(
             system_prompt=CROSS_ACTIVATE_SYSTEM_PROMPT,
             user_message=user_message,
             max_tokens=8192,
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
+        system_principles = llm_service.call_with_json_list_response(**llm_kwargs)
 
-        # Validate response
+        # Validate response structure (retry once on failure)
+        try:
+            validate_system_principles(system_principles)
+        except OutputValidationError as ve:
+            logger.warning(f"[CROSS_ACTIVATE] Output validation failed, retrying: {ve}")
+            system_principles = llm_service.call_with_json_list_response(**llm_kwargs)
+            try:
+                validate_system_principles(system_principles)
+            except OutputValidationError as ve2:
+                logger.error(f"[CROSS_ACTIVATE] Output validation failed after retry: {ve2}")
+                return {
+                    **state,
+                    "cross_video_principles": None,
+                    "current_step": "cross_activate",
+                    "error": f"Output validation failed: {ve2}",
+                }
 
         logger.info(f"[CROSS_ACTIVATE] Generated {len(system_principles)} system-level design principles")
         logger.info(f"[CROSS_ACTIVATE] Project {state['project_id']} cross-video analysis complete!")

@@ -328,8 +328,11 @@ class LLMService:
         except Exception as repair_error:
             logger.warning(f"json-repair also failed: {repair_error}")
 
-        # Strategy 6: Last resort - log (truncated) and raise error
-        logger.error(f"Failed to parse JSON from response (length: {len(response)}): {response[:200]}...")
+        # Strategy 6: Last resort - log length (and truncated content in dev only)
+        if settings.APP_ENV == "development":
+            logger.error(f"Failed to parse JSON from response (length: {len(response)}): {response[:200]}...")
+        else:
+            logger.error(f"Failed to parse JSON from LLM response (length: {len(response)})")
         raise ValueError("Could not parse JSON from LLM response")
 
     @staticmethod
@@ -422,7 +425,8 @@ class LLMService:
             json_mode=False,
         )
 
-        logger.debug(f"Raw LLM response (first 500 chars): {response[:500]}")
+        if settings.APP_ENV == "development":
+            logger.debug(f"Raw LLM response (first 500 chars): {response[:500]}")
 
         return self.parse_json_response(response)
 
