@@ -9,7 +9,7 @@ If validation fails, the caller can retry once before storing an error.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 logger = logging.getLogger(__name__)
 

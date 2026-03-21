@@ -17,7 +17,6 @@ from slowapi.util import get_remote_address
 
 from app.config import settings
 from app.database import Base, engine
-from app.utils.logging_utils import redact_paths
 
 # Configure logging
 logging.basicConfig(
