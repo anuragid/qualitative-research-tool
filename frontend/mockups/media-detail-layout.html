@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Detail Page - Layout Redesign | methodex</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --forest:     #2D5A3D;
+    --forest-light: #3a7350;
+    --gold:       #F5E6C8;
+    --gold-dim:   #e8d6b0;
+    --white:      #ffffff;
+    --gray-50:    #fafafa;
+    --gray-100:   #f4f4f5;
+    --gray-200:   #e4e4e7;
+    --gray-300:   #d4d4d8;
+    --gray-400:   #a1a1aa;
+    --gray-500:   #71717a;
+    --gray-600:   #52525b;
+    --gray-700:   #3f3f46;
+    --gray-800:   #27272a;
+    --radius:     8px;
+    --radius-lg:  12px;
+    --shadow-sm:  0 1px 2px rgba(0,0,0,.05);
+    --shadow:     0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-md:  0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-800);
+    line-height: 1.5;
+    padding: 0 0 80px;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    background: var(--forest);
+    color: var(--white);
+    padding: 32px 48px 28px;
+    border-bottom: 3px solid var(--gold);
+  }
+  .page-header h1 {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .page-header .subtitle {
+    font-size: 14px;
+    color: var(--gold);
+    margin-top: 4px;
+    font-weight: 400;
+  }
+  .brand {
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  /* ── Layout Shell ── */
+  .options-container {
+    display: flex;
+    gap: 40px;
+    padding: 40px 48px;
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+  .option {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Option Headers ── */
+  .option-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .option-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    color: var(--white);
+  }
+  .option-badge.before { background: var(--gray-500); }
+  .option-badge.after  { background: var(--forest); }
+  .option-label h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+
+  /* ── Wireframe Card ── */
+  .wireframe {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  /* ── Shared Wireframe Primitives ── */
+  .wire-box {
+    background: var(--gray-100);
+    border: 1.5px dashed var(--gray-300);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-500);
+    font-size: 13px;
+    font-weight: 500;
+    position: relative;
+  }
+  .wire-box.video {
+    aspect-ratio: 16/9;
+    background: var(--gray-200);
+    border-style: solid;
+    border-color: var(--gray-300);
+  }
+  .wire-box.video::before {
+    content: "";
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.7);
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%,-50%);
+  }
+  .wire-box.video::after {
+    content: "";
+    position: absolute;
+    left: calc(50% + 4px);
+    top: 50%;
+    transform: translate(-50%,-50%);
+    border-left: 14px solid var(--gray-500);
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+  }
+  .wire-box .label {
+    position: absolute;
+    bottom: 8px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: var(--gray-400);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* ── Tabs (Option A) ── */
+  .tabs-bar {
+    display: flex;
+    border-bottom: 2px solid var(--gray-200);
+    padding: 0 16px;
+  }
+  .tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-400);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: default;
+  }
+  .tab.active {
+    color: var(--forest);
+    border-bottom-color: var(--forest);
+  }
+
+  /* ── Nested Tabs (Option A analysis) ── */
+  .nested-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 8px 16px 0;
+    flex-wrap: wrap;
+  }
+  .nested-tab {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px 6px 0 0;
+    background: var(--gray-100);
+    color: var(--gray-400);
+    border: 1px solid var(--gray-200);
+    border-bottom: none;
+  }
+  .nested-tab.active {
+    background: var(--white);
+    color: var(--forest);
+    border-color: var(--gray-300);
+  }
+
+  .content-area {
+    padding: 16px;
+  }
+
+  /* ── Transcript Lines ── */
+  .transcript-line {
+    display: flex;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+    line-height: 1.6;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .transcript-line:last-child { border-bottom: none; }
+  .speaker-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+  }
+  .speaker-dot.s1 { background: #4A90D9; }
+  .speaker-dot.s2 { background: #E07B5A; }
+  .speaker-dot.s3 { background: #8B5CF6; }
+  .speaker-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    width: 52px;
+    color: var(--gray-500);
+  }
+  .transcript-text {
+    color: var(--gray-600);
+  }
+  .transcript-text .highlight {
+    background: var(--gold);
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+
+  /* ── Side Panel (Option B) ── */
+  .side-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+  }
+  .side-panel-header h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--gray-400);
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+  .search-icon {
+    width: 12px;
+    height: 12px;
+    border: 1.5px solid var(--gray-400);
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .search-icon::after {
+    content: "";
+    position: absolute;
+    width: 5px;
+    height: 1.5px;
+    background: var(--gray-400);
+    bottom: -3px;
+    right: -4px;
+    transform: rotate(45deg);
+  }
+  .close-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--gray-400);
+    cursor: default;
+    border: 1px solid transparent;
+  }
+  .close-btn:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-200);
+  }
+
+  /* ── Analysis Step Cards (Option B) ── */
+  .analysis-steps { padding: 16px; }
+  .analysis-step {
+    margin-bottom: 16px;
+  }
+  .analysis-step:last-child { margin-bottom: 0; }
+  .step-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .step-number {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--forest);
+    color: var(--white);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+  .step-content {
+    margin-left: 34px;
+    background: var(--gray-100);
+    border: 1.5px dashed var(--gray-300);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    min-height: 48px;
+    color: var(--gray-400);
+    font-size: 12px;
+  }
+
+  /* ── Section Divider ── */
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--gray-200);
+  }
+
+  /* ── Annotation Callouts ── */
+  .callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 6px 0;
+    padding: 8px 12px;
+    background: #f0faf3;
+    border: 1px solid #c3e0cc;
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--forest);
+    line-height: 1.5;
+  }
+  .callout-icon {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  /* ── Responsive Note ── */
+  .responsive-note {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 0 48px;
+  }
+  .responsive-note-inner {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 24px 32px;
+    box-shadow: var(--shadow-sm);
+  }
+  .responsive-note h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 12px;
+  }
+  .responsive-note ul {
+    list-style: none;
+    padding: 0;
+  }
+  .responsive-note li {
+    position: relative;
+    padding-left: 20px;
+    font-size: 13px;
+    color: var(--gray-600);
+    margin-bottom: 6px;
+  }
+  .responsive-note li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 8px;
+    height: 8px;
+    background: var(--gold);
+    border-radius: 2px;
+    border: 1px solid var(--gold-dim);
+  }
+
+  /* ── Comparison Arrow ── */
+  .arrow-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 48px;
+  }
+  .arrow-col svg {
+    color: var(--forest);
+  }
+
+  /* ── Annotations container ── */
+  .annotations {
+    padding: 12px 16px 16px;
+  }
+  .annotations-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--gray-400);
+    margin-bottom: 8px;
+  }
+
+  /* ── Small helper ── */
+  .placeholder-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .placeholder-line {
+    height: 10px;
+    border-radius: 3px;
+    background: var(--gray-200);
+  }
+  .placeholder-line.w80 { width: 80%; }
+  .placeholder-line.w60 { width: 60%; }
+  .placeholder-line.w90 { width: 90%; }
+  .placeholder-line.w70 { width: 70%; }
+  .placeholder-line.w50 { width: 50%; }
+
+  @media (max-width: 1100px) {
+    .options-container {
+      flex-direction: column;
+      padding: 24px;
+      gap: 32px;
+    }
+    .arrow-col { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ────────────────────── Page Header ────────────────────── -->
+<header class="page-header">
+  <h1>Media Detail Page &mdash; Layout Redesign</h1>
+  <p class="subtitle"><span class="brand">methodex</span> &middot; Wireframe Comparison</p>
+</header>
+
+<!-- ────────────────────── Two Options Side-by-Side ────────────────────── -->
+<div class="options-container">
+
+  <!-- ═══════ OPTION A ═══════ -->
+  <section class="option">
+    <div class="option-label">
+      <span class="option-badge before">Before</span>
+      <h2>Option A &mdash; Current Layout</h2>
+    </div>
+
+    <div class="wireframe">
+      <!-- Video Player (full width) -->
+      <div style="padding:16px 16px 0;">
+        <div class="wire-box video">
+          <span class="label">Video Player &mdash; full width</span>
+        </div>
+      </div>
+
+      <!-- Top-level Tabs -->
+      <div style="margin-top:16px;">
+        <div class="tabs-bar">
+          <span class="tab">Transcript</span>
+          <span class="tab active">Analysis</span>
+        </div>
+      </div>
+
+      <!-- Transcript tab (hidden state) -->
+
+      <!-- Analysis tab (active state) -->
+      <div style="padding:0 0 4px;">
+        <div class="nested-tabs">
+          <span class="nested-tab active">1. Chunks</span>
+          <span class="nested-tab">2. Inferences</span>
+          <span class="nested-tab">3. Patterns</span>
+          <span class="nested-tab">4. Insights</span>
+          <span class="nested-tab">5. Principles</span>
+        </div>
+        <div class="content-area">
+          <div class="wire-box" style="min-height:140px;">
+            <span style="font-size:12px;color:var(--gray-400);">Chunks content area (active tab)</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- Annotations / Pain Points -->
+      <div class="annotations">
+        <p class="annotations-title">Pain points</p>
+        <div class="callout" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">
+          <span class="callout-icon">!</span>
+          <span>Transcript and analysis are hidden behind tabs &mdash; user can only see one at a time.</span>
+        </div>
+        <div class="callout" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">
+          <span class="callout-icon">!</span>
+          <span>5 analysis steps nested inside a second layer of tabs. Hard to scan the full pipeline at a glance.</span>
+        </div>
+        <div class="callout" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">
+          <span class="callout-icon">!</span>
+          <span>Video occupies full width &mdash; no room for transcript alongside it.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Arrow -->
+  <div class="arrow-col">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+  </div>
+
+  <!-- ═══════ OPTION B ═══════ -->
+  <section class="option">
+    <div class="option-label">
+      <span class="option-badge after">After</span>
+      <h2>Option B &mdash; Proposed Layout</h2>
+    </div>
+
+    <div class="wireframe">
+
+      <!-- ── TOP HALF: Video + Transcript Side-by-Side ── -->
+      <div style="padding:16px 16px 0;display:flex;gap:12px;">
+
+        <!-- Left: Video (~60%) -->
+        <div style="flex:3;min-width:0;">
+          <div class="wire-box video">
+            <span class="label">Video Player &mdash; ~60% width</span>
+          </div>
+        </div>
+
+        <!-- Right: Transcript Panel (~40%) -->
+        <div style="flex:2;min-width:0;border:1px solid var(--gray-200);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden;">
+
+          <!-- Panel header -->
+          <div class="side-panel-header">
+            <h4>Transcript</h4>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="search-box">
+                <span class="search-icon"></span>
+                <span>Search&hellip;</span>
+              </div>
+              <span class="close-btn" title="Collapse panel">&times;</span>
+            </div>
+          </div>
+
+          <!-- Transcript body -->
+          <div style="padding:10px 12px;flex:1;overflow-y:auto;max-height:180px;">
+            <div class="transcript-line">
+              <span class="speaker-dot s1"></span>
+              <span class="speaker-label">User 1</span>
+              <span class="transcript-text">I usually start by opening the app and checking the <span class="highlight">main dashboard</span>.</span>
+            </div>
+            <div class="transcript-line">
+              <span class="speaker-dot s2"></span>
+              <span class="speaker-label">Mod</span>
+              <span class="transcript-text">Can you walk me through what you see there?</span>
+            </div>
+            <div class="transcript-line">
+              <span class="speaker-dot s1"></span>
+              <span class="speaker-label">User 1</span>
+              <span class="transcript-text">Sure, there&rsquo;s a sidebar with recent <span class="highlight">projects</span> and then the main area shows...</span>
+            </div>
+            <div class="transcript-line">
+              <span class="speaker-dot s3"></span>
+              <span class="speaker-label">User 2</span>
+              <span class="transcript-text">I actually skip that and go straight to search. The sidebar is too cluttered for me.</span>
+            </div>
+            <div class="transcript-line">
+              <span class="speaker-dot s2"></span>
+              <span class="speaker-label">Mod</span>
+              <span class="transcript-text">Interesting. What would you change about it?</span>
+            </div>
+          </div>
+
+          <!-- Scroll indicator -->
+          <div style="text-align:center;padding:4px 0 8px;font-size:10px;color:var(--gray-400);border-top:1px solid var(--gray-100);">
+            Auto-scrolls with playback &middot; Word-level highlights
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Divider ── -->
+      <div style="padding:16px 16px 0;">
+        <hr class="section-divider">
+      </div>
+
+      <!-- ── BOTTOM HALF: Analysis Steps (sequential) ── -->
+      <div style="padding:8px 16px 4px;">
+        <h3 style="font-size:15px;font-weight:600;color:var(--gray-700);margin-bottom:4px;">Analysis</h3>
+        <p style="font-size:11px;color:var(--gray-400);margin-bottom:12px;">All five analysis steps shown sequentially &mdash; no nested tabs.</p>
+      </div>
+
+      <div class="analysis-steps">
+        <div class="analysis-step">
+          <div class="step-heading">
+            <span class="step-number">1</span>
+            <span class="step-title">Chunks</span>
+          </div>
+          <div class="step-content">
+            <div class="placeholder-lines">
+              <div class="placeholder-line w90"></div>
+              <div class="placeholder-line w70"></div>
+              <div class="placeholder-line w80"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="analysis-step">
+          <div class="step-heading">
+            <span class="step-number">2</span>
+            <span class="step-title">Inferences</span>
+          </div>
+          <div class="step-content">
+            <div class="placeholder-lines">
+              <div class="placeholder-line w80"></div>
+              <div class="placeholder-line w60"></div>
+              <div class="placeholder-line w90"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="analysis-step">
+          <div class="step-heading">
+            <span class="step-number">3</span>
+            <span class="step-title">Patterns</span>
+          </div>
+          <div class="step-content">
+            <div class="placeholder-lines">
+              <div class="placeholder-line w70"></div>
+              <div class="placeholder-line w90"></div>
+              <div class="placeholder-line w50"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="analysis-step">
+          <div class="step-heading">
+            <span class="step-number">4</span>
+            <span class="step-title">Insights</span>
+          </div>
+          <div class="step-content">
+            <div class="placeholder-lines">
+              <div class="placeholder-line w60"></div>
+              <div class="placeholder-line w80"></div>
+              <div class="placeholder-line w70"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="analysis-step">
+          <div class="step-heading">
+            <span class="step-number">5</span>
+            <span class="step-title">Principles</span>
+          </div>
+          <div class="step-content">
+            <div class="placeholder-lines">
+              <div class="placeholder-line w90"></div>
+              <div class="placeholder-line w50"></div>
+              <div class="placeholder-line w80"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- Annotations / Improvements -->
+      <div class="annotations">
+        <p class="annotations-title">Improvements</p>
+        <div class="callout">
+          <span class="callout-icon">+</span>
+          <span>Transcript visible alongside video &mdash; no tab switching needed. Auto-scrolls with playback and highlights active words.</span>
+        </div>
+        <div class="callout">
+          <span class="callout-icon">+</span>
+          <span>All 5 analysis steps visible sequentially. Easy to scan the full pipeline without nested navigation.</span>
+        </div>
+        <div class="callout">
+          <span class="callout-icon">+</span>
+          <span>Color-coded speaker labels make multi-participant transcripts scannable. Collapsible panel preserves full-width video when desired.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ────────────────────── Responsive Behavior Note ────────────────────── -->
+<div class="responsive-note">
+  <div class="responsive-note-inner">
+    <h3>Responsive Behavior</h3>
+    <ul>
+      <li>On mobile / narrow screens (&lt; 768px), the transcript panel stacks below the video player instead of sitting alongside it.</li>
+      <li>Analysis steps remain sequential at all breakpoints &mdash; they naturally reflow as a single column.</li>
+      <li>Transcript collapse toggle becomes especially useful on tablets where horizontal space is limited.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
