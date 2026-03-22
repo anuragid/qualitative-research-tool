@@ -1,18 +1,20 @@
+import { useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transcriptionsService } from "../services/transcriptions";
 import type { LabelSpeakerDto } from "../types";
 
 export function useTranscript(videoId: string | null, shouldFetch: boolean = true) {
+  // Track when we first saw "completed" — the server response doesn't include
+  // completed_at or speaker_labels, so we can't rely on those for the poll window.
+  const completedSeenAt = useRef<number | null>(null);
+
   return useQuery({
     queryKey: ["videos", videoId, "transcript"],
     queryFn: () => transcriptionsService.get(videoId!),
     enabled: !!videoId && shouldFetch,
     retry: (failureCount, error: unknown) => {
-      // Don't retry on 404 - transcript doesn't exist yet
       const status = (error as { status?: number })?.status;
-      if (status === 404) {
-        return false;
-      }
+      if (status === 404) return false;
       return failureCount < 3;
     },
     refetchInterval: (query) => {
@@ -24,19 +26,19 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
         transcript.status === "pending" ||
         transcript.status === "processing"
       ) {
+        completedSeenAt.current = null;
         return 4000;
       }
 
       if (transcript.status === "completed") {
-        const hasSpeakers = transcript.speaker_labels && transcript.speaker_labels.length > 0;
-
-        if (!hasSpeakers) {
-          const completedAt = transcript.completed_at ? new Date(transcript.completed_at).getTime() : Date.now();
-          const timeSinceCompletion = Date.now() - completedAt;
-
-          if (timeSinceCompletion < 30000) {
-            return 3000;
-          }
+        // Record the first time we see "completed"
+        if (completedSeenAt.current === null) {
+          completedSeenAt.current = Date.now();
+        }
+        // Poll for 30 seconds after completion to allow speaker label detection
+        const elapsed = Date.now() - completedSeenAt.current;
+        if (elapsed < 30000) {
+          return 3000;
         }
       }
 
