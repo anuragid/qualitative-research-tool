@@ -60,11 +60,6 @@ function SpeakerRoleEditor({
     return r === "interviewer" || r === "participant";
   };
 
-  const allRolesAssigned = uniqueSpeakers.every(speaker => {
-    const label = speakerLabels?.find((l) => l.speaker_label === speaker);
-    return hasRole(label?.role);
-  });
-
   // Compact summary when collapsed (and not actively editing a speaker)
   if (!editingSpeaker && !isExpanded) {
     return (
