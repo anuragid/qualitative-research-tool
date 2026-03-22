@@ -72,7 +72,7 @@ export function useUploadVideo() {
       file: File;
       onProgress?: (progress: number, loaded: number, total: number) => void;
       cancelToken?: CancelToken;
-    }) => videosService.upload(projectId, file, onProgress, cancelToken),
+    }) => videosService.uploadDirect(projectId, file, onProgress, cancelToken),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["projects", variables.projectId, "videos"],

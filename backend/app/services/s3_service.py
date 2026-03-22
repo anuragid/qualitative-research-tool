@@ -121,6 +121,23 @@ class S3Service:
             logger.error(f"Error generating presigned URL: {e}")
             raise Exception(f"Failed to generate presigned URL: {str(e)}")
 
+    def generate_upload_url(self, s3_key: str, content_type: str, expiration: int = 3600) -> str:
+        """Generate a presigned PUT URL for direct browser upload to R2."""
+        url = self.s3_client.generate_presigned_url(
+            "put_object",
+            Params={
+                "Bucket": self.bucket_name,
+                "Key": s3_key,
+                "ContentType": content_type,
+            },
+            ExpiresIn=expiration,
+        )
+        return url
+
+    def head_object(self, s3_key: str) -> dict:
+        """Check if an object exists in R2 and return its metadata."""
+        return self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_key)
+
     def delete_video(self, s3_key: str) -> bool:
         """
         Delete video from R2.

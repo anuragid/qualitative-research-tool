@@ -3,11 +3,13 @@
 import asyncio
 import logging
 import re
+import uuid as uuid_module
 from pathlib import Path
 from typing import Any, Dict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import Permission, require_permissions, require_permissions_upload
@@ -43,6 +45,130 @@ def _get_video_with_ownership(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Video {video_id} not found",
         )
+    return video
+
+
+# --- Pydantic models for presigned upload flow ---
+
+class UploadUrlRequest(BaseModel):
+    filename: str
+    file_size: int
+    content_type: str
+
+
+class UploadUrlResponse(BaseModel):
+    upload_url: str
+    s3_key: str
+    video_id: str
+
+
+# --- Presigned direct-upload endpoints ---
+# NOTE: Browser direct uploads to R2 require CORS to be configured on the R2
+# bucket (via the Cloudflare dashboard or API). The required CORS rule should
+# allow PUT from the frontend origin with the Content-Type header.
+
+
+@router.post("/{project_id}/upload-url", response_model=UploadUrlResponse, status_code=status.HTTP_200_OK)
+async def get_upload_url(
+    project_id: UUID,
+    request_body: UploadUrlRequest,
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.VIDEO_UPLOAD)),
+    db: Session = Depends(get_db),
+):
+    """Generate a presigned URL for direct browser-to-R2 upload."""
+    current_user_id = current_user["id"]
+
+    # Validate project ownership
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user_id,
+    ).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+
+    # Enforce video quota
+    video_count = db.query(Video).filter(Video.project_id == project_id).count()
+    if video_count >= 20:
+        raise HTTPException(status_code=429, detail="Maximum of 20 videos per project")
+
+    # Validate file extension
+    file_extension = Path(request_body.filename).suffix.lower()
+    allowed_extensions = settings.ALLOWED_VIDEO_EXTENSIONS + settings.ALLOWED_AUDIO_EXTENSIONS
+    if file_extension not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}")
+
+    # Validate content type
+    _ALLOWED_CONTENT_TYPES = {
+        "video/mp4", "video/quicktime", "video/webm", "video/x-msvideo",
+        "audio/mpeg", "audio/wav", "audio/mp4", "audio/ogg", "audio/flac", "audio/aac",
+    }
+    if request_body.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid content type: {request_body.content_type}")
+
+    # Validate file size
+    if request_body.file_size <= 0:
+        raise HTTPException(status_code=400, detail="File size must be positive")
+    if request_body.file_size > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum: {settings.MAX_FILE_SIZE_MB}MB")
+
+    # Sanitize filename
+    safe_filename = Path(request_body.filename).name
+    safe_filename = re.sub(r'[^\w\-.]', '_', safe_filename)
+    if len(safe_filename) > 255:
+        ext = Path(safe_filename).suffix
+        safe_filename = safe_filename[:255 - len(ext)] + ext
+
+    # Generate S3 key
+    s3_key = f"videos/{project_id}/{uuid_module.uuid4()}/{safe_filename}"
+
+    # Create video record in "uploading" state
+    video = Video(
+        project_id=project_id,
+        filename=safe_filename,
+        s3_key=s3_key,
+        s3_url=f"https://{settings.R2_BUCKET_NAME}.r2.cloudflarestorage.com/{s3_key}",
+        file_size_bytes=request_body.file_size,
+        status="uploading",
+    )
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    # Generate presigned URL
+    upload_url = await asyncio.to_thread(
+        s3_service.generate_upload_url,
+        s3_key=s3_key,
+        content_type=request_body.content_type,
+    )
+
+    logger.info(f"Generated upload URL for video {video.id} in project {project_id}")
+    return UploadUrlResponse(upload_url=upload_url, s3_key=s3_key, video_id=str(video.id))
+
+
+@router.post("/{video_id}/confirm-upload", response_model=VideoResponse, status_code=status.HTTP_200_OK)
+async def confirm_upload(
+    video_id: UUID,
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.VIDEO_UPLOAD)),
+    db: Session = Depends(get_db),
+):
+    """Confirm that a direct upload to R2 completed successfully."""
+    current_user_id = current_user["id"]
+    video = _get_video_with_ownership(video_id, current_user_id, db)
+
+    if video.status != "uploading":
+        raise HTTPException(status_code=400, detail="Video is not in uploading state")
+
+    # Verify the object actually exists in R2
+    try:
+        await asyncio.to_thread(s3_service.head_object, video.s3_key)
+    except Exception:
+        raise HTTPException(status_code=400, detail="File not found in storage. Upload may not have completed.")
+
+    video.status = "uploaded"
+    db.commit()
+    db.refresh(video)
+
+    logger.info(f"Upload confirmed for video {video.id}")
     return video
 
 
