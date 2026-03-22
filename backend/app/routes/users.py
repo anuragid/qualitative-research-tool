@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
-from app.constants import RECOMMENDED_MODELS, STANDARD_MODEL_IDS, STANDARD_MODELS
+from app.constants import STANDARD_MODEL_IDS, STANDARD_MODELS
 from app.database import get_db
 from app.models import database_models
 from app.models.schemas import UserResponse, UserSettingsResponse, UserSettingsUpdate
