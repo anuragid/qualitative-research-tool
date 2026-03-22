@@ -55,7 +55,7 @@ function SpeakerRoleEditor({
 
   if (uniqueSpeakers.length === 0) return null;
 
-  const hasRole = (role?: string) => {
+  const hasRole = (role?: string | null) => {
     const r = role?.toLowerCase();
     return r === "interviewer" || r === "participant";
   };
