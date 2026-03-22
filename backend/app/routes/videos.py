@@ -1,5 +1,6 @@
 """Video management and analysis API routes."""
 
+import asyncio
 import logging
 import re
 from pathlib import Path
@@ -156,12 +157,13 @@ async def upload_video(
             ext = Path(safe_filename).suffix
             safe_filename = safe_filename[:255 - len(ext)] + ext
 
-        # Upload to S3
+        # Upload to S3 (offloaded to thread to avoid blocking the event loop)
         logger.info(f"Uploading video for project {project_id}")
-        s3_key, s3_url = s3_service.upload_video(
+        s3_key, s3_url = await asyncio.to_thread(
+            s3_service.upload_video,
             file=file.file,
             filename=safe_filename,
-            project_id=str(project_id)
+            project_id=str(project_id),
         )
 
         # Create video record in database
@@ -237,9 +239,9 @@ async def delete_video(
                 detail="Cannot delete video while it is being processed",
             )
 
-        # Delete from S3 - fail hard on error
+        # Delete from S3 - fail hard on error (offloaded to thread)
         try:
-            s3_service.delete_video(video.s3_key)
+            await asyncio.to_thread(s3_service.delete_video, video.s3_key)
         except Exception as e:
             logger.error(f"Failed to delete S3 object for video {video_id}: {e}")
             raise HTTPException(
@@ -278,10 +280,11 @@ async def get_video_playback_url(
     try:
         video = _get_video_with_ownership(video_id, current_user_id, db)
 
-        # Generate fresh presigned URL (valid for 1 hour)
-        playback_url = s3_service.get_presigned_url(
+        # Generate fresh presigned URL (valid for 1 hour, offloaded to thread)
+        playback_url = await asyncio.to_thread(
+            s3_service.get_presigned_url,
             s3_key=video.s3_key,
-            expiration=3600
+            expiration=3600,
         )
 
         logger.info(f"Generated playback URL for video {video_id}")
@@ -490,6 +493,34 @@ async def trigger_video_analysis(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to trigger video analysis"
         )
+
+
+@router.get("/{video_id}/analysis/status")
+async def get_video_analysis_status(
+    video_id: UUID,
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
+    db: Session = Depends(get_db),
+):
+    """Lightweight status check for polling (returns ~200 bytes instead of 50+ KB)."""
+    current_user_id = current_user["id"]
+    _get_video_with_ownership(video_id, current_user_id, db)
+
+    video_analysis = db.query(VideoAnalysis)\
+        .filter(VideoAnalysis.video_id == video_id)\
+        .first()
+
+    if not video_analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No analysis found for video {video_id}",
+        )
+
+    return {
+        "status": video_analysis.status,
+        "current_step": video_analysis.current_step,
+        "started_at": video_analysis.started_at,
+        "completed_at": video_analysis.completed_at,
+    }
 
 
 @router.get("/{video_id}/analysis", response_model=VideoAnalysisResponse)

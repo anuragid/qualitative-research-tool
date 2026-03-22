@@ -36,11 +36,8 @@ def explain_node(state: VideoAnalysisState) -> Dict[str, Any]:
         if not patterns:
             raise ValueError("No patterns available for insight generation")
 
-        # Format patterns and chunks for Claude
-        patterns_json = json.dumps(patterns, indent=2)
-
-        # Include original chunks for context and evidence
-        chunks_json = json.dumps(chunks, indent=2) if chunks else "[]"
+        # Format patterns for Claude
+        patterns_json = json.dumps(patterns)
 
         # Build research context if available
         research_context = ""
@@ -61,9 +58,6 @@ Ask "WHY?" for each pattern:
 
 PATTERNS:
 {patterns_json}
-
-ORIGINAL CHUNKS (for evidence):
-{chunks_json}
 
 Generate non-consensus insights that challenge assumptions and reveal fundamental truths. Write each insight as a short, punchy headline."""
 

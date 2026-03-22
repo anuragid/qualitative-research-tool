@@ -34,6 +34,11 @@ export const analysisService = {
     return response.data;
   },
 
+  getVideoAnalysisStatus: async (videoId: string) => {
+    const response = await api.get(`/api/videos/${videoId}/analysis/status`);
+    return response.data;
+  },
+
   getVideoAnalysis: async (videoId: string): Promise<VideoAnalysis> => {
     const response = await api.get(`/api/videos/${videoId}/analysis`);
     return response.data;

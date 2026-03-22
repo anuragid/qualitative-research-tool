@@ -1,7 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { analysisService } from "../services/analysis";
 
-// Video Analysis Hooks
+// Video Analysis Status Hook (lightweight polling endpoint ~200 bytes)
+export function useVideoAnalysisStatus(videoId: string | null) {
+  return useQuery({
+    queryKey: ["videos", videoId, "analysis", "status"],
+    queryFn: () => analysisService.getVideoAnalysisStatus(videoId!),
+    enabled: !!videoId,
+    retry: (failureCount, error: unknown) => {
+      const status = (error as { status?: number })?.status;
+      if (status === 404) return false;
+      return failureCount < 3;
+    },
+    refetchInterval: (query) => {
+      if (document.hidden) return false;
+      const data = query.state.data;
+      if (data && (data.status === "processing" || data.status === "pending")) {
+        return 3000;
+      }
+      return false;
+    },
+  });
+}
+
+// Video Analysis Hook (full payload, no polling — use useVideoAnalysisStatus for polling)
 export function useVideoAnalysis(videoId: string | null) {
   return useQuery({
     queryKey: ["videos", videoId, "analysis"],
@@ -15,14 +37,6 @@ export function useVideoAnalysis(videoId: string | null) {
       }
       return failureCount < 3;
     },
-    refetchInterval: (query) => {
-      if (document.hidden) return false;
-      const analysis = query.state.data;
-      if (analysis && (analysis.status === "processing" || analysis.status === "pending")) {
-        return 3000;
-      }
-      return false;
-    },
   });
 }
 
@@ -32,6 +46,7 @@ export function useStartVideoAnalysis() {
   return useMutation({
     mutationFn: (videoId: string) => analysisService.startVideoAnalysis(videoId),
     onSuccess: (_, videoId) => {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis", "status"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
     },
@@ -51,6 +66,7 @@ export function useStartChunkStep() {
   return useMutation({
     mutationFn: (videoId: string) => analysisService.startChunkStep(videoId),
     onSuccess: (_, videoId) => {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis", "status"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
     },
@@ -63,6 +79,7 @@ export function useStartInferStep() {
   return useMutation({
     mutationFn: (videoId: string) => analysisService.startInferStep(videoId),
     onSuccess: (_, videoId) => {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis", "status"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
     },
@@ -75,6 +92,7 @@ export function useStartRelateStep() {
   return useMutation({
     mutationFn: (videoId: string) => analysisService.startRelateStep(videoId),
     onSuccess: (_, videoId) => {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis", "status"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
     },
@@ -87,6 +105,7 @@ export function useStartExplainStep() {
   return useMutation({
     mutationFn: (videoId: string) => analysisService.startExplainStep(videoId),
     onSuccess: (_, videoId) => {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis", "status"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
     },
@@ -99,6 +118,7 @@ export function useStartActivateStep() {
   return useMutation({
     mutationFn: (videoId: string) => analysisService.startActivateStep(videoId),
     onSuccess: (_, videoId) => {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis", "status"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
     },
@@ -123,7 +143,7 @@ export function useProjectAnalysis(projectId: string | null) {
       if (document.hidden) return false;
       const analysis = query.state.data;
       if (analysis && (analysis.status === "processing" || analysis.status === "pending")) {
-        return 4000;
+        return 10000;
       }
       return false;
     },

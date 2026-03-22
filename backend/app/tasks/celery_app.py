@@ -35,8 +35,8 @@ celery_app.conf.update(
 
     # Task execution settings
     task_track_started=True,
-    task_time_limit=7200,  # 2 hours max per task
-    task_soft_time_limit=6900,  # Soft limit at 1h55m
+    task_time_limit=1800,  # 30 minutes max per task
+    task_soft_time_limit=1700,  # Soft limit at ~28 minutes
     task_acks_late=True,  # Acknowledge tasks after execution (survives worker crash)
     task_reject_on_worker_lost=True,  # Re-queue tasks if worker dies mid-execution
 

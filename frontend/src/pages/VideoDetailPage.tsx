@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
 import { useTranscript, useSpeakerLabels, useStartTranscription, useLabelSpeaker } from "../hooks/useTranscriptions";
 import {
   useVideoAnalysis,
+  useVideoAnalysisStatus,
   useStartFullAnalysis,
   useStartChunkStep,
   useStartInferStep,
@@ -41,8 +43,17 @@ export default function VideoDetailPage() {
   const { data: playbackUrl } = useVideoPlaybackUrl(videoId || null);
   const { data: transcript, isLoading: transcriptLoading } = useTranscript(videoId || null);
   const { data: speakerLabels } = useSpeakerLabels(transcript?.id || null);
+  const analysisStatus = useVideoAnalysisStatus(videoId || null);
   const { data: analysis, isLoading: analysisLoading } = useVideoAnalysis(videoId || null);
   const { data: project } = useProject(video?.project_id || null);
+  const queryClient = useQueryClient();
+
+  // When lightweight status endpoint reports "completed" but full analysis hasn't caught up, refetch full data
+  useEffect(() => {
+    if (analysisStatus.data?.status === "completed" && analysis?.status !== "completed") {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
+    }
+  }, [analysisStatus.data?.status, analysis?.status, videoId, queryClient]);
 
   const startTranscription = useStartTranscription();
   const startFullAnalysis = useStartFullAnalysis();

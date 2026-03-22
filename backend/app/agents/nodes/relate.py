@@ -34,7 +34,7 @@ def relate_node(state: VideoAnalysisState) -> Dict[str, Any]:
             raise ValueError("No inferences available for pattern analysis")
 
         # Format inferences for Claude
-        inferences_json = json.dumps(inferences, indent=2)
+        inferences_json = json.dumps(inferences)
 
         # Build research context if available
         research_context = ""

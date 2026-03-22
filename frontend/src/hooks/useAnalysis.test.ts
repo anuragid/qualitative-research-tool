@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import {
   useVideoAnalysis,
+  useVideoAnalysisStatus,
   useStartVideoAnalysis,
   useStartFullAnalysis,
   useStartChunkStep,
@@ -22,6 +23,7 @@ import {
 vi.mock("../services/analysis", () => ({
   analysisService: {
     getVideoAnalysis: vi.fn(),
+    getVideoAnalysisStatus: vi.fn(),
     startVideoAnalysis: vi.fn(),
     startChunkStep: vi.fn(),
     startInferStep: vi.fn(),
@@ -37,6 +39,7 @@ import { analysisService } from "../services/analysis";
 
 const mockedService = analysisService as {
   getVideoAnalysis: ReturnType<typeof vi.fn>;
+  getVideoAnalysisStatus: ReturnType<typeof vi.fn>;
   startVideoAnalysis: ReturnType<typeof vi.fn>;
   startChunkStep: ReturnType<typeof vi.fn>;
   startInferStep: ReturnType<typeof vi.fn>;
@@ -126,7 +129,7 @@ describe("useVideoAnalysis", () => {
     expect(mockedService.getVideoAnalysis.mock.calls.length).toBeGreaterThan(1);
   });
 
-  it("polls when analysis status is processing", async () => {
+  it("fetches successfully when status is processing (no polling)", async () => {
     const analysis = { id: "a1", video_id: "v1", status: "processing" };
     mockedService.getVideoAnalysis.mockResolvedValue(analysis);
 
@@ -138,7 +141,7 @@ describe("useVideoAnalysis", () => {
     expect(result.current.data?.status).toBe("processing");
   });
 
-  it("polls when analysis status is pending", async () => {
+  it("fetches successfully when status is pending (no polling)", async () => {
     const analysis = { id: "a1", video_id: "v1", status: "pending" };
     mockedService.getVideoAnalysis.mockResolvedValue(analysis);
 
@@ -150,7 +153,7 @@ describe("useVideoAnalysis", () => {
     expect(result.current.data?.status).toBe("pending");
   });
 
-  it("does not poll when analysis status is completed", async () => {
+  it("fetches successfully when status is completed", async () => {
     const analysis = { id: "a1", video_id: "v1", status: "completed" };
     mockedService.getVideoAnalysis.mockResolvedValue(analysis);
 
@@ -162,7 +165,7 @@ describe("useVideoAnalysis", () => {
     expect(result.current.data?.status).toBe("completed");
   });
 
-  it("does not poll when analysis status is error", async () => {
+  it("fetches successfully when status is error", async () => {
     const analysis = { id: "a1", video_id: "v1", status: "error" };
     mockedService.getVideoAnalysis.mockResolvedValue(analysis);
 
@@ -172,6 +175,57 @@ describe("useVideoAnalysis", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.status).toBe("error");
+  });
+});
+
+describe("useVideoAnalysisStatus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches video analysis status when videoId is provided", async () => {
+    const status = { status: "completed", current_step: "activate" };
+    mockedService.getVideoAnalysisStatus.mockResolvedValue(status);
+
+    const { result } = renderHook(() => useVideoAnalysisStatus("v1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(status);
+    expect(mockedService.getVideoAnalysisStatus).toHaveBeenCalledWith("v1");
+  });
+
+  it("does not fetch when videoId is null", () => {
+    const { result } = renderHook(() => useVideoAnalysisStatus(null), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(mockedService.getVideoAnalysisStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not retry on 404 error", async () => {
+    mockedService.getVideoAnalysisStatus.mockRejectedValue({ status: 404 });
+
+    const { result } = renderHook(() => useVideoAnalysisStatus("v1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockedService.getVideoAnalysisStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns processing status for polling", async () => {
+    const status = { status: "processing", current_step: "chunk" };
+    mockedService.getVideoAnalysisStatus.mockResolvedValue(status);
+
+    const { result } = renderHook(() => useVideoAnalysisStatus("v1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.status).toBe("processing");
   });
 });
 

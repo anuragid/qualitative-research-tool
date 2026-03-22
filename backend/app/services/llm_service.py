@@ -70,7 +70,7 @@ class LLMService:
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=5, max=30),
+        wait=wait_exponential(multiplier=2, min=2, max=30),
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
         before_sleep=before_sleep_log(logger, logging.WARNING),
     )
@@ -98,7 +98,7 @@ class LLMService:
                     {"role": "user", "content": user_message},
                 ],
                 "extra_headers": OPENROUTER_HEADERS,
-                "timeout": 600.0,  # 10 minute timeout for long operations
+                "timeout": 300.0,  # 5 minute timeout per LLM call
             }
 
             response = client.chat.completions.create(**kwargs)

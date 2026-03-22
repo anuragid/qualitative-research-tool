@@ -1,5 +1,6 @@
 """Project management API routes."""
 
+import asyncio
 import logging
 from typing import Any, Dict, List
 from uuid import UUID
@@ -255,10 +256,10 @@ async def delete_project(
                     detail="Cannot delete project while videos are being processed",
                 )
 
-        # Delete S3 objects for all videos
+        # Delete S3 objects for all videos (offloaded to thread)
         for video in project.videos:
             try:
-                s3_service.delete_video(video.s3_key)
+                await asyncio.to_thread(s3_service.delete_video, video.s3_key)
             except Exception as e:
                 logger.warning(f"Failed to delete S3 object for video {video.id}: {e}")
 

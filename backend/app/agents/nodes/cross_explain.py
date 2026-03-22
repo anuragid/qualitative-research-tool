@@ -35,8 +35,8 @@ def cross_explain_node(state: ProjectAnalysisState) -> Dict[str, Any]:
             raise ValueError("No cross-video patterns available for insight generation")
 
         # Format meta-patterns and individual insights for Claude
-        patterns_json = json.dumps(cross_patterns, indent=2)
-        insights_json = json.dumps(video_insights, indent=2)
+        patterns_json = json.dumps(cross_patterns)
+        insights_json = json.dumps(video_insights)
 
         user_message = f"""Please analyze the following meta-patterns from multiple videos and generate cross-video insights.
 

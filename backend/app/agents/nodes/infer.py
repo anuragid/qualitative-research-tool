@@ -33,7 +33,7 @@ def infer_node(state: VideoAnalysisState) -> Dict[str, Any]:
             raise ValueError("No chunks available for inference")
 
         # Format chunks for Claude
-        chunks_json = json.dumps(chunks, indent=2)
+        chunks_json = json.dumps(chunks)
 
         user_message = f"""Please analyze the following chunks and infer meaning from each one.
 

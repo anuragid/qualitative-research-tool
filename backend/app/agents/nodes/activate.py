@@ -33,7 +33,7 @@ def activate_node(state: VideoAnalysisState) -> Dict[str, Any]:
             raise ValueError("No insights available for design principle generation")
 
         # Format insights for Claude
-        insights_json = json.dumps(insights, indent=2)
+        insights_json = json.dumps(insights)
 
         user_message = f"""Please turn the following insights into actionable design principles.
 

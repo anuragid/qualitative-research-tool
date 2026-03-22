@@ -33,7 +33,7 @@ def cross_activate_node(state: ProjectAnalysisState) -> Dict[str, Any]:
             raise ValueError("No cross-video insights available for principle generation")
 
         # Format insights for Claude
-        insights_json = json.dumps(cross_insights, indent=2)
+        insights_json = json.dumps(cross_insights)
 
         user_message = f"""Please turn the following cross-video insights into system-level design principles.
 

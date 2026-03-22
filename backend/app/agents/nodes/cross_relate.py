@@ -33,7 +33,7 @@ def cross_relate_node(state: ProjectAnalysisState) -> Dict[str, Any]:
             raise ValueError("No video patterns available for cross-video analysis")
 
         # Format patterns from all videos for Claude
-        patterns_json = json.dumps(video_patterns, indent=2)
+        patterns_json = json.dumps(video_patterns)
 
         user_message = f"""Please analyze patterns from multiple videos and identify meta-patterns.
 
