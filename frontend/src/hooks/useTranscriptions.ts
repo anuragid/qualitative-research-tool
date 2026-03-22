@@ -16,33 +16,26 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
       return failureCount < 3;
     },
     refetchInterval: (query) => {
+      if (document.hidden) return false;
       const transcript = query.state.data;
 
-      // Poll if:
-      // 1. We don't have transcript data yet, OR
-      // 2. Transcript is still processing (not yet completed)
       if (
         !transcript ||
         transcript.status === "pending" ||
         transcript.status === "processing"
       ) {
-        return 2000; // Poll every 2 seconds
+        return 4000;
       }
 
-      // IMPORTANT: Continue polling briefly after completion to catch speaker detection
-      // AssemblyAI may add speaker labels slightly after the initial transcript
       if (transcript.status === "completed") {
-        // Check if we have speakers yet
         const hasSpeakers = transcript.speaker_labels && transcript.speaker_labels.length > 0;
 
         if (!hasSpeakers) {
-          // No speakers detected yet, keep polling for up to ~30 seconds after completion
-          // This gives AssemblyAI time to complete speaker diarization
           const completedAt = transcript.completed_at ? new Date(transcript.completed_at).getTime() : Date.now();
           const timeSinceCompletion = Date.now() - completedAt;
 
-          if (timeSinceCompletion < 30000) { // Poll for up to 30 seconds
-            return 1500; // Poll every 1.5 seconds for speaker detection
+          if (timeSinceCompletion < 30000) {
+            return 3000;
           }
         }
       }

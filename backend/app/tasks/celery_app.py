@@ -41,8 +41,8 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,  # Re-queue tasks if worker dies mid-execution
 
     # Worker settings
-    worker_prefetch_multiplier=1,  # One task at a time
-    worker_max_tasks_per_child=None,  # Disabled — solo pool doesn't fork children
+    worker_prefetch_multiplier=1,  # Fetch one task per thread (threads handle concurrency)
+    worker_max_tasks_per_child=None,  # No limit — threads don't need recycling like forked children
     worker_cancel_long_running_tasks_on_connection_loss=True,
 
     # Broker connection resilience

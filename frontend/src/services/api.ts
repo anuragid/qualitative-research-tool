@@ -71,7 +71,11 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
 
       if (status === 401) {
-        // Unauthorized -- token may be expired
+        // Token expired or invalid — redirect to sign-in unless already there
+        if (!window.location.pathname.startsWith("/sign-")) {
+          window.location.href = "/sign-in";
+          return new Promise(() => {}); // Halt further processing during redirect
+        }
       } else if (status === 404) {
         // Don't log 404s for analysis endpoints - these are expected when no analysis exists
         const isAnalysisEndpoint = url.includes('/analysis') ||

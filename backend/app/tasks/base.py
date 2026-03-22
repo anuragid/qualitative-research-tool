@@ -1,6 +1,7 @@
-"""Base Celery task class with database session management."""
+"""Base Celery task class with thread-safe database session management."""
 
 import logging
+import threading
 
 from celery import Task
 from sqlalchemy.orm import Session
@@ -12,33 +13,33 @@ logger = logging.getLogger(__name__)
 
 class DatabaseTask(Task):
     """
-    Base task with per-invocation database session management.
+    Base task with thread-safe, per-invocation database session management.
 
-    Each task invocation gets its own session, which is properly closed
-    after the task completes (success, failure, or retry).
+    Uses threading.local() so each Celery thread gets its own DB session.
+    This is required when using --pool=threads (concurrent task execution).
     """
 
-    # Abstract prevents Celery from registering this as a task itself
     abstract = True
+    _thread_local = threading.local()
 
     def __call__(self, *args, **kwargs):
-        """Override __call__ to create a fresh session per invocation."""
-        self._db = None
+        """Ensure fresh session per invocation (defense-in-depth)."""
+        self._thread_local.db = None
         return super().__call__(*args, **kwargs)
 
     @property
     def db(self) -> Session:
-        """Get or create database session for this task invocation."""
-        if self._db is None:
-            self._db = SessionLocal()
-        return self._db
+        """Get or create database session for this thread."""
+        if not hasattr(self._thread_local, "db") or self._thread_local.db is None:
+            self._thread_local.db = SessionLocal()
+        return self._thread_local.db
 
     def after_return(self, status, retval, task_id, args, kwargs, einfo):
         """Clean up database session after task completes."""
-        if hasattr(self, '_db') and self._db is not None:
+        if hasattr(self._thread_local, "db") and self._thread_local.db is not None:
             try:
-                self._db.close()
+                self._thread_local.db.close()
             except Exception as e:
                 logger.warning(f"Error closing database session for task {task_id}: {e}")
             finally:
-                self._db = None
+                self._thread_local.db = None

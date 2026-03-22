@@ -201,16 +201,11 @@ async def update_user_settings(
 
     # Enforce model tier:
     # - BYOK users: allow ANY model ID (they're paying with their own key)
-    # - Non-BYOK users: allow free models from our curated list, the recommended
-    #   standard model, OR any model whose ID ends with ":free" (OpenRouter convention)
+    # - Non-BYOK users: only allow models from our curated standard list
     if settings.preferred_model is not None:
         has_key = bool(db_user.encrypted_api_key)
         if not has_key:
-            standard_id = RECOMMENDED_MODELS["standard"]["id"]
-            is_known_free = settings.preferred_model in STANDARD_MODEL_IDS
-            is_standard = settings.preferred_model == standard_id
-            is_openrouter_free = settings.preferred_model.endswith(":free")
-            if not (is_known_free or is_standard or is_openrouter_free):
+            if settings.preferred_model not in STANDARD_MODEL_IDS:
                 raise HTTPException(
                     status_code=403,
                     detail="Add your OpenRouter API key in Settings to unlock premium models.",

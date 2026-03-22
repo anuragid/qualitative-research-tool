@@ -8,8 +8,8 @@ export function useProjectVideos(projectId: string | null) {
     queryFn: () => videosService.getByProject(projectId!),
     enabled: !!projectId,
     refetchInterval: (query) => {
+      if (document.hidden) return false;
       const videos = query.state.data;
-      // Poll if any video is transcribing or analyzing
       if (
         videos?.some(
           (v) =>
@@ -19,7 +19,7 @@ export function useProjectVideos(projectId: string | null) {
             (v.status === "analyzed" && !v.analysis)
         )
       ) {
-        return 2000; // Poll every 2 seconds
+        return 4000;
       }
       return false;
     },
@@ -32,28 +32,25 @@ export function useVideo(id: string | null) {
     queryFn: () => videosService.getById(id!),
     enabled: !!id,
     refetchInterval: (query) => {
+      if (document.hidden) return false;
       const video = query.state.data;
       if (!video) return false;
 
-      // Poll while transcribing OR transcribed but transcript data not loaded yet
       const needsTranscriptData =
         video.status === "transcribing" ||
         (video.status === "transcribed" && !video.transcript);
 
-      // Poll while analyzing OR analyzed but analysis data not loaded yet
       const needsAnalysisData =
         video.status === "analyzing" ||
         (video.status === "analyzed" && !video.analysis);
 
-      // IMPORTANT: Also check for speaker labels after transcription
-      // Even if transcript exists, we might not have speaker labels yet
       const needsSpeakerData =
         video.status === "transcribed" &&
         video.transcript &&
         (!video.transcript.speaker_labels || video.transcript.speaker_labels.length === 0);
 
       if (needsTranscriptData || needsAnalysisData || needsSpeakerData) {
-        return 2000; // Poll every 2 seconds for faster feedback
+        return 4000;
       }
 
       return false;

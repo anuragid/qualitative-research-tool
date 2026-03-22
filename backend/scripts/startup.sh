@@ -114,14 +114,18 @@ fi
 # Start the application
 if [ "$SERVICE" = "worker" ]; then
     echo "🔨 Starting Celery worker..."
-    # --pool=solo: Use single-process pool (no fork). Halves memory usage on
-    #   Railway's constrained containers. Safe because prefetch_multiplier=1
-    #   already limits to one task at a time.
-    # --without-heartbeat: Disables worker heartbeat (unnecessary for single worker)
+    # --pool=threads: Run concurrent tasks in threads (I/O-bound: LLM calls,
+    #   AssemblyAI polling, R2 uploads). Threads share process memory so cost
+    #   is ~$0 extra vs solo. Sleeping threads (time.sleep in poll loops)
+    #   don't consume CPU — Railway only bills active CPU.
+    # --concurrency: Number of concurrent tasks. Default 8 handles mix of
+    #   transcriptions (long, mostly sleeping) + analyses (5 LLM calls each).
+    # --without-heartbeat: Disables worker heartbeat (single worker instance)
     # --without-mingle: Skip synchronizing with other workers on startup
     # --without-gossip: Disable worker-to-worker communication
     exec celery -A app.tasks.celery_app worker \
-        --pool=solo \
+        --pool=threads \
+        --concurrency=${CELERY_CONCURRENCY:-8} \
         --loglevel=info \
         --without-heartbeat \
         --without-mingle \

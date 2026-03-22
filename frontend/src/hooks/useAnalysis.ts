@@ -16,10 +16,10 @@ export function useVideoAnalysis(videoId: string | null) {
       return failureCount < 3;
     },
     refetchInterval: (query) => {
+      if (document.hidden) return false;
       const analysis = query.state.data;
-      // Poll while analysis is running or pending (not for completed/failed)
       if (analysis && (analysis.status === "processing" || analysis.status === "pending")) {
-        return 1000; // Poll every 1 second for faster updates
+        return 3000;
       }
       return false;
     },
@@ -120,10 +120,10 @@ export function useProjectAnalysis(projectId: string | null) {
       return failureCount < 3;
     },
     refetchInterval: (query) => {
+      if (document.hidden) return false;
       const analysis = query.state.data;
-      // Poll while analysis is running or pending
       if (analysis && (analysis.status === "processing" || analysis.status === "pending")) {
-        return 2000; // Poll every 2 seconds for faster updates
+        return 4000;
       }
       return false;
     },
