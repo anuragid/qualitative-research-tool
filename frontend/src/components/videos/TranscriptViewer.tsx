@@ -374,13 +374,13 @@ export function TranscriptViewer({
                 placeholder="Search transcript..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-7 text-xs pl-7 pr-2"
+                className="w-full h-7 text-ui pl-7 pr-2"
               />
             </div>
             {searchQuery && (
               <div className="flex items-center gap-0.5 flex-shrink-0">
                 {sortedMatchIndexes.length > 0 && (
-                  <span className="text-[10px] text-text-tertiary whitespace-nowrap">
+                  <span className="text-ui text-text-tertiary whitespace-nowrap">
                     {currentMatchIndex + 1}/{sortedMatchIndexes.length}
                   </span>
                 )}
@@ -411,27 +411,27 @@ export function TranscriptViewer({
                 {/* Top row: speaker + timestamp */}
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${colorSet.bg} ${colorSet.text}`}>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-ui font-semibold ${colorSet.bg} ${colorSet.text}`}>
                       {getSpeakerLabel(utterance.speaker)}
                     </span>
                     {getSpeakerRole(utterance.speaker) && (
-                      <span className="text-[10px] text-text-placeholder truncate">
+                      <span className="text-ui text-text-placeholder truncate">
                         {getSpeakerRole(utterance.speaker)}
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-text-placeholder flex-shrink-0 ml-1">
+                  <span className="text-ui text-text-placeholder flex-shrink-0 ml-1">
                     {formatTimestamp(utterance.start / 1000)}
                   </span>
                 </div>
 
                 {/* Text content — smaller, tighter leading */}
-                <div className="text-xs text-text-primary leading-snug [overflow-wrap:break-word]">
+                <div className="text-ui text-text-primary leading-snug [overflow-wrap:break-word]">
                   {renderWords(utterance)}
                 </div>
 
                 {utterance.confidence < 0.8 && (
-                  <div className="mt-0.5 text-[10px] text-brand-mustard">
+                  <div className="mt-0.5 text-ui text-brand-mustard">
                     Low confidence: {Math.round(utterance.confidence * 100)}%
                   </div>
                 )}
