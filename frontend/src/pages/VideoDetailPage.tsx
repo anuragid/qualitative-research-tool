@@ -154,14 +154,15 @@ export default function VideoDetailPage() {
     if (uniqueSpeakers.length === 0) return false;
     return uniqueSpeakers.every(speaker => {
       const label = speakerLabels?.find((l) => l.speaker_label === speaker);
-      return label?.role && (label.role === "Interviewer" || label.role === "Participant");
+      const role = label?.role?.toLowerCase();
+      return role === "interviewer" || role === "participant";
     });
   };
 
   const hasInterviewerAndParticipant = () => {
     if (!speakerLabels || speakerLabels.length === 0) return false;
-    const hasInterviewer = speakerLabels.some(label => label.role === "Interviewer");
-    const hasParticipant = speakerLabels.some(label => label.role === "Participant");
+    const hasInterviewer = speakerLabels.some(label => label.role?.toLowerCase() === "interviewer");
+    const hasParticipant = speakerLabels.some(label => label.role?.toLowerCase() === "participant");
     return hasInterviewer && hasParticipant;
   };
 

@@ -445,6 +445,9 @@ class LLMService:
                 if isinstance(value, list):
                     logger.debug("Extracted list from dict wrapper in LLM response")
                     return value
+            # LLM returned a single item as a dict — wrap it in a list
+            logger.warning("LLM returned single dict instead of list — wrapping in list")
+            return [result]
         raise ValueError(
             f"Expected list from LLM but got {type(result).__name__}: "
             f"{str(result)[:200]}"
