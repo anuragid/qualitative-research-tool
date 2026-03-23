@@ -7,6 +7,7 @@ export function useProjects() {
     queryKey: ["projects"],
     queryFn: projectsService.getAll,
     refetchInterval: (query) => {
+      if (document.hidden) return false;
       const projects = query.state.data;
       // Poll if any project or its videos are actively processing
       const hasActiveWork = projects?.some(
@@ -30,6 +31,7 @@ export function useProject(id: string | null) {
     queryFn: () => projectsService.getById(id!),
     enabled: !!id,
     refetchInterval: (query) => {
+      if (document.hidden) return false;
       const project = query.state.data;
       // Poll while project or any of its videos are actively processing
       const hasActiveWork =
