@@ -55,7 +55,12 @@ class UserSettingsUpdate(BaseModel):
     @classmethod
     def validate_preferred_model(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
-            v = _strip_control_chars(v)
+            v = _strip_control_chars(v).strip()
+            if not v:
+                raise ValueError("Model ID cannot be blank")
+            # Model IDs follow the format "provider/model-name"
+            if not re.match(r'^[a-zA-Z0-9_\-]+/[a-zA-Z0-9._\-:]+$', v):
+                raise ValueError("Invalid model ID format. Expected format: provider/model-name")
         return v
 
 
@@ -202,6 +207,9 @@ class TranscriptResponse(BaseModel):
 
 # ========== Speaker Label Schemas ==========
 
+_VALID_SPEAKER_ROLES = {"Interviewer", "Participant"}
+
+
 class SpeakerLabelCreate(BaseModel):
     """Schema for creating speaker label."""
     speaker_label: str = Field(..., min_length=1, max_length=50)
@@ -225,6 +233,8 @@ class SpeakerLabelCreate(BaseModel):
     def validate_role(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v = _strip_control_chars(v)
+            if v not in _VALID_SPEAKER_ROLES:
+                raise ValueError(f"Invalid role. Must be one of: {', '.join(sorted(_VALID_SPEAKER_ROLES))}")
         return v
 
 
@@ -245,6 +255,8 @@ class SpeakerLabelUpdate(BaseModel):
     def validate_role(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v = _strip_control_chars(v)
+            if v not in _VALID_SPEAKER_ROLES:
+                raise ValueError(f"Invalid role. Must be one of: {', '.join(sorted(_VALID_SPEAKER_ROLES))}")
         return v
 
 

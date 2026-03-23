@@ -213,6 +213,8 @@ export function ModelSettingsDialog({
                 placeholder="sk-or-v1-..."
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
+                minLength={10}
+                maxLength={500}
                 className="mt-2"
               />
             )}

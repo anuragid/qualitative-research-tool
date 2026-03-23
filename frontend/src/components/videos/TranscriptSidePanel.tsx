@@ -115,6 +115,7 @@ function SpeakerRoleEditor({
                     placeholder="Name (optional)"
                     value={speakerName}
                     onChange={(e) => setSpeakerName(e.target.value)}
+                    maxLength={100}
                     className="h-6 text-ui"
                   />
                   <Select value={speakerRole} onValueChange={(value) => setSpeakerRole(value)}>

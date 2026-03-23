@@ -70,6 +70,7 @@ export default function CreateProjectDialog() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., User Research Study Q1 2024"
+                maxLength={255}
                 required
               />
             </div>
@@ -81,6 +82,7 @@ export default function CreateProjectDialog() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What is this research about? e.g., 'Understanding why users abandon onboarding in mobile banking apps.' This guides the AI analysis — be specific about your research question."
+                maxLength={5000}
                 rows={4}
               />
             </div>

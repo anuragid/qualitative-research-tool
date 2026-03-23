@@ -13,7 +13,7 @@ import { Button } from "../ui/button";
 import { useUploadContext } from "../../contexts/UploadContext";
 import { useProject } from "../../hooks/useProjects";
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB (must match backend MAX_FILE_SIZE_MB)
 
 interface VideoUploadDialogProps {
   projectId: string;
@@ -125,7 +125,7 @@ export default function VideoUploadDialog({
         <DialogHeader>
           <DialogTitle>Select Files to Upload</DialogTitle>
           <DialogDescription>
-            Choose video or audio files to upload (max 2 GB each). They'll continue uploading in the background.
+            Choose video or audio files to upload (max 500 MB each). They'll continue uploading in the background.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,7 +189,7 @@ export default function VideoUploadDialog({
                         {isOversized && (
                           <p className="text-xs text-destructive flex items-center gap-1 mt-1">
                             <AlertTriangle className="h-3 w-3" />
-                            File exceeds 2 GB limit
+                            File exceeds 500 MB limit
                           </p>
                         )}
                       </div>

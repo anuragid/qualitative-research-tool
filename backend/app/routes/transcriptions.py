@@ -120,6 +120,29 @@ async def save_speaker_labels(
                 detail="Cannot assign speaker labels to incomplete transcript"
             )
 
+        # Enforce speaker label limit (reasonable max: 20 speakers per transcript)
+        if len(speaker_labels) > 20:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Maximum of 20 speaker labels per transcript"
+            )
+
+        existing_count = db.query(SpeakerLabel).filter(
+            SpeakerLabel.transcript_id == transcript_id
+        ).count()
+        new_labels = [
+            label for label in speaker_labels
+            if not db.query(SpeakerLabel).filter(
+                SpeakerLabel.transcript_id == transcript_id,
+                SpeakerLabel.speaker_label == label.speaker_label
+            ).first()
+        ]
+        if existing_count + len(new_labels) > 20:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Maximum of 20 speaker labels per transcript"
+            )
+
         saved_labels = []
 
         for label_data in speaker_labels:

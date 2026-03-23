@@ -286,7 +286,7 @@ async def clerk_proxy(path: str, request: Request):
     # Filter response headers — only forward safe ones (avoid leaking
     # internal proxy headers, hop-by-hop headers, or overriding security headers)
     _CLERK_RESP_SAFE_HEADERS = {
-        "content-type", "cache-control", "etag", "x-request-id",
+        "content-type", "cache-control", "content-length", "etag", "x-request-id",
     }
     safe_resp_headers = {
         k: v for k, v in resp.headers.items()

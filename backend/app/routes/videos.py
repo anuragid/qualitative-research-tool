@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, Dict
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import Permission, require_permissions, require_permissions_upload
@@ -51,9 +51,9 @@ def _get_video_with_ownership(
 # --- Pydantic models for presigned upload flow ---
 
 class UploadUrlRequest(BaseModel):
-    filename: str
-    file_size: int
-    content_type: str
+    filename: str = Field(..., min_length=1, max_length=512)
+    file_size: int = Field(..., gt=0)
+    content_type: str = Field(..., min_length=1, max_length=100)
 
 
 class UploadUrlResponse(BaseModel):
@@ -769,7 +769,7 @@ async def get_word_level_transcript(
 @router.get("/{video_id}/transcript/search")
 async def search_transcript_words(
     video_id: UUID,
-    query: str = "",
+    query: str = Query(..., min_length=1, max_length=500),
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
 ):

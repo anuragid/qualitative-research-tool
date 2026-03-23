@@ -48,6 +48,8 @@ _API_KEY_PATTERN = re.compile(
     r"(sk-[A-Za-z0-9]{4})[A-Za-z0-9]{20,}"  # OpenAI-style keys
     r"|"
     r"(Bearer\s+)[A-Za-z0-9_\-]{20,}"  # Bearer tokens in error messages
+    r"|"
+    r"([a-f0-9]{4})[a-f0-9]{28,}"  # AssemblyAI and other hex keys (32+ chars)
 )
 
 # Maximum number of retries per pipeline node before halting
@@ -59,7 +61,10 @@ _NODE_RETRY_DELAY = 2.0
 
 def _sanitize_error(message: str) -> str:
     """Strip potential API key material from error messages before storage."""
-    return _API_KEY_PATTERN.sub(lambda m: (m.group(1) or m.group(2) or m.group(3)) + "***REDACTED***", message)
+    return _API_KEY_PATTERN.sub(
+        lambda m: (m.group(1) or m.group(2) or m.group(3) or m.group(4) or "") + "***REDACTED***",
+        message,
+    )
 
 
 def _run_node_with_retry(step_name: str, node_fn, state: dict, max_retries: int = _NODE_MAX_RETRIES) -> dict:
