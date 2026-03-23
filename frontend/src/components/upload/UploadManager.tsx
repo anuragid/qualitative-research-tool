@@ -42,8 +42,6 @@ export function UploadManager() {
     removeUpload,
     retryUpload,
     clearCompleted,
-    activeUploads: _activeUploads,
-    isUploading: _isUploading,
     cancelUpload,
     pauseUpload,
     resumeUpload,
@@ -65,7 +63,6 @@ export function UploadManager() {
   const uploadingCount = uploads.filter(u => u.status === 'uploading').length;
   const processingCount = uploads.filter(u => u.status === 'processing').length;
   const pausedCount = uploads.filter(u => u.status === 'paused').length;
-  const _cancelledCount = uploads.filter(u => u.status === 'cancelled').length;
   const activeCount = uploadingCount + processingCount;
 
   const formatSpeed = (bytesPerSecond: number): string => {

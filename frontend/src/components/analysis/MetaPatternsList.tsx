@@ -74,6 +74,7 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
         columns={metaPatternColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(mp) => mp.meta_pattern_id}
       />
     );
   }

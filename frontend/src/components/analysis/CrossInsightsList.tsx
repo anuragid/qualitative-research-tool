@@ -77,6 +77,7 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
         columns={crossInsightColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(ci) => ci.cross_insight_id}
       />
     );
   }

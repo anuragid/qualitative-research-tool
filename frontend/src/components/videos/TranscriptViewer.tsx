@@ -400,12 +400,12 @@ export function TranscriptViewer({
 
         {/* Compact utterances — vertical stacking with dividers */}
         <div ref={transcriptContainerRef} className="divide-y divide-border">
-          {transcript.processed_transcript?.utterances?.map((utterance, index) => {
+          {transcript.processed_transcript?.utterances?.map((utterance) => {
             const colorSet = speakerColorMap.get(utterance.speaker) || speakerColors[0];
 
             return (
               <div
-                key={index}
+                key={`${utterance.speaker}-${utterance.start}`}
                 className="px-3 py-2.5 hover:bg-interactive-fill transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
               >
                 {/* Top row: speaker + timestamp */}
@@ -514,12 +514,12 @@ export function TranscriptViewer({
 
       {/* Transcript Content */}
       <div className="p-4 sm:p-6 space-y-3 sm:space-y-5" ref={transcriptContainerRef}>
-        {transcript.processed_transcript?.utterances?.map((utterance, index) => {
+        {transcript.processed_transcript?.utterances?.map((utterance) => {
           const colorSet = speakerColorMap.get(utterance.speaker) || speakerColors[0];
 
           return (
             <div
-              key={index}
+              key={`${utterance.speaker}-${utterance.start}`}
               className="flex gap-3 sm:gap-5 p-4 rounded-xl hover:bg-interactive-fill transition-colors duration-[var(--duration-micro)] ease-[var(--ease)]"
             >
               {/* Timestamp */}

@@ -49,14 +49,18 @@ export default function VideoUploadDialog({
   const { data: project } = useProject(projectId);
 
   // Process initial files when dialog opens
+  // Use initialFiles.length as a dependency proxy to avoid re-running when the
+  // parent passes a new empty array reference on every render.
+  const initialFilesCount = initialFiles.length;
   useEffect(() => {
-    if (initialFiles.length > 0 && open) {
+    if (initialFilesCount > 0 && open) {
       const videoFiles = filterAndNotify(initialFiles);
       if (videoFiles.length > 0) {
         setSelectedFiles(videoFiles);
       }
     }
-  }, [open, initialFiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialFiles identity changes every render; use count as proxy
+  }, [open, initialFilesCount]);
 
   // Check for oversized files
   const oversizedFiles = useMemo(
@@ -95,6 +99,9 @@ export default function VideoUploadDialog({
       if (videoFiles.length > 0) {
         setSelectedFiles(prev => [...prev, ...videoFiles]);
       }
+
+      // Reset the input value so the same files can be re-selected
+      e.target.value = "";
     },
     []
   );

@@ -78,6 +78,7 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
         columns={systemPrincipleColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
+        getRowKey={(sp) => sp.system_principle_id}
       />
     );
   }
