@@ -48,7 +48,7 @@ class TestXSSPrevention:
         s = SpeakerLabelCreate(
             speaker_label="A",
             assigned_name="<script>steal()</script>Alice",
-            role="participant"
+            role="Participant"
         )
         assert "<script>" not in s.assigned_name
         assert "Alice" in s.assigned_name
@@ -129,12 +129,12 @@ class TestSearchQueryValidation:
             f"/api/videos/{uuid.uuid4()}/transcript/search",
             params={"query": ""},
         )
-        # Should fail (either 400 for empty query or 404 for missing video)
-        assert response.status_code in (400, 404)
+        # Should fail (422 for Pydantic validation or 404 for missing video)
+        assert response.status_code in (400, 404, 422)
 
     @pytest.mark.anyio
     async def test_long_search_query_rejected(self, client):
-        """Very long search query should return 400."""
+        """Very long search query should return 400 or 422."""
         import uuid
 
         long_query = "a" * 501
@@ -142,5 +142,5 @@ class TestSearchQueryValidation:
             f"/api/videos/{uuid.uuid4()}/transcript/search",
             params={"query": long_query},
         )
-        # Should fail (either 400 for long query or 404 for missing video)
-        assert response.status_code in (400, 404)
+        # Should fail (422 for Pydantic validation or 404 for missing video)
+        assert response.status_code in (400, 404, 422)
