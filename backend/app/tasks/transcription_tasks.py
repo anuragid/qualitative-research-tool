@@ -105,8 +105,9 @@ def transcribe_video_task(self, video_id: str):
     except Exception as e:
         logger.error(f"Transcription submit failed for video {video_id}: {e}")
 
-        # Update status to error
+        # Update status to error — rollback first to clear any dirty session state
         try:
+            self.db.rollback()
             video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
             transcript = self.db.query(Transcript).filter(
                 Transcript.video_id == UUID(video_id)
@@ -269,8 +270,14 @@ def check_transcription_task(self, video_id: str, started_at: float | None = Non
 
 
 def _mark_transcription_error(db, video_id: str, error_message: str):
-    """Mark both video and transcript as error state."""
+    """Mark both video and transcript as error state.
+
+    Rolls back any dirty session state before querying, ensuring the
+    error status update succeeds even if the previous transaction was
+    left in a broken state.
+    """
     try:
+        db.rollback()
         video = db.query(Video).filter(Video.id == UUID(video_id)).first()
         transcript = db.query(Transcript).filter(
             Transcript.video_id == UUID(video_id)

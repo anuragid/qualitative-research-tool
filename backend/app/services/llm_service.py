@@ -434,8 +434,13 @@ class LLMService:
         """Like call_with_json_response but guarantees a list result.
 
         If the LLM wraps the list in a dict (e.g. {"insights": [...]}),
-        extracts the first list-valued field.  Raises ValueError if no
-        list can be extracted.
+        extracts the first list-valued field.
+
+        If the LLM returns a single dict instead of a list, retries once
+        with an explicit instruction to return a JSON array.  Only falls
+        back to wrapping in a list if the retry also returns a single dict.
+
+        Raises ValueError if no list can be extracted.
         """
         result = self.call_with_json_response(**kwargs)
         if isinstance(result, list):
@@ -445,9 +450,41 @@ class LLMService:
                 if isinstance(value, list):
                     logger.debug("Extracted list from dict wrapper in LLM response")
                     return value
-            # LLM returned a single item as a dict — wrap it in a list
-            logger.warning("LLM returned single dict instead of list — wrapping in list")
-            return [result]
+
+            # LLM returned a single item as a dict — retry with explicit instruction
+            model_name = kwargs.get("model") or self.default_model
+            logger.warning(
+                f"LLM returned single dict instead of list (model={model_name}). "
+                f"Retrying with explicit array instruction."
+            )
+
+            # Build retry kwargs with augmented system prompt
+            retry_kwargs = dict(kwargs)
+            original_prompt = retry_kwargs.get("system_prompt", "")
+            retry_kwargs["system_prompt"] = (
+                original_prompt
+                + "\n\nIMPORTANT: Return a JSON array [...], not a single object. "
+                "The response MUST be a JSON array containing one or more objects."
+            )
+
+            retry_result = self.call_with_json_response(**retry_kwargs)
+            if isinstance(retry_result, list):
+                logger.info(
+                    f"Retry succeeded: LLM returned list on second attempt (model={model_name})"
+                )
+                return retry_result
+            if isinstance(retry_result, dict):
+                for value in retry_result.values():
+                    if isinstance(value, list):
+                        logger.debug("Extracted list from dict wrapper on retry")
+                        return value
+                # Retry also returned single dict — fall back to wrapping
+                logger.warning(
+                    f"LLM returned single dict even after retry (model={model_name}). "
+                    f"Wrapping in list as last resort."
+                )
+                return [retry_result]
+
         raise ValueError(
             f"Expected list from LLM but got {type(result).__name__}: "
             f"{str(result)[:200]}"

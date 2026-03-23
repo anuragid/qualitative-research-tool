@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import RELATE_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.error_classification import classify_error
 from app.utils.input_sanitizer import sanitize_for_prompt
 from app.utils.output_validator import OutputValidationError, validate_patterns
 
@@ -106,10 +107,12 @@ Group related inferences into patterns and explain what each pattern represents.
         }
 
     except Exception as e:
+        error_type = classify_error(e)
         logger.error(f"[RELATE] Error in relate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "patterns": None,
             "current_step": "relate",
             "error": f"{type(e).__name__}: {e}",
+            "error_type": error_type,
         }

@@ -11,8 +11,10 @@ By invoking nodes sequentially on the Celery worker thread we get the
 same pipeline semantics with reliable timeout / error handling.
 """
 
+import json
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -32,6 +34,10 @@ from app.services.byok_service import resolve_byok as _resolve_byok
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
+from app.utils.error_classification import (
+    build_structured_error,
+    is_retryable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +50,74 @@ _API_KEY_PATTERN = re.compile(
     r"(Bearer\s+)[A-Za-z0-9_\-]{20,}"  # Bearer tokens in error messages
 )
 
+# Maximum number of retries per pipeline node before halting
+_NODE_MAX_RETRIES = 2
+
+# Delay (in seconds) between node retries
+_NODE_RETRY_DELAY = 2.0
+
 
 def _sanitize_error(message: str) -> str:
     """Strip potential API key material from error messages before storage."""
     return _API_KEY_PATTERN.sub(lambda m: (m.group(1) or m.group(2) or m.group(3)) + "***REDACTED***", message)
 
 
+def _run_node_with_retry(step_name: str, node_fn, state: dict, max_retries: int = _NODE_MAX_RETRIES) -> dict:
+    """Run a single pipeline node with per-node retry logic.
+
+    Each node is retried up to ``max_retries`` times if the error is
+    classified as retryable.  Non-retryable errors (e.g. validation)
+    halt immediately.
+
+    Args:
+        step_name: Human-readable step name (e.g. "chunk").
+        node_fn: The node callable.
+        state: Current pipeline state dict.
+        max_retries: Maximum number of retry attempts per node.
+
+    Returns:
+        Updated state dict from the node.
+    """
+    last_state = state
+    for attempt in range(1 + max_retries):
+        result_state = node_fn(last_state)
+        if not result_state.get("error"):
+            return result_state
+
+        error_type = result_state.get("error_type", "unknown")
+        retryable = is_retryable(error_type)
+
+        if attempt < max_retries and retryable:
+            delay = _NODE_RETRY_DELAY * (2 ** attempt)  # exponential backoff
+            logger.warning(
+                f"Node '{step_name}' failed (attempt {attempt + 1}/{1 + max_retries}, "
+                f"error_type={error_type}). Retrying in {delay:.1f}s..."
+            )
+            time.sleep(delay)
+            # Reset error in state before retry so node starts clean
+            last_state = {**result_state, "error": None, "error_type": None}
+        else:
+            if not retryable:
+                logger.error(
+                    f"Node '{step_name}' failed with non-retryable error "
+                    f"(error_type={error_type}): {result_state['error']}"
+                )
+            else:
+                logger.error(
+                    f"Node '{step_name}' failed after {attempt + 1} attempts: "
+                    f"{result_state['error']}"
+                )
+            return result_state
+
+    return last_state
+
+
 def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
     """Run the 5-step video analysis pipeline synchronously.
 
-    Each node is called in sequence.  If any node sets ``state["error"]``,
-    the pipeline halts immediately (same behaviour as the LangGraph
-    conditional-edge version, but without the ThreadPoolExecutor).
+    Each node is called in sequence with per-node retry logic.
+    If any node sets ``state["error"]`` after retries are exhausted,
+    the pipeline halts immediately.
 
     Returns the final state dict.
     """
@@ -68,7 +130,7 @@ def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
     ]
     for step_name, node_fn in steps:
         logger.info(f"Running pipeline step '{step_name}' for video {state['video_id']}")
-        state = node_fn(state)
+        state = _run_node_with_retry(step_name, node_fn, state)
         if state.get("error"):
             logger.error(f"Pipeline halting at '{step_name}': {state['error']}")
             break
@@ -76,7 +138,10 @@ def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
 
 
 def _run_project_pipeline(state) -> dict:
-    """Run the 3-step project analysis pipeline synchronously."""
+    """Run the 3-step project analysis pipeline synchronously.
+
+    Each node is called in sequence with per-node retry logic.
+    """
     steps = [
         ("cross_relate", cross_relate_node),
         ("cross_explain", cross_explain_node),
@@ -84,17 +149,33 @@ def _run_project_pipeline(state) -> dict:
     ]
     for step_name, node_fn in steps:
         logger.info(f"Running pipeline step '{step_name}' for project {state['project_id']}")
-        state = node_fn(state)
+        state = _run_node_with_retry(step_name, node_fn, state)
         if state.get("error"):
             logger.error(f"Pipeline halting at '{step_name}': {state['error']}")
             break
     return state
 
 
+def _build_pipeline_error_json(failed_step: str, error_str: str, error_type: str | None = None) -> str:
+    """Build a structured error JSON string from pipeline state info.
+
+    Used when the pipeline halts due to a node error and we need to
+    store structured error information in the DB.
+    """
+    etype = error_type or "unknown"
+    return json.dumps({
+        "step": failed_step,
+        "error_type": etype,
+        "retryable": is_retryable(etype),
+        "message": f"Analysis failed at step '{failed_step}': {error_str}",
+        "details": error_str,
+    })
+
+
 @celery_app.task(base=DatabaseTask, bind=True, name="analyze_video")
 def analyze_video_task(self, video_id: str, user_id: str | None = None):
     """
-    Analyze a video using the 5-step LangGraph pipeline.
+    Analyze a video using the 5-step analysis pipeline.
 
     Steps:
     1. CHUNK - Break transcript into discrete pieces
@@ -102,6 +183,10 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
     3. RELATE - Find patterns across inferences
     4. EXPLAIN - Generate insights from patterns
     5. ACTIVATE - Create design principles from insights
+
+    Each node is retried up to 2 times within the pipeline before
+    the task fails.  Error information is stored as structured JSON
+    in video.error_message.
 
     Args:
         video_id: UUID of the video to analyze
@@ -165,7 +250,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         # Resolve BYOK API key and preferred model for this user
         byok_api_key, byok_model = _resolve_byok(self.db, user_id)
 
-        # Prepare initial state for LangGraph
+        # Prepare initial state for the pipeline
         initial_state: VideoAnalysisState = {
             "video_id": video_id,
             "transcript": transcript.processed_transcript,
@@ -188,12 +273,17 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         # Run the analysis pipeline directly (no LangGraph ThreadPoolExecutor)
         final_state = _run_video_pipeline(initial_state)
 
-        # Check for errors - the graph now halts on any node error via
-        # conditional routing, so if error is set the pipeline stopped early
+        # Check for errors - the pipeline halts on any node error after
+        # retries are exhausted
         if final_state.get("error"):
             failed_step = final_state.get("current_step", "unknown")
-            raise Exception(
-                f"Analysis failed at step '{failed_step}': {final_state['error']}"
+            error_type = final_state.get("error_type", "unknown")
+            structured_err = _build_pipeline_error_json(
+                failed_step, final_state["error"], error_type
+            )
+            raise _PipelineError(
+                f"Analysis failed at step '{failed_step}': {final_state['error']}",
+                structured_json=structured_err,
             )
 
         # Save results to database
@@ -235,8 +325,18 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        safe_msg = _sanitize_error(str(e))
-        logger.error(f"Video analysis failed for video {video_id}: {safe_msg}")
+        # Use structured JSON if the exception carries it, otherwise build one
+        if isinstance(e, _PipelineError) and e.structured_json:
+            error_json = _sanitize_error(e.structured_json)
+        else:
+            safe_msg = _sanitize_error(str(e))
+            error_json = json.dumps(build_structured_error(
+                step="unknown",
+                exc=e,
+                message=safe_msg,
+            ))
+
+        logger.error(f"Video analysis failed for video {video_id}: {_sanitize_error(str(e))}")
 
         # Update status to error
         try:
@@ -248,7 +348,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
 
             if video:
                 video.status = "error"
-                video.error_message = safe_msg
+                video.error_message = error_json
             if video_analysis:
                 video_analysis.status = "error"
                 video_analysis.completed_at = datetime.now(timezone.utc)
@@ -263,7 +363,16 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         raise
 
 
-@celery_app.task(base=DatabaseTask, bind=True, name="analyze_project")
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="analyze_project",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=2,
+)
 def analyze_project_task(self, project_id: str, user_id: str | None = None):
     """
     Analyze a project using cross-video synthesis (3-step pipeline).
@@ -272,6 +381,9 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
     1. CROSS_RELATE - Find meta-patterns across videos
     2. CROSS_EXPLAIN - Generate cross-video insights
     3. CROSS_ACTIVATE - Create system-level design principles
+
+    Each node is retried up to 2 times within the pipeline.  The
+    Celery task itself also has autoretry (max 2 retries with backoff).
 
     Args:
         project_id: UUID of the project to analyze
@@ -338,7 +450,7 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
         # Resolve BYOK API key and preferred model for this user
         byok_api_key, byok_model = _resolve_byok(self.db, user_id)
 
-        # Prepare initial state for LangGraph
+        # Prepare initial state for the pipeline
         initial_state: ProjectAnalysisState = {
             "project_id": project_id,
             "video_ids": video_ids,
@@ -361,7 +473,15 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
 
         # Check for errors
         if final_state.get("error"):
-            raise Exception(f"Analysis failed: {final_state['error']}")
+            failed_step = final_state.get("current_step", "unknown")
+            error_type = final_state.get("error_type", "unknown")
+            structured_err = _build_pipeline_error_json(
+                failed_step, final_state["error"], error_type
+            )
+            raise _PipelineError(
+                f"Analysis failed at step '{failed_step}': {final_state['error']}",
+                structured_json=structured_err,
+            )
 
         # Save results to database
         project_analysis.cross_video_patterns = final_state.get("cross_video_patterns")
@@ -385,8 +505,18 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        safe_msg = _sanitize_error(str(e))
-        logger.error(f"Project analysis failed for project {project_id}: {safe_msg}")
+        # Use structured JSON if the exception carries it, otherwise build one
+        if isinstance(e, _PipelineError) and e.structured_json:
+            error_json = _sanitize_error(e.structured_json)
+        else:
+            safe_msg = _sanitize_error(str(e))
+            error_json = json.dumps(build_structured_error(
+                step="unknown",
+                exc=e,
+                message=safe_msg,
+            ))
+
+        logger.error(f"Project analysis failed for project {project_id}: {_sanitize_error(str(e))}")
 
         # Update status to error
         try:
@@ -401,10 +531,18 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
 
             project = self.db.query(Project).filter(Project.id == UUID(project_id)).first()
             if project:
-                project.error_message = safe_msg
+                project.error_message = error_json
 
             self.db.commit()
         except Exception as cleanup_error:
             logger.error(f"Failed to update error status for project {project_id}: {cleanup_error}")
 
         raise
+
+
+class _PipelineError(Exception):
+    """Internal exception carrying structured error JSON from the pipeline."""
+
+    def __init__(self, message: str, structured_json: str | None = None):
+        super().__init__(message)
+        self.structured_json = structured_json

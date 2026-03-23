@@ -35,9 +35,23 @@ class DatabaseTask(Task):
         return self._thread_local.db
 
     def after_return(self, status, retval, task_id, args, kwargs, einfo):
-        """Clean up database session after task completes."""
+        """Clean up database session after task completes.
+
+        On error/failure paths, rolls back any uncommitted transaction
+        before closing the session to avoid leaving the connection in a
+        dirty state.
+        """
         if hasattr(self._thread_local, "db") and self._thread_local.db is not None:
             try:
+                # On failure/error, rollback any uncommitted changes so
+                # the connection is returned to the pool in a clean state.
+                if status in ("FAILURE", "RETRY", "REVOKED") or einfo is not None:
+                    try:
+                        self._thread_local.db.rollback()
+                    except Exception as rb_err:
+                        logger.warning(
+                            f"Error rolling back session on {status} for task {task_id}: {rb_err}"
+                        )
                 self._thread_local.db.close()
             except Exception as e:
                 logger.warning(f"Error closing database session for task {task_id}: {e}")

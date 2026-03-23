@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import CROSS_EXPLAIN_SYSTEM_PROMPT
 from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.error_classification import classify_error
 from app.utils.output_validator import OutputValidationError, validate_cross_insights
 
 logger = logging.getLogger(__name__)
@@ -91,10 +92,12 @@ Generate insights that reveal truths about the system as a whole, not just indiv
         }
 
     except Exception as e:
+        error_type = classify_error(e)
         logger.error(f"[CROSS_EXPLAIN] Error in cross_explain_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "cross_video_insights": None,
             "current_step": "cross_explain",
             "error": f"{type(e).__name__}: {e}",
+            "error_type": error_type,
         }

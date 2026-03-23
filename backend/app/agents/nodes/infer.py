@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import INFER_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.error_classification import classify_error
 from app.utils.output_validator import OutputValidationError, validate_inferences
 
 logger = logging.getLogger(__name__)
@@ -84,10 +85,12 @@ Generate multiple inferences per chunk if appropriate."""
         }
 
     except Exception as e:
+        error_type = classify_error(e)
         logger.error(f"[INFER] Error in infer_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "inferences": None,
             "current_step": "infer",
             "error": f"{type(e).__name__}: {e}",
+            "error_type": error_type,
         }

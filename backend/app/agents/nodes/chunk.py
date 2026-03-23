@@ -6,6 +6,7 @@ from typing import Any, Dict
 from app.agents.prompts import CHUNK_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.error_classification import classify_error
 from app.utils.input_sanitizer import sanitize_for_prompt
 from app.utils.output_validator import OutputValidationError, validate_chunks
 
@@ -198,10 +199,12 @@ Remember:
         }
 
     except Exception as e:
+        error_type = classify_error(e)
         logger.error(f"[CHUNK] Error in chunk_node for video {state['video_id']}: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "chunks": None,
             "current_step": "chunk",
             "error": f"{type(e).__name__}: {e}",
+            "error_type": error_type,
         }

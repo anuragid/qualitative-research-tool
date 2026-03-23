@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import CROSS_RELATE_SYSTEM_PROMPT
 from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
+from app.utils.error_classification import classify_error
 from app.utils.output_validator import OutputValidationError, validate_meta_patterns
 
 logger = logging.getLogger(__name__)
@@ -85,10 +86,12 @@ Find patterns that transcend individual videos and reveal system-level themes.""
         }
 
     except Exception as e:
+        error_type = classify_error(e)
         logger.error(f"[CROSS_RELATE] Error in cross_relate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "cross_video_patterns": None,
             "current_step": "cross_relate",
             "error": f"{type(e).__name__}: {e}",
+            "error_type": error_type,
         }
