@@ -311,9 +311,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const retryUpload = useCallback((id: string) => {
+    const upload = uploadsRef.current.find(u => u.id === id);
+    if (upload?.status === 'error') {
+      showNotification('info', `Retrying upload for ${upload.file.name}...`);
+    }
+
     setUploads(prev => prev.map(u =>
       u.id === id && u.status === 'error'
-        ? { ...u, status: 'pending' as const, error: undefined, progress: 0 }
+        ? { ...u, status: 'pending' as const, error: undefined, errorType: undefined, progress: 0 }
         : u
     ));
 

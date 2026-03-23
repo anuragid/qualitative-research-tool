@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
@@ -35,7 +35,71 @@ import {
   Play,
   AlertCircle,
   Clock,
+  Wifi,
+  RefreshCw,
+  RotateCcw,
 } from "lucide-react";
+
+/** Attempt to parse a JSON error message into structured info. */
+interface ParsedError {
+  step?: string;
+  errorType?: "rate_limit" | "timeout" | "llm_error" | "network" | "validation" | "unknown";
+  message: string;
+  retryable: boolean;
+}
+
+function parseErrorMessage(raw: string | null): ParsedError | null {
+  if (!raw) return null;
+
+  // Try parsing as JSON first
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null) {
+      return {
+        step: parsed.step || parsed.current_step || undefined,
+        errorType: parsed.error_type || parsed.errorType || "unknown",
+        message: parsed.message || parsed.detail || parsed.error || raw,
+        retryable: parsed.retryable !== false, // Default to retryable
+      };
+    }
+  } catch {
+    // Not JSON, fall through
+  }
+
+  // Classify plain string errors
+  const lower = raw.toLowerCase();
+  if (lower.includes("rate limit") || lower.includes("429") || lower.includes("rate_limit")) {
+    return { message: raw, errorType: "rate_limit", retryable: true };
+  }
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return { message: raw, errorType: "timeout", retryable: true };
+  }
+  if (lower.includes("network") || lower.includes("connection")) {
+    return { message: raw, errorType: "network", retryable: true };
+  }
+
+  return { message: raw, errorType: "unknown", retryable: true };
+}
+
+function getErrorIcon(errorType?: ParsedError["errorType"]) {
+  switch (errorType) {
+    case "timeout": return Clock;
+    case "network": return Wifi;
+    case "rate_limit": return Clock;
+    default: return AlertCircle;
+  }
+}
+
+function getErrorTypeLabel(errorType?: ParsedError["errorType"]) {
+  switch (errorType) {
+    case "rate_limit": return "Rate Limited";
+    case "timeout": return "Timed Out";
+    case "llm_error": return "LLM Error";
+    case "network": return "Network Error";
+    case "validation": return "Validation Error";
+    default: return "Error";
+  }
+}
 
 export default function VideoDetailPage() {
   const { videoId } = useParams<{ videoId: string }>();
@@ -54,6 +118,17 @@ export default function VideoDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
     }
   }, [analysisStatus.data?.status, analysis?.status, videoId, queryClient]);
+
+  // When analysis status transitions to "error", refetch full analysis and video to get error details
+  const prevAnalysisStatusRef = useRef(analysisStatus.data?.status);
+  useEffect(() => {
+    const currentStatus = analysisStatus.data?.status;
+    if (prevAnalysisStatusRef.current !== "error" && currentStatus === "error") {
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId, "analysis"] });
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
+    }
+    prevAnalysisStatusRef.current = currentStatus;
+  }, [analysisStatus.data?.status, videoId, queryClient]);
 
   const startTranscription = useStartTranscription();
   const startFullAnalysis = useStartFullAnalysis();
@@ -167,7 +242,10 @@ export default function VideoDetailPage() {
   };
 
   const canStartAnalysis = () => {
-    const transcriptReady = video?.status === "transcribed" || (transcript && transcript.status === "completed");
+    // Allow starting analysis if transcript is ready (including from error state where transcript completed)
+    const transcriptReady = video?.status === "transcribed"
+      || (transcript && transcript.status === "completed")
+      || (video?.status === "error" && transcript && transcript.status === "completed");
     const rolesAssigned = hasRoleAssignments();
     const hasRequiredRoles = hasInterviewerAndParticipant();
     return !!(transcriptReady && rolesAssigned && hasRequiredRoles);
@@ -213,6 +291,9 @@ export default function VideoDetailPage() {
   }
 
   const canStartTranscription = video.status === "uploaded" && !transcript;
+  const canRetryTranscription = video.status === "error" && !transcript;
+  const canRetryAnalysis = video.status === "error" && !!transcript && (!analysis || analysis.status === "error");
+  const parsedError = parseErrorMessage(video.error_message);
 
   // Step information for step-by-step mode
   const getStepInfo = () => {
@@ -310,12 +391,64 @@ export default function VideoDetailPage() {
             <StatusBadge status={video.status as VideoStatus} />
           </div>
 
-          {/* Error message */}
-          {video.error_message && (
-            <AlertBanner variant="error" title="Error">
-              <span className="break-all">{video.error_message}</span>
-            </AlertBanner>
-          )}
+          {/* Error message with structured display and retry buttons */}
+          {video.error_message && parsedError && (() => {
+            const ErrorIcon = getErrorIcon(parsedError.errorType);
+            return (
+              <AlertBanner
+                variant="error"
+                title={parsedError.step
+                  ? `${getErrorTypeLabel(parsedError.errorType)} — ${parsedError.step} step`
+                  : getErrorTypeLabel(parsedError.errorType)
+                }
+                action={
+                  parsedError.retryable && (canRetryTranscription || canRetryAnalysis) ? (
+                    <div className="flex items-center gap-2">
+                      {canRetryTranscription && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleStartTranscription}
+                          disabled={startTranscription.isPending}
+                          className="rounded-full gap-1.5"
+                        >
+                          {startTranscription.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          )}
+                          Retry Transcription
+                        </Button>
+                      )}
+                      {canRetryAnalysis && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleStartFullAnalysis}
+                          disabled={startFullAnalysis.isPending}
+                          className="rounded-full gap-1.5"
+                        >
+                          {startFullAnalysis.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          )}
+                          Retry Analysis
+                        </Button>
+                      )}
+                    </div>
+                  ) : undefined
+                }
+              >
+                <div className="flex items-start gap-2">
+                  {parsedError.errorType !== "unknown" && (
+                    <ErrorIcon className="h-4 w-4 mt-0.5 shrink-0 opacity-70" />
+                  )}
+                  <span className="break-all">{parsedError.message}</span>
+                </div>
+              </AlertBanner>
+            );
+          })()}
 
           {/* Progress indicator for ongoing tasks */}
           {(video.status === "transcribing" || video.status === "analyzing") && (
@@ -376,12 +509,15 @@ export default function VideoDetailPage() {
             )}
           </div>
 
-          {/* Transcription start button if no transcript yet */}
-          {canStartTranscription && (
+          {/* Transcription start button if no transcript yet (includes retry from error) */}
+          {(canStartTranscription || canRetryTranscription) && (
             <EmptyState
-              icon={FileText}
-              heading="No transcript available"
-              description="Start transcription to begin the analysis process."
+              icon={canRetryTranscription ? RefreshCw : FileText}
+              heading={canRetryTranscription ? "Transcription failed" : "No transcript available"}
+              description={canRetryTranscription
+                ? "The previous transcription attempt failed. You can retry it."
+                : "Start transcription to begin the analysis process."
+              }
               action={
                 <Button onClick={handleStartTranscription} disabled={startTranscription.isPending} className="rounded-full">
                   {startTranscription.isPending ? (
@@ -391,8 +527,8 @@ export default function VideoDetailPage() {
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Transcription
+                      {canRetryTranscription ? <RotateCcw className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                      {canRetryTranscription ? "Retry Transcription" : "Start Transcription"}
                     </>
                   )}
                 </Button>
@@ -429,6 +565,11 @@ export default function VideoDetailPage() {
               patternsDisplay={patternsDisplay}
               insightsDisplay={insightsDisplay}
               principlesDisplay={principlesDisplay}
+              onRetryChunkStep={handleStartChunkStep}
+              onRetryInferStep={handleStartInferStep}
+              onRetryRelateStep={handleStartRelateStep}
+              onRetryExplainStep={handleStartExplainStep}
+              onRetryActivateStep={handleStartActivateStep}
             />
           )}
         </div>

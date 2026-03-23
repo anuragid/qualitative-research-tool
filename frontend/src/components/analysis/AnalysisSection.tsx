@@ -27,6 +27,7 @@ import {
   CheckCircle,
   MoreVertical,
   Zap,
+  RotateCcw,
 } from "lucide-react";
 import type { VideoAnalysis } from "../../types";
 
@@ -66,6 +67,12 @@ interface AnalysisSectionProps {
   patternsDisplay: ReturnType<typeof useAnalysisDisplay>;
   insightsDisplay: ReturnType<typeof useAnalysisDisplay>;
   principlesDisplay: ReturnType<typeof useAnalysisDisplay>;
+  // Step-level retry handlers for individual steps
+  onRetryChunkStep?: () => void;
+  onRetryInferStep?: () => void;
+  onRetryRelateStep?: () => void;
+  onRetryExplainStep?: () => void;
+  onRetryActivateStep?: () => void;
 }
 
 export function AnalysisSection({
@@ -94,11 +101,61 @@ export function AnalysisSection({
   patternsDisplay,
   insightsDisplay,
   principlesDisplay,
+  onRetryChunkStep,
+  onRetryInferStep,
+  onRetryRelateStep,
+  onRetryExplainStep,
+  onRetryActivateStep,
 }: AnalysisSectionProps) {
   if (!hasTranscript) return null;
 
   const hasAnalysis = analysis && analysis.status === "completed";
   const isStepByStepMode = analysis && analysis.status !== "completed";
+
+  // Map step names to their retry handlers
+  const stepRetryHandlers: Record<string, (() => void) | undefined> = {
+    chunk: onRetryChunkStep,
+    infer: onRetryInferStep,
+    relate: onRetryRelateStep,
+    explain: onRetryExplainStep,
+    activate: onRetryActivateStep,
+  };
+
+  const stepNameLabels: Record<string, string> = {
+    chunk: "Chunk",
+    infer: "Infer",
+    relate: "Relate",
+    explain: "Explain",
+    activate: "Activate",
+  };
+
+  // Render an error banner for a specific step
+  const renderStepError = (stepKey: string) => {
+    if (!analysis?.step_status || analysis.step_status[stepKey] !== "error") return null;
+    const retryHandler = stepRetryHandlers[stepKey];
+    const stepLabel = stepNameLabels[stepKey] || stepKey;
+
+    return (
+      <AlertBanner
+        variant="error"
+        title={`${stepLabel} step failed`}
+        action={retryHandler ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={retryHandler}
+            className="rounded-full gap-1.5"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Retry {stepLabel} Step
+          </Button>
+        ) : undefined}
+        className="mb-4"
+      >
+        {analysis.error_message || "An error occurred during this analysis step. You can retry it."}
+      </AlertBanner>
+    );
+  };
 
   // Header with action buttons
   const renderHeader = () => (
@@ -157,14 +214,19 @@ export function AnalysisSection({
           </>
         )}
 
-        {/* Step-by-step continue button in header */}
-        {isStepByStepMode && stepInfo?.nextStep && (
+        {/* Step-by-step continue/retry button in header */}
+        {isStepByStepMode && stepInfo && (stepInfo.nextStep || analysis?.step_status?.[analysis?.current_step || ""] === "error") && (
           <ContinueStepButton
             onClick={stepInfo.handler}
-            nextStepLabel={getNextStepLabel(stepInfo.nextStep)}
+            nextStepLabel={
+              analysis?.step_status?.[analysis?.current_step || ""] === "error"
+                ? getNextStepLabel("") // uses the retry label path
+                : stepInfo.nextStep ? getNextStepLabel(stepInfo.nextStep) : ""
+            }
             canContinue={canContinueCurrentStep}
             isAnyStepPending={isAnyStepPending}
             isCurrentStepProcessing={isCurrentStepProcessing}
+            isRetry={analysis?.step_status?.[analysis?.current_step || ""] === "error"}
             size="sm"
           />
         )}
@@ -196,6 +258,12 @@ export function AnalysisSection({
             <Badge variant="outline">
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
               Processing
+            </Badge>
+          )}
+          {analysis?.current_step && analysis?.step_status?.[analysis.current_step] === "error" && (
+            <Badge variant="destructive">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              Failed
             </Badge>
           )}
         </div>
@@ -387,6 +455,7 @@ export function AnalysisSection({
         </TabsList>
 
         <TabsContent value="chunks" className="mt-6">
+          {renderStepError("chunk")}
           {analysis.step_status?.chunk === "processing" ? (
             <LoadingState message="Processing chunks..." className="bg-card rounded-2xl p-12" />
           ) : analysis.chunks ? (
@@ -417,6 +486,7 @@ export function AnalysisSection({
         </TabsContent>
 
         <TabsContent value="inferences" className="mt-6">
+          {renderStepError("infer")}
           {(startInferStepPending || analysis.step_status?.infer === "processing") ? (
             <LoadingState message={startInferStepPending ? "Starting..." : "Generating inferences..."} className="bg-card rounded-2xl p-12" />
           ) : analysis.inferences ? (
@@ -444,12 +514,13 @@ export function AnalysisSection({
                 </div>
               )}
             </>
-          ) : (
+          ) : analysis.step_status?.infer !== "error" ? (
             <LoadingState message="Loading inferences..." className="bg-card rounded-2xl p-12" />
-          )}
+          ) : null}
         </TabsContent>
 
         <TabsContent value="patterns" className="mt-6">
+          {renderStepError("relate")}
           {(startRelateStepPending || analysis.step_status?.relate === "processing") ? (
             <LoadingState message={startRelateStepPending ? "Starting..." : "Identifying patterns..."} className="bg-card rounded-2xl p-12" />
           ) : analysis.patterns ? (
@@ -476,12 +547,13 @@ export function AnalysisSection({
                 </div>
               )}
             </>
-          ) : (
+          ) : analysis.step_status?.relate !== "error" ? (
             <LoadingState message="Loading patterns..." className="bg-card rounded-2xl p-12" />
-          )}
+          ) : null}
         </TabsContent>
 
         <TabsContent value="insights" className="mt-6">
+          {renderStepError("explain")}
           {(startExplainStepPending || analysis.step_status?.explain === "processing") ? (
             <LoadingState message={startExplainStepPending ? "Starting..." : "Generating insights..."} className="bg-card rounded-2xl p-12" />
           ) : analysis.insights ? (
@@ -508,12 +580,13 @@ export function AnalysisSection({
                 </div>
               )}
             </>
-          ) : (
+          ) : analysis.step_status?.explain !== "error" ? (
             <LoadingState message="Loading insights..." className="bg-card rounded-2xl p-12" />
-          )}
+          ) : null}
         </TabsContent>
 
         <TabsContent value="principles" className="mt-6">
+          {renderStepError("activate")}
           {(startActivateStepPending || analysis.step_status?.activate === "processing") ? (
             <LoadingState message={startActivateStepPending ? "Starting..." : "Generating design principles..."} className="bg-card rounded-2xl p-12" />
           ) : analysis.design_principles ? (
@@ -532,11 +605,40 @@ export function AnalysisSection({
                 </p>
               </div>
             </>
-          ) : (
+          ) : analysis.step_status?.activate !== "error" ? (
             <LoadingState message="Loading design principles..." className="bg-card rounded-2xl p-12" />
-          )}
+          ) : null}
         </TabsContent>
       </Tabs>
+    );
+  };
+
+  // Full-analysis error state (non-step-by-step mode)
+  const renderFullAnalysisError = () => {
+    if (!analysis || analysis.status !== "error" || analysis.current_step) return null;
+    return (
+      <AlertBanner
+        variant="error"
+        title="Analysis failed"
+        action={
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onStartFullAnalysis}
+            disabled={startFullAnalysisPending}
+            className="rounded-full gap-1.5"
+          >
+            {startFullAnalysisPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" />
+            )}
+            Retry Analysis
+          </Button>
+        }
+      >
+        {analysis.error_message || "An error occurred during analysis. You can retry it."}
+      </AlertBanner>
     );
   };
 
@@ -563,6 +665,7 @@ export function AnalysisSection({
       ) : (
         <>
           {renderProgressIndicator()}
+          {renderFullAnalysisError()}
           {renderCompletedTabs()}
           {renderStepByStepTabs()}
           {renderEmptyState()}

@@ -1,5 +1,5 @@
 import { Button } from "../ui/button";
-import { Loader2, PlayCircle } from "lucide-react";
+import { Loader2, PlayCircle, RotateCcw } from "lucide-react";
 
 interface ContinueStepButtonProps {
   onClick: () => void;
@@ -7,6 +7,7 @@ interface ContinueStepButtonProps {
   canContinue: boolean;
   isAnyStepPending: boolean;
   isCurrentStepProcessing: boolean;
+  isRetry?: boolean;
   size?: "sm" | "default" | "lg";
 }
 
@@ -16,6 +17,7 @@ export function ContinueStepButton({
   canContinue,
   isAnyStepPending,
   isCurrentStepProcessing,
+  isRetry = false,
   size = "default",
 }: ContinueStepButtonProps) {
   const isDisabled = !canContinue || isAnyStepPending || isCurrentStepProcessing;
@@ -26,7 +28,7 @@ export function ContinueStepButton({
       onClick={onClick}
       size={size}
       disabled={isDisabled}
-      variant={isLoading ? "secondary" : "default"}
+      variant={isLoading ? "secondary" : isRetry ? "destructive" : "default"}
       className="rounded-full"
     >
       {isAnyStepPending ? (
@@ -41,7 +43,11 @@ export function ContinueStepButton({
         </>
       ) : canContinue ? (
         <>
-          <PlayCircle className="h-4 w-4 mr-2" />
+          {isRetry ? (
+            <RotateCcw className="h-4 w-4 mr-2" />
+          ) : (
+            <PlayCircle className="h-4 w-4 mr-2" />
+          )}
           {nextStepLabel}
         </>
       ) : (

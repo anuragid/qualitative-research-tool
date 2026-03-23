@@ -15,6 +15,7 @@ export function useVideoAnalysisStatus(videoId: string | null) {
     refetchInterval: (query) => {
       if (document.hidden) return false;
       const data = query.state.data;
+      // Poll while processing or pending; stop for completed, error, or no data
       if (data && (data.status === "processing" || data.status === "pending")) {
         return 3000;
       }
