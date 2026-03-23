@@ -200,7 +200,17 @@ app.add_middleware(
 # Custom exception handlers — hide internal details from clients
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(status_code=422, content={"detail": "Invalid request data"})
+    # Return field-level validation info without exposing internal details
+    errors = []
+    for error in exc.errors():
+        loc = error.get("loc", [])
+        # Only include field name (last element), not internal path components
+        field = loc[-1] if loc else "unknown"
+        errors.append({
+            "field": str(field),
+            "message": error.get("msg", "Invalid value"),
+        })
+    return JSONResponse(status_code=422, content={"detail": "Invalid request data", "errors": errors})
 
 
 @app.exception_handler(Exception)
@@ -273,7 +283,16 @@ async def clerk_proxy(path: str, request: Request):
         params=dict(request.query_params),
         content=body if body else None,
     )
-    return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+    # Filter response headers — only forward safe ones (avoid leaking
+    # internal proxy headers, hop-by-hop headers, or overriding security headers)
+    _CLERK_RESP_SAFE_HEADERS = {
+        "content-type", "cache-control", "etag", "x-request-id",
+    }
+    safe_resp_headers = {
+        k: v for k, v in resp.headers.items()
+        if k.lower() in _CLERK_RESP_SAFE_HEADERS
+    }
+    return Response(content=resp.content, status_code=resp.status_code, headers=safe_resp_headers)
 
 
 # Import and include routers

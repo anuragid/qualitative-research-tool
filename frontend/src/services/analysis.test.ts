@@ -345,4 +345,48 @@ describe("analysisService", () => {
       });
     });
   });
+
+  describe("getVideoAnalysisStatus", () => {
+    it("fetches video analysis status", async () => {
+      const statusData = { status: "processing", current_step: "chunk" };
+      mockedApi.get.mockResolvedValue({ data: statusData });
+
+      const result = await analysisService.getVideoAnalysisStatus("vid-1");
+
+      expect(mockedApi.get).toHaveBeenCalledWith(
+        "/api/videos/vid-1/analysis/status"
+      );
+      expect(result).toEqual(statusData);
+    });
+
+    it("propagates 404 errors silently", async () => {
+      mockedApi.get.mockRejectedValue({
+        status: 404,
+        message: "Analysis not found",
+        silent: true,
+      });
+
+      await expect(
+        analysisService.getVideoAnalysisStatus("vid-1")
+      ).rejects.toEqual({
+        status: 404,
+        message: "Analysis not found",
+        silent: true,
+      });
+    });
+
+    it("propagates 500 errors", async () => {
+      mockedApi.get.mockRejectedValue({
+        status: 500,
+        message: "Internal Server Error",
+      });
+
+      await expect(
+        analysisService.getVideoAnalysisStatus("vid-1")
+      ).rejects.toEqual({
+        status: 500,
+        message: "Internal Server Error",
+      });
+    });
+  });
 });

@@ -62,6 +62,25 @@ def chunk_node(state: VideoAnalysisState) -> Dict[str, Any]:
         logger.info(f"[CHUNK] Participant segments: {len(participant_segments)}")
         logger.info(f"[CHUNK] Speaker roles: {speaker_roles}")
 
+        # Guard: if no utterances exist at all, fail early
+        if not transcript.get("utterances"):
+            return {
+                **state,
+                "chunks": None,
+                "current_step": "chunk",
+                "error": "Transcript contains no utterances. The transcription may have failed.",
+                "error_type": "validation_error",
+            }
+
+        # Guard: if no participant segments, warn and fall back to using all segments
+        if not participant_segments:
+            logger.warning(
+                f"[CHUNK] No participant segments found (all speakers may be interviewers or roles not set). "
+                f"Falling back to all {len(all_segments)} segments."
+            )
+            participant_segments = all_segments
+            participant_transcript_text = full_transcript_text
+
         # Include speaker mapping with roles in the message
         speaker_mapping_text = "SPEAKER MAPPING WITH ROLES:\n"
         for speaker_id, speaker_name in speaker_labels.items():
@@ -79,6 +98,18 @@ RESEARCH CONTEXT:
 <research_context>{safe_description}</research_context>
 Focus on extracting chunks that are relevant to this research context. Ignore small talk and conversation that is not related to the research topic.
 """
+
+        # Truncate extremely long transcripts to avoid exceeding LLM context limits
+        # (~100K chars is roughly ~25K tokens, safe for most models)
+        MAX_TRANSCRIPT_CHARS = 100000
+        if len(full_transcript_text) > MAX_TRANSCRIPT_CHARS:
+            logger.warning(
+                f"[CHUNK] Transcript too long ({len(full_transcript_text)} chars), "
+                f"truncating to {MAX_TRANSCRIPT_CHARS} chars"
+            )
+            full_transcript_text = full_transcript_text[:MAX_TRANSCRIPT_CHARS] + "\n\n[... TRANSCRIPT TRUNCATED ...]"
+        if len(participant_transcript_text) > MAX_TRANSCRIPT_CHARS:
+            participant_transcript_text = participant_transcript_text[:MAX_TRANSCRIPT_CHARS] + "\n\n[... TRANSCRIPT TRUNCATED ...]"
 
         user_message = f"""Please analyze the following interview transcript and break it down into chunks.
 
@@ -188,6 +219,17 @@ Remember:
             logger.info(f"[CHUNK] Quality filter: dropped {dropped}/{original_count} low-substance chunks")
 
         chunks = filtered_chunks
+
+        # Guard against empty chunk list after filtering
+        if not chunks:
+            logger.error(f"[CHUNK] All chunks were filtered out for video {state['video_id']}")
+            return {
+                **state,
+                "chunks": None,
+                "current_step": "chunk",
+                "error": "No substantive chunks found in transcript. The transcript may contain only filler phrases or very short responses.",
+                "error_type": "validation_error",
+            }
 
         logger.info(f"[CHUNK] Generated {len(chunks)} chunks for video {state['video_id']}")
 

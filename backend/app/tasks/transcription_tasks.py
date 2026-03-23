@@ -22,10 +22,6 @@ logger = logging.getLogger(__name__)
     base=DatabaseTask,
     bind=True,
     name="transcribe_video",
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_backoff_max=600,
-    retry_jitter=True,
     max_retries=2,
 )
 def transcribe_video_task(self, video_id: str):

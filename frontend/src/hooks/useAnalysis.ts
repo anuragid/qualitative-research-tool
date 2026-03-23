@@ -9,7 +9,10 @@ export function useVideoAnalysisStatus(videoId: string | null) {
     enabled: !!videoId,
     retry: (failureCount, error: unknown) => {
       const status = (error as { status?: number })?.status;
-      if (status === 404) return false;
+      // Retry 404s a couple of times to handle the race condition where
+      // startVideoAnalysis has been called but the backend hasn't created
+      // the analysis record yet.
+      if (status === 404) return failureCount < 2;
       return failureCount < 3;
     },
     refetchInterval: (query) => {

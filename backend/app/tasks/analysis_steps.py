@@ -69,17 +69,28 @@ def get_video_analysis_state(db: Session, video_id: UUID) -> Dict[str, Any]:
 def _update_analysis_error(db: Session, video_id: str, step_name: str):
     """Safely update analysis record to error state.
 
+    Rolls back any dirty session state before querying, ensuring the
+    error status update succeeds even if the previous transaction was
+    left in a broken state.
+
     Uses a fresh query to avoid UnboundLocalError if the analysis variable
     was never assigned in the calling scope.
     """
     try:
+        db.rollback()
         analysis = db.query(VideoAnalysis).filter(
             VideoAnalysis.video_id == UUID(video_id)
         ).first()
         if analysis:
             analysis.status = "error"
             analysis.step_status = {**(analysis.step_status or {}), step_name: "error"}
-            db.commit()
+
+        # Also reset video status from "analyzing" so it's not stuck
+        video = db.query(Video).filter(Video.id == UUID(video_id)).first()
+        if video and video.status == "analyzing":
+            video.status = "error"
+
+        db.commit()
     except Exception as commit_error:
         logger.error(f"Failed to update error status for {step_name}: {commit_error}")
         try:

@@ -121,6 +121,21 @@ async def get_upload_url(
     # Generate S3 key
     s3_key = f"videos/{project_id}/{uuid_module.uuid4()}/{safe_filename}"
 
+    # Generate presigned URL BEFORE creating the DB record.
+    # If URL generation fails, we avoid leaving an orphaned "uploading" record.
+    try:
+        upload_url = await asyncio.to_thread(
+            s3_service.generate_upload_url,
+            s3_key=s3_key,
+            content_type=request_body.content_type,
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate upload URL for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate upload URL",
+        )
+
     # Create video record in "uploading" state
     video = Video(
         project_id=project_id,
@@ -133,13 +148,6 @@ async def get_upload_url(
     db.add(video)
     db.commit()
     db.refresh(video)
-
-    # Generate presigned URL
-    upload_url = await asyncio.to_thread(
-        s3_service.generate_upload_url,
-        s3_key=s3_key,
-        content_type=request_body.content_type,
-    )
 
     logger.info(f"Generated upload URL for video {video.id} in project {project_id}")
     return UploadUrlResponse(upload_url=upload_url, s3_key=s3_key, video_id=str(video.id))
@@ -158,9 +166,14 @@ async def confirm_upload(
     if video.status != "uploading":
         raise HTTPException(status_code=400, detail="Video is not in uploading state")
 
-    # Verify the object actually exists in R2
+    # Verify the object actually exists in R2 and is not empty
     try:
-        await asyncio.to_thread(s3_service.head_object, video.s3_key)
+        head_result = await asyncio.to_thread(s3_service.head_object, video.s3_key)
+        content_length = head_result.get("ContentLength", 0)
+        if content_length == 0:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes). Please re-upload.")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="File not found in storage. Upload may not have completed.")
 
@@ -592,8 +605,9 @@ async def trigger_video_analysis(
         else:
             video_analysis.status = "pending"
 
-        # Update video status
+        # Update video status (clear previous error if retrying)
         video.status = "analyzing"
+        video.error_message = None
         db.commit()
         db.refresh(video_analysis)
 
@@ -755,7 +769,7 @@ async def get_word_level_transcript(
 @router.get("/{video_id}/transcript/search")
 async def search_transcript_words(
     video_id: UUID,
-    query: str,
+    query: str = "",
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
 ):
@@ -765,6 +779,12 @@ async def search_transcript_words(
     current_user_id = current_user["id"]
     try:
         import httpx
+
+        # Validate query parameter
+        if not query or not query.strip():
+            raise HTTPException(status_code=400, detail="Search query cannot be empty")
+        if len(query) > 500:
+            raise HTTPException(status_code=400, detail="Search query too long (max 500 characters)")
 
         _get_video_with_ownership(video_id, current_user_id, db)
 
@@ -835,6 +855,12 @@ async def trigger_chunk_step(
                 detail="Video must have a completed transcript"
             )
 
+        # Set video status to "analyzing" before dispatching task to prevent
+        # concurrent requests from passing the status check
+        video.status = "analyzing"
+        video.error_message = None
+        db.commit()
+
         from app.tasks.analysis_steps import analyze_chunk_step
         task = analyze_chunk_step.delay(str(video_id), current_user_id)
         logger.info(f"CHUNK step started for video {video_id}, task_id: {task.id}")
@@ -882,6 +908,10 @@ async def trigger_infer_step(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="CHUNK step must be completed first"
             )
+
+        video.status = "analyzing"
+        video.error_message = None
+        db.commit()
 
         from app.tasks.analysis_steps import analyze_infer_step
         task = analyze_infer_step.delay(str(video_id), current_user_id)
@@ -931,6 +961,10 @@ async def trigger_relate_step(
                 detail="INFER step must be completed first"
             )
 
+        video.status = "analyzing"
+        video.error_message = None
+        db.commit()
+
         from app.tasks.analysis_steps import analyze_relate_step
         task = analyze_relate_step.delay(str(video_id), current_user_id)
         logger.info(f"RELATE step started for video {video_id}, task_id: {task.id}")
@@ -979,6 +1013,10 @@ async def trigger_explain_step(
                 detail="RELATE step must be completed first"
             )
 
+        video.status = "analyzing"
+        video.error_message = None
+        db.commit()
+
         from app.tasks.analysis_steps import analyze_explain_step
         task = analyze_explain_step.delay(str(video_id), current_user_id)
         logger.info(f"EXPLAIN step started for video {video_id}, task_id: {task.id}")
@@ -1026,6 +1064,10 @@ async def trigger_activate_step(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="EXPLAIN step must be completed first"
             )
+
+        video.status = "analyzing"
+        video.error_message = None
+        db.commit()
 
         from app.tasks.analysis_steps import analyze_activate_step
         task = analyze_activate_step.delay(str(video_id), current_user_id)

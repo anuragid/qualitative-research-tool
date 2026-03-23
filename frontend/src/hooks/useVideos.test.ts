@@ -16,6 +16,9 @@ vi.mock("../services/videos", () => ({
     getByProject: vi.fn(),
     getById: vi.fn(),
     upload: vi.fn(),
+    uploadDirect: vi.fn(),
+    getUploadUrl: vi.fn(),
+    confirmUpload: vi.fn(),
     delete: vi.fn(),
     getPlaybackUrl: vi.fn(),
   },
@@ -27,6 +30,9 @@ const mockedService = videosService as {
   getByProject: ReturnType<typeof vi.fn>;
   getById: ReturnType<typeof vi.fn>;
   upload: ReturnType<typeof vi.fn>;
+  uploadDirect: ReturnType<typeof vi.fn>;
+  getUploadUrl: ReturnType<typeof vi.fn>;
+  confirmUpload: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
   getPlaybackUrl: ReturnType<typeof vi.fn>;
 };
@@ -264,7 +270,7 @@ describe("useUploadVideo", () => {
 
   it("uploads a video and invalidates queries", async () => {
     const uploaded = { id: "v1", filename: "video.mp4" };
-    mockedService.upload.mockResolvedValue(uploaded);
+    mockedService.uploadDirect.mockResolvedValue(uploaded);
 
     const { result } = renderHook(() => useUploadVideo(), {
       wrapper: createWrapper(),
@@ -280,7 +286,7 @@ describe("useUploadVideo", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockedService.upload).toHaveBeenCalledWith(
+    expect(mockedService.uploadDirect).toHaveBeenCalledWith(
       "p1",
       mockFile,
       undefined,
@@ -290,7 +296,7 @@ describe("useUploadVideo", () => {
 
   it("passes onProgress and cancelToken", async () => {
     const uploaded = { id: "v1", filename: "video.mp4" };
-    mockedService.upload.mockResolvedValue(uploaded);
+    mockedService.uploadDirect.mockResolvedValue(uploaded);
 
     const { result } = renderHook(() => useUploadVideo(), {
       wrapper: createWrapper(),
@@ -310,7 +316,7 @@ describe("useUploadVideo", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockedService.upload).toHaveBeenCalledWith(
+    expect(mockedService.uploadDirect).toHaveBeenCalledWith(
       "p1",
       mockFile,
       onProgress,
@@ -319,7 +325,7 @@ describe("useUploadVideo", () => {
   });
 
   it("handles upload error", async () => {
-    mockedService.upload.mockRejectedValue(new Error("Upload failed"));
+    mockedService.uploadDirect.mockRejectedValue(new Error("Upload failed"));
 
     const { result } = renderHook(() => useUploadVideo(), {
       wrapper: createWrapper(),

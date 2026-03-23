@@ -11,10 +11,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # Matches Unicode control characters except tab (\x09), newline (\x0a), carriage return (\x0d)
 _CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]')
 
+# Matches HTML/script tags that could enable XSS if rendered in a browser
+_HTML_TAG_RE = re.compile(r'<[^>]+>')
+
 
 def _strip_control_chars(v: str) -> str:
-    """Remove Unicode control characters (except tab, newline, carriage return)."""
-    return _CONTROL_CHAR_RE.sub('', v)
+    """Remove Unicode control characters and HTML tags for XSS prevention."""
+    v = _CONTROL_CHAR_RE.sub('', v)
+    v = _HTML_TAG_RE.sub('', v)
+    return v
 
 # ========== User Schemas ==========
 

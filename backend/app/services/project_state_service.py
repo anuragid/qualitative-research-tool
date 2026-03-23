@@ -2,7 +2,7 @@
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.database_models import Project, Video
 
@@ -20,12 +20,15 @@ class ProjectStateService:
             if not project:
                 return
 
-            # Check if all videos have completed analysis
-            # We check video_analysis.status instead of video.status because:
-            # 1. video_analysis.status properly tracks analysis completion
-            # 2. It handles both standard and step-by-step analysis modes
-            # 3. video.status uses "analyzed" not "completed"
-            videos = db.query(Video).filter(Video.project_id == project_id).all()
+            # Check if all videos have completed analysis.
+            # Eagerly load video_analysis to avoid lazy-load issues in Celery
+            # (where the session may not support implicit lazy loading).
+            videos = (
+                db.query(Video)
+                .options(selectinload(Video.video_analysis))
+                .filter(Video.project_id == project_id)
+                .all()
+            )
             if videos:
                 # Check if all videos have an analysis and all are completed
                 all_completed = all(

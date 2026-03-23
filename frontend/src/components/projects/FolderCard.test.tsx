@@ -98,26 +98,26 @@ describe("FolderCard", () => {
     expect(screen.getByText("My Cool Project")).toBeDefined();
   });
 
-  // 2. Renders video count text when videos exist
-  it("renders video count when the project has videos", () => {
+  // 2. Renders file count text when files exist
+  it("renders file count when the project has videos", () => {
     const project = createProject({
       videos: [makeVideo("v1"), makeVideo("v2")],
     });
     renderCard(project);
-    expect(screen.getByText("2 videos")).toBeDefined();
+    expect(screen.getByText("2 files")).toBeDefined();
   });
 
-  it("renders singular 'video' for one video", () => {
+  it("renders singular 'file' for one video", () => {
     const project = createProject({
       videos: [makeVideo("v1")],
     });
     renderCard(project);
-    expect(screen.getByText("1 video")).toBeDefined();
+    expect(screen.getByText("1 file")).toBeDefined();
   });
 
-  it('renders "No videos" when there are no videos', () => {
+  it('renders "No files" when there are no videos', () => {
     renderCard(createProject({ videos: [] }));
-    expect(screen.getByText("No videos")).toBeDefined();
+    expect(screen.getByText("No files")).toBeDefined();
   });
 
   // 3. Renders FolderStatusIcon for various statuses

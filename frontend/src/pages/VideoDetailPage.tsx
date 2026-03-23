@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
@@ -39,47 +39,8 @@ import {
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
-
-/** Attempt to parse a JSON error message into structured info. */
-interface ParsedError {
-  step?: string;
-  errorType?: "rate_limit" | "timeout" | "llm_error" | "network" | "validation" | "unknown";
-  message: string;
-  retryable: boolean;
-}
-
-function parseErrorMessage(raw: string | null): ParsedError | null {
-  if (!raw) return null;
-
-  // Try parsing as JSON first
-  try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed === "object" && parsed !== null) {
-      return {
-        step: parsed.step || parsed.current_step || undefined,
-        errorType: parsed.error_type || parsed.errorType || "unknown",
-        message: parsed.message || parsed.detail || parsed.error || raw,
-        retryable: parsed.retryable !== false, // Default to retryable
-      };
-    }
-  } catch {
-    // Not JSON, fall through
-  }
-
-  // Classify plain string errors
-  const lower = raw.toLowerCase();
-  if (lower.includes("rate limit") || lower.includes("429") || lower.includes("rate_limit")) {
-    return { message: raw, errorType: "rate_limit", retryable: true };
-  }
-  if (lower.includes("timeout") || lower.includes("timed out")) {
-    return { message: raw, errorType: "timeout", retryable: true };
-  }
-  if (lower.includes("network") || lower.includes("connection")) {
-    return { message: raw, errorType: "network", retryable: true };
-  }
-
-  return { message: raw, errorType: "unknown", retryable: true };
-}
+import { parseErrorMessage, getErrorTypeLabel } from "../lib/parseError";
+import type { ParsedError } from "../lib/parseError";
 
 function getErrorIcon(errorType?: ParsedError["errorType"]) {
   switch (errorType) {
@@ -87,17 +48,6 @@ function getErrorIcon(errorType?: ParsedError["errorType"]) {
     case "network": return Wifi;
     case "rate_limit": return Clock;
     default: return AlertCircle;
-  }
-}
-
-function getErrorTypeLabel(errorType?: ParsedError["errorType"]) {
-  switch (errorType) {
-    case "rate_limit": return "Rate Limited";
-    case "timeout": return "Timed Out";
-    case "llm_error": return "LLM Error";
-    case "network": return "Network Error";
-    case "validation": return "Validation Error";
-    default: return "Error";
   }
 }
 
@@ -216,53 +166,51 @@ export default function VideoDetailPage() {
     }
   };
 
-  // Validation functions for workflow prerequisites
-  const getUniqueSpeakers = () => {
+  // Validation functions for workflow prerequisites — memoized to avoid
+  // creating new array/object references on every render.
+  const uniqueSpeakers = useMemo(() => {
     if (!transcript?.processed_transcript?.utterances) return [];
     return Array.from(
       new Set(transcript.processed_transcript.utterances.map((u) => u.speaker))
     );
-  };
+  }, [transcript?.processed_transcript?.utterances]);
 
-  const hasRoleAssignments = () => {
-    const uniqueSpeakers = getUniqueSpeakers();
+  const hasRoleAssignments = useMemo(() => {
     if (uniqueSpeakers.length === 0) return false;
     return uniqueSpeakers.every(speaker => {
       const label = speakerLabels?.find((l) => l.speaker_label === speaker);
       const role = label?.role?.toLowerCase();
       return role === "interviewer" || role === "participant";
     });
-  };
+  }, [uniqueSpeakers, speakerLabels]);
 
-  const hasInterviewerAndParticipant = () => {
+  const hasInterviewerAndParticipant = useMemo(() => {
     if (!speakerLabels || speakerLabels.length === 0) return false;
     const hasInterviewer = speakerLabels.some(label => label.role?.toLowerCase() === "interviewer");
     const hasParticipant = speakerLabels.some(label => label.role?.toLowerCase() === "participant");
     return hasInterviewer && hasParticipant;
-  };
+  }, [speakerLabels]);
 
-  const canStartAnalysis = () => {
+  const canAnalysisStart = useMemo(() => {
     // Allow starting analysis if transcript is ready (including from error state where transcript completed)
     const transcriptReady = video?.status === "transcribed"
       || (transcript && transcript.status === "completed")
       || (video?.status === "error" && transcript && transcript.status === "completed");
-    const rolesAssigned = hasRoleAssignments();
-    const hasRequiredRoles = hasInterviewerAndParticipant();
-    return !!(transcriptReady && rolesAssigned && hasRequiredRoles);
-  };
+    return !!(transcriptReady && hasRoleAssignments && hasInterviewerAndParticipant);
+  }, [video?.status, transcript, hasRoleAssignments, hasInterviewerAndParticipant]);
 
-  const getWorkflowBlockerMessage = () => {
+  const workflowBlockerMessage = useMemo(() => {
     if (!transcript || transcript.status !== "completed") {
       return null;
     }
-    if (!hasRoleAssignments()) {
+    if (!hasRoleAssignments) {
       return "Please assign roles to all speakers before starting analysis.";
     }
-    if (!hasInterviewerAndParticipant()) {
+    if (!hasInterviewerAndParticipant) {
       return "You must have at least one Interviewer and one Participant assigned.";
     }
     return null;
-  };
+  }, [transcript, hasRoleAssignments, hasInterviewerAndParticipant]);
 
   if (videoLoading) {
     return (
@@ -503,7 +451,7 @@ export default function VideoDetailPage() {
                   speakerRole={speakerRole}
                   setSpeakerRole={setSpeakerRole}
                   onLabelSpeaker={handleLabelSpeaker}
-                  uniqueSpeakers={getUniqueSpeakers()}
+                  uniqueSpeakers={uniqueSpeakers}
                 />
               </div>
             )}
@@ -543,8 +491,8 @@ export default function VideoDetailPage() {
               analysis={analysis}
               analysisLoading={analysisLoading}
               hasTranscript={!!transcript}
-              canStartAnalysis={canStartAnalysis()}
-              workflowBlockerMessage={getWorkflowBlockerMessage()}
+              canStartAnalysis={canAnalysisStart}
+              workflowBlockerMessage={workflowBlockerMessage}
               onStartChunkStep={handleStartChunkStep}
               onStartFullAnalysis={handleStartFullAnalysis}
               startChunkStepPending={startChunkStep.isPending}

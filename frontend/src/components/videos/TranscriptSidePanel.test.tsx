@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { TranscriptSidePanel } from "./TranscriptSidePanel";
 import type { Transcript, SpeakerLabel } from "../../types";
 
@@ -101,14 +102,20 @@ describe("TranscriptSidePanel", () => {
     expect(screen.getAllByText(/Bob: Participant/).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders full speaker editor when roles are NOT all assigned", () => {
-    renderPanel({
+  it("renders full speaker editor when roles are NOT all assigned (after expanding)", async () => {
+    const user = userEvent.setup();
+    const { container } = renderPanel({
       uniqueSpeakers: ["Speaker A", "Speaker B"],
       speakerLabels: [
         { id: "sl-1", transcript_id: "t-1", speaker_label: "Speaker A", assigned_name: "Alice", role: "Interviewer", created_at: "2025-06-15T00:00:00Z" },
         { id: "sl-2", transcript_id: "t-1", speaker_label: "Speaker B", assigned_name: "Bob", role: null, created_at: "2025-06-15T00:00:00Z" },
       ],
     });
+
+    // The speaker editor starts collapsed — click the compact summary to expand
+    const expandButton = container.querySelector("button") as HTMLButtonElement;
+    await user.click(expandButton);
+
     expect(screen.getByText(/Speakers \(2\)/)).toBeDefined();
     expect(screen.getByText("No role")).toBeDefined();
   });

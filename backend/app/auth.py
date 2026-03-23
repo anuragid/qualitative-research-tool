@@ -296,7 +296,7 @@ if _is_dev:
 
         class _NoOpClerkAuth:
             """Stub that raises clear errors if Clerk verification is attempted without valid keys."""
-            def verify_token(self, token: str) -> Dict[str, Any]:
+            def verify_token(self, token: str, leeway: int = 0) -> Dict[str, Any]:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Clerk is not configured. Use dev bypass (no auth header) or set Clerk keys.",

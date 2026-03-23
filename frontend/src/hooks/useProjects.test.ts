@@ -109,6 +109,91 @@ describe("useProjects", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(projects);
   });
+
+  it("respects document.hidden check — does not poll when hidden", async () => {
+    const projects = [
+      { id: "1", name: "Project 1", status: "processing" },
+    ];
+    mockedService.getAll.mockResolvedValue(projects);
+
+    Object.defineProperty(document, "hidden", {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useProjects(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // With document.hidden=true, refetchInterval returns false even for processing projects
+    expect(mockedService.getAll).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, "hidden", {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it("polls when a video within a project is transcribing", async () => {
+    const projects = [
+      {
+        id: "1",
+        name: "Project 1",
+        status: "ready",
+        videos: [{ id: "v1", status: "transcribing" }],
+      },
+    ];
+    mockedService.getAll.mockResolvedValue(projects);
+
+    const { result } = renderHook(() => useProjects(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(projects);
+  });
+
+  it("polls when a video within a project is analyzing", async () => {
+    const projects = [
+      {
+        id: "1",
+        name: "Project 1",
+        status: "ready",
+        videos: [{ id: "v1", status: "analyzing" }],
+      },
+    ];
+    mockedService.getAll.mockResolvedValue(projects);
+
+    const { result } = renderHook(() => useProjects(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(projects);
+  });
+
+  it("stops polling when no active work", async () => {
+    const projects = [
+      {
+        id: "1",
+        name: "Project 1",
+        status: "completed",
+        videos: [{ id: "v1", status: "analyzed" }],
+      },
+    ];
+    mockedService.getAll.mockResolvedValue(projects);
+
+    const { result } = renderHook(() => useProjects(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // Only one call — no polling for completed projects with no active videos
+    expect(mockedService.getAll).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("useProject", () => {
@@ -161,6 +246,65 @@ describe("useProject", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.status).toBe("completed");
+  });
+
+  it("respects document.hidden check — does not poll when hidden", async () => {
+    const project = { id: "1", name: "Project 1", status: "processing" };
+    mockedService.getById.mockResolvedValue(project);
+
+    Object.defineProperty(document, "hidden", {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useProject("1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // With document.hidden=true, refetchInterval returns false even for processing project
+    expect(mockedService.getById).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, "hidden", {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it("polls when project has a video that is transcribing", async () => {
+    const project = {
+      id: "1",
+      name: "Project 1",
+      status: "ready",
+      videos: [{ id: "v1", status: "transcribing" }],
+    };
+    mockedService.getById.mockResolvedValue(project);
+
+    const { result } = renderHook(() => useProject("1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(project);
+  });
+
+  it("stops polling when no videos are actively processing", async () => {
+    const project = {
+      id: "1",
+      name: "Project 1",
+      status: "completed",
+      videos: [{ id: "v1", status: "analyzed" }],
+    };
+    mockedService.getById.mockResolvedValue(project);
+
+    const { result } = renderHook(() => useProject("1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedService.getById).toHaveBeenCalledTimes(1);
   });
 });
 

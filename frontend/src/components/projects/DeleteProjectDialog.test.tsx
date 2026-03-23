@@ -89,24 +89,24 @@ describe("DeleteProjectDialog", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("shows video count and related items when videoCount > 0", () => {
+  it("shows file count and related items when videoCount > 0", () => {
     renderDialog({ project: { id: "p-1", name: "P", videoCount: 3 } });
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    expect(scoped.getByText("3 videos")).toBeDefined();
+    expect(scoped.getByText("3 files")).toBeDefined();
     expect(scoped.getByText("All associated transcripts")).toBeDefined();
     expect(scoped.getByText("All analysis data")).toBeDefined();
   });
 
-  it("shows singular 'video' when videoCount is 1", () => {
+  it("shows singular 'file' when videoCount is 1", () => {
     renderDialog({ project: { id: "p-1", name: "P", videoCount: 1 } });
 
     const dialog = getDialogContent();
     const scoped = within(dialog);
 
-    expect(scoped.getByText("1 video")).toBeDefined();
+    expect(scoped.getByText("1 file")).toBeDefined();
   });
 
   it("does not show video-related items when videoCount is 0", () => {

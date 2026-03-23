@@ -304,11 +304,12 @@ describe("AnalysisSection", () => {
 
     const tablist = container.querySelector('[role="tablist"]');
     expect(tablist).not.toBeNull();
-    expect(tablist!.textContent).toContain("1. Chunks (2)");
-    expect(tablist!.textContent).toContain("2. Inferences (1)");
-    expect(tablist!.textContent).toContain("3. Patterns (1)");
-    expect(tablist!.textContent).toContain("4. Insights (1)");
-    expect(tablist!.textContent).toContain("5. Principles (1)");
+    expect(tablist!.textContent).toContain("Chunks");
+    expect(tablist!.textContent).toContain("2"); // 2 chunks
+    expect(tablist!.textContent).toContain("Inferences");
+    expect(tablist!.textContent).toContain("Patterns");
+    expect(tablist!.textContent).toContain("Insights");
+    expect(tablist!.textContent).toContain("Principles");
   });
 
   // 11. Shows progress indicator in step-by-step mode
@@ -345,7 +346,7 @@ describe("AnalysisSection", () => {
 
     const tablist = container.querySelector('[role="tablist"]');
     expect(tablist).not.toBeNull();
-    expect(tablist!.textContent).toContain("1. Chunks");
+    expect(tablist!.textContent).toContain("Chunks");
   });
 
   // 14. Shows loading state when analysisLoading is true
@@ -402,5 +403,164 @@ describe("AnalysisSection", () => {
     const { container } = renderSection({ analysis: createCompletedAnalysis() });
     const chunksList = container.querySelector('[data-testid="chunks-list"]');
     expect(chunksList).not.toBeNull();
+  });
+
+  // ---- Error state tests ----
+
+  // 19. Error banner appears when a step has error status
+  it("shows error banner when a step has error status", () => {
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+      activeStepTab: "inferences",
+    });
+
+    // Look for the error alert banner
+    const alertBanner = container.querySelector('[data-variant="error"]');
+    expect(alertBanner).not.toBeNull();
+    expect(alertBanner!.textContent).toContain("Infer step failed");
+  });
+
+  // 20. Retry button appears in error banner for errored step
+  it("shows retry button in error banner for errored step", () => {
+    const retryHandler = vi.fn();
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+      activeStepTab: "inferences",
+      onRetryInferStep: retryHandler,
+    });
+
+    // The retry button should say "Retry Infer Step"
+    const buttons = container.querySelectorAll("button");
+    const retryButton = Array.from(buttons).find(
+      (btn) => btn.textContent?.includes("Retry Infer Step")
+    );
+    expect(retryButton).toBeDefined();
+  });
+
+  // 21. "Failed" badge shows in progress indicator for errored step
+  it('shows "Failed" badge in progress indicator when step has error', () => {
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+    });
+
+    // Should render the "Failed" destructive badge
+    const badges = container.querySelectorAll('[data-slot="badge"]');
+    const failedBadge = Array.from(badges).find(
+      (badge) => badge.textContent?.includes("Failed")
+    );
+    expect(failedBadge).toBeDefined();
+  });
+
+  // 22. Loading spinner is suppressed when step has errored (inferences tab)
+  it("does not show loading spinner when infer step has errored and no inferences", () => {
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+    analysis.inferences = null;
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+      activeStepTab: "inferences",
+      startInferStepPending: false,
+    });
+
+    // The loading state should NOT appear since the step errored
+    // The code guards: `analysis.step_status?.infer !== "error"` before showing loading
+    const loadingState = container.querySelector('[data-slot="loading-state"]');
+    expect(loadingState).toBeNull();
+  });
+
+  // 23. Full analysis error state (non step-by-step)
+  it("shows full analysis error with retry button when analysis.status is error and no current_step", () => {
+    const analysis = createCompletedAnalysis({
+      status: "error",
+      current_step: null,
+      error_message: "LLM request failed",
+    });
+
+    const onStartFullAnalysis = vi.fn();
+
+    const { container } = renderSection({
+      analysis,
+      onStartFullAnalysis,
+    });
+
+    const alertBanner = container.querySelector('[data-variant="error"]');
+    expect(alertBanner).not.toBeNull();
+    expect(alertBanner!.textContent).toContain("Analysis failed");
+    expect(alertBanner!.textContent).toContain("LLM request failed");
+
+    const retryButton = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.includes("Retry Analysis")
+    );
+    expect(retryButton).toBeDefined();
+  });
+
+  // 24. Error icon shows in tab trigger for errored step
+  it("shows error icon in tab trigger for errored step", () => {
+    const analysis = createStepByStepAnalysis("relate");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "completed",
+      relate: "error",
+      explain: "pending",
+      activate: "pending",
+    };
+    analysis.inferences = [
+      { chunk_id: "c1", inferences: [{ inference_id: "i1", meaning: "Greeting", importance: "low", context: "start" }] },
+    ];
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Relate", number: 3, nextStep: "explain", handler: vi.fn() },
+    });
+
+    // The patterns tab trigger should have the error icon class (AlertCircle with text-destructive)
+    const tablist = container.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+    // The tab should be accessible (not disabled) when step has error
+    const tabs = tablist!.querySelectorAll('[role="tab"]');
+    const patternsTab = Array.from(tabs).find(
+      (tab) => tab.textContent?.includes("Patterns")
+    );
+    expect(patternsTab).toBeDefined();
+    // The patterns tab should NOT be disabled when step has error
+    expect(patternsTab!.getAttribute("data-disabled")).not.toBe("true");
   });
 });

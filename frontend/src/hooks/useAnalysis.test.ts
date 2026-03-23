@@ -205,15 +205,27 @@ describe("useVideoAnalysisStatus", () => {
     expect(mockedService.getVideoAnalysisStatus).not.toHaveBeenCalled();
   });
 
-  it("does not retry on 404 error", async () => {
+  it("retries on 404 up to 2 times to handle race conditions", async () => {
     mockedService.getVideoAnalysisStatus.mockRejectedValue({ status: 404 });
 
+    // Use a wrapper without default retry: false so the hook's custom retry function runs
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retryDelay: 0 },
+      },
+    });
+    const w = function Wrapper({ children }: { children: React.ReactNode }) {
+      return React.createElement(QueryClientProvider, { client: queryClient }, children);
+    };
+
     const { result } = renderHook(() => useVideoAnalysisStatus("v1"), {
-      wrapper: createWrapper(),
+      wrapper: w,
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(mockedService.getVideoAnalysisStatus).toHaveBeenCalledTimes(1);
+    // The hook retries 404s up to 2 times (initial + 2 retries = 3 calls)
+    // to handle the race condition where analysis hasn't been created yet
+    expect(mockedService.getVideoAnalysisStatus).toHaveBeenCalledTimes(3);
   });
 
   it("returns processing status for polling", async () => {
@@ -226,6 +238,66 @@ describe("useVideoAnalysisStatus", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.status).toBe("processing");
+  });
+
+  it("stops polling when status is completed", async () => {
+    // The refetchInterval callback returns false for "completed" status
+    const status = { status: "completed", current_step: "activate" };
+    mockedService.getVideoAnalysisStatus.mockResolvedValue(status);
+
+    const { result } = renderHook(() => useVideoAnalysisStatus("v1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.status).toBe("completed");
+    // Only one call should have been made — no continued polling
+    expect(mockedService.getVideoAnalysisStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops polling when status is error", async () => {
+    // The refetchInterval callback returns false for "error" status
+    const status = { status: "error", current_step: "chunk" };
+    mockedService.getVideoAnalysisStatus.mockResolvedValue(status);
+
+    const { result } = renderHook(() => useVideoAnalysisStatus("v1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.status).toBe("error");
+    // Only one call — no continued polling
+    expect(mockedService.getVideoAnalysisStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("respects document.hidden for polling (refetchInterval returns false when hidden)", async () => {
+    // Verify that the source code checks document.hidden
+    // We test the code path: when document.hidden is true, refetchInterval returns false
+    const status = { status: "processing", current_step: "chunk" };
+    mockedService.getVideoAnalysisStatus.mockResolvedValue(status);
+
+    // Mock document.hidden to be true
+    Object.defineProperty(document, "hidden", {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useVideoAnalysisStatus("v1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // The initial fetch succeeds, but polling should not continue
+    // because document.hidden is true in the refetchInterval callback
+    expect(mockedService.getVideoAnalysisStatus).toHaveBeenCalledTimes(1);
+
+    // Restore
+    Object.defineProperty(document, "hidden", {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
   });
 });
 
@@ -261,6 +333,32 @@ describe("useStartVideoAnalysis", () => {
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it("invalidates correct query keys on success", async () => {
+    mockedService.startVideoAnalysis.mockResolvedValue({ task_id: "t1" });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const w = function Wrapper({ children }: { children: React.ReactNode }) {
+      return React.createElement(QueryClientProvider, { client: queryClient }, children);
+    };
+
+    const { result } = renderHook(() => useStartVideoAnalysis(), { wrapper: w });
+
+    await act(async () => {
+      result.current.mutate("v1");
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    // Should invalidate analysis status, analysis data, and video queries
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["videos", "v1", "analysis", "status"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["videos", "v1", "analysis"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["videos", "v1"] });
   });
 });
 
@@ -469,6 +567,46 @@ describe("useProjectAnalysis", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // Only one call — no continued polling for completed status
+    expect(mockedService.getProjectAnalysis).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not poll when status is error", async () => {
+    const analysis = { id: "pa1", project_id: "p1", status: "error" };
+    mockedService.getProjectAnalysis.mockResolvedValue(analysis);
+
+    const { result } = renderHook(() => useProjectAnalysis("p1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.status).toBe("error");
+    expect(mockedService.getProjectAnalysis).toHaveBeenCalledTimes(1);
+  });
+
+  it("respects document.hidden for polling", async () => {
+    const analysis = { id: "pa1", project_id: "p1", status: "processing" };
+    mockedService.getProjectAnalysis.mockResolvedValue(analysis);
+
+    Object.defineProperty(document, "hidden", {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useProjectAnalysis("p1"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // Initial fetch succeeds but polling should not continue when document is hidden
+    expect(mockedService.getProjectAnalysis).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, "hidden", {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
   });
 });
 
