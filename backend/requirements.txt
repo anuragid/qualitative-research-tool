@@ -43,3 +43,6 @@ cryptography==45.0.0
 
 # Rate Limiting
 slowapi==0.1.9
+
+# Error Monitoring & Observability
+sentry-sdk[fastapi,celery]

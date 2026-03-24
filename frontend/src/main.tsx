@@ -1,4 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
+import "./instrument"; // Sentry must initialize before any other imports
+import { reactErrorHandler } from "@sentry/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -44,7 +46,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-createRoot(document.getElementById("root")!).render(
+createRoot(document.getElementById("root")!, {
+  // React 19 error handlers — report to Sentry automatically
+  onUncaughtError: reactErrorHandler(),
+  onCaughtError: reactErrorHandler(),
+  onRecoverableError: reactErrorHandler(),
+}).render(
   <StrictMode>
     <ErrorBoundary>
       <ThemeProvider>

@@ -1,0 +1,32 @@
+"""Sentry SDK initialization for both FastAPI and Celery worker processes.
+
+Call `init_sentry()` once per process — in main.py (API) and via
+the celeryd_init signal (worker). If SENTRY_DSN is unset or empty,
+Sentry is silently disabled.
+"""
+
+import os
+
+import sentry_sdk
+
+
+def init_sentry() -> None:
+    dsn = os.environ.get("SENTRY_DSN", "")
+    if not dsn:
+        return
+
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", os.environ.get("APP_ENV", "production")),
+        send_default_pii=True,
+
+        # Tracing — capture everything while user base is small
+        traces_sample_rate=1.0,
+
+        # Continuous profiling tied to active spans
+        profile_session_sample_rate=1.0,
+        profile_lifecycle="trace",
+
+        # Structured logs
+        enable_logs=True,
+    )

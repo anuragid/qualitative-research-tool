@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
@@ -10,7 +11,15 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://storybook.js.org/docs/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.SENTRY_AUTH_TOKEN, // Don't warn in dev when token isn't set
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(dirname, './src'),
@@ -18,7 +27,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false,
+    sourcemap: "hidden", // Generate source maps for Sentry but don't expose to browser
   },
   test: {
     coverage: {

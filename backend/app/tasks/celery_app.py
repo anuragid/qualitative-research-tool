@@ -2,11 +2,25 @@
 
 import logging
 
-from celery import Celery
+from celery import Celery, signals
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@signals.celeryd_init.connect
+def init_sentry_for_worker(**kwargs):
+    """Initialize Sentry in the Celery worker process.
+
+    The API process initializes Sentry in main.py. The worker is a
+    separate process and needs its own init call so that task errors,
+    traces, and profiling are captured.
+    """
+    from app.sentry_setup import init_sentry
+    init_sentry()
+    logger.info("Sentry initialized for Celery worker")
+
 
 # Create Celery app
 celery_app = Celery(

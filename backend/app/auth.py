@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 import jwt
+import sentry_sdk
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -349,7 +350,7 @@ def _make_get_current_user(leeway: int = 0):
         user_data = clerk_auth.verify_token(token, leeway=leeway)
 
         # Extract user info from Clerk JWT with RBAC
-        return {
+        user = {
             "id": user_data.get("sub"),  # Clerk user ID
             "email": user_data.get("email"),
             "email_verified": user_data.get("email_verified"),
@@ -361,6 +362,11 @@ def _make_get_current_user(leeway: int = 0):
             "permissions": user_data.get("permissions", []),  # User permissions
             "raw_payload": user_data,  # Keep the full payload for reference
         }
+
+        # Tag Sentry events with the authenticated user
+        sentry_sdk.set_user({"id": user["id"], "email": user.get("email")})
+
+        return user
 
     return get_current_user
 
@@ -376,6 +382,7 @@ get_current_user_upload = _make_get_current_user(leeway=300)
 
 def _dev_user_dict() -> Dict[str, Any]:
     """Return a synthetic user dict for local development."""
+    sentry_sdk.set_user({"id": DEV_USER_ID, "email": "dev@localhost"})
     return {
         "id": DEV_USER_ID,
         "email": "dev@localhost",

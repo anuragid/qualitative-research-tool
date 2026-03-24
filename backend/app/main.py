@@ -1,11 +1,17 @@
 """FastAPI main application."""
 
+# Sentry must initialize before any other app imports so the SDK can
+# auto-instrument FastAPI, SQLAlchemy, httpx, etc.
+from app.sentry_setup import init_sentry
+init_sentry()
+
 import base64
 import json
 import logging
 import re
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -216,6 +222,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    # Capture the exception for Sentry with request context
+    sentry_sdk.capture_exception(exc)
     # Safety net: if the error message accidentally contains file paths,
     # redact them before sending to the client.  The full detail is already
     # logged server-side above.
