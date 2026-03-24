@@ -8,6 +8,7 @@ Sentry is silently disabled.
 import os
 
 import sentry_sdk
+from sentry_sdk.integrations.openai import OpenAIIntegration
 
 
 def init_sentry() -> None:
@@ -18,7 +19,14 @@ def init_sentry() -> None:
     sentry_sdk.init(
         dsn=dsn,
         environment=os.environ.get("SENTRY_ENVIRONMENT", os.environ.get("APP_ENV", "production")),
+        release=os.environ.get("SENTRY_RELEASE", os.environ.get("RAILWAY_GIT_COMMIT_SHA")),
         send_default_pii=True,
+
+        integrations=[
+            OpenAIIntegration(
+                include_prompts=True,
+            ),
+        ],
 
         # Tracing — capture everything while user base is small
         traces_sample_rate=1.0,

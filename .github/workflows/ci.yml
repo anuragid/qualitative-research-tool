@@ -88,6 +88,7 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_CLERK_PROXY_URL: ${{ secrets.VITE_CLERK_PROXY_URL }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
 
       - name: Verify no test keys in build
         run: |
