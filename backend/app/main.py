@@ -2,7 +2,7 @@
 
 # Sentry must initialize before any other app imports so the SDK can
 # auto-instrument FastAPI, SQLAlchemy, httpx, etc.
-from app.sentry_setup import init_sentry
+from app.sentry_setup import init_sentry  # noqa: E402, I001 — must run before other imports
 init_sentry()
 
 import base64
@@ -11,8 +11,8 @@ import logging
 import re
 from contextlib import asynccontextmanager
 
-import sentry_sdk
 import httpx
+import sentry_sdk
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
