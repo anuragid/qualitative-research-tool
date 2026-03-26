@@ -325,30 +325,28 @@ export default function LandingPage() {
           </div>
           <div className="feature-mockup-card reveal">
             <div className="node-editor">
-              {/* SVG edges — all dashed, matching reference style */}
+              {/* SVG edges — all route through column gaps, never over nodes */}
               <svg className="node-edges" aria-hidden="true">
-                {/* Transcript → Chunk */}
-                <path d="M140,48 C175,48 185,48 210,48" />
-                {/* Chunk → Infer */}
-                <path d="M340,68 C340,100 270,125 270,150" />
-                {/* Chunk → Relate (skip) */}
-                <path d="M340,48 C410,48 440,100 440,140" />
-                {/* Infer → Relate */}
-                <path d="M340,175 C380,175 400,175 420,175" />
-                {/* Infer → Synthesize */}
-                <path d="M300,200 C300,250 380,280 420,290" />
-                {/* Relate → Synthesize */}
-                <path d="M520,200 C520,250 500,280 490,290" />
+                {/* Transcript → Chunk: horizontal */}
+                <path d="M120,127 C130,127 132,127 140,127" />
+                {/* Chunk → Infer: fan up-right through gap */}
+                <path d="M240,127 C268,127 260,82 260,59" />
+                {/* Chunk → Relate: fan down-right through gap */}
+                <path d="M240,127 C268,127 260,172 260,193" />
+                {/* Infer → Synthesize: converge down-right */}
+                <path d="M360,59 C388,59 380,102 380,127" />
+                {/* Relate → Synthesize: converge up-right */}
+                <path d="M360,193 C388,193 380,152 380,127" />
               </svg>
 
-              {/* Input — Transcript */}
+              {/* Transcript — input */}
               <div className="node-card node-input" style={{ gridArea: 'input' }}>
                 <div className="node-port node-port-out" />
                 <span className="node-label">Transcript</span>
                 <p className="node-desc">Raw interview data</p>
               </div>
 
-              {/* Chunk Agent */}
+              {/* Chunk Agent — fans out to Infer + Relate */}
               <div className="node-card" style={{ gridArea: 'chunk' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
@@ -357,7 +355,7 @@ export default function LandingPage() {
                 <p className="node-desc">Segment into units</p>
               </div>
 
-              {/* Infer Agent */}
+              {/* Infer Agent — top branch */}
               <div className="node-card" style={{ gridArea: 'infer' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
@@ -366,7 +364,7 @@ export default function LandingPage() {
                 <p className="node-desc">Derive meaning</p>
               </div>
 
-              {/* Relate Agent */}
+              {/* Relate Agent — bottom branch */}
               <div className="node-card" style={{ gridArea: 'relate' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
@@ -375,7 +373,7 @@ export default function LandingPage() {
                 <p className="node-desc">Find patterns</p>
               </div>
 
-              {/* Synthesize */}
+              {/* Synthesize — converges both branches */}
               <div className="node-card" style={{ gridArea: 'synth' }}>
                 <div className="node-port node-port-in" />
                 <span className="node-status-dot node-status-dot-queued" />
@@ -385,7 +383,6 @@ export default function LandingPage() {
 
               {/* Ghost — extensibility hint */}
               <div className="node-card node-ghost" style={{ gridArea: 'custom' }}>
-                <div className="node-port node-port-in" />
                 <span className="node-label">+ Your method</span>
               </div>
 
