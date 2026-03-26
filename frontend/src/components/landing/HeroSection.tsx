@@ -26,7 +26,7 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
       <div className="hero-content">
         <h1>Your research toolkit, <em>digitized</em></h1>
         <p className="hero-subtitle">
-          Turn interview recordings into structured insights using proven analytical frameworks.
+          Transform qualitative research data into structured insights using proven analytical frameworks.
         </p>
         <div className="hero-cta-group">
           <Link to={isSignedIn ? '/projects' : '/sign-up'} className="glass-btn">

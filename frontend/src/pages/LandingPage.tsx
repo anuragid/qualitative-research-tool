@@ -662,19 +662,19 @@ export default function LandingPage() {
         <div className="about-inner reveal">
           <p className="section-label">About</p>
           <h2 className="about-heading">
-            Built to help researchers <em>analyze</em>,
+            Built <em>for</em> designers,
             <br />
-            by researchers
+            by designers
           </h2>
           <p className="about-text">
             methodex brings analysis and synthesis methods taught by Jeremy Alexis at the Institute of
-            Design, Illinois Institute of Technology, into an AI-powered digital workflow. Upload
-            interview recordings, and AI applies proven analytical frameworks to surface patterns and
-            insights that would take hours to find manually.
+            Design, Illinois Institute of Technology, into an AI-powered digital workflow. Upload your
+            qualitative research data, and AI applies proven analytical frameworks to surface patterns
+            and insights that would take hours to find manually.
           </p>
           <p className="about-text">
             Designed for design researchers and students, methodex pairs the rigor of established
-            analytical methods with modern AI to transform raw interview data into structured, actionable insight.
+            methods with modern AI to transform qualitative data into structured, actionable insight.
           </p>
 
           <div className="about-orgs">
