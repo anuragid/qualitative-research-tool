@@ -580,8 +580,8 @@ export default function LandingPage() {
               <div>
                 <h3 className="folder-card-title">AEIOU Framework</h3>
                 <p className="folder-card-desc">
-                  Activities, Environments, Interactions, Objects, and Users. A structured lens for
-                  ethnographic observation.
+                  Activities, Environments, Interactions, Objects, and Users. A structured framework for
+                  analyzing ethnographic observation data.
                 </p>
               </div>
               <div className="folder-card-footer">
@@ -593,8 +593,8 @@ export default function LandingPage() {
               <div>
                 <h3 className="folder-card-title">Affinity Mapping</h3>
                 <p className="folder-card-desc">
-                  Cluster observations into meaningful groups. Surface hidden relationships across
-                  research data.
+                  Group collected observations into meaningful clusters. Surface hidden relationships
+                  across your research data.
                 </p>
               </div>
               <div className="folder-card-footer">
@@ -619,8 +619,8 @@ export default function LandingPage() {
               <div>
                 <h3 className="folder-card-title">Thematic Analysis</h3>
                 <p className="folder-card-desc">
-                  Identify and analyze recurring themes. Build codebooks from qualitative data
-                  systematically.
+                  Identify and analyze recurring themes across your recordings. Build codebooks from
+                  collected research data systematically.
                 </p>
               </div>
               <div className="folder-card-footer">
@@ -662,7 +662,7 @@ export default function LandingPage() {
         <div className="about-inner reveal">
           <p className="section-label">About</p>
           <h2 className="about-heading">
-            Built <em>for</em> researchers,
+            Built to help researchers <em>analyze</em>,
             <br />
             by researchers
           </h2>

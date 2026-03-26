@@ -17,8 +17,8 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
               <Logo size="sidebar" className="text-white" />
             </div>
             <p className="footer-tagline">
-              Your research toolkit, digitized. Transform qualitative research with proven
-              analytical frameworks.
+              Analysis and synthesis, digitized. Turn research recordings into insights with
+              proven analytical frameworks.
             </p>
           </div>
           <div className="footer-links">
