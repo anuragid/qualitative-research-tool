@@ -588,14 +588,14 @@ export default function LandingPage() {
             by researchers
           </h2>
           <p className="about-text">
-            methodex is developed by Jeremy Alexis at the Institute of Design, Illinois Institute of
-            Technology. It brings the rigor of established qualitative research methods to a
-            digital-first workflow, making structured analysis accessible to design researchers and
-            students.
+            methodex brings qualitative research methods taught by Jeremy Alexis at the Institute of
+            Design, Illinois Institute of Technology, into an AI-powered digital workflow. Upload
+            interview videos, and AI applies proven analytical frameworks to surface patterns and
+            insights that would take hours to find manually.
           </p>
           <p className="about-text">
-            Rooted in the Center for Decision Quality's mission, methodex transforms how teams move
-            from raw observation to actionable insight.
+            Designed for design researchers and students, methodex pairs the rigor of established
+            methods with modern AI to transform raw observations into structured, actionable insight.
           </p>
 
           <div className="about-orgs">
