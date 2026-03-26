@@ -1328,10 +1328,9 @@
 }
 
 .landing-page .folder-card {
-  position: relative;
   border-radius: var(--radius-lg);
-  padding: var(--space-lg) var(--space-md) var(--space-md);
-  min-height: 180px;
+  padding: var(--space-md);
+  min-height: 160px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1343,19 +1342,6 @@
 .landing-page .folder-card:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-card);
-}
-
-/* Folder tab */
-.landing-page .folder-card::before {
-  content: '';
-  position: absolute;
-  top: -12px;
-  left: 16px;
-  width: 48px;
-  height: 16px;
-  border-radius: 6px 6px 0 0;
-  background: inherit;
-  filter: brightness(0.95);
 }
 
 .landing-page .folder-card-title {

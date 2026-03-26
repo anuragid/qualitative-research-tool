@@ -507,9 +507,6 @@ export default function LandingPage() {
               </div>
               <div className="folder-card-footer">
                 <span className="folder-card-status">In Development</span>
-                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 10h12M12 6l4 4-4 4" />
-                </svg>
               </div>
             </div>
 
@@ -523,9 +520,6 @@ export default function LandingPage() {
               </div>
               <div className="folder-card-footer">
                 <span className="folder-card-status">Planned</span>
-                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 10h12M12 6l4 4-4 4" />
-                </svg>
               </div>
             </div>
 
@@ -539,9 +533,6 @@ export default function LandingPage() {
               </div>
               <div className="folder-card-footer">
                 <span className="folder-card-status">Planned</span>
-                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 10h12M12 6l4 4-4 4" />
-                </svg>
               </div>
             </div>
 
@@ -555,9 +546,6 @@ export default function LandingPage() {
               </div>
               <div className="folder-card-footer">
                 <span className="folder-card-status">Planned</span>
-                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 10h12M12 6l4 4-4 4" />
-                </svg>
               </div>
             </div>
 
@@ -571,9 +559,6 @@ export default function LandingPage() {
               </div>
               <div className="folder-card-footer">
                 <span className="folder-card-status">Exploring</span>
-                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 10h12M12 6l4 4-4 4" />
-                </svg>
               </div>
             </div>
 
@@ -587,9 +572,6 @@ export default function LandingPage() {
               </div>
               <div className="folder-card-footer">
                 <span className="folder-card-status">Exploring</span>
-                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 10h12M12 6l4 4-4 4" />
-                </svg>
               </div>
             </div>
           </div>
