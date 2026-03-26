@@ -324,51 +324,90 @@ export default function LandingPage() {
             </Link>
           </div>
           <div className="feature-mockup-card reveal">
-            <div className="pipeline-mockup">
-              <div className="pipeline-step">
-                <div className="pipeline-step-num" style={{ background: '#5A8DB8' }}>1</div>
-                <div className="pipeline-step-content">
-                  <p className="pipeline-step-title">Chunk</p>
-                  <p className="pipeline-step-desc">Break transcript into meaningful pieces</p>
+            <div className="node-editor">
+              {/* SVG edges connecting nodes */}
+              <svg className="node-edges" aria-hidden="true">
+                {/* Transcript → Chunk */}
+                <path d="M140,56 C180,56 180,56 210,56" />
+                {/* Chunk → Infer */}
+                <path d="M330,56 C370,56 370,100 370,120" />
+                {/* Infer → Relate */}
+                <path d="M330,148 C370,148 370,148 400,148" />
+                {/* Chunk → Relate (skip connection) */}
+                <path d="M330,56 C390,56 430,100 430,120" className="node-edge-skip" />
+                {/* Relate → Synthesize */}
+                <path d="M330,240 C370,240 370,240 400,240" />
+                {/* Infer → Synthesize */}
+                <path d="M330,148 C390,170 390,210 400,230" className="node-edge-skip" />
+              </svg>
+
+              {/* Input node */}
+              <div className="node-card node-input" style={{ gridArea: 'input' }}>
+                <div className="node-port node-port-out" />
+                <div className="node-header" style={{ borderColor: '#9CA3AF' }}>
+                  <span className="node-icon">📄</span>
+                  <span className="node-label">Transcript</span>
                 </div>
-                <span className="pipeline-step-status complete">Done</span>
+                <p className="node-desc">Raw interview data</p>
               </div>
-              <div className="pipeline-connector" />
-              <div className="pipeline-step">
-                <div className="pipeline-step-num" style={{ background: '#5D9F55' }}>2</div>
-                <div className="pipeline-step-content">
-                  <p className="pipeline-step-title">Infer</p>
-                  <p className="pipeline-step-desc">Interpret meaning from each chunk</p>
+
+              {/* Agent nodes — row 1 */}
+              <div className="node-card" style={{ gridArea: 'chunk' }}>
+                <div className="node-port node-port-in" />
+                <div className="node-port node-port-out" />
+                <div className="node-header" style={{ borderColor: '#5A8DB8' }}>
+                  <span className="node-icon">🔷</span>
+                  <span className="node-label">Chunk Agent</span>
                 </div>
-                <span className="pipeline-step-status complete">Done</span>
+                <p className="node-desc">Segment into units</p>
+                <span className="node-status node-status-done">done</span>
               </div>
-              <div className="pipeline-connector" />
-              <div className="pipeline-step">
-                <div className="pipeline-step-num" style={{ background: '#C8A848' }}>3</div>
-                <div className="pipeline-step-content">
-                  <p className="pipeline-step-title">Relate</p>
-                  <p className="pipeline-step-desc">Find patterns across inferences</p>
+
+              {/* Agent nodes — row 2 */}
+              <div className="node-card" style={{ gridArea: 'infer' }}>
+                <div className="node-port node-port-in" />
+                <div className="node-port node-port-out" />
+                <div className="node-header" style={{ borderColor: '#5D9F55' }}>
+                  <span className="node-icon">🟢</span>
+                  <span className="node-label">Infer Agent</span>
                 </div>
-                <span className="pipeline-step-status active">Running</span>
+                <p className="node-desc">Derive meaning</p>
+                <span className="node-status node-status-done">done</span>
               </div>
-              <div className="pipeline-connector" />
-              <div className="pipeline-step">
-                <div className="pipeline-step-num" style={{ background: '#A11735' }}>4</div>
-                <div className="pipeline-step-content">
-                  <p className="pipeline-step-title">Explain</p>
-                  <p className="pipeline-step-desc">Generate insights from patterns</p>
+
+              <div className="node-card" style={{ gridArea: 'relate' }}>
+                <div className="node-port node-port-in" />
+                <div className="node-port node-port-out" />
+                <div className="node-header" style={{ borderColor: '#C8A848' }}>
+                  <span className="node-icon">🟡</span>
+                  <span className="node-label">Relate Agent</span>
                 </div>
-                <span className="pipeline-step-status pending">Queued</span>
+                <p className="node-desc">Find patterns</p>
+                <span className="node-status node-status-active">running</span>
               </div>
-              <div className="pipeline-connector" />
-              <div className="pipeline-step">
-                <div className="pipeline-step-num" style={{ background: '#8B6BAE' }}>5</div>
-                <div className="pipeline-step-content">
-                  <p className="pipeline-step-title">Activate</p>
-                  <p className="pipeline-step-desc">Turn insights into design principles</p>
+
+              {/* Output node */}
+              <div className="node-card" style={{ gridArea: 'synth' }}>
+                <div className="node-port node-port-in" />
+                <div className="node-header" style={{ borderColor: '#8B6BAE' }}>
+                  <span className="node-icon">✦</span>
+                  <span className="node-label">Synthesize</span>
                 </div>
-                <span className="pipeline-step-status pending">Queued</span>
+                <p className="node-desc">Insights &amp; principles</p>
+                <span className="node-status node-status-pending">queued</span>
               </div>
+
+              {/* Ghost node — hints at extensibility */}
+              <div className="node-card node-ghost" style={{ gridArea: 'custom' }}>
+                <div className="node-port node-port-in" />
+                <div className="node-header" style={{ borderColor: 'transparent' }}>
+                  <span className="node-icon">+</span>
+                  <span className="node-label">Your method</span>
+                </div>
+              </div>
+
+              {/* Canvas dots background */}
+              <div className="node-canvas-dots" aria-hidden="true" />
             </div>
           </div>
         </div>
