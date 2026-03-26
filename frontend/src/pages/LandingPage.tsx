@@ -28,33 +28,39 @@ export default function LandingPage() {
   }, []);
 
   // GSAP scroll reveal animations for .reveal elements
+  // Initial hidden state is set via CSS (.landing-page .reveal-init) so content
+  // remains visible if GSAP/ScrollTrigger fails (e.g. iOS Safari momentum scroll).
   useGSAP(
     () => {
       if (prefersReducedMotion()) {
-        // Make everything visible immediately
         gsap.set('.reveal, .reveal-stagger', { opacity: 1, y: 0 });
         gsap.set('.reveal-stagger > *', { opacity: 1, y: 0 });
         return;
       }
 
       const revealElements = gsap.utils.toArray<HTMLElement>('.reveal, .reveal-stagger');
+
+      // Mark elements as GSAP-managed and set initial state
       revealElements.forEach((el) => {
-        gsap.fromTo(
-          el,
-          { opacity: 0, y: 24 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.7,
-            ease: 'power2.out',
-            scrollTrigger: {
-              trigger: el,
-              start: 'top 85%',
-              once: true,
-            },
-          },
-        );
+        el.classList.add('reveal-init');
       });
+
+      revealElements.forEach((el) => {
+        gsap.to(el, {
+          opacity: 1,
+          y: 0,
+          duration: 0.7,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: el,
+            start: 'top 85%',
+            once: true,
+          },
+        });
+      });
+
+      // iOS Safari fix: refresh ScrollTrigger after layout settles
+      ScrollTrigger.refresh();
     },
     { scope: containerRef },
   );

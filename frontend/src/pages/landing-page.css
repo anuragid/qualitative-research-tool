@@ -1683,39 +1683,34 @@
 
 /* ================================================================
    SCROLL ANIMATIONS
-   ================================================================ */
-.landing-page .reveal {
-  opacity: 0;
-  transform: translateY(24px);
-  transition:
-    opacity 0.7s var(--ease-out),
-    transform 0.7s var(--ease-out);
-}
-.landing-page .reveal.visible {
+   ================================================================
+   Elements are visible by default. GSAP adds .reveal-init to mark
+   elements it is managing, which hides them for the scroll reveal.
+   If GSAP/ScrollTrigger fails (e.g. iOS Safari), content stays
+   visible because .reveal-init is never added without JS. */
+
+/* Visible by default — safe fallback */
+.landing-page .reveal,
+.landing-page .reveal-stagger > * {
   opacity: 1;
   transform: translateY(0);
 }
-/* Stagger children */
-.landing-page .reveal-stagger > * {
+
+/* Hidden only when GSAP is actively managing the element */
+.landing-page .reveal-init {
+  opacity: 0;
+  transform: translateY(24px);
+}
+.landing-page .reveal-init.reveal-stagger > * {
   opacity: 0;
   transform: translateY(20px);
-  transition:
-    opacity 0.6s var(--ease-out),
-    transform 0.6s var(--ease-out);
 }
-.landing-page .reveal-stagger.visible > *:nth-child(1) { transition-delay: 0ms; opacity: 1; transform: translateY(0); }
-.landing-page .reveal-stagger.visible > *:nth-child(2) { transition-delay: 80ms; opacity: 1; transform: translateY(0); }
-.landing-page .reveal-stagger.visible > *:nth-child(3) { transition-delay: 160ms; opacity: 1; transform: translateY(0); }
-.landing-page .reveal-stagger.visible > *:nth-child(4) { transition-delay: 240ms; opacity: 1; transform: translateY(0); }
-.landing-page .reveal-stagger.visible > *:nth-child(5) { transition-delay: 320ms; opacity: 1; transform: translateY(0); }
-.landing-page .reveal-stagger.visible > *:nth-child(6) { transition-delay: 400ms; opacity: 1; transform: translateY(0); }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-page .reveal,
-  .landing-page .reveal-stagger > * {
+  .landing-page .reveal-init,
+  .landing-page .reveal-init.reveal-stagger > * {
     opacity: 1;
     transform: none;
-    transition: none;
   }
   .landing-page .hero-cloud-1,
   .landing-page .hero-cloud-2 {
