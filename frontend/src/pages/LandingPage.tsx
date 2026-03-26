@@ -326,82 +326,121 @@ export default function LandingPage() {
           <div className="feature-mockup-card reveal">
             <div className="node-editor">
               {/* SVG edges connecting nodes */}
-              <svg className="node-edges" aria-hidden="true">
+              <svg className="node-edges" viewBox="0 0 700 360" preserveAspectRatio="none" aria-hidden="true">
                 {/* Transcript → Chunk */}
-                <path d="M140,56 C180,56 180,56 210,56" />
+                <path d="M185,60 C220,60 240,60 270,60" />
+                <text className="node-edge-label" x="228" y="52">segments</text>
                 {/* Chunk → Infer */}
-                <path d="M330,56 C370,56 370,100 370,120" />
+                <path d="M430,80 C430,110 310,140 310,170" />
+                <text className="node-edge-label" x="360" y="130">meanings</text>
                 {/* Infer → Relate */}
-                <path d="M330,148 C370,148 370,148 400,148" />
+                <path d="M430,200 C470,200 490,200 510,200" />
+                <text className="node-edge-label" x="462" y="192">patterns</text>
                 {/* Chunk → Relate (skip connection) */}
-                <path d="M330,56 C390,56 430,100 430,120" className="node-edge-skip" />
+                <path d="M430,60 C500,60 540,120 540,170" className="node-edge-skip" />
                 {/* Relate → Synthesize */}
-                <path d="M330,240 C370,240 370,240 400,240" />
+                <path d="M660,220 C680,260 620,310 600,320" />
                 {/* Infer → Synthesize */}
-                <path d="M330,148 C390,170 390,210 400,230" className="node-edge-skip" />
+                <path d="M380,220 C380,280 450,320 500,330" className="node-edge-skip" />
               </svg>
 
-              {/* Input node */}
-              <div className="node-card node-input" style={{ gridArea: 'input' }}>
+              {/* Input node — Transcript */}
+              <div className="node-card node-input" style={{ gridArea: 'input', borderLeftColor: '#9CA3AF' }}>
                 <div className="node-port node-port-out" />
-                <div className="node-header" style={{ borderColor: '#9CA3AF' }}>
-                  <span className="node-icon">📄</span>
+                <div className="node-header">
+                  <span className="node-icon">
+                    <svg viewBox="0 0 16 16" strokeWidth="1.5" stroke="#9CA3AF">
+                      <rect x="3" y="1.5" width="10" height="13" rx="1.5" />
+                      <line x1="5.5" y1="5" x2="10.5" y2="5" />
+                      <line x1="5.5" y1="7.5" x2="10.5" y2="7.5" />
+                      <line x1="5.5" y1="10" x2="8.5" y2="10" />
+                    </svg>
+                  </span>
                   <span className="node-label">Transcript</span>
                 </div>
                 <p className="node-desc">Raw interview data</p>
               </div>
 
-              {/* Agent nodes — row 1 */}
-              <div className="node-card" style={{ gridArea: 'chunk' }}>
+              {/* Chunk Agent — row 1 */}
+              <div className="node-card" style={{ gridArea: 'chunk', borderLeftColor: '#5A8DB8' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
-                <div className="node-header" style={{ borderColor: '#5A8DB8' }}>
-                  <span className="node-icon">🔷</span>
+                <span className="node-status-dot node-status-dot-done" />
+                <div className="node-header">
+                  <span className="node-icon">
+                    <svg viewBox="0 0 16 16" strokeWidth="1.5" stroke="#5A8DB8">
+                      <rect x="1.5" y="1.5" width="5" height="5" rx="1" />
+                      <rect x="9.5" y="1.5" width="5" height="5" rx="1" />
+                      <rect x="1.5" y="9.5" width="5" height="5" rx="1" />
+                      <rect x="9.5" y="9.5" width="5" height="5" rx="1" />
+                    </svg>
+                  </span>
                   <span className="node-label">Chunk Agent</span>
                 </div>
                 <p className="node-desc">Segment into units</p>
-                <span className="node-status node-status-done">done</span>
               </div>
 
-              {/* Agent nodes — row 2 */}
-              <div className="node-card" style={{ gridArea: 'infer' }}>
+              {/* Infer Agent — row 2 */}
+              <div className="node-card" style={{ gridArea: 'infer', borderLeftColor: '#5D9F55' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
-                <div className="node-header" style={{ borderColor: '#5D9F55' }}>
-                  <span className="node-icon">🟢</span>
+                <span className="node-status-dot node-status-dot-done" />
+                <div className="node-header">
+                  <span className="node-icon">
+                    <svg viewBox="0 0 16 16" strokeWidth="1.5" stroke="#5D9F55">
+                      <path d="M6 13.5h4" />
+                      <path d="M6.5 11.5h3" />
+                      <path d="M5.5 11.5c0-1.5-2-2.5-2-5a4.5 4.5 0 1 1 9 0c0 2.5-2 3.5-2 5" />
+                    </svg>
+                  </span>
                   <span className="node-label">Infer Agent</span>
                 </div>
                 <p className="node-desc">Derive meaning</p>
-                <span className="node-status node-status-done">done</span>
               </div>
 
-              <div className="node-card" style={{ gridArea: 'relate' }}>
+              {/* Relate Agent */}
+              <div className="node-card" style={{ gridArea: 'relate', borderLeftColor: '#C8A848' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
-                <div className="node-header" style={{ borderColor: '#C8A848' }}>
-                  <span className="node-icon">🟡</span>
+                <span className="node-status-dot node-status-dot-running" />
+                <div className="node-header">
+                  <span className="node-icon">
+                    <svg viewBox="0 0 16 16" strokeWidth="1.5" stroke="#C8A848">
+                      <circle cx="5.5" cy="8" r="3.5" />
+                      <circle cx="10.5" cy="8" r="3.5" />
+                    </svg>
+                  </span>
                   <span className="node-label">Relate Agent</span>
                 </div>
                 <p className="node-desc">Find patterns</p>
-                <span className="node-status node-status-active">running</span>
               </div>
 
-              {/* Output node */}
-              <div className="node-card" style={{ gridArea: 'synth' }}>
+              {/* Synthesize — output */}
+              <div className="node-card" style={{ gridArea: 'synth', borderLeftColor: '#8B6BAE' }}>
                 <div className="node-port node-port-in" />
-                <div className="node-header" style={{ borderColor: '#8B6BAE' }}>
-                  <span className="node-icon">✦</span>
+                <span className="node-status-dot node-status-dot-queued" />
+                <div className="node-header">
+                  <span className="node-icon">
+                    <svg viewBox="0 0 16 16" strokeWidth="1.5" stroke="#8B6BAE">
+                      <path d="M8 1l1.8 4.2L14.5 6l-3.5 3 1 4.5L8 11l-4 2.5 1-4.5L1.5 6l4.7-.8z" />
+                    </svg>
+                  </span>
                   <span className="node-label">Synthesize</span>
                 </div>
                 <p className="node-desc">Insights &amp; principles</p>
-                <span className="node-status node-status-pending">queued</span>
               </div>
 
               {/* Ghost node — hints at extensibility */}
               <div className="node-card node-ghost" style={{ gridArea: 'custom' }}>
                 <div className="node-port node-port-in" />
-                <div className="node-header" style={{ borderColor: 'transparent' }}>
-                  <span className="node-icon">+</span>
+                <div className="node-header">
+                  <span className="node-icon">
+                    <svg viewBox="0 0 16 16" strokeWidth="1.5" stroke="currentColor">
+                      <circle cx="8" cy="8" r="5.5" />
+                      <line x1="8" y1="5" x2="8" y2="11" />
+                      <line x1="5" y1="8" x2="11" y2="8" />
+                    </svg>
+                  </span>
                   <span className="node-label">Your method</span>
                 </div>
               </div>
