@@ -111,8 +111,11 @@ export function ContactForm() {
               className="form-textarea"
               placeholder="What are you working on?"
               rows={4}
-              {...register('message')}
+              {...register('message', { required: true })}
             />
+            {errors.message && (
+              <span style={{ color: 'var(--color-gold)', fontSize: 12 }}>Message is required</span>
+            )}
           </div>
 
           {status === 'success' ? (

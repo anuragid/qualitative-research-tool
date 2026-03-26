@@ -69,7 +69,7 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
             <div className="hero-app-main">
               <div className="hero-app-main-header">
                 <h4>Kitchen Study</h4>
-                <p className="hero-app-main-subtitle">3 videos &middot; 1 analyzed, 1 in progress</p>
+                <p className="hero-app-main-subtitle">3 videos &middot; 1 analyzed, 1 in progress, 1 ready</p>
               </div>
               <div className="hero-app-cards">
                 {/* Card 1: Analysis complete */}
@@ -85,8 +85,8 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
                       <span className="hero-app-step" style={{ background: '#5A8DB8' }} title="Chunk" />
                       <span className="hero-app-step" style={{ background: '#5D9F55' }} title="Infer" />
                       <span className="hero-app-step" style={{ background: '#C8A848' }} title="Relate" />
-                      <span className="hero-app-step" style={{ background: '#C0392B' }} title="Evaluate" />
-                      <span className="hero-app-step" style={{ background: '#7B6CB7' }} title="Synthesize" />
+                      <span className="hero-app-step" style={{ background: '#A11735' }} title="Explain" />
+                      <span className="hero-app-step" style={{ background: '#8B6BAE' }} title="Activate" />
                     </div>
                   </div>
                 </div>

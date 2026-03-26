@@ -19,11 +19,11 @@ gsap.registerPlugin(ScrollTrigger);
 type Edge = { from: string; fromSide: 'right' | 'bottom'; to: string; toSide: 'left' | 'top' };
 
 const EDGES: Edge[] = [
-  { from: 'input',  fromSide: 'right',  to: 'chunk',  toSide: 'left' },   // Transcript → Chunk
-  { from: 'chunk',  fromSide: 'bottom', to: 'infer',  toSide: 'top' },    // Chunk ↓ Infer
-  { from: 'chunk',  fromSide: 'right',  to: 'relate', toSide: 'left' },   // Chunk → Relate (through empty cell)
-  { from: 'infer',  fromSide: 'right',  to: 'synth',  toSide: 'left' },   // Infer → Synth (through gap)
-  { from: 'relate', fromSide: 'bottom', to: 'synth',  toSide: 'top' },    // Relate ↓ Synth
+  { from: 'input',   fromSide: 'right',  to: 'chunk',    toSide: 'left' },    // Transcript → Chunk
+  { from: 'chunk',   fromSide: 'bottom', to: 'infer',    toSide: 'top' },     // Chunk ↓ Infer
+  { from: 'chunk',   fromSide: 'right',  to: 'relate',   toSide: 'left' },    // Chunk → Relate
+  { from: 'infer',   fromSide: 'right',  to: 'explain',  toSide: 'left' },    // Infer → Explain
+  { from: 'relate',  fromSide: 'bottom', to: 'activate', toSide: 'top' },     // Relate ↓ Activate
 ];
 
 function getPort(el: HTMLElement, box: DOMRect, side: 'left' | 'right' | 'top' | 'bottom') {
@@ -115,16 +115,23 @@ function NodeEditorMockup() {
         <div className="node-card" data-node="relate" style={{ gridArea: 'relate' }}>
           <div className="node-port node-port-in" />
           <div className="node-port node-port-out" />
-          <span className="node-status-dot node-status-dot-running" />
+          <span className="node-status-dot node-status-dot-done" />
           <span className="node-label">Relate Agent</span>
-          <p className="node-desc">Find patterns</p>
+          <p className="node-desc">Find connections</p>
         </div>
 
-        <div className="node-card" data-node="synth" style={{ gridArea: 'synth' }}>
+        <div className="node-card" data-node="explain" style={{ gridArea: 'explain' }}>
+          <div className="node-port node-port-in" />
+          <span className="node-status-dot node-status-dot-running" />
+          <span className="node-label">Explain Agent</span>
+          <p className="node-desc">Build explanations</p>
+        </div>
+
+        <div className="node-card" data-node="activate" style={{ gridArea: 'activate' }}>
           <div className="node-port node-port-in" />
           <span className="node-status-dot node-status-dot-queued" />
-          <span className="node-label">Synthesize</span>
-          <p className="node-desc">Insights &amp; principles</p>
+          <span className="node-label">Activate Agent</span>
+          <p className="node-desc">Design implications</p>
         </div>
 
         <div className="node-card node-ghost" data-node="custom" style={{ gridArea: 'custom' }}>
@@ -438,7 +445,7 @@ export default function LandingPage() {
               not a black box
             </h2>
             <p className="feature-body">
-              Each video passes through five progressive steps in sequence, building layered
+              Each video passes through five progressive analysis steps, building layered
               understanding. Then cross-video synthesis reveals patterns across your entire corpus.
             </p>
             <Link
