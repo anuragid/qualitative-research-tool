@@ -415,7 +415,7 @@ body {
 
 @utility text-ui {
   font-family: var(--font-body);
-  font-size: var(--text-ui-size);              /* 13px — Craft standard for UI text */
+  font-size: var(--text-ui-size);              /* 13px — compact UI text */
   font-weight: 500;
   line-height: 1.385;                         /* 18px */
 }

@@ -136,3 +136,6 @@ skills-lock.json
 # Brand inspiration (local reference only)
 ../brand-inspiration/
 **/brand-inspiration/
+
+# Brainstorm prototypes (local only)
+.superpowers/

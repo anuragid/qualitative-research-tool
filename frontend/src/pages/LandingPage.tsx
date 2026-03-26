@@ -1,541 +1,635 @@
-import { useRef, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Upload, Brain, GitMerge, Lock, Menu, X } from "lucide-react";
-import { Logo } from "../components/ui/logo";
-import { gsap, useGSAP, ease, duration, prefersReducedMotion } from "../lib/animations";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useAuth } from "../hooks/useAuth";
+import { useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { gsap, useGSAP, prefersReducedMotion } from '../lib/animations';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useAuth } from '../hooks/useAuth';
+import './landing-page.css';
+import { LandingNav } from '../components/landing/LandingNav';
+import { HeroSection } from '../components/landing/HeroSection';
+import { ContactForm } from '../components/landing/ContactForm';
+import { LandingFooter } from '../components/landing/LandingFooter';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLElement>(null);
-  const [headerScrolled, setHeaderScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isSignedIn } = useAuth();
 
-  // Frosted-glass header on scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      setHeaderScrolled(window.scrollY > 10);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+  const scrollToSection = useCallback((id: string) => {
+    const target = document.getElementById(id);
+    if (target) {
+      const navHeight = 80;
+      const targetPosition = target.getBoundingClientRect().top + window.scrollY - navHeight;
+      window.scrollTo({
+        top: targetPosition,
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      });
+    }
   }, []);
 
-  // GSAP animations — hero entrance only uses opacity.
-  // Scroll-triggered sections use y-movement only (no opacity: 0 initial state)
-  // to prevent invisible content when ScrollTrigger hasn't fired yet.
+  // GSAP scroll reveal animations for .reveal elements
   useGSAP(
     () => {
-      if (prefersReducedMotion()) return;
+      if (prefersReducedMotion()) {
+        // Make everything visible immediately
+        gsap.set('.reveal, .reveal-stagger', { opacity: 1, y: 0 });
+        gsap.set('.reveal-stagger > *', { opacity: 1, y: 0 });
+        return;
+      }
 
-      // Hero entrance — only above-the-fold content uses opacity animation
-      gsap.fromTo("[data-animate='hero']",
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: duration.slow, ease: ease.standard, stagger: 0.12 }
-      );
-
-      // Feature cards — subtle slide-up on scroll (always visible, just moves)
-      gsap.fromTo("[data-animate='feature-card']",
-        { y: 30 },
-        {
-          y: 0,
-          scrollTrigger: { trigger: "[data-section='features']", start: "top 80%", once: true },
-          duration: duration.entrance, ease: ease.standard, stagger: 0.1,
-        }
-      );
-
-      // How-it-works steps
-      gsap.fromTo("[data-animate='step']",
-        { y: 20 },
-        {
-          y: 0,
-          scrollTrigger: { trigger: "[data-section='how-it-works']", start: "top 80%", once: true },
-          duration: duration.entrance, ease: ease.standard, stagger: 0.08,
-        }
-      );
-
-      // Security section
-      gsap.fromTo("[data-animate='security']",
-        { y: 15 },
-        {
-          y: 0,
-          scrollTrigger: { trigger: "[data-section='security']", start: "top 85%", once: true },
-          duration: duration.entrance, ease: ease.standard,
-        }
-      );
-
-      // CTA section
-      gsap.fromTo("[data-animate='cta']",
-        { y: 15 },
-        {
-          y: 0,
-          scrollTrigger: { trigger: "[data-section='cta']", start: "top 85%", once: true },
-          duration: duration.entrance, ease: ease.standard, stagger: 0.1,
-        }
-      );
+      const revealElements = gsap.utils.toArray<HTMLElement>('.reveal, .reveal-stagger');
+      revealElements.forEach((el) => {
+        gsap.fromTo(
+          el,
+          { opacity: 0, y: 24 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.7,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: el,
+              start: 'top 85%',
+              once: true,
+            },
+          },
+        );
+      });
     },
-    { scope: containerRef }
+    { scope: containerRef },
   );
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-surface-page">
-      {/* ===== HEADER / NAVIGATION ===== */}
-      <header
-        ref={headerRef}
-        className={`fixed top-0 left-0 right-0 z-[var(--z-sticky)] transition-[background,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease)] ${
-          headerScrolled
-            ? "frosted-glass shadow-subtle"
-            : "bg-transparent"
-        }`}
-      >
-        <div className="mx-auto max-w-6xl flex h-16 items-center justify-between px-6">
-          {/* Typemark */}
-          <Link to="/" className="no-underline">
-            <Logo size="sidebar" className="text-foreground" />
-          </Link>
+    <div ref={containerRef} className="landing-page">
+      <LandingNav isSignedIn={isSignedIn} scrollToSection={scrollToSection} />
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-ui text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-ui text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-            >
-              How it works
-            </a>
-            {isSignedIn ? (
-              <Link
-                to="/projects"
-                className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-              >
-                Go to Projects
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/sign-in"
-                  className="text-ui text-text-tertiary hover:text-foreground transition-[color] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/sign-up"
-                  className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-                >
-                  Try methodex
-                </Link>
-              </>
-            )}
-          </nav>
+      <HeroSection isSignedIn={isSignedIn} />
 
-          {/* Mobile hamburger */}
-          <button
-            className="md:hidden flex items-center justify-center w-11 h-11 rounded-md hover:bg-interactive-fill transition-[background] duration-[var(--duration-micro)] ease-[var(--ease)]"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          >
-            {mobileMenuOpen ? (
-              <X className="w-5 h-5 text-foreground" />
-            ) : (
-              <Menu className="w-5 h-5 text-foreground" />
-            )}
-          </button>
-        </div>
+      {/* Breathing Space */}
+      <div className="breathing">
+        <p className="breathing-tagline reveal">Proven methods meet modern intelligence.</p>
+      </div>
 
-        {/* Mobile menu dropdown */}
-        {mobileMenuOpen && (
-          <div className="md:hidden frosted-glass border-t border-border px-6 py-4 flex flex-col gap-3">
-            <a
-              href="#features"
-              className="text-ui text-text-tertiary hover:text-foreground no-underline py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-ui text-text-tertiary hover:text-foreground no-underline py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              How it works
-            </a>
-            {isSignedIn ? (
-              <Link
-                to="/projects"
-                className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2.5 no-underline mt-1"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Go to Projects
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/sign-in"
-                  className="text-ui text-text-tertiary hover:text-foreground no-underline py-2"
-                  onClick={() => setMobileMenuOpen(false)}
+      {/* The Collection - 5D Analysis Featured Card */}
+      <section className="collection" id="collection">
+        <div className="collection-inner">
+          <p className="section-label reveal">The Collection</p>
+          <h2 className="collection-heading reveal">
+            Analytical frameworks,
+            <br />
+            <em>ready to use</em>
+          </h2>
+
+          <div className="featured-card reveal">
+            <div className="featured-card-content">
+              <div className="featured-card-badge">
+                <svg viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
+                  <circle cx="7" cy="7" r="2" fill="currentColor" />
+                </svg>
+                Featured Method
+              </div>
+              <h3>5D Analysis</h3>
+              <p>
+                Analyze research videos through five progressive steps that build layered
+                understanding. Each step transforms raw data into actionable design insight.
+              </p>
+              <div className="dimensions reveal-stagger">
+                <span className="dimension-badge">
+                  <span className="dimension-dot" style={{ background: '#5A8DB8' }} />
+                  Chunk
+                </span>
+                <span className="dimension-badge">
+                  <span className="dimension-dot" style={{ background: '#5D9F55' }} />
+                  Infer
+                </span>
+                <span className="dimension-badge">
+                  <span className="dimension-dot" style={{ background: '#C8A848' }} />
+                  Relate
+                </span>
+                <span className="dimension-badge">
+                  <span className="dimension-dot" style={{ background: '#A11735' }} />
+                  Explain
+                </span>
+                <span className="dimension-badge">
+                  <span className="dimension-dot" style={{ background: '#8B6BAE' }} />
+                  Activate
+                </span>
+              </div>
+            </div>
+            <div className="featured-mockup">
+              <div className="mockup-header">
+                <div className="mockup-dots">
+                  <span className="mockup-dot" />
+                  <span className="mockup-dot" />
+                  <span className="mockup-dot" />
+                </div>
+                <span className="mockup-title">5D Analysis Results</span>
+              </div>
+              {/* Chunk */}
+              <div className="mockup-dimension-row">
+                <div
+                  className="mockup-dim-icon"
+                  style={{ background: 'rgba(90,141,184,0.12)', color: '#5A8DB8' }}
                 >
-                  Sign In
-                </Link>
-                <Link
-                  to="/sign-up"
-                  className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-5 py-2.5 no-underline mt-1"
-                  onClick={() => setMobileMenuOpen(false)}
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <rect x="2" y="3" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
+                    <rect x="8" y="3" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
+                    <rect x="5" y="8" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
+                  </svg>
+                </div>
+                <span className="mockup-dim-name">Chunk</span>
+                <div className="mockup-dim-bar">
+                  <div className="mockup-dim-fill" style={{ width: '85%', background: '#5A8DB8' }} />
+                </div>
+              </div>
+              {/* Infer */}
+              <div className="mockup-dimension-row">
+                <div
+                  className="mockup-dim-icon"
+                  style={{ background: 'rgba(93,159,85,0.12)', color: '#5D9F55' }}
                 >
-                  Try methodex
-                </Link>
-              </>
-            )}
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M7 4v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <span className="mockup-dim-name">Infer</span>
+                <div className="mockup-dim-bar">
+                  <div className="mockup-dim-fill" style={{ width: '72%', background: '#5D9F55' }} />
+                </div>
+              </div>
+              {/* Relate */}
+              <div className="mockup-dimension-row">
+                <div
+                  className="mockup-dim-icon"
+                  style={{ background: 'rgba(200,168,72,0.12)', color: '#C8A848' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="4" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" />
+                    <circle cx="10" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M6 7h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <span className="mockup-dim-name">Relate</span>
+                <div className="mockup-dim-bar">
+                  <div className="mockup-dim-fill" style={{ width: '58%', background: '#C8A848' }} />
+                </div>
+              </div>
+              {/* Explain */}
+              <div className="mockup-dimension-row">
+                <div
+                  className="mockup-dim-icon"
+                  style={{ background: 'rgba(161,23,53,0.10)', color: '#A11735' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M3 11l4-8 4 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M4.5 8h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <span className="mockup-dim-name">Explain</span>
+                <div className="mockup-dim-bar">
+                  <div className="mockup-dim-fill" style={{ width: '68%', background: '#A11735' }} />
+                </div>
+              </div>
+              {/* Activate */}
+              <div className="mockup-dimension-row">
+                <div
+                  className="mockup-dim-icon"
+                  style={{ background: 'rgba(139,107,174,0.12)', color: '#8B6BAE' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 2l1.5 3H12l-2.5 2 1 3L7 8.5 3.5 10l1-3L2 5h3.5L7 2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <span className="mockup-dim-name">Activate</span>
+                <div className="mockup-dim-bar">
+                  <div className="mockup-dim-fill" style={{ width: '45%', background: '#8B6BAE' }} />
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </header>
-
-      {/* ===== HERO SECTION ===== */}
-      <section className="relative overflow-hidden pt-32 pb-24 sm:pt-40 sm:pb-32">
-        {/* Warm pastel gradient background */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(135deg, var(--color-brand-pale-blue) 0%, var(--color-brand-pale-green) 50%, var(--color-brand-pale-gold) 100%)",
-          }}
-        />
-        {/* Noise overlay */}
-        <div className="absolute inset-0 noise-texture noise-light">
-          <span className="relative z-[2]" />
         </div>
+      </section>
 
-        <div className="relative z-[2] mx-auto max-w-3xl px-6 text-center">
-          <h1 data-animate="hero" className="text-h1 text-foreground mb-6">
-            Your research, beautifully organized
-          </h1>
-          <p
-            data-animate="hero"
-            className="text-lg leading-relaxed text-text-secondary mb-10 max-w-2xl mx-auto"
-          >
-            Upload video interviews, let AI extract deep insights, and discover
-            cross-cutting patterns across your qualitative research — all in one
-            place.
-          </p>
-          <div data-animate="hero">
+      {/* Breathing Space */}
+      <div className="breathing">
+        <p className="breathing-tagline reveal">From raw footage to structured understanding.</p>
+      </div>
+
+      {/* Feature 1: Upload & Transcribe (Purple) */}
+      <section className="feature-section feature-purple" id="features">
+        <div className="feature-texture" aria-hidden="true">
+          <img src="/landing/paper-texture.png" alt="" loading="lazy" />
+        </div>
+        <div className="feature-inner">
+          <div className="feature-text reveal">
+            <p className="feature-label">Upload &amp; Transcribe</p>
+            <h2 className="feature-heading">
+              Start with <em>video</em>,
+              <br />
+              end with insight
+            </h2>
+            <p className="feature-body">
+              Upload research recordings and receive accurate, timestamped transcriptions powered by
+              AssemblyAI. Support for interviews, observations, and field studies.
+            </p>
             <Link
-              to={isSignedIn ? "/projects" : "/sign-up"}
-              className="inline-flex items-center justify-center frosted-glass text-ui text-foreground rounded-full px-8 py-3 shadow-subtle hover:shadow-card transition-[box-shadow,opacity] duration-[var(--duration-normal)] ease-[var(--ease)] no-underline border border-border"
+              to={isSignedIn ? '/projects' : '/sign-up'}
+              className="glass-btn glass-btn-white"
+              style={{ alignSelf: 'flex-start' }}
             >
-              {isSignedIn ? "Go to Projects" : "Start Analyzing"}
+              <span>Try it free</span>
             </Link>
           </div>
-        </div>
-      </section>
-
-      {/* ===== FEATURES SECTION ===== */}
-      <section
-        id="features"
-        data-section="features"
-        className="py-20 sm:py-28 bg-surface-page"
-      >
-        <div className="mx-auto max-w-6xl px-6">
-          <h2
-            className="text-h2 text-foreground text-center mb-4"
-            data-animate="feature-card"
-          >
-            Everything you need
-          </h2>
-          <p
-            className="text-center text-text-tertiary mb-14 max-w-xl mx-auto text-body"
-            data-animate="feature-card"
-          >
-            From raw video to actionable design principles, methodex handles the
-            entire qualitative analysis pipeline.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Feature 1: Upload & Transcribe */}
-            <div
-              data-animate="feature-card"
-              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light bg-brand-pale-blue"
-            >
-              <div className="relative z-[2]">
-                <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
-                  <Upload className="w-6 h-6 text-foreground" />
+          <div className="feature-mockup-card reveal">
+            <div className="upload-mockup">
+              <div className="upload-dropzone">
+                <div className="upload-icon">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 14V3M6 7l4-4 4 4" />
+                    <path d="M17 14v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2" />
+                  </svg>
                 </div>
-                <h3 className="text-h3 text-foreground mb-3">
-                  Upload &amp; Transcribe
-                </h3>
-                <p
-                  className="text-text-secondary text-body-sm"
-                >
-                  Drop in video interviews and get speaker-identified
-                  transcripts automatically. Supports all major formats.
+                <p className="upload-label">
+                  <strong>Click to upload</strong> or drag and drop
+                </p>
+                <p className="upload-label" style={{ fontSize: 12, color: 'var(--color-ink-35)' }}>
+                  MP4, MOV, WebM up to 2GB
                 </p>
               </div>
-            </div>
-
-            {/* Feature 2: AI Analysis */}
-            <div
-              data-animate="feature-card"
-              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light bg-brand-pale-green"
-            >
-              <div className="relative z-[2]">
-                <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
-                  <Brain className="w-6 h-6 text-foreground" />
+              <div className="upload-file-row">
+                <div className="upload-file-icon">MP4</div>
+                <div className="upload-file-info">
+                  <p className="upload-file-name">kitchen-observation-03.mp4</p>
+                  <p className="upload-file-meta">1.2 GB &middot; Transcribing...</p>
+                  <div className="upload-progress">
+                    <div className="upload-progress-fill" />
+                  </div>
                 </div>
-                <h3 className="text-h3 text-foreground mb-3">
-                  AI Analysis
-                </h3>
-                <p
-                  className="text-text-secondary text-body-sm"
-                >
-                  A five-step framework — chunk, infer, relate, explain,
-                  activate — extracts meaning and generates design principles
-                  from every interview.
-                </p>
               </div>
-            </div>
-
-            {/* Feature 3: Cross-Video Insights */}
-            <div
-              data-animate="feature-card"
-              className="relative rounded-2xl p-8 shadow-block noise-texture noise-light sm:col-span-2 lg:col-span-1 bg-brand-pale-gold"
-            >
-              <div className="relative z-[2]">
-                <div className="w-12 h-12 rounded-xl bg-surface-card/60 flex items-center justify-center mb-5">
-                  <GitMerge className="w-6 h-6 text-foreground" />
+              <div className="upload-file-row">
+                <div className="upload-file-icon" style={{ background: 'var(--color-green)' }}>
+                  MOV
                 </div>
-                <h3 className="text-h3 text-foreground mb-3">
-                  Cross-Video Insights
-                </h3>
-                <p
-                  className="text-text-secondary text-body-sm"
-                >
-                  Discover meta-patterns, saturation analysis, and system-level
-                  insights that emerge across multiple interviews in a project.
-                </p>
+                <div className="upload-file-info">
+                  <p className="upload-file-name">user-interview-sarah.mov</p>
+                  <p className="upload-file-meta">842 MB &middot; Complete</p>
+                </div>
+                <div className="upload-check">
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2.5 6l2.5 2.5 4.5-5" />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ===== HOW IT WORKS SECTION ===== */}
-      <section
-        id="how-it-works"
-        data-section="how-it-works"
-        className="py-20 sm:py-28 bg-surface-card"
-      >
-        <div className="mx-auto max-w-4xl px-6">
-          <h2
-            className="text-h2 text-foreground text-center mb-4"
-            data-animate="step"
-          >
-            How it works
-          </h2>
-          <p
-            className="text-center text-text-tertiary mb-16 max-w-lg mx-auto text-body"
-            data-animate="step"
-          >
-            Five steps from raw interview to actionable design principles.
-          </p>
+      {/* Breathing Space */}
+      <div className="breathing">
+        <p className="breathing-tagline reveal">Five steps. One complete picture.</p>
+      </div>
 
-          <div className="flex flex-col gap-10">
-            {[
-              {
-                step: 1,
-                name: "Chunk",
-                desc: "Break each interview transcript into meaningful segments — quotes, facts, context, and observations.",
-                color: "var(--color-brand-mustard)",
-              },
-              {
-                step: 2,
-                name: "Infer",
-                desc: "Extract deeper meaning, assumptions, and mental models from each segment using AI analysis.",
-                color: "var(--color-brand-forest)",
-              },
-              {
-                step: 3,
-                name: "Relate",
-                desc: "Connect individual inferences into coherent themes and patterns within each interview.",
-                color: "var(--color-brand-maroon)",
-              },
-              {
-                step: 4,
-                name: "Explain",
-                desc: "Generate higher-order insights and explanatory models that account for observed patterns.",
-                color: "var(--color-brand-crimson)",
-              },
-              {
-                step: 5,
-                name: "Activate",
-                desc: "Transform insights into concrete, actionable design principles your team can apply.",
-                color: "var(--color-brand-burnt-orange)",
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                data-animate="step"
-                className="flex items-start gap-5"
-              >
-                <div
-                  className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-text-on-brand font-semibold text-base"
-                  style={{ backgroundColor: item.color }}
-                >
-                  {item.step}
-                </div>
-                <div className="pt-1">
-                  <h4 className="text-h4 text-foreground mb-1">{item.name}</h4>
-                  <p
-                    className="text-text-secondary text-body-sm"
-                  >
-                    {item.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Feature 2: AI-Powered Analysis (Green) */}
+      <section className="feature-section feature-green">
+        <div className="feature-texture" aria-hidden="true">
+          <img src="/landing/paper-texture.png" alt="" loading="lazy" />
         </div>
-      </section>
-
-      {/* ===== SECURITY / TRUST SECTION ===== */}
-      <section
-        data-section="security"
-        className="py-16 sm:py-20 bg-surface-page"
-      >
-        <div className="mx-auto max-w-3xl px-6">
-          <div
-            data-animate="security"
-            className="flex flex-col sm:flex-row items-start gap-5"
-          >
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-interactive-fill flex items-center justify-center">
-              <Lock className="w-5 h-5 text-text-tertiary" />
-            </div>
-            <div>
-              <h3 className="text-h4 text-foreground mb-2">
-                Your data stays private
-              </h3>
-              <p
-                className="text-text-tertiary text-body-sm"
-              >
-                All research videos, transcripts, and analyses are private to
-                your account. We use secure cloud storage, encrypted API keys,
-                and never share your data with third parties.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== CTA SECTION ===== */}
-      <section
-        data-section="cta"
-        className="relative overflow-hidden py-20 sm:py-28"
-      >
-        {/* Different gradient from hero */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(135deg, var(--color-brand-lavender) 0%, var(--color-brand-pale-gold) 50%, var(--color-brand-peach) 100%)",
-          }}
-        />
-        <div className="absolute inset-0 noise-texture noise-light">
-          <span className="relative z-[2]" />
-        </div>
-
-        <div className="relative z-[2] mx-auto max-w-2xl px-6 text-center">
-          <h2 data-animate="cta" className="text-h2 text-foreground mb-4">
-            Ready to dive into your research?
-          </h2>
-          <p
-            data-animate="cta"
-            className="text-text-secondary mb-10 text-body"
-          >
-            Create a free account and start analyzing your qualitative data in
-            minutes.
-          </p>
-          <div
-            data-animate="cta"
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
-            {isSignedIn ? (
-              <Link
-                to="/projects"
-                className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-8 py-3 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-              >
-                Go to Projects
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/sign-up"
-                  className="inline-flex items-center justify-center text-ui bg-primary text-primary-foreground rounded-full px-8 py-3 hover:opacity-90 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-                >
-                  Get Started Free
-                </Link>
-                <Link
-                  to="/sign-in"
-                  className="inline-flex items-center justify-center text-ui text-foreground rounded-full px-8 py-3 border border-border bg-surface-card/50 hover:bg-surface-card/80 transition-[color,background,box-shadow,opacity] duration-[var(--duration-micro)] ease-[var(--ease)] no-underline"
-                >
-                  Sign In
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== FOOTER ===== */}
-      <footer
-        className="rounded-t-3xl py-14 bg-primary"
-      >
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            {/* Typemark */}
-            <Logo size="sidebar" className="text-primary-foreground" />
-
-            {/* Links */}
-            <div className="flex items-center gap-6">
-              {isSignedIn ? (
-                <Link
-                  to="/projects"
-                  className="text-ui text-primary-foreground/70 no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
-                >
-                  Go to Projects
-                </Link>
-              ) : (
-                <>
-                  <Link
-                    to="/sign-in"
-                    className="text-ui text-primary-foreground/70 no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/sign-up"
-                    className="text-ui text-primary-foreground/70 no-underline transition-[opacity] duration-[var(--duration-micro)] ease-[var(--ease)] hover:opacity-100"
-                  >
-                    Sign Up
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-10 pt-6 border-t border-primary-foreground/10">
-            <p
-              className="text-sm text-primary-foreground/50"
-            >
-              &copy; {new Date().getFullYear()} methodex. All rights reserved.
+        <div className="feature-inner reversed">
+          <div className="feature-text reveal">
+            <p className="feature-label">AI-Powered Analysis</p>
+            <h2 className="feature-heading">
+              A structured <em>pipeline</em>,
+              <br />
+              not a black box
+            </h2>
+            <p className="feature-body">
+              Each video passes through five progressive steps in sequence, building layered
+              understanding. Then cross-video synthesis reveals patterns across your entire corpus.
             </p>
+            <Link
+              to={isSignedIn ? '/projects' : '/sign-up'}
+              className="glass-btn glass-btn-white"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <span>See how it works</span>
+            </Link>
+          </div>
+          <div className="feature-mockup-card reveal">
+            <div className="pipeline-mockup">
+              <div className="pipeline-step">
+                <div className="pipeline-step-num" style={{ background: '#5A8DB8' }}>1</div>
+                <div className="pipeline-step-content">
+                  <p className="pipeline-step-title">Chunk</p>
+                  <p className="pipeline-step-desc">Break transcript into meaningful pieces</p>
+                </div>
+                <span className="pipeline-step-status complete">Done</span>
+              </div>
+              <div className="pipeline-connector" />
+              <div className="pipeline-step">
+                <div className="pipeline-step-num" style={{ background: '#5D9F55' }}>2</div>
+                <div className="pipeline-step-content">
+                  <p className="pipeline-step-title">Infer</p>
+                  <p className="pipeline-step-desc">Interpret meaning from each chunk</p>
+                </div>
+                <span className="pipeline-step-status complete">Done</span>
+              </div>
+              <div className="pipeline-connector" />
+              <div className="pipeline-step">
+                <div className="pipeline-step-num" style={{ background: '#C8A848' }}>3</div>
+                <div className="pipeline-step-content">
+                  <p className="pipeline-step-title">Relate</p>
+                  <p className="pipeline-step-desc">Find patterns across inferences</p>
+                </div>
+                <span className="pipeline-step-status active">Running</span>
+              </div>
+              <div className="pipeline-connector" />
+              <div className="pipeline-step">
+                <div className="pipeline-step-num" style={{ background: '#A11735' }}>4</div>
+                <div className="pipeline-step-content">
+                  <p className="pipeline-step-title">Explain</p>
+                  <p className="pipeline-step-desc">Generate insights from patterns</p>
+                </div>
+                <span className="pipeline-step-status pending">Queued</span>
+              </div>
+              <div className="pipeline-connector" />
+              <div className="pipeline-step">
+                <div className="pipeline-step-num" style={{ background: '#8B6BAE' }}>5</div>
+                <div className="pipeline-step-content">
+                  <p className="pipeline-step-title">Activate</p>
+                  <p className="pipeline-step-desc">Turn insights into design principles</p>
+                </div>
+                <span className="pipeline-step-status pending">Queued</span>
+              </div>
+            </div>
           </div>
         </div>
-      </footer>
+      </section>
+
+      {/* Breathing Space */}
+      <div className="breathing">
+        <p className="breathing-tagline reveal">Patterns emerge across the whole corpus.</p>
+      </div>
+
+      {/* Feature 3: Cross-Video Insights (Gold) */}
+      <section className="feature-section feature-gold">
+        <div className="feature-texture" aria-hidden="true">
+          <img src="/landing/paper-texture.png" alt="" loading="lazy" />
+        </div>
+        <div className="feature-inner">
+          <div className="feature-text reveal">
+            <p className="feature-label">Cross-Video Insights</p>
+            <h2 className="feature-heading">
+              See the <em>bigger</em>
+              <br />
+              picture
+            </h2>
+            <p className="feature-body">
+              Once individual videos are analyzed, cross-video synthesis identifies recurring themes,
+              contradictions, and emergent patterns across your entire research set.
+            </p>
+            <Link
+              to={isSignedIn ? '/projects' : '/sign-up'}
+              className="glass-btn glass-btn-white"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <span>Explore insights</span>
+            </Link>
+          </div>
+          <div className="feature-mockup-card reveal">
+            <div className="insights-mockup">
+              {/* Theme card */}
+              <div className="insight-card">
+                <div className="insight-card-header">
+                  <div
+                    className="insight-card-icon"
+                    style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <span className="insight-card-label" style={{ color: '#8B5CF6' }}>Theme</span>
+                </div>
+                <p className="insight-card-text">
+                  Participants consistently improvise workarounds when standard tools fail, revealing
+                  latent needs unaddressed by current solutions.
+                </p>
+                <div className="insight-card-tags">
+                  <span className="insight-tag">3 videos</span>
+                  <span className="insight-tag">Chunk</span>
+                  <span className="insight-tag">Infer</span>
+                </div>
+              </div>
+              {/* Contradiction card */}
+              <div className="insight-card">
+                <div className="insight-card-header">
+                  <div
+                    className="insight-card-icon"
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 10L10 2M2 2l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <span className="insight-card-label" style={{ color: '#EF4444' }}>
+                    Contradiction
+                  </span>
+                </div>
+                <p className="insight-card-text">
+                  Stated preference for efficiency conflicts with observed behavior favoring familiar,
+                  slower workflows over unfamiliar faster ones.
+                </p>
+                <div className="insight-card-tags">
+                  <span className="insight-tag">2 videos</span>
+                  <span className="insight-tag">Explain</span>
+                  <span className="insight-tag">Relate</span>
+                </div>
+              </div>
+              {/* Pattern card */}
+              <div className="insight-card">
+                <div className="insight-card-header">
+                  <div
+                    className="insight-card-icon"
+                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+                      <path d="M6 3.5v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <span className="insight-card-label" style={{ color: '#10B981' }}>Pattern</span>
+                </div>
+                <p className="insight-card-text">
+                  Environmental noise levels directly correlate with increased hesitation and error
+                  rates across all observed tasks.
+                </p>
+                <div className="insight-card-tags">
+                  <span className="insight-tag">4 videos</span>
+                  <span className="insight-tag">Activate</span>
+                  <span className="insight-tag">Chunk</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Breathing Space */}
+      <div className="breathing">
+        <p className="breathing-tagline reveal">More methods on the way.</p>
+      </div>
+
+      {/* Upcoming Methods - Folder Tab Cards */}
+      <section className="methods-section" id="upcoming">
+        <div className="methods-inner">
+          <p className="section-label reveal">Coming Soon</p>
+          <h2 className="methods-heading reveal">
+            Upcoming <em>methods</em>
+          </h2>
+
+          <div className="methods-grid reveal-stagger">
+            <div className="folder-card" style={{ background: '#D4EDE8' }}>
+              <div>
+                <h3 className="folder-card-title">AEIOU Framework</h3>
+                <p className="folder-card-desc">
+                  Activities, Environments, Interactions, Objects, and Users. A structured lens for
+                  ethnographic observation.
+                </p>
+              </div>
+              <div className="folder-card-footer">
+                <span className="folder-card-status">In Development</span>
+                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10h12M12 6l4 4-4 4" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="folder-card" style={{ background: '#D4E0ED' }}>
+              <div>
+                <h3 className="folder-card-title">Affinity Mapping</h3>
+                <p className="folder-card-desc">
+                  Cluster observations into meaningful groups. Surface hidden relationships across
+                  research data.
+                </p>
+              </div>
+              <div className="folder-card-footer">
+                <span className="folder-card-status">Planned</span>
+                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10h12M12 6l4 4-4 4" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="folder-card" style={{ background: '#E8D8EE' }}>
+              <div>
+                <h3 className="folder-card-title">Journey Mapping</h3>
+                <p className="folder-card-desc">
+                  Trace the complete experience arc. Map touchpoints, emotions, and pain points
+                  across time.
+                </p>
+              </div>
+              <div className="folder-card-footer">
+                <span className="folder-card-status">Planned</span>
+                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10h12M12 6l4 4-4 4" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="folder-card" style={{ background: '#F2E4CF' }}>
+              <div>
+                <h3 className="folder-card-title">Thematic Analysis</h3>
+                <p className="folder-card-desc">
+                  Identify and analyze recurring themes. Build codebooks from qualitative data
+                  systematically.
+                </p>
+              </div>
+              <div className="folder-card-footer">
+                <span className="folder-card-status">Planned</span>
+                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10h12M12 6l4 4-4 4" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="folder-card" style={{ background: '#E8DDD4' }}>
+              <div>
+                <h3 className="folder-card-title">Grounded Theory</h3>
+                <p className="folder-card-desc">
+                  Theory emerges from the data. Open, axial, and selective coding in a guided
+                  workflow.
+                </p>
+              </div>
+              <div className="folder-card-footer">
+                <span className="folder-card-status">Exploring</span>
+                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10h12M12 6l4 4-4 4" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="folder-card" style={{ background: '#F0D4D9' }}>
+              <div>
+                <h3 className="folder-card-title">Persona Synthesis</h3>
+                <p className="folder-card-desc">
+                  Construct evidence-based personas from observed behaviors, not assumptions or
+                  demographics.
+                </p>
+              </div>
+              <div className="folder-card-footer">
+                <span className="folder-card-status">Exploring</span>
+                <svg className="folder-card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10h12M12 6l4 4-4 4" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* About */}
+      <section className="about-section" id="about">
+        <div className="about-inner reveal">
+          <p className="section-label">About</p>
+          <h2 className="about-heading">
+            Built <em>for</em> researchers,
+            <br />
+            by researchers
+          </h2>
+          <p className="about-text">
+            methodex is developed by Jeremy Alexis at the Institute of Design, Illinois Institute of
+            Technology. It brings the rigor of established qualitative research methods to a
+            digital-first workflow, making structured analysis accessible to design researchers and
+            students.
+          </p>
+          <p className="about-text">
+            Rooted in the Center for Decision Quality's mission, methodex transforms how teams move
+            from raw observation to actionable insight.
+          </p>
+
+          <div className="about-orgs">
+            <span className="about-org">
+              <span className="about-org-dot" style={{ background: 'var(--color-teal)' }} />
+              Institute of Design
+            </span>
+            <span className="about-org">
+              <span className="about-org-dot" style={{ background: 'var(--color-purple)' }} />
+              Illinois Institute of Technology
+            </span>
+            <span className="about-org">
+              <span className="about-org-dot" style={{ background: 'var(--color-gold)' }} />
+              Center for Decision Quality
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <ContactForm />
+
+      <LandingFooter scrollToSection={scrollToSection} />
     </div>
   );
 }
