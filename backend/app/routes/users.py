@@ -3,12 +3,13 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
 from app.constants import STANDARD_MODEL_IDS, STANDARD_MODELS
 from app.database import get_db
+from app.main import limiter
 from app.models import database_models
 from app.models.schemas import UserResponse, UserSettingsResponse, UserSettingsUpdate
 from app.services.clerk_service import fetch_clerk_user
@@ -173,7 +174,9 @@ async def get_user_settings(
 
 
 @router.put("/settings", response_model=UserSettingsResponse)
+@limiter.limit("5/minute")
 async def update_user_settings(
+    request: Request,
     settings: UserSettingsUpdate,
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db),

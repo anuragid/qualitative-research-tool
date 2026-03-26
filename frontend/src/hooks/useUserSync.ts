@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "./useAuth";
 import { api } from "../services/api";
+import { toast } from "sonner";
 
 /**
  * Hook to sync user data with the backend after authentication.
@@ -19,6 +20,7 @@ export function useUserSync() {
           syncedUserIdRef.current = user.id;
         } catch (error) {
           console.warn("User sync failed, will retry:", error);
+          toast.warning("Failed to sync user profile. Some features may be limited.");
         }
       }
     };

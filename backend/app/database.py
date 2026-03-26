@@ -7,9 +7,15 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
+# Build connect_args based on database backend
+_connect_args: dict = {}
+if "postgresql" in settings.DATABASE_URL:
+    _connect_args["options"] = "-c statement_timeout=30000"  # 30s query timeout
+
 # Create database engine
 engine = create_engine(
     settings.DATABASE_URL,
+    connect_args=_connect_args,
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=10,
     max_overflow=20,

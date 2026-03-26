@@ -5,7 +5,13 @@ interface MediaPlayerSectionProps {
 }
 
 export function MediaPlayerSection({ playbackUrl, filename }: MediaPlayerSectionProps) {
-  if (!playbackUrl) return null;
+  if (!playbackUrl) {
+    return (
+      <div className="bg-card shadow-card overflow-hidden h-full flex items-center justify-center">
+        <p className="text-text-tertiary text-sm">Media preview unavailable</p>
+      </div>
+    );
+  }
 
   const isAudio = /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(filename);
 

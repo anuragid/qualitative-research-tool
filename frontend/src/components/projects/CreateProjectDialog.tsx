@@ -14,6 +14,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CreateProjectDialog() {
   const [open, setOpen] = useState(false);
@@ -38,7 +39,7 @@ export default function CreateProjectDialog() {
       setDescription("");
       setOpen(false);
     } catch {
-      // Error is handled by the mutation's error state
+      toast.error("Failed to create project. Please try again.");
     }
   };
 

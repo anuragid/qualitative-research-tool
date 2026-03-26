@@ -148,6 +148,9 @@ def check_transcription_task(self, video_id: str, started_at: float | None = Non
         Exception: If transcription fails or times out
     """
     try:
+        # Expire cached objects to get fresh data on each check
+        self.db.expire_all()
+
         logger.info(f"Checking transcription status for video {video_id}")
 
         # Timeout safety: fail if we've been checking for over 1 hour

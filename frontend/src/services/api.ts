@@ -33,8 +33,16 @@ export const api = axios.create({
   timeout: 30000, // 30 seconds
 });
 
+// Guard against multiple 401 redirects racing
+let isRedirecting = false;
+
 // Request interceptor — inject auth token
 const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
+
+// Validate API URL at startup
+if (!import.meta.env.VITE_API_URL && !DEV_BYPASS) {
+  console.warn("VITE_API_URL is not set — API calls will use relative paths");
+}
 
 api.interceptors.request.use(
   async (config) => {
@@ -71,10 +79,10 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
 
       if (status === 401) {
-        // Token expired or invalid — redirect to sign-in unless already there
-        if (!window.location.pathname.startsWith("/sign-")) {
+        if (!DEV_BYPASS && !isRedirecting && !window.location.pathname.startsWith("/sign-")) {
+          isRedirecting = true;
           window.location.href = "/sign-in";
-          return new Promise(() => {}); // Halt further processing during redirect
+          return new Promise(() => {});
         }
       } else if (status === 404) {
         // Don't log 404s for analysis endpoints - these are expected when no analysis exists

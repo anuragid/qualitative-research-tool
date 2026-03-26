@@ -62,7 +62,9 @@ export class ErrorBoundary extends Component<Props, State> {
                 </button>
                 {this.state.showDetails && (
                   <pre className="mt-3 max-h-32 overflow-auto rounded bg-interactive-fill p-3 text-left text-xs text-text-tertiary">
-                    {this.state.error.message}
+                    {import.meta.env.PROD
+                      ? this.state.error.message.replace(/\/[^\s]+\.(ts|tsx|js|jsx|py)/g, "[redacted path]")
+                      : this.state.error.message}
                   </pre>
                 )}
               </div>

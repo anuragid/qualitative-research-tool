@@ -133,8 +133,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           : u
       ));
 
-      // Simulate server processing time (in reality, this would be part of the upload response)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Brief delay to ensure state updates propagate before marking completed
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Mark as completed
       setUploads(prev => prev.map(u =>

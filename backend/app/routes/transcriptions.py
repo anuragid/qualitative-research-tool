@@ -120,6 +120,18 @@ async def save_speaker_labels(
                 detail="Cannot assign speaker labels to incomplete transcript"
             )
 
+        # Validate that speaker_labels reference actual speakers in the transcript
+        if transcript.raw_transcript:
+            valid_speakers = set()
+            for utterance in transcript.raw_transcript.get("utterances", []):
+                valid_speakers.add(utterance.get("speaker", ""))
+            for label_data in speaker_labels:
+                if valid_speakers and label_data.speaker_label not in valid_speakers:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Speaker '{label_data.speaker_label}' not found in transcript"
+                    )
+
         # Enforce speaker label limit (reasonable max: 20 speakers per transcript)
         if len(speaker_labels) > 20:
             raise HTTPException(

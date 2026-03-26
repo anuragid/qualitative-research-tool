@@ -400,7 +400,7 @@ export default function VideoDetailPage() {
 
           {/* Progress indicator for ongoing tasks */}
           {(video.status === "transcribing" || video.status === "analyzing") && (
-            <div className="bg-card rounded-2xl shadow-card p-4 sm:p-6 space-y-3">
+            <div className="bg-card rounded-2xl shadow-card p-4 sm:p-6 space-y-3" role="status" aria-live="polite">
               <div className="flex items-center gap-2 text-sm text-text-tertiary overflow-x-auto">
                 <Clock className="h-4 w-4" />
                 <span>

@@ -6,6 +6,7 @@ Covers finding: P2-1
 import os
 from unittest.mock import patch
 
+import pytest
 from cryptography.fernet import Fernet
 
 
@@ -88,12 +89,12 @@ class TestEncryptionService:
         result = service.decrypt("not-valid-ciphertext")
         assert result is None
 
-    def test_rotate_invalid_returns_none(self):
-        """Rotating invalid ciphertext should return None."""
+    def test_rotate_invalid_raises_error(self):
+        """Rotating invalid ciphertext should raise ValueError."""
         key = Fernet.generate_key().decode()
         service = self._make_service(key)
-        result = service.rotate("not-valid-ciphertext")
-        assert result is None
+        with pytest.raises(ValueError, match="Key rotation failed"):
+            service.rotate("not-valid-ciphertext")
 
     def test_empty_plaintext(self):
         """Encrypting an empty string should work."""

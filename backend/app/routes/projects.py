@@ -98,6 +98,7 @@ async def list_projects(
         # Cap limit to prevent excessive data retrieval
         limit = min(limit, 100)
         skip = max(skip, 0)
+        skip = min(skip, 10000)
 
         projects = db.query(Project)\
             .filter(Project.user_id == current_user_id)\

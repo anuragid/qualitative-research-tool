@@ -22,8 +22,18 @@ interface VideoUploadDialogProps {
   initialFiles?: File[];
 }
 
+const MEDIA_EXTENSIONS = new Set([
+  ".mp4", ".mov", ".webm", ".avi", ".mkv",
+  ".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac",
+]);
+
 function isMediaFile(file: File): boolean {
-  return file.type.startsWith("video/") || file.type.startsWith("audio/");
+  if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
+    return true;
+  }
+  // Fallback to extension check when browser doesn't provide MIME type
+  const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+  return MEDIA_EXTENSIONS.has(ext);
 }
 
 function filterAndNotify(files: File[]): File[] {
@@ -87,7 +97,14 @@ export default function VideoUploadDialog({
     const videoFiles = filterAndNotify(files);
 
     if (videoFiles.length > 0) {
-      setSelectedFiles(prev => [...prev, ...videoFiles]);
+      setSelectedFiles(prev => {
+        const existingNames = new Set(prev.map(f => `${f.name}-${f.size}`));
+        const newFiles = videoFiles.filter(f => !existingNames.has(`${f.name}-${f.size}`));
+        if (newFiles.length < videoFiles.length) {
+          toast.info("Duplicate files were skipped.");
+        }
+        return [...prev, ...newFiles];
+      });
     }
   }, []);
 
@@ -97,7 +114,14 @@ export default function VideoUploadDialog({
       const videoFiles = filterAndNotify(files);
 
       if (videoFiles.length > 0) {
-        setSelectedFiles(prev => [...prev, ...videoFiles]);
+        setSelectedFiles(prev => {
+          const existingNames = new Set(prev.map(f => `${f.name}-${f.size}`));
+          const newFiles = videoFiles.filter(f => !existingNames.has(`${f.name}-${f.size}`));
+          if (newFiles.length < videoFiles.length) {
+            toast.info("Duplicate files were skipped.");
+          }
+          return [...prev, ...newFiles];
+        });
       }
 
       // Reset the input value so the same files can be re-selected

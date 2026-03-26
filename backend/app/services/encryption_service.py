@@ -46,17 +46,17 @@ class EncryptionService:
             logger.error("Failed to decrypt API key - key may have been rotated or is invalid")
             return None
 
-    def rotate(self, ciphertext: str) -> str | None:
+    def rotate(self, ciphertext: str) -> str:
         """Re-encrypt ciphertext with the primary key.
 
         Useful when rotating keys: decrypt with old key, re-encrypt with new primary.
-        Returns None if decryption fails.
+        Raises ValueError if decryption fails.
         """
         try:
             return self._multi_fernet.rotate(ciphertext.encode()).decode()
         except InvalidToken:
             logger.error("Failed to rotate - ciphertext cannot be decrypted with any known key")
-            return None
+            raise ValueError("Key rotation failed: ciphertext cannot be decrypted with any known key")
 
 
 encryption_service = EncryptionService()

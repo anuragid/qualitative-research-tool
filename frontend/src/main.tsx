@@ -13,8 +13,13 @@ import App from "./App.tsx";
 const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
-if (!DEV_BYPASS && !CLERK_PUBLISHABLE_KEY) {
-  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY environment variable");
+if (!DEV_BYPASS) {
+  if (!CLERK_PUBLISHABLE_KEY) {
+    throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY environment variable");
+  }
+  if (!CLERK_PUBLISHABLE_KEY.startsWith("pk_")) {
+    throw new Error("Invalid VITE_CLERK_PUBLISHABLE_KEY — must start with 'pk_'");
+  }
 }
 
 const queryClient = new QueryClient({
