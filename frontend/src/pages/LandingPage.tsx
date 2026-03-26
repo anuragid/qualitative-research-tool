@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { gsap, useGSAP, prefersReducedMotion } from '../lib/animations';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -10,6 +10,132 @@ import { ContactForm } from '../components/landing/ContactForm';
 import { LandingFooter } from '../components/landing/LandingFooter';
 
 gsap.registerPlugin(ScrollTrigger);
+
+/* ── Node Editor Mockup ────────────────────────────────────────────────
+   Dynamically calculates SVG edge paths from actual rendered node
+   positions so connections always go port-to-port, never over nodes.
+   ──────────────────────────────────────────────────────────────────── */
+
+type Edge = { from: string; fromSide: 'right' | 'bottom'; to: string; toSide: 'left' | 'top' };
+
+const EDGES: Edge[] = [
+  { from: 'input',  fromSide: 'right',  to: 'chunk',  toSide: 'left' },   // Transcript → Chunk
+  { from: 'chunk',  fromSide: 'bottom', to: 'infer',  toSide: 'top' },    // Chunk ↓ Infer
+  { from: 'chunk',  fromSide: 'right',  to: 'relate', toSide: 'left' },   // Chunk → Relate (through empty cell)
+  { from: 'infer',  fromSide: 'right',  to: 'synth',  toSide: 'left' },   // Infer → Synth (through gap)
+  { from: 'relate', fromSide: 'bottom', to: 'synth',  toSide: 'top' },    // Relate ↓ Synth
+];
+
+function getPort(el: HTMLElement, box: DOMRect, side: 'left' | 'right' | 'top' | 'bottom') {
+  const r = el.getBoundingClientRect();
+  const x = r.left - box.left;
+  const y = r.top - box.top;
+  switch (side) {
+    case 'right':  return { x: x + r.width, y: y + r.height / 2 };
+    case 'left':   return { x, y: y + r.height / 2 };
+    case 'bottom': return { x: x + r.width / 2, y: y + r.height };
+    case 'top':    return { x: x + r.width / 2, y };
+  }
+}
+
+function buildPath(from: { x: number; y: number }, fromSide: string, to: { x: number; y: number }, toSide: string) {
+  // Vertical → Vertical: straight line through row gap
+  if ((fromSide === 'bottom' && toSide === 'top') || (fromSide === 'top' && toSide === 'bottom')) {
+    return `M${from.x},${from.y} L${to.x},${to.y}`;
+  }
+
+  const dx = Math.abs(to.x - from.x);
+  // Tension stays within the gap — never push control points into adjacent nodes
+  const t = Math.max(Math.min(dx * 0.55, 28), 12);
+
+  const cp1x = fromSide === 'right' ? from.x + t : fromSide === 'left' ? from.x - t : from.x;
+  const cp1y = fromSide === 'bottom' ? from.y + t : fromSide === 'top' ? from.y - t : from.y;
+  const cp2x = toSide === 'left' ? to.x - t : toSide === 'right' ? to.x + t : to.x;
+  const cp2y = toSide === 'top' ? to.y - t : toSide === 'bottom' ? to.y + t : to.y;
+  return `M${from.x},${from.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${to.x},${to.y}`;
+}
+
+function NodeEditorMockup() {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [paths, setPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    function calc() {
+      const el = editorRef.current;
+      if (!el) return;
+      const box = el.getBoundingClientRect();
+      const result: string[] = [];
+      for (const edge of EDGES) {
+        const fromEl = el.querySelector<HTMLElement>(`[data-node="${edge.from}"]`);
+        const toEl = el.querySelector<HTMLElement>(`[data-node="${edge.to}"]`);
+        if (!fromEl || !toEl) continue;
+        const fromPort = getPort(fromEl, box, edge.fromSide);
+        const toPort = getPort(toEl, box, edge.toSide);
+        result.push(buildPath(fromPort, edge.fromSide, toPort, edge.toSide));
+      }
+      setPaths(result);
+    }
+    calc();
+    window.addEventListener('resize', calc);
+    // Recalc after fonts/layout settle
+    const t = setTimeout(calc, 200);
+    return () => { window.removeEventListener('resize', calc); clearTimeout(t); };
+  }, []);
+
+  return (
+    <div className="feature-mockup-card reveal">
+      <div className="node-editor" ref={editorRef}>
+        {/* SVG edges — dynamically positioned */}
+        <svg className="node-edges" aria-hidden="true">
+          {paths.map((d, i) => <path key={i} d={d} />)}
+        </svg>
+
+        <div className="node-card node-input" data-node="input" style={{ gridArea: 'input' }}>
+          <div className="node-port node-port-out" />
+          <span className="node-label">Transcript</span>
+          <p className="node-desc">Raw interview data</p>
+        </div>
+
+        <div className="node-card" data-node="chunk" style={{ gridArea: 'chunk' }}>
+          <div className="node-port node-port-in" />
+          <div className="node-port node-port-out" />
+          <span className="node-status-dot node-status-dot-done" />
+          <span className="node-label">Chunk Agent</span>
+          <p className="node-desc">Segment into units</p>
+        </div>
+
+        <div className="node-card" data-node="infer" style={{ gridArea: 'infer' }}>
+          <div className="node-port node-port-in" />
+          <div className="node-port node-port-out" />
+          <span className="node-status-dot node-status-dot-done" />
+          <span className="node-label">Infer Agent</span>
+          <p className="node-desc">Derive meaning</p>
+        </div>
+
+        <div className="node-card" data-node="relate" style={{ gridArea: 'relate' }}>
+          <div className="node-port node-port-in" />
+          <div className="node-port node-port-out" />
+          <span className="node-status-dot node-status-dot-running" />
+          <span className="node-label">Relate Agent</span>
+          <p className="node-desc">Find patterns</p>
+        </div>
+
+        <div className="node-card" data-node="synth" style={{ gridArea: 'synth' }}>
+          <div className="node-port node-port-in" />
+          <span className="node-status-dot node-status-dot-queued" />
+          <span className="node-label">Synthesize</span>
+          <p className="node-desc">Insights &amp; principles</p>
+        </div>
+
+        <div className="node-card node-ghost" data-node="custom" style={{ gridArea: 'custom' }}>
+          <span className="node-label">+ Your method</span>
+        </div>
+
+        <div className="node-canvas-dots" aria-hidden="true" />
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -323,77 +449,7 @@ export default function LandingPage() {
               <span>See how it works</span>
             </Link>
           </div>
-          <div className="feature-mockup-card reveal">
-            <div className="node-editor">
-              {/* SVG edges — route port-to-port through gaps, never over nodes
-                   Layout:  col1[Transcript]  col2[Chunk]     col3(empty)
-                            col1(empty)       col2[Infer]     col3[Relate]
-                            col1(empty)       col2[Custom]    col3[Synthesize]
-                   Approx positions: cols at ~28/158, 186/316, 344/474; rows at ~36/86, 104/154, 172/222
-                   Ports: right-edge center, left-edge center */}
-              <svg className="node-edges" aria-hidden="true">
-                {/* Transcript.right → Chunk.left: horizontal through col gap */}
-                <path d="M158,61 L186,61" />
-                {/* Chunk.bottom-right → through empty col3 row1 → Relate.left: diagonal */}
-                <path d="M316,61 C360,61 344,100 344,129" />
-                {/* Chunk.bottom-center → Infer.top-center: short vertical through row gap */}
-                <path d="M251,86 L251,104" />
-                {/* Infer.right → through col gap (avoids Relate) → Synth.left: diagonal */}
-                <path d="M316,129 C332,129 344,170 344,197" />
-                {/* Relate.bottom-center → Synth.top-center: short vertical through row gap */}
-                <path d="M409,154 L409,172" />
-              </svg>
-
-              {/* Transcript — input */}
-              <div className="node-card node-input" style={{ gridArea: 'input' }}>
-                <div className="node-port node-port-out" />
-                <span className="node-label">Transcript</span>
-                <p className="node-desc">Raw interview data</p>
-              </div>
-
-              {/* Chunk Agent */}
-              <div className="node-card" style={{ gridArea: 'chunk' }}>
-                <div className="node-port node-port-in" />
-                <div className="node-port node-port-out" />
-                <span className="node-status-dot node-status-dot-done" />
-                <span className="node-label">Chunk Agent</span>
-                <p className="node-desc">Segment into units</p>
-              </div>
-
-              {/* Infer Agent */}
-              <div className="node-card" style={{ gridArea: 'infer' }}>
-                <div className="node-port node-port-in" />
-                <div className="node-port node-port-out" />
-                <span className="node-status-dot node-status-dot-done" />
-                <span className="node-label">Infer Agent</span>
-                <p className="node-desc">Derive meaning</p>
-              </div>
-
-              {/* Relate Agent */}
-              <div className="node-card" style={{ gridArea: 'relate' }}>
-                <div className="node-port node-port-in" />
-                <div className="node-port node-port-out" />
-                <span className="node-status-dot node-status-dot-running" />
-                <span className="node-label">Relate Agent</span>
-                <p className="node-desc">Find patterns</p>
-              </div>
-
-              {/* Synthesize */}
-              <div className="node-card" style={{ gridArea: 'synth' }}>
-                <div className="node-port node-port-in" />
-                <span className="node-status-dot node-status-dot-queued" />
-                <span className="node-label">Synthesize</span>
-                <p className="node-desc">Insights &amp; principles</p>
-              </div>
-
-              {/* Ghost — extensibility hint */}
-              <div className="node-card node-ghost" style={{ gridArea: 'custom' }}>
-                <span className="node-label">+ Your method</span>
-              </div>
-
-              <div className="node-canvas-dots" aria-hidden="true" />
-            </div>
-          </div>
+          <NodeEditorMockup />
         </div>
       </section>
 
