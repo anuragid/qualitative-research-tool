@@ -1174,30 +1174,27 @@
 }
 .landing-page .upload-check svg { width: 12px; height: 12px; }
 
-/* Node-based editor mockup */
+/* Node-based editor mockup — clean minimal style */
 .landing-page .node-editor {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 32px 1fr 32px 1fr;
-  grid-template-rows: auto 20px auto 20px auto;
+  grid-template-columns: auto auto auto;
+  grid-template-rows: auto auto auto;
   grid-template-areas:
-    "input  .    chunk  .    ."
-    ".      .    .      .    ."
-    ".      .    infer  .    relate"
-    ".      .    .      .    ."
-    ".      .    custom .    synth";
-  gap: 0;
-  padding: 36px 28px;
-  min-height: 340px;
+    "input chunk  ."
+    ".     infer  relate"
+    ".     custom synth";
+  gap: 16px 32px;
+  padding: 40px 32px;
+  min-height: 300px;
 }
 .landing-page .node-canvas-dots {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background-image: radial-gradient(circle, rgba(3,3,2,0.06) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(circle, rgba(3,3,2,0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
   border-radius: var(--radius-md);
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.04);
 }
 .landing-page .node-edges {
   position: absolute;
@@ -1210,123 +1207,78 @@
 }
 .landing-page .node-edges path {
   fill: none;
-  stroke: var(--color-ink-20);
+  stroke: var(--color-ink-12, rgba(3,3,2,0.12));
   stroke-width: 1.5;
+  stroke-dasharray: 6 4;
   stroke-linecap: round;
-}
-.landing-page .node-edges .node-edge-skip {
-  stroke-dasharray: 5 4;
-  stroke: var(--color-ink-09);
-}
-.landing-page .node-edge-label {
-  font-size: 9px;
-  fill: var(--color-ink-35);
-  font-family: var(--font-sans, system-ui, sans-serif);
-  letter-spacing: 0.02em;
 }
 .landing-page .node-card {
   position: relative;
   z-index: 2;
   background: white;
-  border-radius: 10px;
-  padding: 16px 18px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
-  min-width: 160px;
-  border-left: 3px solid transparent;
-}
-.landing-page .node-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.landing-page .node-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  line-height: 1;
-}
-.landing-page .node-icon svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  min-width: 140px;
+  max-width: 170px;
 }
 .landing-page .node-label {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-ink);
+  display: block;
+  margin-bottom: 4px;
 }
 .landing-page .node-desc {
   font-size: 11px;
   color: var(--color-ink-35);
   line-height: 1.4;
-  margin-left: 24px;
 }
-/* Status dots — top-right corner of node card */
+/* Status dots — top-right corner */
 .landing-page .node-status-dot {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
 }
-.landing-page .node-status-dot-done {
-  background: #16A34A;
-}
+.landing-page .node-status-dot-done { background: #16A34A; }
 .landing-page .node-status-dot-running {
   background: #0D9488;
-  animation: nodePulse 1.8s ease-in-out infinite;
+  animation: nodePulse 2s ease-in-out infinite;
 }
-.landing-page .node-status-dot-queued {
-  background: var(--color-ink-20);
-}
+.landing-page .node-status-dot-queued { background: var(--color-ink-09); }
 @keyframes nodePulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(13,148,136,0.4); }
-  50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(13,148,136,0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(13,148,136,0.3); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(13,148,136,0); }
 }
-/* Connection ports */
+/* Connection ports — solid gray circles */
 .landing-page .node-port {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: white;
-  border: 1.5px solid var(--color-ink-20);
+  background: #C4C4C4;
   z-index: 3;
 }
-.landing-page .node-port-in {
-  left: -4px;
-}
-.landing-page .node-port-out {
-  right: -4px;
-}
+.landing-page .node-port-in { left: -5px; }
+.landing-page .node-port-out { right: -5px; }
 /* Ghost node */
 .landing-page .node-ghost {
-  border-left-color: transparent;
   border: 1.5px dashed var(--color-ink-09);
-  background: rgba(255,255,255,0.5);
+  background: transparent;
   box-shadow: none;
-}
-.landing-page .node-ghost .node-icon svg {
-  stroke: var(--color-ink-20);
 }
 .landing-page .node-ghost .node-label {
   color: var(--color-ink-20);
   font-weight: 500;
 }
 /* Input node */
-.landing-page .node-input {
-  align-self: center;
-  border-left-color: #9CA3AF;
-}
+.landing-page .node-input { align-self: center; }
 
 /* Insights mockup */
 .landing-page .insights-mockup {
@@ -1928,16 +1880,13 @@
 
   /* Node editor: compact */
   .landing-page .node-editor {
-    grid-template-columns: 1fr 24px 1fr 24px 1fr;
-    grid-template-rows: auto 14px auto 14px auto;
-    padding: 28px 18px;
+    gap: 12px 24px;
+    padding: 28px 20px;
   }
   .landing-page .node-card {
-    min-width: 120px;
+    min-width: 110px;
+    max-width: 150px;
     padding: 12px 14px;
-  }
-  .landing-page .node-desc {
-    margin-left: 0;
   }
 
   /* Contact: full width button */
@@ -2101,8 +2050,7 @@
   }
   .landing-page .node-edges { display: none; }
   .landing-page .node-port { display: none; }
-  .landing-page .node-card { max-width: none; min-width: 0; border-left-width: 2px; padding: 12px 12px; }
-  .landing-page .node-desc { margin-left: 0; }
+  .landing-page .node-card { max-width: none; min-width: 0; padding: 12px; }
 
   /* Mockup dimension rows: fit on mobile */
   .landing-page .mockup-dim-bar { width: 50px; }
@@ -2332,7 +2280,7 @@
   .landing-page .node-editor { padding: 14px 8px; gap: 8px; }
   .landing-page .node-card { padding: 8px 10px; }
   .landing-page .node-label { font-size: 11px; }
-  .landing-page .node-desc { font-size: 10px; margin-left: 0; }
+  .landing-page .node-desc { font-size: 10px; }
 
   /* Insight cards: smaller */
   .landing-page .insight-card { padding: var(--space-xs); }
