@@ -667,14 +667,14 @@ export default function LandingPage() {
             by researchers
           </h2>
           <p className="about-text">
-            methodex brings qualitative research methods taught by Jeremy Alexis at the Institute of
+            methodex brings analysis and synthesis methods taught by Jeremy Alexis at the Institute of
             Design, Illinois Institute of Technology, into an AI-powered digital workflow. Upload
-            interview videos, and AI applies proven analytical frameworks to surface patterns and
+            interview recordings, and AI applies proven analytical frameworks to surface patterns and
             insights that would take hours to find manually.
           </p>
           <p className="about-text">
             Designed for design researchers and students, methodex pairs the rigor of established
-            methods with modern AI to transform raw observations into structured, actionable insight.
+            analytical methods with modern AI to transform raw interview data into structured, actionable insight.
           </p>
 
           <div className="about-orgs">
