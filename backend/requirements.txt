@@ -45,4 +45,4 @@ cryptography==45.0.0
 slowapi==0.1.9
 
 # Error Monitoring & Observability
-sentry-sdk[fastapi,celery]
+sentry-sdk[fastapi,celery,openai]>=2.41.0
