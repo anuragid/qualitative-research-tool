@@ -325,18 +325,23 @@ export default function LandingPage() {
           </div>
           <div className="feature-mockup-card reveal">
             <div className="node-editor">
-              {/* SVG edges — all route through column gaps, never over nodes */}
+              {/* SVG edges — route port-to-port through gaps, never over nodes
+                   Layout:  col1[Transcript]  col2[Chunk]     col3(empty)
+                            col1(empty)       col2[Infer]     col3[Relate]
+                            col1(empty)       col2[Custom]    col3[Synthesize]
+                   Approx positions: cols at ~28/158, 186/316, 344/474; rows at ~36/86, 104/154, 172/222
+                   Ports: right-edge center, left-edge center */}
               <svg className="node-edges" aria-hidden="true">
-                {/* Transcript → Chunk: horizontal */}
-                <path d="M120,127 C130,127 132,127 140,127" />
-                {/* Chunk → Infer: fan up-right through gap */}
-                <path d="M240,127 C268,127 260,82 260,59" />
-                {/* Chunk → Relate: fan down-right through gap */}
-                <path d="M240,127 C268,127 260,172 260,193" />
-                {/* Infer → Synthesize: converge down-right */}
-                <path d="M360,59 C388,59 380,102 380,127" />
-                {/* Relate → Synthesize: converge up-right */}
-                <path d="M360,193 C388,193 380,152 380,127" />
+                {/* Transcript.right → Chunk.left: horizontal through col gap */}
+                <path d="M158,61 L186,61" />
+                {/* Chunk.bottom-right → through empty col3 row1 → Relate.left: diagonal */}
+                <path d="M316,61 C360,61 344,100 344,129" />
+                {/* Chunk.bottom-center → Infer.top-center: short vertical through row gap */}
+                <path d="M251,86 L251,104" />
+                {/* Infer.right → through col gap (avoids Relate) → Synth.left: diagonal */}
+                <path d="M316,129 C332,129 344,170 344,197" />
+                {/* Relate.bottom-center → Synth.top-center: short vertical through row gap */}
+                <path d="M409,154 L409,172" />
               </svg>
 
               {/* Transcript — input */}
@@ -346,7 +351,7 @@ export default function LandingPage() {
                 <p className="node-desc">Raw interview data</p>
               </div>
 
-              {/* Chunk Agent — fans out to Infer + Relate */}
+              {/* Chunk Agent */}
               <div className="node-card" style={{ gridArea: 'chunk' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
@@ -355,7 +360,7 @@ export default function LandingPage() {
                 <p className="node-desc">Segment into units</p>
               </div>
 
-              {/* Infer Agent — top branch */}
+              {/* Infer Agent */}
               <div className="node-card" style={{ gridArea: 'infer' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
@@ -364,7 +369,7 @@ export default function LandingPage() {
                 <p className="node-desc">Derive meaning</p>
               </div>
 
-              {/* Relate Agent — bottom branch */}
+              {/* Relate Agent */}
               <div className="node-card" style={{ gridArea: 'relate' }}>
                 <div className="node-port node-port-in" />
                 <div className="node-port node-port-out" />
@@ -373,7 +378,7 @@ export default function LandingPage() {
                 <p className="node-desc">Find patterns</p>
               </div>
 
-              {/* Synthesize — converges both branches */}
+              {/* Synthesize */}
               <div className="node-card" style={{ gridArea: 'synth' }}>
                 <div className="node-port node-port-in" />
                 <span className="node-status-dot node-status-dot-queued" />
