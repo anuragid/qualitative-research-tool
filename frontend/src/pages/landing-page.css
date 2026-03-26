@@ -136,6 +136,10 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+}
+.landing-page *, .landing-page *::before, .landing-page *::after {
+  box-sizing: inherit;
 }
 
 .landing-page img { display: block; max-width: 100%; height: auto; }
@@ -1720,23 +1724,26 @@
 }
 
 /* ================================================================
-   RESPONSIVE -- Tablet
+   RESPONSIVE -- Tablet Landscape (1024px)
    ================================================================ */
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .landing-page {
-    --space-lg: 28px;
+    --space-lg: 32px;
   }
 
+  /* Nav: switch to hamburger */
   .landing-page .nav-links { display: none; }
   .landing-page .nav-cta.desktop-only { display: none; }
   .landing-page .nav-hamburger { display: flex; }
   .landing-page .nav-mobile-overlay { display: block; }
 
+  /* Featured card: single column */
   .landing-page .featured-card {
     grid-template-columns: 1fr;
     padding: var(--space-lg);
   }
 
+  /* Feature sections: single column, remove RTL trick */
   .landing-page .feature-inner,
   .landing-page .feature-inner.reversed {
     grid-template-columns: 1fr;
@@ -1744,43 +1751,223 @@
   }
   .landing-page .feature-inner.reversed > * { direction: ltr; }
 
+  /* Methods: 2 columns */
   .landing-page .methods-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  /* Form row: single column */
   .landing-page .form-row {
     grid-template-columns: 1fr;
   }
 
+  /* Footer: stack top section */
   .landing-page .footer-top {
     flex-direction: column;
   }
   .landing-page .footer-links {
     gap: var(--space-lg);
   }
+
+  /* Paper pieces: scale down slightly */
+  .landing-page .paper-0 { width: 800px; }
+  .landing-page .paper-1 { width: 590px; height: 500px; }
+  .landing-page .paper-3 { width: 650px; }
+  .landing-page .paper-4 { width: 720px; }
 }
 
 /* ================================================================
-   RESPONSIVE -- Mobile
+   RESPONSIVE -- Tablet Portrait (768px)
+   ================================================================ */
+@media (max-width: 768px) {
+  .landing-page {
+    --space-lg: 24px;
+    --space-xl: 48px;
+    --space-2xl: 72px;
+    --space-section: clamp(60px, 8vw, 100px);
+    --space-breathing: clamp(48px, 6vw, 80px);
+  }
+
+  /* Nav: tighter margins */
+  .landing-page .nav {
+    width: min(var(--nav-width), calc(100vw - 32px));
+    top: 20px;
+  }
+  .landing-page .nav.scrolled { top: 12px; }
+
+  /* Hero: reduce height, smaller heading */
+  .landing-page .hero {
+    height: auto;
+    min-height: 85vh;
+    margin: 10px;
+  }
+  .landing-page .hero h1 {
+    font-size: clamp(36px, 7vw, 48px);
+  }
+  .landing-page .hero-subtitle {
+    font-size: clamp(15px, 2vw, 18px);
+  }
+  .landing-page .hero-content {
+    padding-top: clamp(140px, 18vh, 220px);
+    padding-bottom: clamp(48px, 6vh, 80px);
+  }
+
+  /* Hero product mockup */
+  .landing-page .hero-product {
+    max-width: 680px;
+  }
+  .landing-page .hero-app-card-thumb {
+    height: 60px;
+  }
+
+  /* Paper pieces: smaller for tablet */
+  .landing-page .hero-papers { height: 450px; }
+  .landing-page .paper-0 { width: 650px; bottom: -200px; }
+  .landing-page .paper-1 { width: 480px; height: 410px; bottom: -220px; margin-left: -660px; }
+  .landing-page .paper-2 { width: 300px; bottom: 120px; margin-left: 220px; }
+  .landing-page .paper-3 { width: 530px; bottom: -50px; }
+  .landing-page .paper-4 { width: 580px; bottom: -190px; margin-left: 40px; }
+
+  /* Feature headings: smaller */
+  .landing-page .feature-heading {
+    font-size: clamp(28px, 5vw, 40px);
+  }
+  .landing-page .feature-body {
+    max-width: 100%;
+  }
+  .landing-page .feature-section {
+    padding: clamp(48px, 6vw, 80px) clamp(20px, 3vw, 40px);
+  }
+
+  /* Section headings: smaller */
+  .landing-page .collection-heading,
+  .landing-page .methods-heading,
+  .landing-page .about-heading,
+  .landing-page .contact-heading {
+    font-size: clamp(28px, 5vw, 40px);
+  }
+
+  /* Methods grid: single column below 768px */
+  .landing-page .methods-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Mockup dimension bar: narrower */
+  .landing-page .mockup-dim-bar {
+    width: 60px;
+  }
+
+  /* Upload file rows: prevent overflow */
+  .landing-page .upload-file-name {
+    max-width: 180px;
+  }
+
+  /* Pipeline step: smaller text */
+  .landing-page .pipeline-step-title {
+    font-size: 13px;
+  }
+  .landing-page .pipeline-step-desc {
+    font-size: 11px;
+  }
+  .landing-page .pipeline-step-status {
+    font-size: 11px;
+  }
+
+  /* Contact: full width button */
+  .landing-page .form-submit {
+    width: 100%;
+  }
+
+  /* Footer adjustments */
+  .landing-page .footer-inner {
+    padding: var(--space-lg) var(--space-md) var(--space-md);
+  }
+  .landing-page .footer-links {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  .landing-page .footer-bottom {
+    flex-direction: column;
+    text-align: center;
+    gap: var(--space-sm);
+  }
+
+  /* About section */
+  .landing-page .about-text {
+    font-size: 16px;
+  }
+}
+
+/* ================================================================
+   RESPONSIVE -- Mobile (640px)
    ================================================================ */
 @media (max-width: 640px) {
   .landing-page {
     --space-lg: 20px;
+    --space-xl: 40px;
+    --space-section: clamp(48px, 8vw, 80px);
+    --space-breathing: clamp(40px, 6vw, 64px);
   }
 
+  /* Nav: near edge-to-edge, float higher */
+  .landing-page .nav {
+    width: min(var(--nav-width), calc(100vw - 24px));
+    top: 16px;
+  }
+  .landing-page .nav.scrolled { top: 8px; }
+  .landing-page .nav-inner {
+    height: 48px;
+    padding: 0 6px 0 16px;
+  }
+  .landing-page .nav-hamburger {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Hero: use svh for iOS Safari, shrink heading */
   .landing-page .hero {
+    height: auto;
+    min-height: 100svh;
     margin: 8px;
     border-radius: var(--radius-xl);
   }
-
+  .landing-page .hero h1 {
+    font-size: clamp(32px, 8vw, 48px);
+  }
+  .landing-page .hero-subtitle {
+    font-size: clamp(14px, 3.5vw, 17px);
+    max-width: 400px;
+  }
   .landing-page .hero-content {
-    padding-top: clamp(140px, 18vh, 200px);
-    padding-bottom: clamp(40px, 6vh, 70px);
+    padding-top: clamp(120px, 16vh, 180px);
+    padding-bottom: clamp(32px, 5vh, 60px);
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
   }
 
+  /* Hero CTA: ensure touch target */
+  .landing-page .glass-btn {
+    height: 48px;
+    min-height: 44px;
+    padding: 0 28px;
+  }
+
+  /* Clouds: smaller on mobile */
   .landing-page .hero-cloud-1 { width: 200px; left: -25%; top: 8%; }
   .landing-page .hero-cloud-2 { width: 160px; right: -20%; top: 18%; }
 
+  /* Paper collage: shrink all pieces significantly */
+  .landing-page .hero-papers { height: 360px; }
+  .landing-page .paper-0 { width: 500px; bottom: -160px; left: -30px; }
+  .landing-page .paper-1 { width: 380px; height: 320px; bottom: -180px; margin-left: -520px; }
+  .landing-page .paper-2 { width: 240px; bottom: 90px; margin-left: 160px; }
+  .landing-page .paper-3 { width: 420px; bottom: -40px; }
+  .landing-page .paper-4 { width: 460px; bottom: -150px; margin-left: 20px; }
+
+  /* Hero product mockup */
+  .landing-page .hero-product {
+    max-width: 520px;
+  }
   .landing-page .hero-app-content {
     grid-template-columns: 1fr;
   }
@@ -1790,28 +1977,355 @@
   .landing-page .hero-app-cards {
     grid-template-columns: 1fr;
   }
+  .landing-page .hero-app-card-thumb {
+    height: 50px;
+  }
+  .landing-page .hero-app-main {
+    padding: 16px;
+  }
+  .landing-page .hero-app-main h4 {
+    font-size: 18px;
+  }
 
+  /* Feature sections */
   .landing-page .feature-section {
     max-width: min(1200px, calc(100% - 16px));
     margin-left: auto;
     margin-right: auto;
     border-radius: var(--radius-xl);
-    padding: var(--space-xl) var(--space-lg);
+    padding: var(--space-lg) var(--space-sm);
+  }
+  .landing-page .feature-heading {
+    font-size: clamp(26px, 6.5vw, 36px);
+  }
+  .landing-page .feature-body {
+    font-size: 15px;
+  }
+  .landing-page .feature-mockup-card {
+    padding: var(--space-sm);
   }
 
+  /* Upload mockup: prevent file row overflow */
+  .landing-page .upload-file-row {
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+  }
+  .landing-page .upload-file-name {
+    max-width: 140px;
+    font-size: 13px;
+  }
+  .landing-page .upload-file-meta {
+    font-size: 11px;
+  }
+  .landing-page .upload-dropzone {
+    padding: var(--space-md) var(--space-sm);
+  }
+
+  /* Pipeline mockup: tighter */
+  .landing-page .pipeline-step {
+    padding: 10px var(--space-xs);
+    gap: var(--space-xs);
+  }
+  .landing-page .pipeline-step-title { font-size: 13px; }
+  .landing-page .pipeline-step-desc { font-size: 11px; }
+  .landing-page .pipeline-step-status { font-size: 11px; padding: 2px 6px; }
+
+  /* Mockup dimension rows: fit on mobile */
+  .landing-page .mockup-dim-bar { width: 50px; }
+  .landing-page .mockup-dim-name { font-size: 13px; }
+  .landing-page .mockup-dimension-row { gap: var(--space-xs); }
+
+  /* Section headings: mobile size */
+  .landing-page .collection-heading,
+  .landing-page .methods-heading,
+  .landing-page .about-heading,
+  .landing-page .contact-heading {
+    font-size: clamp(26px, 6.5vw, 36px);
+  }
+
+  /* Breathing tagline */
+  .landing-page .breathing-tagline {
+    font-size: clamp(18px, 4vw, 24px);
+  }
+
+  /* Methods grid: single column */
   .landing-page .methods-grid {
     grid-template-columns: 1fr;
   }
 
-  .landing-page .footer-links {
-    flex-direction: column;
-    gap: var(--space-lg);
+  /* Folder cards: smaller min-height */
+  .landing-page .folder-card {
+    min-height: 150px;
+    padding: var(--space-md) var(--space-sm) var(--space-sm);
   }
 
+  /* Dimension badges: ensure wrapping */
+  .landing-page .dimensions {
+    gap: 6px;
+  }
+  .landing-page .dimension-badge {
+    font-size: 13px;
+    padding: 5px 10px;
+  }
+
+  /* Contact form: full width inputs */
+  .landing-page .form-input,
+  .landing-page .form-select {
+    height: 48px;
+    min-height: 44px;
+    font-size: 16px; /* prevent iOS zoom */
+  }
+  .landing-page .form-textarea {
+    font-size: 16px; /* prevent iOS zoom */
+    min-height: 100px;
+  }
+  .landing-page .form-submit {
+    width: 100%;
+    height: 48px;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  /* Footer */
+  .landing-page .footer-inner {
+    padding: var(--space-md) var(--space-sm) var(--space-sm);
+  }
+  .landing-page .footer-links {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
   .landing-page .footer-bottom {
     flex-direction: column;
     text-align: center;
   }
+  .landing-page .footer-copyright,
+  .landing-page .footer-credits {
+    font-size: 12px;
+  }
+
+  /* About orgs: wrap better */
+  .landing-page .about-orgs {
+    gap: var(--space-sm);
+  }
+  .landing-page .about-org {
+    font-size: 13px;
+  }
+
+  /* Mobile overlay: better touch targets */
+  .landing-page .nav-mobile-link {
+    font-size: 28px;
+    padding: var(--space-sm) var(--space-lg);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* All interactive elements: enforce min touch target */
+  .landing-page .nav-cta {
+    height: 40px;
+    min-height: 44px;
+    padding: 0 14px;
+  }
+  .landing-page .footer-col a,
+  .landing-page .footer-col button {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}
+
+/* ================================================================
+   RESPONSIVE -- Small Mobile / iPhone SE (400px)
+   ================================================================ */
+@media (max-width: 400px) {
+  .landing-page {
+    --space-lg: 16px;
+    --space-md: 20px;
+    --space-sm: 12px;
+  }
+
+  /* Nav: minimal margins */
+  .landing-page .nav {
+    width: calc(100vw - 16px);
+    top: 12px;
+  }
+  .landing-page .nav.scrolled { top: 6px; }
+  .landing-page .nav-inner {
+    padding: 0 4px 0 12px;
+  }
+  .landing-page .nav-logo {
+    font-size: 18px;
+  }
+
+  /* Hero: compact everything */
+  .landing-page .hero {
+    margin: 6px;
+    min-height: 100svh;
+  }
+  .landing-page .hero h1 {
+    font-size: clamp(28px, 8vw, 36px);
+  }
+  .landing-page .hero-subtitle {
+    font-size: 14px;
+  }
+  .landing-page .hero-content {
+    padding-top: clamp(100px, 14vh, 150px);
+    padding-bottom: clamp(24px, 4vh, 48px);
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+  }
+
+  /* Paper pieces: hide less important ones, shrink rest */
+  .landing-page .paper-1 { display: none; }
+  .landing-page .paper-2 { display: none; }
+  .landing-page .hero-papers { height: 280px; }
+  .landing-page .paper-0 { width: 380px; bottom: -130px; left: -40px; }
+  .landing-page .paper-3 { width: 320px; bottom: -30px; margin-left: -20px; }
+  .landing-page .paper-4 { width: 350px; bottom: -120px; margin-left: 0; }
+
+  /* Hero product: minimal */
+  .landing-page .hero-product {
+    width: 95%;
+    max-width: 380px;
+  }
+  .landing-page .hero-app-bar {
+    height: 32px;
+    padding: 0 10px;
+  }
+  .landing-page .hero-app-dot { width: 8px; height: 8px; }
+  .landing-page .hero-app-title { font-size: 11px; }
+  .landing-page .hero-app-main {
+    padding: 12px 10px;
+  }
+  .landing-page .hero-app-main h4 { font-size: 16px; }
+  .landing-page .hero-app-main-subtitle { font-size: 11px; }
+  .landing-page .hero-app-card-thumb { height: 40px; }
+  .landing-page .hero-app-card-body { padding: 8px 10px; }
+  .landing-page .hero-app-card-title { font-size: 11px; }
+  .landing-page .hero-app-card-status { font-size: 10px; }
+  .landing-page .hero-app-step { width: 6px; height: 6px; }
+
+  /* Section headings: smallest tier */
+  .landing-page .collection-heading,
+  .landing-page .methods-heading,
+  .landing-page .about-heading,
+  .landing-page .contact-heading {
+    font-size: clamp(24px, 6vw, 30px);
+  }
+  .landing-page .feature-heading {
+    font-size: clamp(24px, 6vw, 30px);
+  }
+
+  /* Feature sections: tightest padding */
+  .landing-page .feature-section {
+    max-width: calc(100% - 12px);
+    padding: var(--space-lg) var(--space-sm);
+    border-radius: var(--radius-lg);
+  }
+  .landing-page .feature-body {
+    font-size: 14px;
+  }
+  .landing-page .feature-label {
+    font-size: 11px;
+  }
+
+  /* Featured card: compact */
+  .landing-page .featured-card {
+    padding: var(--space-md);
+    gap: var(--space-md);
+    border-radius: var(--radius-xl);
+  }
+  .landing-page .featured-card h3 {
+    font-size: clamp(20px, 5vw, 24px);
+  }
+  .landing-page .featured-card p {
+    font-size: 14px;
+  }
+
+  /* Mockup: compact rows */
+  .landing-page .mockup-header { gap: var(--space-xs); padding-bottom: var(--space-xs); margin-bottom: var(--space-xs); }
+  .landing-page .mockup-dim-bar { width: 40px; }
+  .landing-page .mockup-dim-icon { width: 24px; height: 24px; font-size: 12px; }
+  .landing-page .mockup-dim-name { font-size: 12px; }
+  .landing-page .mockup-dimension-row { padding: 8px 0; gap: 6px; }
+
+  /* Upload mockup: very tight */
+  .landing-page .upload-file-name { max-width: 100px; font-size: 12px; }
+  .landing-page .upload-file-icon { width: 28px; height: 28px; font-size: 10px; }
+  .landing-page .upload-label { font-size: 12px; }
+
+  /* Pipeline: compact */
+  .landing-page .pipeline-step { padding: 8px 6px; gap: 6px; }
+  .landing-page .pipeline-step-num { width: 24px; height: 24px; font-size: 11px; }
+  .landing-page .pipeline-step-title { font-size: 12px; }
+  .landing-page .pipeline-step-desc { font-size: 10px; }
+  .landing-page .pipeline-connector { margin-left: 11px; height: 8px; }
+
+  /* Insight cards: smaller */
+  .landing-page .insight-card { padding: var(--space-xs); }
+  .landing-page .insight-card-text { font-size: 13px; }
+  .landing-page .insight-tag { font-size: 10px; }
+
+  /* Breathing tagline */
+  .landing-page .breathing-tagline {
+    font-size: clamp(16px, 4vw, 20px);
+  }
+
+  /* Glass button: ensure touch size */
+  .landing-page .glass-btn {
+    height: 44px;
+    padding: 0 24px;
+    font-size: 14px;
+  }
+
+  /* Dimension badges: tiny screens */
+  .landing-page .dimension-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+  .landing-page .dimension-dot { width: 6px; height: 6px; }
+
+  /* Folder cards */
+  .landing-page .folder-card {
+    min-height: auto;
+    padding: var(--space-sm) var(--space-sm) var(--space-xs);
+  }
+  .landing-page .folder-card-title { font-size: 18px; }
+  .landing-page .folder-card-desc { font-size: 13px; }
+
+  /* Contact form: stacked, touch-friendly */
+  .landing-page .form-input,
+  .landing-page .form-select {
+    height: 48px;
+    font-size: 16px;
+  }
+  .landing-page .form-textarea { font-size: 16px; }
+  .landing-page .form-label { font-size: 13px; }
+  .landing-page .form-submit {
+    height: 48px;
+    font-size: 16px;
+  }
+
+  /* Footer: compact */
+  .landing-page .footer-inner {
+    padding: var(--space-sm) var(--space-xs) var(--space-xs);
+  }
+  .landing-page .footer-logo { font-size: 18px; }
+  .landing-page .footer-tagline { font-size: 12px; }
+  .landing-page .footer-col h4 { font-size: 13px; }
+  .landing-page .footer-col a,
+  .landing-page .footer-col button { font-size: 13px; }
+  .landing-page .footer-copyright,
+  .landing-page .footer-credits { font-size: 11px; }
+
+  /* About */
+  .landing-page .about-text { font-size: 14px; }
+  .landing-page .about-org { font-size: 12px; padding: 6px 10px; }
+
+  /* Mobile overlay: smaller links */
+  .landing-page .nav-mobile-link { font-size: 24px; }
+  .landing-page .nav-mobile-close { top: 20px; right: 20px; }
 }
 
 /* ================================================================
