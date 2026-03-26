@@ -1738,14 +1738,9 @@
   opacity: 0;
   transform: translateY(24px);
 }
-.landing-page .reveal-init.reveal-stagger > * {
-  opacity: 0;
-  transform: translateY(20px);
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-page .reveal-init,
-  .landing-page .reveal-init.reveal-stagger > * {
+  .landing-page .reveal-init {
     opacity: 1;
     transform: none;
   }
