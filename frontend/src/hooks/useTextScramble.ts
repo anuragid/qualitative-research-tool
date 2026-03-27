@@ -107,14 +107,18 @@ export function useTextScramble(
     rafRef.current = requestAnimationFrame(step);
   }, [text, duration, charSet, cancel]);
 
-  // Cleanup on unmount
+  // Set initial text + cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
+    // Seed the element with the final text so it's never empty
+    if (ref.current) {
+      ref.current.textContent = text;
+    }
     return () => {
       isMountedRef.current = false;
       cancel();
     };
-  }, [cancel]);
+  }, [text, cancel]);
 
   return { ref, replay };
 }

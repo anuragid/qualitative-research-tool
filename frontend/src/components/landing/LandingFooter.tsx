@@ -105,9 +105,7 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
           <p
             className="footer-copyright"
             ref={copyrightScramble.ref as React.RefObject<HTMLParagraphElement>}
-          >
-            &copy; {new Date().getFullYear()} methodex. All rights reserved.
-          </p>
+          />
           <p className="footer-credits">
             {creditsResolved ? (
               <>
@@ -117,9 +115,7 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
                 </a>
               </>
             ) : (
-              <span ref={creditsScramble.ref as React.RefObject<HTMLSpanElement>}>
-                {CREDITS_TEXT}
-              </span>
+              <span ref={creditsScramble.ref as React.RefObject<HTMLSpanElement>} />
             )}
           </p>
         </div>
