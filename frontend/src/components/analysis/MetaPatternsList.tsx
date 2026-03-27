@@ -2,7 +2,7 @@ import type { MetaPattern } from "../../types";
 import { Badge } from "../ui/badge";
 import { Network } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
-import { consistencyStyles } from "./config/displayConfig";
+import { consistencyStyles, normalizeConsistency } from "./config/displayConfig";
 import { MetaPatternCard } from "./cards/MetaPatternCard";
 import { CardView } from "./display/CardView";
 import { TableView, type TableColumn } from "./display/TableView";
@@ -29,11 +29,14 @@ const metaPatternColumns: TableColumn<MetaPattern>[] = [
     key: "consistency",
     label: "Consistency",
     sortable: true,
-    render: (mp) => (
-      <Badge className={`${consistencyStyles[mp.consistency] || ""} text-label`}>
-        {mp.consistency}
-      </Badge>
-    ),
+    render: (mp) => {
+      const norm = normalizeConsistency(mp.consistency);
+      return (
+        <Badge className={`${consistencyStyles[norm] || ""} text-label`}>
+          {norm}
+        </Badge>
+      );
+    },
     className: "w-32",
   },
   {
@@ -90,7 +93,7 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
           {Object.entries(consistencyStyles)
             .filter(([key]) =>
               ["consistent", "varying", "contradictory"].includes(key) &&
-              metaPatterns.some((mp) => mp.consistency === key)
+              metaPatterns.some((mp) => normalizeConsistency(mp.consistency) === key)
             )
             .map(([type, style]) => (
               <Badge key={type} className={style}>
@@ -110,8 +113,8 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-semibold text-text-primary">{metaPattern.pattern_name}</span>
-                      <Badge className={consistencyStyles[metaPattern.consistency]}>
-                        {metaPattern.consistency}
+                      <Badge className={consistencyStyles[normalizeConsistency(metaPattern.consistency)]}>
+                        {normalizeConsistency(metaPattern.consistency)}
                       </Badge>
                       <Badge className="bg-interactive-focus-bg text-interactive-focus border-0">
                         {metaPattern.appears_in_videos.length} videos

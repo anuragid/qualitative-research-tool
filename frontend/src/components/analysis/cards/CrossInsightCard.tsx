@@ -18,7 +18,9 @@ export function CrossInsightCard({ insight, compact = false }: CrossInsightCardP
       <div className="flex items-start gap-2 mb-2">
         <Sparkles className="h-4 w-4 text-interactive-focus flex-shrink-0 mt-0.5" />
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`${scStyle} text-label`}>{insight.scope}</Badge>
+          {insight.scope in scopeStyles && (
+            <Badge className={`${scStyle} text-label`}>{insight.scope}</Badge>
+          )}
           <Badge className={`${consStyle} text-label`}>
             {insight.consistency_across_videos} consistency
           </Badge>

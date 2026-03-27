@@ -65,6 +65,12 @@ export const consistencyStyles: Record<string, string> = {
   low: "bg-brand-crimson/20 text-brand-crimson",
 };
 
+// ===== CONSISTENCY NORMALIZATION =====
+export function normalizeConsistency(value: string): string {
+  if (value === "variable") return "varying";
+  return value;
+}
+
 // ===== SCOPE =====
 export const scopeStyles: Record<string, string> = {
   universal: "bg-interactive-focus-bg text-interactive-focus",

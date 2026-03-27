@@ -17,6 +17,18 @@ export function formatDuration(seconds: number): string {
   return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
+export function formatTimestamp(value: string | number): string {
+  if (typeof value === "string" && value.includes(":")) {
+    return value;
+  }
+  const num = Number(value);
+  if (isNaN(num)) {
+    return String(value);
+  }
+  const seconds = num > 1000 ? num / 1000 : num;
+  return formatDuration(seconds);
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;

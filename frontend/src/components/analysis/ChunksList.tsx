@@ -1,6 +1,7 @@
 import type { Chunk } from "../../types";
 import { Badge } from "../ui/badge";
 import { chunkTypeStyles } from "./config/displayConfig";
+import { formatTimestamp } from "../../lib/utils";
 import { ChunkCard } from "./cards/ChunkCard";
 import { CardView } from "./display/CardView";
 import { TableView, type TableColumn } from "./display/TableView";
@@ -24,7 +25,7 @@ const chunkColumns: TableColumn<Chunk>[] = [
     <p className="text-sm text-text-primary line-clamp-2">{c.text}</p>
   ) },
   { key: "timestamp", label: "Time", sortable: true, render: (c) => (
-    <span className="text-label text-text-placeholder">{c.timestamp || "\u2014"}</span>
+    <span className="text-label text-text-placeholder">{c.timestamp ? formatTimestamp(c.timestamp) : "\u2014"}</span>
   ), className: "w-24" },
 ];
 

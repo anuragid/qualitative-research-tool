@@ -1,6 +1,6 @@
 import { Badge } from "../../ui/badge";
 import { Network } from "lucide-react";
-import { consistencyStyles } from "../config/displayConfig";
+import { consistencyStyles, normalizeConsistency } from "../config/displayConfig";
 import type { MetaPattern } from "../../../types";
 
 interface MetaPatternCardProps {
@@ -9,7 +9,8 @@ interface MetaPatternCardProps {
 }
 
 export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCardProps) {
-  const consStyle = consistencyStyles[metaPattern.consistency] || "";
+  const normalized = normalizeConsistency(metaPattern.consistency);
+  const consStyle = consistencyStyles[normalized] || "";
 
   return (
     <div className="bg-card rounded-xl p-3 sm:p-4">
@@ -23,7 +24,7 @@ export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCar
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className={`${consStyle} text-label`}>
-              {metaPattern.consistency}
+              {normalized}
             </Badge>
             <Badge className="bg-interactive-focus-bg text-interactive-focus text-label">
               {metaPattern.appears_in_videos.length} video{metaPattern.appears_in_videos.length !== 1 ? "s" : ""}

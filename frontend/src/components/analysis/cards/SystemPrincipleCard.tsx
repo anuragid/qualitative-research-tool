@@ -20,7 +20,9 @@ export function SystemPrincipleCard({ principle, compact = false }: SystemPrinci
           <Badge className={`${pStyle.badge} text-label`}>
             {principle.priority} priority
           </Badge>
-          <Badge className={`${scStyle} text-label`}>{principle.scope}</Badge>
+          {principle.scope in scopeStyles && (
+            <Badge className={`${scStyle} text-label`}>{principle.scope}</Badge>
+          )}
         </div>
       </div>
       <h4 className="font-semibold text-sm text-text-primary mb-1">

@@ -1,6 +1,7 @@
 import { Badge } from "../../ui/badge";
 import { Clock } from "lucide-react";
 import { chunkTypeStyles } from "../config/displayConfig";
+import { formatTimestamp } from "../../../lib/utils";
 import type { Chunk } from "../../../types";
 
 interface ChunkCardProps {
@@ -25,7 +26,7 @@ export function ChunkCard({ chunk, compact = false }: ChunkCardProps) {
       {chunk.timestamp && (
         <div className="flex items-center gap-1 mt-2 text-label text-text-placeholder">
           <Clock className="h-3 w-3" />
-          <span>{chunk.timestamp}</span>
+          <span>{formatTimestamp(chunk.timestamp)}</span>
         </div>
       )}
     </div>
