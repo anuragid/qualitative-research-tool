@@ -1,5 +1,5 @@
 import api from "./api";
-import type { VideoAnalysis, ProjectAnalysis } from "../types";
+import type { VideoAnalysis, ProjectAnalysis, AnalysisStatusResponse } from "../types";
 
 export const analysisService = {
   // Video Analysis
@@ -34,7 +34,7 @@ export const analysisService = {
     return response.data;
   },
 
-  getVideoAnalysisStatus: async (videoId: string) => {
+  getVideoAnalysisStatus: async (videoId: string): Promise<AnalysisStatusResponse> => {
     const response = await api.get(`/api/videos/${videoId}/analysis/status`);
     return response.data;
   },

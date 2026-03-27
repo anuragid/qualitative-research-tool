@@ -124,6 +124,7 @@ if [ "$SERVICE" = "worker" ]; then
     # --without-mingle: Skip synchronizing with other workers on startup
     # --without-gossip: Disable worker-to-worker communication
     exec celery -A app.tasks.celery_app worker \
+        --beat \
         --pool=threads \
         --concurrency=${CELERY_CONCURRENCY:-8} \
         --loglevel=info \

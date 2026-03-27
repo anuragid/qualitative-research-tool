@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
@@ -38,9 +38,45 @@ import {
   Wifi,
   RefreshCw,
   RotateCcw,
+  Check,
+  Circle,
+  XCircle,
 } from "lucide-react";
 import { parseErrorMessage, getErrorTypeLabel } from "../lib/parseError";
 import type { ParsedError } from "../lib/parseError";
+
+const ANALYSIS_STEP_LABELS: Record<string, string> = {
+  chunk: "Chunking transcript",
+  infer: "Inferring meaning",
+  relate: "Finding patterns",
+  explain: "Generating insights",
+  activate: "Creating principles",
+};
+const ANALYSIS_STEP_ORDER = ["chunk", "infer", "relate", "explain", "activate"];
+
+function useElapsedTime(startedAt: string | null | undefined, isActive: boolean) {
+  const [elapsed, setElapsed] = useState("");
+
+  const computeElapsed = useCallback(() => {
+    if (!startedAt) return "";
+    const diff = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+    const m = Math.floor(diff / 60);
+    const s = diff % 60;
+    return m > 0 ? `${m}m ${s}s elapsed` : `${s}s elapsed`;
+  }, [startedAt]);
+
+  useEffect(() => {
+    if (!isActive || !startedAt) {
+      setElapsed("");
+      return;
+    }
+    setElapsed(computeElapsed());
+    const id = setInterval(() => setElapsed(computeElapsed()), 1000);
+    return () => clearInterval(id);
+  }, [isActive, startedAt, computeElapsed]);
+
+  return elapsed;
+}
 
 function getErrorIcon(errorType?: ParsedError["errorType"]) {
   switch (errorType) {
@@ -101,6 +137,10 @@ export default function VideoDetailPage() {
 
   // Active tab state for step-by-step mode
   const [activeStepTab, setActiveStepTab] = React.useState("chunks");
+
+  // Elapsed time for analysis progress
+  const isAnalysisProcessing = analysisStatus.data?.status === "processing";
+  const analysisElapsed = useElapsedTime(analysisStatus.data?.started_at, isAnalysisProcessing);
 
   // Analysis display state (view mode, sort, filter, search) per tab
   const chunksDisplay = useAnalysisDisplay("chunks");
@@ -398,16 +438,94 @@ export default function VideoDetailPage() {
             );
           })()}
 
-          {/* Progress indicator for ongoing tasks */}
-          {(video.status === "transcribing" || video.status === "analyzing") && (
+          {/* Progress indicator for transcription */}
+          {video.status === "transcribing" && (
             <div className="bg-card rounded-2xl shadow-card p-4 sm:p-6 space-y-3" role="status" aria-live="polite">
-              <div className="flex items-center gap-2 text-sm text-text-tertiary overflow-x-auto">
+              <div className="flex items-center gap-2 text-sm text-text-tertiary">
                 <Clock className="h-4 w-4" />
-                <span>
-                  {video.status === "transcribing"
-                    ? "Transcription in progress..."
-                    : "Running 5D analysis..."}
-                </span>
+                <span>Transcription in progress...</span>
+              </div>
+              <Progress value={undefined} className="h-2" />
+            </div>
+          )}
+
+          {/* Step-by-step analysis progress */}
+          {video.status === "analyzing" && isAnalysisProcessing && (() => {
+            const stepStatus = analysisStatus.data?.step_status;
+            const currentStep = analysisStatus.data?.current_step;
+            const completedCount = stepStatus
+              ? ANALYSIS_STEP_ORDER.filter(s => stepStatus[s] === "completed").length
+              : 0;
+            const currentStepIndex = currentStep
+              ? ANALYSIS_STEP_ORDER.indexOf(currentStep) + 1
+              : 0;
+            const progressPercent = (completedCount / ANALYSIS_STEP_ORDER.length) * 100;
+
+            return (
+              <div className="bg-card rounded-2xl shadow-card p-4 sm:p-6 space-y-4" role="status" aria-live="polite">
+                {/* Header row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin text-text-tertiary" />
+                    <span>
+                      {currentStep
+                        ? `Step ${currentStepIndex} of ${ANALYSIS_STEP_ORDER.length} — ${ANALYSIS_STEP_LABELS[currentStep] || currentStep}`
+                        : "Running 5D analysis..."}
+                    </span>
+                  </div>
+                  {analysisElapsed && (
+                    <span className="text-xs text-text-tertiary tabular-nums">{analysisElapsed}</span>
+                  )}
+                </div>
+
+                {/* Progress bar */}
+                <Progress value={progressPercent} className="h-1.5" />
+
+                {/* Step list */}
+                {stepStatus && (
+                  <div className="flex items-center gap-3 text-xs text-text-tertiary overflow-x-auto">
+                    {ANALYSIS_STEP_ORDER.map((step, i) => {
+                      const status = stepStatus[step] || "pending";
+                      return (
+                        <div key={step} className="flex items-center gap-1.5 shrink-0">
+                          {status === "completed" && (
+                            <Check className="h-3.5 w-3.5 text-green-600" />
+                          )}
+                          {status === "processing" && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-interactive-focus" />
+                          )}
+                          {status === "pending" && (
+                            <Circle className="h-3.5 w-3.5 text-text-tertiary/40" />
+                          )}
+                          {status === "error" && (
+                            <XCircle className="h-3.5 w-3.5 text-red-500" />
+                          )}
+                          <span className={
+                            status === "processing" ? "text-foreground font-medium" :
+                            status === "completed" ? "text-text-secondary" :
+                            status === "error" ? "text-red-500" :
+                            "text-text-tertiary/60"
+                          }>
+                            {ANALYSIS_STEP_LABELS[step]}
+                          </span>
+                          {i < ANALYSIS_STEP_ORDER.length - 1 && (
+                            <span className="text-text-tertiary/30 ml-1.5">·</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Fallback: analyzing state without step data */}
+          {video.status === "analyzing" && !isAnalysisProcessing && (
+            <div className="bg-card rounded-2xl shadow-card p-4 sm:p-6 space-y-3" role="status" aria-live="polite">
+              <div className="flex items-center gap-2 text-sm text-text-tertiary">
+                <Clock className="h-4 w-4" />
+                <span>Running 5D analysis...</span>
               </div>
               <Progress value={undefined} className="h-2" />
             </div>

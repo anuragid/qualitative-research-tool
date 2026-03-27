@@ -1,6 +1,7 @@
 """Celery application configuration."""
 
 import logging
+from datetime import timedelta
 
 from celery import Celery, signals
 
@@ -31,6 +32,7 @@ celery_app = Celery(
         "app.tasks.transcription_tasks",
         "app.tasks.analysis_tasks",
         "app.tasks.analysis_steps",
+        "app.tasks.watchdog_tasks",
     ]
 )
 
@@ -68,6 +70,14 @@ celery_app.conf.update(
     # Logging
     worker_hijack_root_logger=False,
     worker_log_format="[%(asctime)s: %(levelname)s/%(processName)s] %(message)s",
+
+    # Celery Beat schedule for periodic tasks
+    beat_schedule={
+        "watchdog-reset-stuck-analyses": {
+            "task": "reset_stuck_analyses",
+            "schedule": timedelta(minutes=5),
+        },
+    },
 )
 
 logger.info("Celery app configured")

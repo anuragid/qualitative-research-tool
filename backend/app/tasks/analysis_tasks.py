@@ -18,6 +18,8 @@ import time
 from datetime import datetime, timezone
 from uuid import UUID
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.agents.nodes import (
     activate_node,
     chunk_node,
@@ -117,12 +119,56 @@ def _run_node_with_retry(step_name: str, node_fn, state: dict, max_retries: int 
     return last_state
 
 
-def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
+def _update_step_progress(db, video_analysis_id, step_name: str, step_status_value: str) -> None:
+    """Update step-level progress in the database (best-effort).
+
+    Queries the VideoAnalysis fresh to avoid session conflicts with the
+    main task.  Failures here are logged but never propagated.
+
+    Args:
+        db: SQLAlchemy session.
+        video_analysis_id: Primary key of the VideoAnalysis row.
+        step_name: Pipeline step name (e.g. "chunk", "infer").
+        step_status_value: One of "pending", "processing", "completed", "error".
+    """
+    try:
+        va = db.query(VideoAnalysis).filter(VideoAnalysis.id == video_analysis_id).first()
+        if va is None:
+            logger.warning(f"_update_step_progress: VideoAnalysis {video_analysis_id} not found")
+            return
+
+        va.current_step = step_name
+
+        # Merge into existing step_status dict
+        current = va.step_status if isinstance(va.step_status, dict) else {}
+        current[step_name] = step_status_value
+        va.step_status = current
+        flag_modified(va, "step_status")
+
+        # Set per-step completion timestamp
+        if step_status_value == "completed":
+            ts_column = f"{step_name}_completed_at"
+            if hasattr(va, ts_column):
+                setattr(va, ts_column, datetime.now(timezone.utc))
+
+        db.commit()
+    except Exception:
+        logger.exception(f"_update_step_progress failed for step '{step_name}' ({step_status_value})")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
+def _run_video_pipeline(state: VideoAnalysisState, db=None, video_analysis_id=None) -> VideoAnalysisState:
     """Run the 5-step video analysis pipeline synchronously.
 
     Each node is called in sequence with per-node retry logic.
     If any node sets ``state["error"]`` after retries are exhausted,
     the pipeline halts immediately.
+
+    When *db* and *video_analysis_id* are provided, step-level progress
+    is written to the database before and after each node.
 
     Returns the final state dict.
     """
@@ -135,10 +181,17 @@ def _run_video_pipeline(state: VideoAnalysisState) -> VideoAnalysisState:
     ]
     for step_name, node_fn in steps:
         logger.info(f"Running pipeline step '{step_name}' for video {state['video_id']}")
+        if db is not None and video_analysis_id is not None:
+            _update_step_progress(db, video_analysis_id, step_name, "processing")
         state = _run_node_with_retry(step_name, node_fn, state)
         if state.get("error"):
             logger.error(f"Pipeline halting at '{step_name}': {state['error']}")
+            if db is not None and video_analysis_id is not None:
+                _update_step_progress(db, video_analysis_id, step_name, "error")
             break
+        else:
+            if db is not None and video_analysis_id is not None:
+                _update_step_progress(db, video_analysis_id, step_name, "completed")
     return state
 
 
@@ -146,6 +199,8 @@ def _run_project_pipeline(state) -> dict:
     """Run the 3-step project analysis pipeline synchronously.
 
     Each node is called in sequence with per-node retry logic.
+    ProjectAnalysis does not have per-step DB columns, so progress is
+    logged only.
     """
     steps = [
         ("cross_relate", cross_relate_node),
@@ -156,8 +211,10 @@ def _run_project_pipeline(state) -> dict:
         logger.info(f"Running pipeline step '{step_name}' for project {state['project_id']}")
         state = _run_node_with_retry(step_name, node_fn, state)
         if state.get("error"):
-            logger.error(f"Pipeline halting at '{step_name}': {state['error']}")
+            logger.error(f"Project pipeline halting at '{step_name}': {state['error']}")
             break
+        else:
+            logger.info(f"Project pipeline step '{step_name}' completed for project {state['project_id']}")
     return state
 
 
@@ -238,16 +295,29 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
             VideoAnalysis.video_id == video.id
         ).first()
 
+        initial_step_status = {
+            "chunk": "pending",
+            "infer": "pending",
+            "relate": "pending",
+            "explain": "pending",
+            "activate": "pending",
+        }
+
         if not video_analysis:
             video_analysis = VideoAnalysis(
                 video_id=video.id,
                 status="processing",
-                started_at=datetime.now(timezone.utc)
+                started_at=datetime.now(timezone.utc),
+                current_step="chunk",
+                step_status=initial_step_status,
             )
             self.db.add(video_analysis)
         else:
             video_analysis.status = "processing"
             video_analysis.started_at = datetime.now(timezone.utc)
+            video_analysis.current_step = "chunk"
+            video_analysis.step_status = initial_step_status
+            flag_modified(video_analysis, "step_status")
 
         video.status = "analyzing"
         self.db.commit()
@@ -276,7 +346,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         logger.info(f"Running video analysis pipeline for video {video_id}")
 
         # Run the analysis pipeline directly (no LangGraph ThreadPoolExecutor)
-        final_state = _run_video_pipeline(initial_state)
+        final_state = _run_video_pipeline(initial_state, db=self.db, video_analysis_id=video_analysis.id)
 
         # Check for errors - the pipeline halts on any node error after
         # retries are exhausted

@@ -658,6 +658,7 @@ async def get_video_analysis_status(
     return {
         "status": video_analysis.status,
         "current_step": video_analysis.current_step,
+        "step_status": video_analysis.step_status,
         "started_at": video_analysis.started_at,
         "completed_at": video_analysis.completed_at,
     }

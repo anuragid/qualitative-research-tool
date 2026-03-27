@@ -123,6 +123,14 @@ export interface VideoAnalysis {
 
 export type AnalysisStatus = "pending" | "processing" | "completed" | "error";
 
+export interface AnalysisStatusResponse {
+  status: AnalysisStatus;
+  current_step: string | null;
+  step_status: Record<string, string> | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
 export interface Chunk {
   chunk_id: string;
   speaker: string;
