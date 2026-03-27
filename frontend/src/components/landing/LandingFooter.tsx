@@ -21,22 +21,16 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
     `\u00A9 ${new Date().getFullYear()} methodex. All rights reserved.`,
     { duration: 0.6 },
   );
-  const creditsScramble = useTextScramble(CREDITS_TEXT, { duration: 0.6 });
+  const creditsScramble = useTextScramble(CREDITS_TEXT, {
+    duration: 0.6,
+    onComplete: () => setCreditsResolved(true),
+  });
 
   // Store replay fns in refs so the ScrollTrigger effect doesn't re-run
   const copyrightReplayRef = useRef(copyrightScramble.replay);
   const creditsReplayRef = useRef(creditsScramble.replay);
   copyrightReplayRef.current = copyrightScramble.replay;
   creditsReplayRef.current = creditsScramble.replay;
-
-  // When credits scramble finishes, show the version with the link
-  const prevScrambling = useRef(false);
-  useEffect(() => {
-    if (prevScrambling.current && !creditsScramble.isScrambling) {
-      setCreditsResolved(true);
-    }
-    prevScrambling.current = creditsScramble.isScrambling;
-  }, [creditsScramble.isScrambling]);
 
   // Trigger scramble on scroll-in — only once
   useEffect(() => {
@@ -56,7 +50,7 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
     });
 
     return () => trigger.kill();
-  }, []); // no dependencies — runs once, uses refs for replay
+  }, []);
 
   return (
     <footer className="footer">

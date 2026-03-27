@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface UseTextScrambleOptions {
   duration?: number;
   charSet?: string;
+  onComplete?: () => void;
 }
 
 interface UseTextScrambleReturn {
   ref: React.RefObject<HTMLElement | null>;
   replay: () => void;
-  isScrambling: boolean;
 }
 
 const DEFAULT_CHARSET =
@@ -24,12 +24,13 @@ export function useTextScramble(
   text: string,
   options?: UseTextScrambleOptions,
 ): UseTextScrambleReturn {
-  const { duration = 1, charSet = DEFAULT_CHARSET } = options ?? {};
+  const { duration = 1, charSet = DEFAULT_CHARSET, onComplete } = options ?? {};
 
   const ref = useRef<HTMLElement | null>(null);
-  const [isScrambling, setIsScrambling] = useState(false);
   const rafRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   const cancel = useCallback(() => {
     if (rafRef.current !== null) {
@@ -45,18 +46,16 @@ export function useTextScramble(
     // Respect prefers-reduced-motion
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       el.textContent = text;
+      onCompleteRef.current?.();
       return;
     }
 
     cancel();
-    setIsScrambling(true);
 
     const chars = Array.from(text);
     const len = chars.length;
     const durationMs = duration * 1000;
 
-    // Each character gets a random start delay within the first 40% of total duration,
-    // and resolves over ~60% of the total duration from its start time.
     const resolveWindow = durationMs * 0.6;
     const delayWindow = durationMs * 0.4;
 
@@ -98,9 +97,7 @@ export function useTextScramble(
 
       if (allResolved) {
         rafRef.current = null;
-        if (isMountedRef.current) {
-          setIsScrambling(false);
-        }
+        onCompleteRef.current?.();
         return;
       }
 
@@ -119,5 +116,5 @@ export function useTextScramble(
     };
   }, [cancel]);
 
-  return { ref, replay, isScrambling };
+  return { ref, replay };
 }
