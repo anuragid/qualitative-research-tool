@@ -42,7 +42,6 @@ export const Large: Story = {
 };
 
 export const LoadingVideos: Story = {
-  name: "Loading Videos",
   args: {
     message: "Loading videos...",
     size: "default",
@@ -50,7 +49,6 @@ export const LoadingVideos: Story = {
 };
 
 export const AllSizes: Story = {
-  name: "All Sizes",
   render: () => (
     <div className="flex items-end gap-8">
       <LoadingState size="sm" message="Small" />

@@ -28,6 +28,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: "hidden", // Generate source maps for Sentry but don't expose to browser
+    chunkSizeWarningLimit: 1200,
   },
   test: {
     coverage: {

@@ -23,7 +23,6 @@ export const Default: Story = {
 };
 
 export const WithIcons: Story = {
-  name: "With Icons",
   args: {
     items: [
       { icon: HardDrive, value: "1.2 GB" },
@@ -34,7 +33,6 @@ export const WithIcons: Story = {
 };
 
 export const WithLabels: Story = {
-  name: "With Labels",
   args: {
     items: [
       { label: "Size", value: "1.2 GB" },
@@ -56,7 +54,6 @@ export const WithIconsAndLabels: Story = {
 };
 
 export const PipeSeparator: Story = {
-  name: "Pipe Separator",
   args: {
     items: [
       { value: "1.2 GB" },
@@ -68,7 +65,6 @@ export const PipeSeparator: Story = {
 };
 
 export const ProjectMetadata: Story = {
-  name: "Project Metadata",
   args: {
     items: [
       { icon: Video, value: "8 videos" },
@@ -79,7 +75,6 @@ export const ProjectMetadata: Story = {
 };
 
 export const AnalysisSummary: Story = {
-  name: "Analysis Summary",
   args: {
     items: [
       { icon: FileText, value: "5 themes identified" },
@@ -90,7 +85,6 @@ export const AnalysisSummary: Story = {
 };
 
 export const SingleItem: Story = {
-  name: "Single Item",
   args: {
     items: [{ icon: Clock, value: "Last updated 2 hours ago" }],
   },

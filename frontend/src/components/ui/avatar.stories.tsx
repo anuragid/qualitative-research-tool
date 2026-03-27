@@ -85,7 +85,6 @@ export const Group: Story = {
 };
 
 export const WithBadge: Story = {
-  name: "With Badge",
   render: () => (
     <div className="flex items-center gap-6">
       <Avatar size="sm">

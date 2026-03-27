@@ -78,7 +78,6 @@ export const Default: Story = {
 };
 
 export const LeftSide: Story = {
-  name: "Left Side",
   render: () => (
     <Sheet>
       <SheetTrigger asChild>
@@ -121,7 +120,6 @@ export const LeftSide: Story = {
 };
 
 export const TopSide: Story = {
-  name: "Top Side",
   render: () => (
     <Sheet>
       <SheetTrigger asChild>
@@ -154,7 +152,6 @@ export const TopSide: Story = {
 };
 
 export const BottomSide: Story = {
-  name: "Bottom Side",
   render: () => (
     <Sheet>
       <SheetTrigger asChild>

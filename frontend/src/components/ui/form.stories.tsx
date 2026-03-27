@@ -195,6 +195,5 @@ function ValidationExample() {
 }
 
 export const WithValidationErrors: Story = {
-  name: "With Validation Errors",
   render: () => <ValidationExample />,
 };

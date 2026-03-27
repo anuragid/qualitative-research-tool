@@ -61,6 +61,7 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
         <div className="footer-top">
           <div className="footer-brand">
             <div className="footer-logo">
+              {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white logo on dark footer background */}
               <Logo size="sidebar" className="text-white" />
             </div>
             <p className="footer-tagline">

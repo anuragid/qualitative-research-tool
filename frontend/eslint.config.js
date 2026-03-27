@@ -36,7 +36,7 @@ const designSystemPlugin = {
   },
 }
 
-export default defineConfig([globalIgnores(['dist', 'coverage']), {
+export default defineConfig([globalIgnores(['dist', 'coverage', 'storybook-static', '.storybook/mocks']), {
   files: ['**/*.{ts,tsx}'],
   extends: [
     js.configs.recommended,

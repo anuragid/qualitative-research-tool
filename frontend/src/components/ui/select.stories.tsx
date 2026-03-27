@@ -63,7 +63,6 @@ export const Default: Story = {
 };
 
 export const WithSeparator: Story = {
-  name: "With Separator",
   render: () => (
     <Select>
       <SelectTrigger className="w-[220px]">

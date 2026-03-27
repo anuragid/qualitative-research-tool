@@ -53,7 +53,6 @@ export const WithAction: Story = {
 };
 
 export const NoProjects: Story = {
-  name: "No Projects",
   args: {
     icon: FolderOpen,
     heading: "No projects yet",
@@ -64,7 +63,6 @@ export const NoProjects: Story = {
 };
 
 export const NoSearchResults: Story = {
-  name: "No Search Results",
   args: {
     icon: Search,
     heading: "No results found",
@@ -74,7 +72,6 @@ export const NoSearchResults: Story = {
 };
 
 export const NoTranscripts: Story = {
-  name: "No Transcripts",
   args: {
     icon: FileText,
     heading: "No transcripts available",

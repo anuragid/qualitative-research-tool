@@ -91,7 +91,6 @@ export const NoTitle: Story = {
 };
 
 export const AllVariants: Story = {
-  name: "All Variants",
   args: { variant: "error", children: "All variants shown below" },
   render: () => (
     <div className="space-y-4 max-w-lg">

@@ -26,7 +26,6 @@ export const Default: Story = {
 };
 
 export const ShortContent: Story = {
-  name: "Short Content",
   args: {
     label: "Status",
     children: "Complete",
@@ -34,7 +33,6 @@ export const ShortContent: Story = {
 };
 
 export const LongContent: Story = {
-  name: "Long Content",
   args: {
     label: "Summary",
     children:
@@ -43,7 +41,6 @@ export const LongContent: Story = {
 };
 
 export const WithRichContent: Story = {
-  name: "With Rich Content",
   args: {
     label: "Key Quotes",
     children: (
@@ -57,7 +54,6 @@ export const WithRichContent: Story = {
 };
 
 export const MultipleFields: Story = {
-  name: "Multiple Fields",
   render: () => (
     <div className="space-y-4">
       <DataField label="Dimension">Physical</DataField>
@@ -71,7 +67,6 @@ export const MultipleFields: Story = {
 };
 
 export const AnalysisAccordionContent: Story = {
-  name: "Analysis Accordion Content",
   render: () => (
     <div className="space-y-4 p-4 border border-border-default rounded-lg">
       <DataField label="Code">Navigation Confusion</DataField>

@@ -156,7 +156,6 @@ export const Informational: Story = {
 };
 
 export const CustomButtonSizes: Story = {
-  name: "Custom Button Sizes",
   render: () => (
     <AlertDialog>
       <AlertDialogTrigger asChild>

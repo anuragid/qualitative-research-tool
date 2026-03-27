@@ -48,7 +48,6 @@ export const WithText: Story = {
 };
 
 export const OutlineVariant: Story = {
-  name: "Outline Variant",
   render: () => (
     <Toggle variant="outline" aria-label="Toggle underline">
       <Underline className="size-4" />
@@ -64,7 +63,6 @@ export const OutlineVariant: Story = {
 };
 
 export const AllSizes: Story = {
-  name: "All Sizes",
   render: () => (
     <div className="flex items-center gap-4">
       <Toggle size="sm" aria-label="Small toggle">
@@ -107,7 +105,6 @@ export const Disabled: Story = {
 };
 
 export const DefaultPressed: Story = {
-  name: "Default Pressed",
   render: () => (
     <Toggle defaultPressed aria-label="Pressed toggle">
       <Bold className="size-4" />

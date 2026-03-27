@@ -40,7 +40,6 @@ export const Default: Story = {
 };
 
 export const WithEllipsis: Story = {
-  name: "With Ellipsis",
   render: () => (
     <Breadcrumb>
       <BreadcrumbList>
@@ -65,7 +64,6 @@ export const WithEllipsis: Story = {
 };
 
 export const DeepNavigation: Story = {
-  name: "Deep Navigation",
   render: () => (
     <Breadcrumb>
       <BreadcrumbList>
@@ -90,7 +88,6 @@ export const DeepNavigation: Story = {
 };
 
 export const SingleLevel: Story = {
-  name: "Single Level",
   render: () => (
     <Breadcrumb>
       <BreadcrumbList>

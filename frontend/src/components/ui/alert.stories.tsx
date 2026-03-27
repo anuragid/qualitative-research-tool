@@ -43,7 +43,6 @@ export const Destructive: Story = {
 };
 
 export const WithoutIcon: Story = {
-  name: "Without Icon",
   render: () => (
     <Alert className="max-w-md">
       <AlertTitle>Heads up!</AlertTitle>

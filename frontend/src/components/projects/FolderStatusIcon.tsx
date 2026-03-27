@@ -174,6 +174,7 @@ export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIco
   if (status === "planning" || (status === "ready" && videoCount === 0)) {
     return (
       <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)" }}>
+        {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white icon on colored folder background */}
         <Plus className={`${iconSize} text-white/70`} />
       </div>
     );
@@ -182,6 +183,7 @@ export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIco
   if (status === "ready") {
     return (
       <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)" }}>
+        {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white icon on colored folder background */}
         <Play className={`${iconSize} text-white/70 fill-white/70`} />
       </div>
     );
@@ -196,6 +198,7 @@ export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIco
           animation: "folder-icon-bounce-in 0.5s ease both",
         }}
       >
+        {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white icon on colored folder background */}
         <Check className={`${iconSize} text-white`} />
       </div>
     );
@@ -210,6 +213,7 @@ export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIco
           animation: "folder-icon-shake 0.5s ease",
         }}
       >
+        {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white icon on colored folder background */}
         <AlertCircle className={`${iconSize} text-white`} />
       </div>
     );
@@ -218,6 +222,7 @@ export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIco
   if (status === "archived") {
     return (
       <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)", opacity: 0.6 }}>
+        {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white icon on colored folder background */}
         <Archive className={`${iconSize} text-white/70`} />
       </div>
     );
@@ -226,6 +231,7 @@ export function FolderStatusIcon({ status, videoCount, videos }: FolderStatusIco
   // Fallback for any unknown status
   return (
     <div className="folder-status-icon" style={{ background: "var(--folder-icon-bg-static)" }}>
+      {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white icon on colored folder background */}
       <Plus className={`${iconSize} text-white/70`} />
     </div>
   );

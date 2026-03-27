@@ -17,7 +17,6 @@ export const Default: Story = {
 };
 
 export const WithLabel: Story = {
-  name: "With Label",
   render: () => (
     <div className="flex items-center space-x-2">
       <Switch id="notifications" />

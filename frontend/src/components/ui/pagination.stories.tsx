@@ -44,7 +44,6 @@ export const Default: Story = {
 };
 
 export const WithEllipsis: Story = {
-  name: "With Ellipsis",
   render: () => (
     <Pagination>
       <PaginationContent>
@@ -146,7 +145,6 @@ export const VideoResults: Story = {
 };
 
 export const FewPages: Story = {
-  name: "Few Pages",
   render: () => (
     <Pagination>
       <PaginationContent>

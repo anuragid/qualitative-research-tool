@@ -97,7 +97,7 @@ describe("MediaPlayerSection", () => {
         videoStatus="transcribed"
       />
     );
-    expect(container.innerHTML).toBe("");
+    expect(container.innerHTML).toContain("Media preview unavailable");
   });
 
   // 8. Video element has controls attribute

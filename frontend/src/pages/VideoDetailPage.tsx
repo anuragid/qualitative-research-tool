@@ -489,6 +489,7 @@ export default function VideoDetailPage() {
                       return (
                         <div key={step} className="flex items-center gap-1.5 shrink-0">
                           {status === "completed" && (
+                            // eslint-disable-next-line design-system/no-raw-tailwind-colors -- status color, no semantic token available
                             <Check className="h-3.5 w-3.5 text-green-600" />
                           )}
                           {status === "processing" && (
@@ -498,14 +499,17 @@ export default function VideoDetailPage() {
                             <Circle className="h-3.5 w-3.5 text-text-tertiary/40" />
                           )}
                           {status === "error" && (
+                            // eslint-disable-next-line design-system/no-raw-tailwind-colors -- status color, no semantic token available
                             <XCircle className="h-3.5 w-3.5 text-red-500" />
                           )}
+                          {/* eslint-disable design-system/no-raw-tailwind-colors -- status color, no semantic token available */}
                           <span className={
                             status === "processing" ? "text-foreground font-medium" :
                             status === "completed" ? "text-text-secondary" :
                             status === "error" ? "text-red-500" :
                             "text-text-tertiary/60"
                           }>
+                          {/* eslint-enable design-system/no-raw-tailwind-colors */}
                             {ANALYSIS_STEP_LABELS[step]}
                           </span>
                           {i < ANALYSIS_STEP_ORDER.length - 1 && (

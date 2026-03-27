@@ -196,6 +196,7 @@ export default function FolderCard({ project, colorIndex }: FolderCardProps) {
                         }}
                       >
                         <div className="absolute inset-0 flex items-center justify-center">
+                          {/* eslint-disable-next-line design-system/no-raw-tailwind-colors -- white play icon on colored thumbnail */}
                           <Play className="w-[18px] h-[18px] fill-white/80 text-white/80 drop-shadow-sm" />
                         </div>
                       </div>

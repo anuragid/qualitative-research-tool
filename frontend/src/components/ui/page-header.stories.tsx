@@ -22,7 +22,6 @@ export const Default: Story = {
 };
 
 export const WithActions: Story = {
-  name: "With Actions",
   args: {
     title: "Projects",
     description: "Manage your qualitative research projects.",
@@ -36,7 +35,6 @@ export const WithActions: Story = {
 };
 
 export const WithBadge: Story = {
-  name: "With Badge",
   args: {
     title: "User Research Spring 2026",
     description: "12 videos uploaded, 8 analyzed.",
@@ -45,7 +43,6 @@ export const WithBadge: Story = {
 };
 
 export const WithBackLink: Story = {
-  name: "With Back Link",
   args: {
     title: "Interview #3 - Sarah",
     description: "Recorded March 10, 2026",
@@ -55,7 +52,6 @@ export const WithBackLink: Story = {
 };
 
 export const FullFeatured: Story = {
-  name: "Full Featured",
   args: {
     title: "5D Analysis Results",
     description: "Cross-video analysis across all participant interviews.",
@@ -76,7 +72,6 @@ export const FullFeatured: Story = {
 };
 
 export const TitleOnly: Story = {
-  name: "Title Only",
   args: {
     title: "Settings",
   },

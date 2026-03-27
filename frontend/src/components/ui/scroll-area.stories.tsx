@@ -56,7 +56,6 @@ export const Horizontal: Story = {
 };
 
 export const BothDirections: Story = {
-  name: "Both Directions",
   render: () => (
     <ScrollArea className="h-72 w-80 rounded-lg border border-border">
       <div className="w-[600px] p-4">

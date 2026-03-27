@@ -16,7 +16,6 @@ export const Default: Story = {
 };
 
 export const CardSkeleton: Story = {
-  name: "Card Skeleton",
   render: () => (
     <div className="flex flex-col space-y-3">
       <Skeleton className="h-[125px] w-[250px] rounded-2xl" />

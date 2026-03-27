@@ -39,7 +39,6 @@ export const ErrorStatus: Story = { args: { status: "error" } };
 export const Paused: Story = { args: { status: "paused" } };
 
 export const AllStatuses: Story = {
-  name: "All Statuses",
   render: () => (
     <div className="flex flex-wrap gap-2">
       <StatusBadge status="pending" />
@@ -56,7 +55,6 @@ export const AllStatuses: Story = {
 };
 
 export const VideoProcessingPipeline: Story = {
-  name: "Video Processing Pipeline",
   render: () => (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
