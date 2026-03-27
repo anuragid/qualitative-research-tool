@@ -100,6 +100,11 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
           duration: 0.8,
           stagger: 0.15,
           ease: 'power2.out',
+          onComplete: () => {
+            // Clear the inline transformOrigin so CSS rotate/scale pivot from
+            // their default center — otherwise pieces are permanently displaced.
+            rollPieces.forEach(el => { el.style.transformOrigin = ''; });
+          },
         }, 0.2); // begin 0.2s into the timeline
       }
 
