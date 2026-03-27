@@ -27,7 +27,7 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
         transcript.status === "processing"
       ) {
         completedSeenAt.current = null;
-        return 4000;
+        return 6000;
       }
 
       if (transcript.status === "completed") {

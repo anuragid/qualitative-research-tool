@@ -15,7 +15,7 @@ import {
 } from "../hooks/useAnalysis";
 import Layout from "../components/Layout";
 import { useProject } from "../hooks/useProjects";
-import { formatFileSize } from "../lib/utils";
+import { formatFileSize, formatFilename } from "../lib/utils";
 import { useAnalysisDisplay } from "../components/analysis/hooks/useAnalysisDisplay";
 import { MediaPlayerSection } from "../components/videos/MediaPlayerSection";
 import { TranscriptSidePanel } from "../components/videos/TranscriptSidePanel";
@@ -323,7 +323,7 @@ export default function VideoDetailPage() {
           {/* Page Header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h1 className="text-h3 sm:text-h2 text-foreground truncate">{video.filename}</h1>
+              <h1 className="text-h3 sm:text-h2 text-foreground truncate" title={video.filename}>{formatFilename(video.filename)}</h1>
               <MetadataRow
                 className="mt-2"
                 separator="|"

@@ -212,10 +212,13 @@ def check_transcription_task(self, video_id: str, started_at: float | None = Non
                     )
                     self.db.add(speaker_label)
 
-            # Update video status
+            # Update video status and persist duration
             video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
             if video:
                 video.status = "transcribed"
+                duration = processed_transcript.get("duration_seconds")
+                if duration:
+                    video.duration_seconds = int(round(duration))
             self.db.commit()
 
             logger.info(f"Transcription completed for video {video_id}")

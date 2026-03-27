@@ -244,7 +244,7 @@ OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
   }
 ]
 
-Each object MUST have: "meta_pattern_id" (string like "MP001"), "pattern_name" (string), "description" (string), "appears_in_videos" (array of strings), "related_patterns" (array of strings), "consistency" (one of: "consistent", "variable", "contradictory"), "significance" (string).
+Each object MUST have: "meta_pattern_id" (string like "MP001"), "pattern_name" (string), "description" (string), "appears_in_videos" (array of strings), "related_patterns" (array of strings), "consistency" (one of: "consistent", "varying", "contradictory"), "significance" (string).
 
 CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks.""" + _INJECTION_GUARD
 
@@ -270,11 +270,12 @@ OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
     "consistency_across_videos": "high",
     "evidence": ["Quote from video 1", "Quote from video 2"],
     "implications": "System-level implications",
-    "confidence": "high"
+    "confidence": "high",
+    "scope": "universal"
   }
 ]
 
-Each object MUST have: "cross_insight_id" (string like "CIN001"), "headline" (string), "explanation" (string), "supporting_meta_patterns" (array of strings), "consistency_across_videos" (one of: "high", "medium", "low"), "evidence" (array of strings), "implications" (string), "confidence" (one of: "high", "medium", "low").
+Each object MUST have: "cross_insight_id" (string like "CIN001"), "headline" (string), "explanation" (string), "supporting_meta_patterns" (array of strings), "consistency_across_videos" (one of: "high", "medium", "low"), "evidence" (array of strings), "implications" (string), "confidence" (one of: "high", "medium", "low"), "scope" (one of: "universal", "context-dependent").
 
 CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks.""" + _INJECTION_GUARD
 
@@ -299,10 +300,11 @@ OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
     "rationale": "Why this is important system-wide",
     "context_considerations": "How to adapt to contexts",
     "how_might_we": ["HMW question 1?"],
-    "priority": "critical"
+    "priority": "critical",
+    "scope": "universal"
   }
 ]
 
-Each object MUST have: "system_principle_id" (string like "SP001"), "cross_insight_id" (string), "principle" (string), "rationale" (string), "context_considerations" (string), "how_might_we" (array of strings), "priority" (one of: "critical", "high", "medium", "low").
+Each object MUST have: "system_principle_id" (string like "SP001"), "cross_insight_id" (string), "principle" (string), "rationale" (string), "context_considerations" (string), "how_might_we" (array of strings), "priority" (one of: "critical", "high", "medium", "low"), "scope" (one of: "universal", "segmented").
 
 CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks.""" + _INJECTION_GUARD

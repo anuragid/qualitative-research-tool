@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { formatFileSize, formatDuration, formatDate } from "../../lib/utils";
+import { formatFileSize, formatDuration, formatDate, formatFilename } from "../../lib/utils";
 import {
   FileVideo,
   FileAudio,
@@ -94,8 +94,8 @@ export default function VideoCard({ video }: VideoCardProps) {
             <div className="flex items-start gap-3 flex-1 min-w-0">
               <FileIcon className="h-10 w-10 text-text-placeholder flex-shrink-0 mt-1" />
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg truncate text-text-primary">
-                  {video.filename}
+                <CardTitle className="text-lg truncate text-text-primary" title={video.filename}>
+                  {formatFilename(video.filename)}
                 </CardTitle>
                 <CardDescription className="mt-1 text-text-placeholder">
                   Uploaded {formatDate(video.uploaded_at)}

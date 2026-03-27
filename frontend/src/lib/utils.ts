@@ -46,3 +46,11 @@ export function formatDate(date: string | Date): string {
     minute: "2-digit",
   });
 }
+
+export function formatFilename(filename: string): string {
+  // Strip file extension (everything after last dot)
+  const lastDot = filename.lastIndexOf(".");
+  const name = lastDot > 0 ? filename.slice(0, lastDot) : filename;
+  // Replace underscores and hyphens with spaces, collapse multiple spaces, trim
+  return name.replace(/[_-]/g, " ").replace(/\s+/g, " ").trim();
+}

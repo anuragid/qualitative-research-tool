@@ -36,9 +36,7 @@ export function useVideo(id: string | null) {
       const video = query.state.data;
       if (!video) return false;
 
-      const needsTranscriptData =
-        video.status === "transcribing" ||
-        (video.status === "transcribed" && !video.transcript);
+      const needsTranscriptData = video.status === "transcribing";
 
       const needsAnalysisData =
         video.status === "analyzing" ||
