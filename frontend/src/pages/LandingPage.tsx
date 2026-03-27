@@ -81,68 +81,68 @@ function NodeEditorMockup() {
     return () => { window.removeEventListener('resize', calc); clearTimeout(t); };
   }, []);
 
-  // Edge draw-on + node entrance animations
-  useGSAP(
-    () => {
-      if (prefersReducedMotion()) return;
-      const el = editorRef.current;
-      const svg = svgRef.current;
-      if (!el || !svg) return;
+  // Edge draw-on + node entrance animations — runs once when paths are ready
+  const animInitRef = useRef(false);
+  useEffect(() => {
+    if (prefersReducedMotion() || animInitRef.current) return;
+    const el = editorRef.current;
+    const svg = svgRef.current;
+    if (!el || !svg) return;
 
-      // Wait for paths to be computed
-      const svgPaths = svg.querySelectorAll('path');
-      if (!svgPaths.length) return;
+    const svgPaths = svg.querySelectorAll('path');
+    if (!svgPaths.length) return;
 
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: el,
-          start: 'top 80%',
-          once: true,
-        },
-      });
+    // Mark as initialized so this never runs again
+    animInitRef.current = true;
 
-      // 1. Node entrance stagger
-      const nodes = NODE_ORDER
-        .map(id => el.querySelector<HTMLElement>(`[data-node="${id}"]`))
-        .filter(Boolean) as HTMLElement[];
-      gsap.set(nodes, { scale: 0.9, opacity: 0 });
-      tl.to(nodes, {
-        scale: 1,
-        opacity: 1,
-        duration: 0.35,
-        stagger: 0.12,
-        ease: 'power2.out',
-      });
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: el,
+        start: 'top 80%',
+        once: true,
+      },
+    });
 
-      // 2. Edge draw-on (after first couple nodes appear)
-      svgPaths.forEach((path) => {
-        const length = path.getTotalLength();
-        gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
-      });
-      tl.to(
-        svgPaths,
-        {
-          strokeDashoffset: 0,
-          duration: 0.6,
-          stagger: 0.2,
-          ease: 'power2.inOut',
-        },
-        0.24, // start after first 2 nodes appear
-      );
+    // 1. Node entrance stagger
+    const nodes = NODE_ORDER
+      .map(id => el.querySelector<HTMLElement>(`[data-node="${id}"]`))
+      .filter(Boolean) as HTMLElement[];
+    gsap.set(nodes, { scale: 0.9, opacity: 0 });
+    tl.to(nodes, {
+      scale: 1,
+      opacity: 1,
+      duration: 0.35,
+      stagger: 0.12,
+      ease: 'power2.out',
+    });
 
-      // 3. Status dots light up in sequence
-      const statusDots = el.querySelectorAll('.node-status-dot');
-      gsap.set(statusDots, { opacity: 0, scale: 0 });
-      tl.to(statusDots, {
-        opacity: 1,
-        scale: 1,
-        duration: 0.25,
-        stagger: 0.15,
-        ease: 'back.out(1.4)',
-      }, '>-0.3');
-    },
-    { scope: editorRef, dependencies: [paths] },
-  );
+    // 2. Edge draw-on (after first couple nodes appear)
+    svgPaths.forEach((path) => {
+      const length = path.getTotalLength();
+      gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
+    });
+    tl.to(
+      svgPaths,
+      {
+        strokeDashoffset: 0,
+        duration: 0.6,
+        stagger: 0.2,
+        ease: 'power2.inOut',
+      },
+      0.24,
+    );
+
+    // 3. Status dots light up in sequence
+    const statusDots = el.querySelectorAll('.node-status-dot');
+    gsap.set(statusDots, { opacity: 0, scale: 0 });
+    tl.to(statusDots, {
+      opacity: 1,
+      scale: 1,
+      duration: 0.25,
+      stagger: 0.15,
+      ease: 'back.out(1.4)',
+    }, '>-0.3');
+  }, [paths]);
 
   return (
     <div className="feature-mockup-card">

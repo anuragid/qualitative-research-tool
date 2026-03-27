@@ -15,12 +15,19 @@ const CREDITS_TEXT = 'Built at the Institute of Design, Illinois Institute of Te
 export function LandingFooter({ scrollToSection }: LandingFooterProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [creditsResolved, setCreditsResolved] = useState(false);
+  const hasTriggered = useRef(false);
 
   const copyrightScramble = useTextScramble(
     `\u00A9 ${new Date().getFullYear()} methodex. All rights reserved.`,
-    { duration: 1 },
+    { duration: 0.6 },
   );
-  const creditsScramble = useTextScramble(CREDITS_TEXT, { duration: 1 });
+  const creditsScramble = useTextScramble(CREDITS_TEXT, { duration: 0.6 });
+
+  // Store replay fns in refs so the ScrollTrigger effect doesn't re-run
+  const copyrightReplayRef = useRef(copyrightScramble.replay);
+  const creditsReplayRef = useRef(creditsScramble.replay);
+  copyrightReplayRef.current = copyrightScramble.replay;
+  creditsReplayRef.current = creditsScramble.replay;
 
   // When credits scramble finishes, show the version with the link
   const prevScrambling = useRef(false);
@@ -31,7 +38,7 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
     prevScrambling.current = creditsScramble.isScrambling;
   }, [creditsScramble.isScrambling]);
 
-  // Trigger scramble on scroll-in
+  // Trigger scramble on scroll-in — only once
   useEffect(() => {
     const el = bottomRef.current;
     if (!el) return;
@@ -41,13 +48,15 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
       start: 'top 90%',
       once: true,
       onEnter: () => {
-        copyrightScramble.replay();
-        setTimeout(() => creditsScramble.replay(), 300);
+        if (hasTriggered.current) return;
+        hasTriggered.current = true;
+        copyrightReplayRef.current();
+        setTimeout(() => creditsReplayRef.current(), 300);
       },
     });
 
     return () => trigger.kill();
-  }, [copyrightScramble, creditsScramble]);
+  }, []); // no dependencies — runs once, uses refs for replay
 
   return (
     <footer className="footer">
