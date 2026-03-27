@@ -14,8 +14,8 @@ interface ContactFormData {
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error';
 
-const FORMSPREE_URL =
-  import.meta.env.VITE_FORMSPREE_ENDPOINT || 'https://formspree.io/f/placeholder';
+const FORMSPREE_URL = import.meta.env.VITE_FORMSPREE_ENDPOINT || '';
+const IS_FORM_CONFIGURED = Boolean(FORMSPREE_URL);
 
 export function ContactForm() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -28,13 +28,18 @@ export function ContactForm() {
   } = useForm<ContactFormData>();
 
   const onSubmit = async (data: ContactFormData) => {
+    if (!IS_FORM_CONFIGURED) return;
     setStatus('submitting');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
       const response = await fetch(FORMSPREE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(data),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (response.ok) {
         setStatus('success');
         reset();
@@ -42,6 +47,7 @@ export function ContactForm() {
         setStatus('error');
       }
     } catch {
+      clearTimeout(timeout);
       setStatus('error');
     }
   };
@@ -93,7 +99,7 @@ export function ContactForm() {
                 {...register('name', { required: true })}
               />
               {errors.name && (
-                <span style={{ color: 'var(--color-gold)', fontSize: 12 }}>Name is required</span>
+                <span role="alert" style={{ color: 'var(--color-gold)', fontSize: 12 }}>Name is required</span>
               )}
             </div>
             <div className="form-group">
@@ -105,10 +111,18 @@ export function ContactForm() {
                 id="contact-email"
                 className="form-input"
                 placeholder="you@university.edu"
-                {...register('email', { required: true })}
+                {...register('email', {
+                  required: 'Email is required',
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Please enter a valid email address',
+                  },
+                })}
               />
               {errors.email && (
-                <span style={{ color: 'var(--color-gold)', fontSize: 12 }}>Email is required</span>
+                <span role="alert" style={{ color: 'var(--color-gold)', fontSize: 12 }}>
+                  {errors.email.message || 'Email is required'}
+                </span>
               )}
             </div>
           </div>
@@ -144,12 +158,13 @@ export function ContactForm() {
               {...register('message', { required: true })}
             />
             {errors.message && (
-              <span style={{ color: 'var(--color-gold)', fontSize: 12 }}>Message is required</span>
+              <span role="alert" style={{ color: 'var(--color-gold)', fontSize: 12 }}>Message is required</span>
             )}
           </div>
 
           {status === 'success' ? (
             <p
+              role="alert"
               style={{
                 color: 'var(--color-teal)',
                 fontWeight: 500,
@@ -163,14 +178,19 @@ export function ContactForm() {
             <button
               type="submit"
               className="form-submit"
-              disabled={status === 'submitting'}
+              disabled={status === 'submitting' || !IS_FORM_CONFIGURED}
             >
-              {status === 'submitting' ? 'Sending...' : 'Send Message'}
+              {!IS_FORM_CONFIGURED
+                ? 'Coming Soon'
+                : status === 'submitting'
+                  ? 'Sending...'
+                  : 'Send Message'}
             </button>
           )}
 
           {status === 'error' && (
             <p
+              role="alert"
               style={{
                 color: 'var(--color-gold)',
                 fontSize: 'var(--fs-small)',

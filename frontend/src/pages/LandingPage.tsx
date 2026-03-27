@@ -35,6 +35,10 @@ function getPort(el: HTMLElement, box: DOMRect, side: 'left' | 'right' | 'top' |
     case 'left':   return { x, y: y + r.height / 2 };
     case 'bottom': return { x: x + r.width / 2, y: y + r.height };
     case 'top':    return { x: x + r.width / 2, y };
+    default: {
+      const _exhaustive: never = side;
+      return _exhaustive;
+    }
   }
 }
 
@@ -64,6 +68,7 @@ function NodeEditorMockup() {
       const el = editorRef.current;
       if (!el) return;
       const box = el.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) return;
       const result: string[] = [];
       for (const edge of EDGES) {
         const fromEl = el.querySelector<HTMLElement>(`[data-node="${edge.from}"]`);
@@ -148,7 +153,7 @@ function NodeEditorMockup() {
     <div className="feature-mockup-card">
       <div className="node-editor" ref={editorRef}>
         <svg className="node-edges" aria-hidden="true" ref={svgRef}>
-          {paths.map((d, i) => <path key={i} d={d} />)}
+          {paths.map((d, i) => <path key={`${EDGES[i]?.from}-${EDGES[i]?.to}`} d={d} />)}
         </svg>
 
         <div className="node-card node-input" data-node="input" style={{ gridArea: 'input' }}>

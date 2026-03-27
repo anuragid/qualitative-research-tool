@@ -92,11 +92,6 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
                 <li>
                   <button onClick={() => scrollToSection('contact')}>Contact</button>
                 </li>
-                <li>
-                  <a href="https://id.iit.edu" target="_blank" rel="noopener noreferrer">
-                    Institute of Design
-                  </a>
-                </li>
               </ul>
             </div>
           </div>
