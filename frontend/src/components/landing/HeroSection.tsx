@@ -78,7 +78,32 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
         }, '>-0.3');
       }
 
-      // ── Parallax: paper pieces ──
+      // ── Paper roll-out: diagonal bottom-to-top, staggered left-to-right ──
+      // Order by horizontal position (leftmost first)
+      const rollOrder = ['.paper-1', '.paper-0', '.paper-3', '.paper-4', '.paper-2'];
+      const papersEl = papersRef.current;
+      if (papersEl) {
+        const rollPieces = rollOrder
+          .map(sel => papersEl.querySelector<HTMLElement>(sel))
+          .filter(Boolean) as HTMLElement[];
+
+        gsap.set(rollPieces, {
+          rotateX: -90,
+          transformOrigin: '20% 100%', // bottom-left bias for diagonal feel
+          opacity: 0,
+        });
+
+        // Start rolling during the headline entrance for a layered reveal
+        tl.to(rollPieces, {
+          rotateX: 0,
+          opacity: 1,
+          duration: 0.8,
+          stagger: 0.15,
+          ease: 'power2.out',
+        }, 0.2); // begin 0.2s into the timeline
+      }
+
+      // ── Parallax: paper pieces (scroll-linked, after roll-out) ──
       const paperSpeeds = [
         { selector: '.paper-0', y: -30 },
         { selector: '.paper-1', y: -50 },
@@ -86,7 +111,6 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
         { selector: '.paper-3', y: -40 },
         { selector: '.paper-4', y: -80 },
       ];
-      const papersEl = papersRef.current;
       if (papersEl) {
         paperSpeeds.forEach(({ selector, y }) => {
           const piece = papersEl.querySelector(selector);
