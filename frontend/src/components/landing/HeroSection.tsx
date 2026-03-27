@@ -29,44 +29,42 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
       // ── Hero entrance timeline ──
       const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
 
-      // 1. Word stagger
-      const words = headlineRef.current?.querySelectorAll('.hero-word');
-      if (words?.length) {
-        gsap.set(words, { y: 20, opacity: 0 });
-        tl.to(words, {
-          y: 0,
-          opacity: 1,
-          duration: 0.35,
-          stagger: 0.06,
+      // 1. Words rise from baseline — inner spans slide up inside overflow:hidden wrappers
+      const wordInners = headlineRef.current?.querySelectorAll('.hero-word-inner');
+      if (wordInners?.length) {
+        gsap.set(wordInners, { yPercent: 110 });
+        tl.to(wordInners, {
+          yPercent: 0,
+          duration: 0.5,
+          stagger: 0.07,
+          ease: 'power3.out',
         });
-        // The em word gets slightly longer duration — target it specifically
-        const emWord = headlineRef.current?.querySelector('.hero-word-em');
-        if (emWord) {
-          gsap.set(emWord, { y: 20, opacity: 0 });
-          tl.to(
-            emWord,
-            { y: 0, opacity: 1, duration: 0.5 },
-            '<0.06', // start 0.06s after last word begins
-          );
-        }
       }
 
-      // 2. Subtitle + CTA
+      // 2. Subtitle + CTA — fade in place, no slide
       gsap.set([subtitleRef.current, ctaRef.current], { opacity: 0 });
-      tl.to([subtitleRef.current, ctaRef.current], {
-        opacity: 1,
-        duration: 0.4,
-      }, '>-0.1');
+      tl.to(subtitleRef.current, { opacity: 1, duration: 0.5 }, '>-0.15');
+      tl.to(ctaRef.current, { opacity: 1, duration: 0.4 }, '>-0.2');
 
-      // 3. Product mockup
+      // 3. Clouds drift in from off-screen
+      if (cloud1Ref.current) {
+        gsap.set(cloud1Ref.current, { x: -120, opacity: 0 });
+        tl.to(cloud1Ref.current, { x: 0, opacity: 0.85, duration: 1.2, ease: 'power1.out' }, 0.3);
+      }
+      if (cloud2Ref.current) {
+        gsap.set(cloud2Ref.current, { x: 120, opacity: 0 });
+        tl.to(cloud2Ref.current, { x: 0, opacity: 0.85, duration: 1.2, ease: 'power1.out' }, 0.5);
+      }
+
+      // 4. Product mockup slides up
       gsap.set(productRef.current, { y: 60, opacity: 0 });
       tl.to(productRef.current, {
         y: 0,
         opacity: 1,
         duration: 0.8,
-      }, '>-0.2');
+      }, '>-0.8');
 
-      // 4. Video cards stagger
+      // 5. Video cards stagger
       const cards = productRef.current?.querySelectorAll('.hero-app-card');
       if (cards?.length) {
         gsap.set(cards, { y: 16, opacity: 0 });
@@ -180,11 +178,17 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
       <div className="hero-content">
         <h1 ref={headlineRef}>
           {HEADLINE_WORDS.map((word, i) => (
-            <span key={i} className="hero-word" style={{ display: 'inline-block', marginRight: '0.25em' }}>
-              {word}
+            <span key={i} className="hero-word" style={{ display: 'inline-block', overflow: 'hidden', marginRight: '0.25em', verticalAlign: 'bottom' }}>
+              <span className="hero-word-inner" style={{ display: 'inline-block' }}>
+                {word}
+              </span>
             </span>
           ))}
-          <em className="hero-word hero-word-em" style={{ display: 'inline-block' }}>{HEADLINE_EM}</em>
+          <em className="hero-word" style={{ display: 'inline-block', overflow: 'hidden', verticalAlign: 'bottom' }}>
+            <span className="hero-word-inner" style={{ display: 'inline-block' }}>
+              {HEADLINE_EM}
+            </span>
+          </em>
         </h1>
         <p className="hero-subtitle" ref={subtitleRef}>
           Transform qualitative research data into structured insights using proven analytical frameworks.
