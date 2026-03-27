@@ -178,13 +178,13 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
       <div className="hero-content">
         <h1 ref={headlineRef}>
           {HEADLINE_WORDS.map((word, i) => (
-            <span key={i} className="hero-word" style={{ display: 'inline-block', overflow: 'hidden', marginRight: '0.25em', verticalAlign: 'bottom' }}>
+            <span key={i} className="hero-word" style={{ display: 'inline-block', clipPath: 'inset(-10% -5% -20% -5%)', marginRight: '0.25em' }}>
               <span className="hero-word-inner" style={{ display: 'inline-block' }}>
                 {word}
               </span>
             </span>
           ))}
-          <em className="hero-word" style={{ display: 'inline-block', overflow: 'hidden', verticalAlign: 'bottom' }}>
+          <em className="hero-word" style={{ display: 'inline-block', clipPath: 'inset(-10% -5% -20% -5%)' }}>
             <span className="hero-word-inner" style={{ display: 'inline-block' }}>
               {HEADLINE_EM}
             </span>
