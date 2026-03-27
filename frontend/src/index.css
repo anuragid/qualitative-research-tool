@@ -327,13 +327,13 @@
   --color-brand-burnt-orange: #E06A1A;
   --color-brand-olive: #CCC01A;
 
-  /* Brand pastel — deep muted tints for dark mode */
-  --color-brand-pale-blue: #1A2230;
-  --color-brand-pale-green: #1E2A1A;
-  --color-brand-lavender: #22223A;
-  --color-brand-sage: #262826;
-  --color-brand-pale-gold: #2A2418;
-  --color-brand-pale-yellow: #2A2818;
+  /* Brand pastel — mid-tone muted tints for dark mode */
+  --color-brand-pale-blue: #253548;
+  --color-brand-pale-green: #2A3D25;
+  --color-brand-lavender: #33334F;
+  --color-brand-sage: #363A36;
+  --color-brand-pale-gold: #3D3520;
+  --color-brand-pale-yellow: #3D3A20;
 
   /* Shadows — deeper for dark backgrounds */
   --shadow-subtle: 0 4px 12px rgba(0, 0, 0, 0.4);
