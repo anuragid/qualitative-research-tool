@@ -559,6 +559,11 @@
   border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
   z-index: 4;
   pointer-events: none;
+  perspective: 1200px;
+}
+.landing-page .paper-roll {
+  position: absolute;
+  inset: 0;
 }
 
 .landing-page .paper-piece {

@@ -78,25 +78,26 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
         }, '>-0.3');
       }
 
-      // ── Paper roll-out: clip-path reveal, staggered left-to-right ──
-      // Order by horizontal position (leftmost first)
+      // ── Paper roll-out: 3D rotateX on wrapper divs, staggered left-to-right ──
+      // GSAP animates the .paper-roll WRAPPERS — the inner .paper-piece elements
+      // keep their CSS rotate/scale/skew completely untouched.
       const rollOrder = ['.paper-1', '.paper-0', '.paper-3', '.paper-4', '.paper-2'];
       const papersEl = papersRef.current;
       if (papersEl) {
-        const rollPieces = rollOrder
-          .map(sel => papersEl.querySelector<HTMLElement>(sel))
-          .filter(Boolean) as HTMLElement[];
+        // Find each piece's parent wrapper
+        const rollWrappers = rollOrder
+          .map(sel => papersEl.querySelector(sel)?.parentElement)
+          .filter((el): el is HTMLElement => el != null && el.classList.contains('paper-roll'));
 
-        // Clip-path: pieces are in their correct CSS positions at all times.
-        // We just reveal them from bottom to top with a diagonal leading edge.
-        // Start: collapsed to a line at the bottom (left side 20% lower for diagonal)
-        // End:   fully open rectangle
-        gsap.set(rollPieces, {
-          clipPath: 'polygon(0% 120%, 100% 100%, 100% 100%, 0% 120%)',
+        gsap.set(rollWrappers, {
+          rotateX: -90,
+          transformOrigin: '20% 100%',
+          opacity: 0,
         });
 
-        tl.to(rollPieces, {
-          clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)',
+        tl.to(rollWrappers, {
+          rotateX: 0,
+          opacity: 1,
           duration: 0.9,
           stagger: 0.15,
           ease: 'power2.out',
@@ -295,43 +296,53 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
         </div>
       </div>
 
-      {/* Layer 5: Torn paper collage */}
+      {/* Layer 5: Torn paper collage — each piece wrapped for 3D roll animation */}
       <div className="hero-papers" aria-hidden="true" ref={papersRef}>
         {/* Piece 0: Large white sheet (backdrop) */}
-        <div className="paper-piece paper-0">
-          <div className="paper-piece-inner paperSheetMask">
-            <div className="paper-piece-color" style={{ background: '#F7F7F7' }} />
+        <div className="paper-roll">
+          <div className="paper-piece paper-0">
+            <div className="paper-piece-inner paperSheetMask">
+              <div className="paper-piece-color" style={{ background: '#F7F7F7' }} />
+            </div>
           </div>
         </div>
         {/* Piece 1: Lavender blob (left) */}
-        <div className="paper-piece paper-1">
-          <div className="paper-piece-inner paperShredBlobSquareMask">
-            <div className="paper-piece-color" style={{ background: 'rgb(184, 202, 245)' }} />
-            <img src="/landing/paper-texture.webp" alt="" className="paper-piece-texture" />
+        <div className="paper-roll">
+          <div className="paper-piece paper-1">
+            <div className="paper-piece-inner paperShredBlobSquareMask">
+              <div className="paper-piece-color" style={{ background: 'rgb(184, 202, 245)' }} />
+              <img src="/landing/paper-texture.webp" alt="" className="paper-piece-texture" />
+            </div>
           </div>
         </div>
         {/* Piece 2: Dark UFO shape (right, high) */}
-        <div className="paper-piece paper-2">
-          <div className="paper-piece-inner paperShredUfoMask">
-            <div className="paper-piece-color" style={{ background: '#FFFFFF' }} />
-            <img src="/landing/paper-black.png" alt="" className="paper-piece-texture" style={{ mixBlendMode: 'normal', opacity: 1 }} />
+        <div className="paper-roll">
+          <div className="paper-piece paper-2">
+            <div className="paper-piece-inner paperShredUfoMask">
+              <div className="paper-piece-color" style={{ background: '#FFFFFF' }} />
+              <img src="/landing/paper-black.png" alt="" className="paper-piece-texture" style={{ mixBlendMode: 'normal', opacity: 1 }} />
+            </div>
           </div>
         </div>
         {/* Piece 3: White+Grey mountain stack */}
-        <div className="paper-piece paper-3">
-          <div className="paper-3-back paper-piece-inner paperShredFlatBottomBackMask">
-            <div className="paper-piece-color" style={{ background: '#FFFFFF' }} />
-          </div>
-          <div className="paper-3-front paper-piece-inner paperShredFlatBottomFrontMask">
-            <div className="paper-piece-color" style={{ background: 'rgb(230, 230, 228)' }} />
-            <img src="/landing/paper-texture.webp" alt="" className="paper-piece-texture" />
+        <div className="paper-roll">
+          <div className="paper-piece paper-3">
+            <div className="paper-3-back paper-piece-inner paperShredFlatBottomBackMask">
+              <div className="paper-piece-color" style={{ background: '#FFFFFF' }} />
+            </div>
+            <div className="paper-3-front paper-piece-inner paperShredFlatBottomFrontMask">
+              <div className="paper-piece-color" style={{ background: 'rgb(230, 230, 228)' }} />
+              <img src="/landing/paper-texture.webp" alt="" className="paper-piece-texture" />
+            </div>
           </div>
         </div>
         {/* Piece 4: White blob + notebook texture (right, foreground) */}
-        <div className="paper-piece paper-4">
-          <div className="paper-piece-inner paperShredBlobMask">
-            <div className="paper-piece-color" style={{ background: '#FFFFFF' }} />
-            <img src="/landing/paper-notebook.webp" alt="" className="paper-piece-texture" style={{ mixBlendMode: 'normal', opacity: 1 }} />
+        <div className="paper-roll">
+          <div className="paper-piece paper-4">
+            <div className="paper-piece-inner paperShredBlobMask">
+              <div className="paper-piece-color" style={{ background: '#FFFFFF' }} />
+              <img src="/landing/paper-notebook.webp" alt="" className="paper-piece-texture" style={{ mixBlendMode: 'normal', opacity: 1 }} />
+            </div>
           </div>
         </div>
       </div>
