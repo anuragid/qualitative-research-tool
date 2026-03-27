@@ -17,7 +17,7 @@ function NotFoundContent() {
         </p>
         <Button
           asChild
-          className="bg-[var(--color-brand-accent)] text-white hover:bg-[var(--color-brand-accent)]/90 dark:bg-[var(--color-brand-accent-dark)] dark:text-black dark:hover:bg-[var(--color-brand-accent-dark)]/90"
+          className="bg-[var(--color-brand-accent)] text-primary-foreground hover:bg-[var(--color-brand-accent)]/90 dark:bg-[var(--color-brand-accent-dark)] dark:text-primary-foreground dark:hover:bg-[var(--color-brand-accent-dark)]/90"
         >
           <Link to="/projects">Go to Projects</Link>
         </Button>
@@ -41,7 +41,7 @@ function UnauthenticatedNotFound() {
         </p>
         <Button
           asChild
-          className="bg-[var(--color-brand-accent)] text-white hover:bg-[var(--color-brand-accent)]/90 dark:bg-[var(--color-brand-accent-dark)] dark:text-black dark:hover:bg-[var(--color-brand-accent-dark)]/90"
+          className="bg-[var(--color-brand-accent)] text-primary-foreground hover:bg-[var(--color-brand-accent)]/90 dark:bg-[var(--color-brand-accent-dark)] dark:text-primary-foreground dark:hover:bg-[var(--color-brand-accent-dark)]/90"
         >
           <Link to="/">Go Home</Link>
         </Button>
