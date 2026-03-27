@@ -180,7 +180,8 @@
   transition:
     top var(--duration-base) var(--ease-out),
     box-shadow var(--duration-base) var(--ease-out),
-    background var(--duration-base) var(--ease-out);
+    background var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
 }
 .landing-page .nav::before {
   content: '';
@@ -193,6 +194,7 @@
 .landing-page .nav.scrolled {
   top: 16px;
   background: rgba(255, 255, 255, 0.85);
+  transform: translateX(-50%) scale(0.98);
 }
 .landing-page .nav-inner {
   display: flex;
@@ -220,6 +222,7 @@
   list-style: none;
 }
 .landing-page .nav-link {
+  position: relative;
   font-size: 15px;
   font-weight: 450;
   letter-spacing: var(--ls-nav);
@@ -231,12 +234,28 @@
     background-color var(--duration-base) var(--ease-out);
   white-space: nowrap;
 }
+.landing-page .nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 14px;
+  right: 14px;
+  height: 1.5px;
+  background: var(--color-teal);
+  border-radius: 1px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--duration-base) var(--ease-out);
+}
 /* Spotlight hover */
 .landing-page .nav-links:hover .nav-link {
   color: var(--color-ink-35);
 }
 .landing-page .nav-links:hover .nav-link:hover {
   color: var(--color-ink);
+}
+.landing-page .nav-links:hover .nav-link:hover::after {
+  transform: scaleX(1);
 }
 
 /* Nav CTA */
@@ -1084,8 +1103,13 @@
   flex-direction: column;
   gap: var(--space-sm);
 }
+@keyframes dropzonePulse {
+  0%, 100% { border-color: var(--color-ink-20); }
+  50% { border-color: var(--color-ink-35); }
+}
 .landing-page .upload-dropzone {
   border: 2px dashed var(--color-ink-20);
+  animation: dropzonePulse 3s ease-in-out infinite;
   border-radius: var(--radius-sm);
   padding: var(--space-lg) var(--space-md);
   display: flex;
@@ -1254,6 +1278,10 @@
   0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(13,148,136,0.3); }
   50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(13,148,136,0); }
 }
+@keyframes amberPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,158,11,0.3); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(245,158,11,0); }
+}
 /* Connection ports — solid gray circles */
 .landing-page .node-port {
   position: absolute;
@@ -1376,11 +1404,13 @@
   justify-content: space-between;
   transition:
     transform var(--duration-base) var(--ease-out),
-    box-shadow var(--duration-base) var(--ease-out);
+    box-shadow var(--duration-base) var(--ease-out),
+    rotate var(--duration-base) var(--ease-out);
   cursor: default;
 }
 .landing-page .folder-card:hover {
   transform: translateY(-3px);
+  rotate: 0deg;
   box-shadow: var(--shadow-card);
 }
 
@@ -1507,6 +1537,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.landing-page .form-group:focus-within {
+  transform: scale(1.01);
 }
 .landing-page .form-label {
   font-size: var(--fs-small);
@@ -1678,14 +1712,30 @@
 }
 .landing-page .footer-col a,
 .landing-page .footer-col button {
+  position: relative;
   font-size: var(--fs-small);
   color: var(--color-footer-muted);
   transition: color var(--duration-base) var(--ease-out);
   text-align: left;
   padding: 0;
 }
+.landing-page .footer-col a::after,
+.landing-page .footer-col button::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--duration-base) var(--ease-out);
+}
 .landing-page .footer-col a:hover,
 .landing-page .footer-col button:hover { color: white; }
+.landing-page .footer-col a:hover::after,
+.landing-page .footer-col button:hover::after { transform: scaleX(1); }
 .landing-page .footer-bottom {
   display: flex;
   justify-content: space-between;
@@ -1736,6 +1786,12 @@
   .landing-page .hero-cloud-1,
   .landing-page .hero-cloud-2 {
     animation: none;
+  }
+  .landing-page .upload-dropzone {
+    animation: none;
+  }
+  .landing-page .form-group:focus-within {
+    transform: none;
   }
 }
 

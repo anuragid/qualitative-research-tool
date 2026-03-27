@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { gsap, useGSAP, prefersReducedMotion } from '../../lib/animations';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 interface ContactFormData {
   name: string;
@@ -14,6 +18,7 @@ const FORMSPREE_URL =
   import.meta.env.VITE_FORMSPREE_ENDPOINT || 'https://formspree.io/f/placeholder';
 
 export function ContactForm() {
+  const formRef = useRef<HTMLFormElement>(null);
   const [status, setStatus] = useState<FormStatus>('idle');
   const {
     register,
@@ -41,6 +46,31 @@ export function ContactForm() {
     }
   };
 
+  // Field cascade entrance animation
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return;
+      const form = formRef.current;
+      if (!form) return;
+
+      const fields = form.querySelectorAll('.form-group, .form-row, .form-submit');
+      gsap.set(fields, { y: 12, opacity: 0 });
+      gsap.to(fields, {
+        y: 0,
+        opacity: 1,
+        duration: 0.35,
+        stagger: 0.1,
+        ease: 'power2.out',
+        scrollTrigger: {
+          trigger: form,
+          start: 'top 85%',
+          once: true,
+        },
+      });
+    },
+    { scope: formRef },
+  );
+
   return (
     <section className="contact-section" id="contact">
       <div className="contact-inner">
@@ -49,7 +79,7 @@ export function ContactForm() {
           <em>Say</em> hello
         </h2>
 
-        <form className="contact-form reveal" onSubmit={handleSubmit(onSubmit)}>
+        <form className="contact-form" ref={formRef} onSubmit={handleSubmit(onSubmit)}>
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="contact-name" className="form-label">

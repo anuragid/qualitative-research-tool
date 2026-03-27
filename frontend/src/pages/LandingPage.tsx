@@ -39,15 +39,11 @@ function getPort(el: HTMLElement, box: DOMRect, side: 'left' | 'right' | 'top' |
 }
 
 function buildPath(from: { x: number; y: number }, fromSide: string, to: { x: number; y: number }, toSide: string) {
-  // Vertical → Vertical: straight line through row gap
   if ((fromSide === 'bottom' && toSide === 'top') || (fromSide === 'top' && toSide === 'bottom')) {
     return `M${from.x},${from.y} L${to.x},${to.y}`;
   }
-
   const dx = Math.abs(to.x - from.x);
-  // Tension stays within the gap — never push control points into adjacent nodes
   const t = Math.max(Math.min(dx * 0.55, 28), 12);
-
   const cp1x = fromSide === 'right' ? from.x + t : fromSide === 'left' ? from.x - t : from.x;
   const cp1y = fromSide === 'bottom' ? from.y + t : fromSide === 'top' ? from.y - t : from.y;
   const cp2x = toSide === 'left' ? to.x - t : toSide === 'right' ? to.x + t : to.x;
@@ -55,8 +51,12 @@ function buildPath(from: { x: number; y: number }, fromSide: string, to: { x: nu
   return `M${from.x},${from.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${to.x},${to.y}`;
 }
 
+/* Node entrance order for staggered animation */
+const NODE_ORDER = ['input', 'chunk', 'infer', 'relate', 'explain', 'activate', 'custom'];
+
 function NodeEditorMockup() {
   const editorRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [paths, setPaths] = useState<string[]>([]);
 
   useEffect(() => {
@@ -77,16 +77,77 @@ function NodeEditorMockup() {
     }
     calc();
     window.addEventListener('resize', calc);
-    // Recalc after fonts/layout settle
     const t = setTimeout(calc, 200);
     return () => { window.removeEventListener('resize', calc); clearTimeout(t); };
   }, []);
 
+  // Edge draw-on + node entrance animations
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return;
+      const el = editorRef.current;
+      const svg = svgRef.current;
+      if (!el || !svg) return;
+
+      // Wait for paths to be computed
+      const svgPaths = svg.querySelectorAll('path');
+      if (!svgPaths.length) return;
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: el,
+          start: 'top 80%',
+          once: true,
+        },
+      });
+
+      // 1. Node entrance stagger
+      const nodes = NODE_ORDER
+        .map(id => el.querySelector<HTMLElement>(`[data-node="${id}"]`))
+        .filter(Boolean) as HTMLElement[];
+      gsap.set(nodes, { scale: 0.9, opacity: 0 });
+      tl.to(nodes, {
+        scale: 1,
+        opacity: 1,
+        duration: 0.35,
+        stagger: 0.12,
+        ease: 'power2.out',
+      });
+
+      // 2. Edge draw-on (after first couple nodes appear)
+      svgPaths.forEach((path) => {
+        const length = path.getTotalLength();
+        gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
+      });
+      tl.to(
+        svgPaths,
+        {
+          strokeDashoffset: 0,
+          duration: 0.6,
+          stagger: 0.2,
+          ease: 'power2.inOut',
+        },
+        0.24, // start after first 2 nodes appear
+      );
+
+      // 3. Status dots light up in sequence
+      const statusDots = el.querySelectorAll('.node-status-dot');
+      gsap.set(statusDots, { opacity: 0, scale: 0 });
+      tl.to(statusDots, {
+        opacity: 1,
+        scale: 1,
+        duration: 0.25,
+        stagger: 0.15,
+        ease: 'back.out(1.4)',
+      }, '>-0.3');
+    },
+    { scope: editorRef, dependencies: [paths] },
+  );
+
   return (
-    <div className="feature-mockup-card reveal">
+    <div className="feature-mockup-card">
       <div className="node-editor" ref={editorRef}>
-        {/* SVG edges — dynamically positioned */}
-        <svg className="node-edges" aria-hidden="true">
+        <svg className="node-edges" aria-hidden="true" ref={svgRef}>
           {paths.map((d, i) => <path key={i} d={d} />)}
         </svg>
 
@@ -144,6 +205,27 @@ function NodeEditorMockup() {
   );
 }
 
+/* ── Deterministic folder card rotations ── */
+const FOLDER_ROTATIONS = [1.2, -0.8, 1.5, -1.1, 0.7, -1.4];
+
+/* ── Breathing tagline helper ── */
+function BreathingTagline({ text }: { text: string }) {
+  return (
+    <p className="breathing-tagline">
+      {text.split(' ').map((word, i) => (
+        <span
+          key={i}
+          className="breathing-word"
+          style={{ display: 'inline-block' }}
+        >
+          {word}
+          {i < text.split(' ').length - 1 ? '\u00A0' : ''}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 export default function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { isSignedIn } = useAuth();
@@ -160,24 +242,22 @@ export default function LandingPage() {
     }
   }, []);
 
-  // GSAP scroll reveal animations for .reveal elements
-  // Initial hidden state is set via CSS (.landing-page .reveal-init) so content
-  // remains visible if GSAP/ScrollTrigger fails (e.g. iOS Safari momentum scroll).
   useGSAP(
     () => {
       if (prefersReducedMotion()) {
+        // Ensure everything is visible when reduced motion is preferred
         gsap.set('.reveal, .reveal-stagger', { opacity: 1, y: 0 });
         gsap.set('.reveal-stagger > *', { opacity: 1, y: 0 });
+        gsap.set('.breathing-word', { clipPath: 'inset(0 0% 0 0)' });
+        gsap.set('.mockup-dim-fill', { clearProps: 'width' });
         return;
       }
 
+      // ── Generic reveal for standard elements ──
       const revealElements = gsap.utils.toArray<HTMLElement>('.reveal, .reveal-stagger');
-
-      // Mark elements as GSAP-managed and set initial state
       revealElements.forEach((el) => {
         el.classList.add('reveal-init');
       });
-
       revealElements.forEach((el) => {
         gsap.to(el, {
           opacity: 1,
@@ -191,6 +271,232 @@ export default function LandingPage() {
           },
         });
       });
+
+      // ── Breathing taglines: masked word reveal ──
+      const taglines = gsap.utils.toArray<HTMLElement>('.breathing-tagline');
+      taglines.forEach((tagline) => {
+        const words = tagline.querySelectorAll('.breathing-word');
+        if (!words.length) return;
+        gsap.set(words, { clipPath: 'inset(0 100% 0 0)' });
+        gsap.to(words, {
+          clipPath: 'inset(0 0% 0 0)',
+          duration: 0.4,
+          stagger: 0.04,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: tagline,
+            start: 'top 85%',
+            once: true,
+          },
+        });
+      });
+
+      // ── Collection: progress bar fill ──
+      const dimFills = gsap.utils.toArray<HTMLElement>('.mockup-dim-fill');
+      if (dimFills.length) {
+        const targetWidths = dimFills.map((el) => el.style.width || '0%');
+        gsap.set(dimFills, { width: '0%' });
+        dimFills.forEach((fill, i) => {
+          gsap.to(fill, {
+            width: targetWidths[i],
+            duration: 0.6,
+            delay: i * 0.15,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: '.featured-mockup',
+              start: 'top 80%',
+              once: true,
+            },
+          });
+        });
+      }
+
+      // ── Collection: dimension badge spring entrance ──
+      const dimBadges = gsap.utils.toArray<HTMLElement>('.dimension-badge');
+      if (dimBadges.length) {
+        gsap.set(dimBadges, { y: 12, opacity: 0, scale: 0.95 });
+        gsap.to(dimBadges, {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          duration: 0.35,
+          stagger: 0.08,
+          ease: 'back.out(1.4)',
+          scrollTrigger: {
+            trigger: '.dimensions',
+            start: 'top 85%',
+            once: true,
+          },
+        });
+      }
+
+      // ── Upload section: progress fill ──
+      const uploadFill = document.querySelector('.upload-progress-fill');
+      if (uploadFill) {
+        gsap.set(uploadFill, { width: '0%' });
+        gsap.to(uploadFill, {
+          width: '72%',
+          duration: 0.8,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: '.upload-mockup',
+            start: 'top 80%',
+            once: true,
+          },
+        });
+      }
+
+      // ── Upload section: file rows stagger ──
+      const fileRows = gsap.utils.toArray<HTMLElement>('.upload-file-row');
+      if (fileRows.length) {
+        gsap.set(fileRows, { x: 30, opacity: 0 });
+        gsap.to(fileRows, {
+          x: 0,
+          opacity: 1,
+          duration: 0.35,
+          stagger: 0.15,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: '.upload-mockup',
+            start: 'top 80%',
+            once: true,
+          },
+        });
+      }
+
+      // ── Upload section: checkmark pop ──
+      const uploadCheck = document.querySelector('.upload-check');
+      if (uploadCheck) {
+        gsap.set(uploadCheck, { scale: 0 });
+        gsap.to(uploadCheck, {
+          scale: 1,
+          duration: 0.3,
+          ease: 'back.out(1.7)',
+          scrollTrigger: {
+            trigger: '.upload-mockup',
+            start: 'top 80%',
+            once: true,
+          },
+          delay: 0.5, // after file rows land
+        });
+      }
+
+      // ── Insights: card stagger with rotation ──
+      const insightCards = gsap.utils.toArray<HTMLElement>('.insight-card');
+      const insightRotations = [-0.8, 0.6, -0.5];
+      if (insightCards.length) {
+        insightCards.forEach((card, i) => {
+          gsap.set(card, { y: 24, opacity: 0, rotate: insightRotations[i % insightRotations.length] });
+        });
+        gsap.to(insightCards, {
+          y: 0,
+          opacity: 1,
+          rotate: 0,
+          duration: 0.4,
+          stagger: 0.15,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: '.insights-mockup',
+            start: 'top 80%',
+            once: true,
+          },
+        });
+
+        // Tags delayed reveal
+        insightCards.forEach((card, i) => {
+          const tags = card.querySelectorAll('.insight-tag');
+          if (!tags.length) return;
+          gsap.set(tags, { opacity: 0 });
+          gsap.to(tags, {
+            opacity: 1,
+            duration: 0.25,
+            stagger: 0.05,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: '.insights-mockup',
+              start: 'top 80%',
+              once: true,
+            },
+            delay: 0.3 + i * 0.15, // after parent card appears
+          });
+        });
+      }
+
+      // ── Folder cards: deal animation with rotation ──
+      const folderCards = gsap.utils.toArray<HTMLElement>('.folder-card');
+      if (folderCards.length) {
+        folderCards.forEach((card, i) => {
+          const rot = FOLDER_ROTATIONS[i % FOLDER_ROTATIONS.length];
+          gsap.set(card, { y: 20, opacity: 0, rotate: rot });
+          // Keep rotation after entrance — CSS :hover will snap to 0
+        });
+        gsap.to(folderCards, {
+          y: 0,
+          opacity: 1,
+          // Keep rotation (don't animate to 0 — that's for hover)
+          duration: 0.4,
+          stagger: 0.08,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: '.methods-grid',
+            start: 'top 85%',
+            once: true,
+          },
+        });
+
+        // Status text delayed reveal
+        const statusTexts = gsap.utils.toArray<HTMLElement>('.folder-card-status');
+        gsap.set(statusTexts, { opacity: 0 });
+        gsap.to(statusTexts, {
+          opacity: 1,
+          duration: 0.3,
+          stagger: 0.08,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: '.methods-grid',
+            start: 'top 85%',
+            once: true,
+          },
+          delay: 0.5,
+        });
+      }
+
+      // ── About: paragraph entrance ──
+      const aboutTexts = gsap.utils.toArray<HTMLElement>('.about-text');
+      if (aboutTexts.length) {
+        gsap.set(aboutTexts, { y: 16, opacity: 0 });
+        gsap.to(aboutTexts, {
+          y: 0,
+          opacity: 1,
+          duration: 0.5,
+          stagger: 0.15,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: '.about-section',
+            start: 'top 75%',
+            once: true,
+          },
+        });
+      }
+
+      // ── About: org badges spring entrance ──
+      const orgBadges = gsap.utils.toArray<HTMLElement>('.about-org');
+      if (orgBadges.length) {
+        gsap.set(orgBadges, { y: 12, opacity: 0, scale: 0.95 });
+        gsap.to(orgBadges, {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          duration: 0.35,
+          stagger: 0.08,
+          ease: 'back.out(1.4)',
+          scrollTrigger: {
+            trigger: '.about-orgs',
+            start: 'top 85%',
+            once: true,
+          },
+        });
+      }
 
       // iOS Safari fix: refresh ScrollTrigger after layout settles
       ScrollTrigger.refresh();
@@ -206,7 +512,7 @@ export default function LandingPage() {
 
       {/* Breathing Space */}
       <div className="breathing">
-        <p className="breathing-tagline reveal">Proven methods meet modern intelligence.</p>
+        <BreathingTagline text="Proven methods meet modern intelligence." />
       </div>
 
       {/* The Collection - 5D Analysis Featured Card */}
@@ -233,7 +539,7 @@ export default function LandingPage() {
                 Analyze research videos through five progressive steps that build layered
                 understanding. Each step transforms raw data into actionable design insight.
               </p>
-              <div className="dimensions reveal-stagger">
+              <div className="dimensions">
                 <span className="dimension-badge">
                   <span className="dimension-dot" style={{ background: '#5A8DB8' }} />
                   Chunk
@@ -267,10 +573,7 @@ export default function LandingPage() {
               </div>
               {/* Chunk */}
               <div className="mockup-dimension-row">
-                <div
-                  className="mockup-dim-icon"
-                  style={{ background: 'rgba(90,141,184,0.12)', color: '#5A8DB8' }}
-                >
+                <div className="mockup-dim-icon" style={{ background: 'rgba(90,141,184,0.12)', color: '#5A8DB8' }}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <rect x="2" y="3" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
                     <rect x="8" y="3" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
@@ -284,10 +587,7 @@ export default function LandingPage() {
               </div>
               {/* Infer */}
               <div className="mockup-dimension-row">
-                <div
-                  className="mockup-dim-icon"
-                  style={{ background: 'rgba(93,159,85,0.12)', color: '#5D9F55' }}
-                >
+                <div className="mockup-dim-icon" style={{ background: 'rgba(93,159,85,0.12)', color: '#5D9F55' }}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2" />
                     <path d="M7 4v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -300,10 +600,7 @@ export default function LandingPage() {
               </div>
               {/* Relate */}
               <div className="mockup-dimension-row">
-                <div
-                  className="mockup-dim-icon"
-                  style={{ background: 'rgba(200,168,72,0.12)', color: '#C8A848' }}
-                >
+                <div className="mockup-dim-icon" style={{ background: 'rgba(200,168,72,0.12)', color: '#C8A848' }}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <circle cx="4" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" />
                     <circle cx="10" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" />
@@ -317,10 +614,7 @@ export default function LandingPage() {
               </div>
               {/* Explain */}
               <div className="mockup-dimension-row">
-                <div
-                  className="mockup-dim-icon"
-                  style={{ background: 'rgba(161,23,53,0.10)', color: '#A11735' }}
-                >
+                <div className="mockup-dim-icon" style={{ background: 'rgba(161,23,53,0.10)', color: '#A11735' }}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M3 11l4-8 4 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M4.5 8h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -333,10 +627,7 @@ export default function LandingPage() {
               </div>
               {/* Activate */}
               <div className="mockup-dimension-row">
-                <div
-                  className="mockup-dim-icon"
-                  style={{ background: 'rgba(139,107,174,0.12)', color: '#8B6BAE' }}
-                >
+                <div className="mockup-dim-icon" style={{ background: 'rgba(139,107,174,0.12)', color: '#8B6BAE' }}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M7 2l1.5 3H12l-2.5 2 1 3L7 8.5 3.5 10l1-3L2 5h3.5L7 2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -353,7 +644,7 @@ export default function LandingPage() {
 
       {/* Breathing Space */}
       <div className="breathing">
-        <p className="breathing-tagline reveal">From raw footage to structured understanding.</p>
+        <BreathingTagline text="From raw footage to structured understanding." />
       </div>
 
       {/* Feature 1: Upload & Transcribe (Purple) */}
@@ -428,7 +719,7 @@ export default function LandingPage() {
 
       {/* Breathing Space */}
       <div className="breathing">
-        <p className="breathing-tagline reveal">Five steps. One complete picture.</p>
+        <BreathingTagline text="Five steps. One complete picture." />
       </div>
 
       {/* Feature 2: AI-Powered Analysis (Green) */}
@@ -462,7 +753,7 @@ export default function LandingPage() {
 
       {/* Breathing Space */}
       <div className="breathing">
-        <p className="breathing-tagline reveal">Patterns emerge across the whole corpus.</p>
+        <BreathingTagline text="Patterns emerge across the whole corpus." />
       </div>
 
       {/* Feature 3: Cross-Video Insights (Gold) */}
@@ -495,10 +786,7 @@ export default function LandingPage() {
               {/* Theme card */}
               <div className="insight-card">
                 <div className="insight-card-header">
-                  <div
-                    className="insight-card-icon"
-                    style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}
-                  >
+                  <div className="insight-card-icon" style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                       <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     </svg>
@@ -518,17 +806,12 @@ export default function LandingPage() {
               {/* Contradiction card */}
               <div className="insight-card">
                 <div className="insight-card-header">
-                  <div
-                    className="insight-card-icon"
-                    style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
-                  >
+                  <div className="insight-card-icon" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                       <path d="M2 10L10 2M2 2l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     </svg>
                   </div>
-                  <span className="insight-card-label" style={{ color: '#EF4444' }}>
-                    Contradiction
-                  </span>
+                  <span className="insight-card-label" style={{ color: '#EF4444' }}>Contradiction</span>
                 </div>
                 <p className="insight-card-text">
                   Stated preference for efficiency conflicts with observed behavior favoring familiar,
@@ -543,10 +826,7 @@ export default function LandingPage() {
               {/* Pattern card */}
               <div className="insight-card">
                 <div className="insight-card-header">
-                  <div
-                    className="insight-card-icon"
-                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
-                  >
+                  <div className="insight-card-icon" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                       <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" />
                       <path d="M6 3.5v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -571,7 +851,7 @@ export default function LandingPage() {
 
       {/* Breathing Space */}
       <div className="breathing">
-        <p className="breathing-tagline reveal">More methods on the way.</p>
+        <BreathingTagline text="More methods on the way." />
       </div>
 
       {/* Upcoming Methods - Folder Tab Cards */}
@@ -582,7 +862,7 @@ export default function LandingPage() {
             Upcoming <em>methods</em>
           </h2>
 
-          <div className="methods-grid reveal-stagger">
+          <div className="methods-grid">
             <div className="folder-card" style={{ background: '#D4EDE8' }}>
               <div>
                 <h3 className="folder-card-title">AEIOU Framework</h3>

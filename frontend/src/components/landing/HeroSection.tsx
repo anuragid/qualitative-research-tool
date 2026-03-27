@@ -1,12 +1,141 @@
+import { useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { gsap, useGSAP, prefersReducedMotion } from '../../lib/animations';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 interface HeroSectionProps {
   isSignedIn: boolean;
 }
 
+const HEADLINE_WORDS = ['Your', 'research', 'toolkit,'];
+const HEADLINE_EM = 'digitized';
+
 export function HeroSection({ isSignedIn }: HeroSectionProps) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const headlineRef = useRef<HTMLHeadingElement>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const ctaRef = useRef<HTMLDivElement>(null);
+  const productRef = useRef<HTMLDivElement>(null);
+  const papersRef = useRef<HTMLDivElement>(null);
+  const cloud1Ref = useRef<HTMLImageElement>(null);
+  const cloud2Ref = useRef<HTMLImageElement>(null);
+
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return;
+
+      // ── Hero entrance timeline ──
+      const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+
+      // 1. Word stagger
+      const words = headlineRef.current?.querySelectorAll('.hero-word');
+      if (words?.length) {
+        gsap.set(words, { y: 20, opacity: 0 });
+        tl.to(words, {
+          y: 0,
+          opacity: 1,
+          duration: 0.35,
+          stagger: 0.06,
+        });
+        // The em word gets slightly longer duration — target it specifically
+        const emWord = headlineRef.current?.querySelector('.hero-word-em');
+        if (emWord) {
+          gsap.set(emWord, { y: 20, opacity: 0 });
+          tl.to(
+            emWord,
+            { y: 0, opacity: 1, duration: 0.5 },
+            '<0.06', // start 0.06s after last word begins
+          );
+        }
+      }
+
+      // 2. Subtitle + CTA
+      gsap.set([subtitleRef.current, ctaRef.current], { opacity: 0 });
+      tl.to([subtitleRef.current, ctaRef.current], {
+        opacity: 1,
+        duration: 0.4,
+      }, '>-0.1');
+
+      // 3. Product mockup
+      gsap.set(productRef.current, { y: 60, opacity: 0 });
+      tl.to(productRef.current, {
+        y: 0,
+        opacity: 1,
+        duration: 0.8,
+      }, '>-0.2');
+
+      // 4. Video cards stagger
+      const cards = productRef.current?.querySelectorAll('.hero-app-card');
+      if (cards?.length) {
+        gsap.set(cards, { y: 16, opacity: 0 });
+        tl.to(cards, {
+          y: 0,
+          opacity: 1,
+          duration: 0.35,
+          stagger: 0.12,
+        }, '>-0.3');
+      }
+
+      // ── Parallax: paper pieces ──
+      const paperSpeeds = [
+        { selector: '.paper-0', y: -30 },
+        { selector: '.paper-1', y: -50 },
+        { selector: '.paper-2', y: -60 },
+        { selector: '.paper-3', y: -40 },
+        { selector: '.paper-4', y: -80 },
+      ];
+      const papersEl = papersRef.current;
+      if (papersEl) {
+        paperSpeeds.forEach(({ selector, y }) => {
+          const piece = papersEl.querySelector(selector);
+          if (piece) {
+            gsap.to(piece, {
+              y,
+              ease: 'none',
+              scrollTrigger: {
+                trigger: sectionRef.current,
+                start: 'top top',
+                end: 'bottom top',
+                scrub: true,
+              },
+            });
+          }
+        });
+      }
+
+      // ── Parallax: clouds ──
+      if (cloud1Ref.current) {
+        gsap.to(cloud1Ref.current, {
+          x: -40,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: true,
+          },
+        });
+      }
+      if (cloud2Ref.current) {
+        gsap.to(cloud2Ref.current, {
+          x: 40,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: true,
+          },
+        });
+      }
+    },
+    { scope: sectionRef },
+  );
+
   return (
-    <section className="hero" id="hero">
+    <section className="hero" id="hero" ref={sectionRef}>
       {/* Layer 1: Sky gradient */}
       <div className="hero-sky" aria-hidden="true" />
 
@@ -19,16 +148,23 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
       </div>
 
       {/* Layer 4: Edge clouds */}
-      <img src="/landing/cloud.png" alt="" className="hero-cloud hero-cloud-1" loading="eager" aria-hidden="true" />
-      <img src="/landing/cloud.png" alt="" className="hero-cloud hero-cloud-2" loading="eager" aria-hidden="true" />
+      <img ref={cloud1Ref} src="/landing/cloud.png" alt="" className="hero-cloud hero-cloud-1" loading="eager" aria-hidden="true" />
+      <img ref={cloud2Ref} src="/landing/cloud.png" alt="" className="hero-cloud hero-cloud-2" loading="eager" aria-hidden="true" />
 
       {/* Content */}
       <div className="hero-content">
-        <h1>Your research toolkit, <em>digitized</em></h1>
-        <p className="hero-subtitle">
+        <h1 ref={headlineRef}>
+          {HEADLINE_WORDS.map((word, i) => (
+            <span key={i} className="hero-word" style={{ display: 'inline-block', marginRight: '0.25em' }}>
+              {word}
+            </span>
+          ))}
+          <em className="hero-word hero-word-em" style={{ display: 'inline-block' }}>{HEADLINE_EM}</em>
+        </h1>
+        <p className="hero-subtitle" ref={subtitleRef}>
           Transform qualitative research data into structured insights using proven analytical frameworks.
         </p>
-        <div className="hero-cta-group">
+        <div className="hero-cta-group" ref={ctaRef}>
           <Link to={isSignedIn ? '/projects' : '/sign-up'} className="glass-btn">
             <span>Get Started Free</span>
           </Link>
@@ -36,7 +172,7 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
       </div>
 
       {/* Product screenshot mockup */}
-      <div className="hero-product">
+      <div className="hero-product" ref={productRef}>
         <div className="hero-app-bar">
           <span className="hero-app-dot hero-app-dot-r" />
           <span className="hero-app-dot hero-app-dot-y" />
@@ -96,7 +232,10 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
                   <div className="hero-app-card-body">
                     <div className="hero-app-card-title">Interview &mdash; James K.</div>
                     <div className="hero-app-card-status">
-                      <span className="hero-app-status-dot" style={{ background: '#F59E0B' }} />
+                      <span
+                        className="hero-app-status-dot"
+                        style={{ background: '#F59E0B', animation: 'amberPulse 2s ease-in-out infinite' }}
+                      />
                       Step 3 of 5
                     </div>
                     <div className="hero-app-card-steps">
@@ -133,7 +272,7 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
       </div>
 
       {/* Layer 5: Torn paper collage */}
-      <div className="hero-papers" aria-hidden="true">
+      <div className="hero-papers" aria-hidden="true" ref={papersRef}>
         {/* Piece 0: Large white sheet (backdrop) */}
         <div className="paper-piece paper-0">
           <div className="paper-piece-inner paperSheetMask">
