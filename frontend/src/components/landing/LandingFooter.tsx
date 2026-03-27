@@ -39,7 +39,7 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
 
     const trigger = ScrollTrigger.create({
       trigger: el,
-      start: 'top 90%',
+      start: 'top bottom',
       once: true,
       onEnter: () => {
         if (hasTriggered.current) return;

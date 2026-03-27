@@ -63,7 +63,6 @@ export function useTextScramble(
     const startDelays = chars.map(() => Math.random() * delayWindow);
 
     const startTime = performance.now();
-
     const step = (now: number) => {
       if (!isMountedRef.current) return;
 
