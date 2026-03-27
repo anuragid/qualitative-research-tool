@@ -78,7 +78,7 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
         }, '>-0.3');
       }
 
-      // ── Paper roll-out: diagonal bottom-to-top, staggered left-to-right ──
+      // ── Paper roll-out: clip-path reveal, staggered left-to-right ──
       // Order by horizontal position (leftmost first)
       const rollOrder = ['.paper-1', '.paper-0', '.paper-3', '.paper-4', '.paper-2'];
       const papersEl = papersRef.current;
@@ -87,25 +87,20 @@ export function HeroSection({ isSignedIn }: HeroSectionProps) {
           .map(sel => papersEl.querySelector<HTMLElement>(sel))
           .filter(Boolean) as HTMLElement[];
 
+        // Clip-path: pieces are in their correct CSS positions at all times.
+        // We just reveal them from bottom to top with a diagonal leading edge.
+        // Start: collapsed to a line at the bottom (left side 20% lower for diagonal)
+        // End:   fully open rectangle
         gsap.set(rollPieces, {
-          rotateX: -90,
-          transformOrigin: '20% 100%', // bottom-left bias for diagonal feel
-          opacity: 0,
+          clipPath: 'polygon(0% 120%, 100% 100%, 100% 100%, 0% 120%)',
         });
 
-        // Start rolling during the headline entrance for a layered reveal
         tl.to(rollPieces, {
-          rotateX: 0,
-          opacity: 1,
-          duration: 0.8,
+          clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)',
+          duration: 0.9,
           stagger: 0.15,
           ease: 'power2.out',
-          onComplete: () => {
-            // Clear the inline transformOrigin so CSS rotate/scale pivot from
-            // their default center — otherwise pieces are permanently displaced.
-            rollPieces.forEach(el => { el.style.transformOrigin = ''; });
-          },
-        }, 0.2); // begin 0.2s into the timeline
+        }, 0.2);
       }
 
       // ── Parallax: paper pieces (scroll-linked, after roll-out) ──
