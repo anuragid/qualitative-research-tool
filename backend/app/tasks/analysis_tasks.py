@@ -160,6 +160,24 @@ def _update_step_progress(db, video_analysis_id, step_name: str, step_status_val
             pass
 
 
+def _is_cancelled(db, video_analysis_id) -> bool:
+    """Check if watchdog has already marked this analysis as error.
+
+    Re-queries the VideoAnalysis with a fresh read to detect status
+    changes committed by the watchdog in a separate session.
+    Returns True if the analysis should stop.
+    """
+    try:
+        db.expire_all()  # Clear ORM cache to force fresh DB read
+        va = db.query(VideoAnalysis).filter(VideoAnalysis.id == video_analysis_id).first()
+        if va is None:
+            return True  # Record gone, treat as cancelled
+        return va.status == "error"
+    except Exception:
+        logger.exception("_is_cancelled check failed, assuming not cancelled")
+        return False
+
+
 def _run_video_pipeline(state: VideoAnalysisState, db=None, video_analysis_id=None) -> VideoAnalysisState:
     """Run the 5-step video analysis pipeline synchronously.
 
@@ -180,6 +198,17 @@ def _run_video_pipeline(state: VideoAnalysisState, db=None, video_analysis_id=No
         ("activate", activate_node),
     ]
     for step_name, node_fn in steps:
+        # Check if watchdog has cancelled this analysis
+        if db is not None and video_analysis_id is not None:
+            if _is_cancelled(db, video_analysis_id):
+                logger.warning(
+                    f"Pipeline cancelled by watchdog at step '{step_name}' "
+                    f"for video {state['video_id']}"
+                )
+                state["error"] = "Analysis cancelled by watchdog (timeout)"
+                state["error_type"] = "timeout"
+                break
+
         logger.info(f"Running pipeline step '{step_name}' for video {state['video_id']}")
         if db is not None and video_analysis_id is not None:
             _update_step_progress(db, video_analysis_id, step_name, "processing")
@@ -361,6 +390,18 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
                 structured_json=structured_err,
             )
 
+        # Final cancellation check before writing results
+        self.db.expire_all()
+        video_analysis = self.db.query(VideoAnalysis).filter(
+            VideoAnalysis.id == video_analysis.id
+        ).first()
+        if video_analysis is None or video_analysis.status == "error":
+            logger.warning(
+                f"Watchdog cancelled analysis for video {video_id} "
+                f"before results could be saved. Discarding results."
+            )
+            return {"video_id": video_id, "status": "cancelled_by_watchdog"}
+
         # Save results to database
         video_analysis.chunks = final_state.get("chunks")
         video_analysis.inferences = final_state.get("inferences")
@@ -422,11 +463,19 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
             ).first()
 
             if video:
-                video.status = "error"
-                video.error_message = error_json
+                # Only update if watchdog hasn't already handled this
+                if video.status not in ("error", "analyzed"):
+                    video.status = "error"
+                    video.error_message = error_json
+                else:
+                    logger.info(
+                        f"Video {video_id} already in '{video.status}' state "
+                        f"(likely set by watchdog), skipping error update"
+                    )
             if video_analysis:
-                video_analysis.status = "error"
-                video_analysis.completed_at = datetime.now(timezone.utc)
+                if video_analysis.status != "error":
+                    video_analysis.status = "error"
+                    video_analysis.completed_at = datetime.now(timezone.utc)
 
             # Explicitly flush and commit
             self.db.flush()

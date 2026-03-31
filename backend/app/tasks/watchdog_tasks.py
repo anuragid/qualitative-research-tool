@@ -25,7 +25,7 @@ from app.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 # How long a record can sit in "processing" before the watchdog resets it.
-_ANALYSIS_TIMEOUT = timedelta(minutes=30)
+_ANALYSIS_TIMEOUT = timedelta(minutes=35)  # Must exceed Celery task_time_limit (30 min) so Celery kills the task first
 _TRANSCRIPT_TIMEOUT = timedelta(minutes=60)
 
 
@@ -73,7 +73,7 @@ def reset_stuck_analyses(self):
 
             # Also mark the parent Video as errored.
             video = db.query(Video).filter(Video.id == va.video_id).first()
-            if video and video.status == "analyzing":
+            if video and video.status not in ("analyzed", "error"):
                 video.status = "error"
                 video.error_message = error_msg
 
@@ -111,6 +111,46 @@ def reset_stuck_analyses(self):
                 "Watchdog reset stuck Video %s — linked VideoAnalysis exceeded timeout",
                 video.id,
             )
+
+        # --- Videos stuck in "analyzing" with terminal or missing analysis ---
+        # Catches the case where watchdog or task set VideoAnalysis to error/completed
+        # but the Video.status was never updated (race condition).
+        orphaned_analyzing = (
+            db.query(Video)
+            .filter(Video.status == "analyzing")
+            .outerjoin(VideoAnalysis, VideoAnalysis.video_id == Video.id)
+            .filter(
+                (VideoAnalysis.id == None)
+                | (VideoAnalysis.status.in_(["error", "completed"]))
+            )
+            .all()
+        )
+
+        for video in orphaned_analyzing:
+            va = db.query(VideoAnalysis).filter(
+                VideoAnalysis.video_id == video.id
+            ).first()
+            if va and va.status == "completed":
+                # Analysis actually completed but video status wasn't synced
+                video.status = "analyzed"
+                logger.warning(
+                    "Watchdog fixed orphaned Video %s: analyzing -> analyzed "
+                    "(analysis was completed)",
+                    video.id,
+                )
+            else:
+                error_msg = _watchdog_error_json(
+                    "Video stuck in 'analyzing' with no active analysis"
+                )
+                video.status = "error"
+                video.error_message = error_msg
+                logger.warning(
+                    "Watchdog fixed orphaned Video %s: analyzing -> error "
+                    "(analysis was %s)",
+                    video.id,
+                    va.status if va else "missing",
+                )
+            videos_reset += 1
 
         # --- ProjectAnalysis stuck in "processing" ---
         stuck_project_analyses = (

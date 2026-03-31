@@ -41,6 +41,17 @@ class ProjectStateService:
                     db.commit()
                     logger.info(f"Project {project_id} marked as 'completed'")
 
+                # If project has videos with transcripts/analyses but isn't fully complete,
+                # transition from planning to ready
+                if not all_completed:
+                    has_transcribed = any(
+                        v.status in ("transcribed", "analyzed") for v in videos
+                    )
+                    if has_transcribed and project.status == "planning":
+                        project.status = "ready"
+                        db.commit()
+                        logger.info(f"Project {project_id} marked as 'ready'")
+
         except Exception as e:
             logger.error(f"Error marking project as completed: {e}")
             db.rollback()
