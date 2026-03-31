@@ -28,7 +28,9 @@ from sqlalchemy.orm import sessionmaker
 # We create the engine directly from DATABASE_URL to avoid requiring every
 # env var that app.config.Settings mandates (Redis, R2, etc.).  The ORM
 # models only need Base's registry, which is populated at import time.
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# Prefer DATABASE_PUBLIC_URL (reachable from outside Railway's private network)
+# and fall back to DATABASE_URL (used inside Railway services).
+DATABASE_URL = os.environ.get("DATABASE_PUBLIC_URL") or os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     print("ERROR: DATABASE_URL environment variable is not set.")
     sys.exit(1)
