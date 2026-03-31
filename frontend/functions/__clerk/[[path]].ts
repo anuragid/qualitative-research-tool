@@ -23,7 +23,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   );
   clerkHeaders.delete("host");
 
-  const body = request.method !== "GET" && request.method !== "HEAD" ? request.body : null;
+  // Buffer body once so it can be sent to both targets (ReadableStream is consumed on first use)
+  const body = request.method !== "GET" && request.method !== "HEAD"
+    ? await request.arrayBuffer()
+    : null;
 
   // Try direct to Clerk first (frontend-api.clerk.dev has valid TLS)
   try {

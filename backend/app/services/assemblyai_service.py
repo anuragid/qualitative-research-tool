@@ -51,6 +51,11 @@ class AssemblyAIService:
                 config=config
             )
 
+            # Check for errors (e.g. AssemblyAI couldn't download the file)
+            if transcript.status == aai.TranscriptStatus.error:
+                error_msg = transcript.error or "Unknown transcription error"
+                raise Exception(f"Transcription submission failed: {error_msg}")
+
             logger.info(f"Started transcription with speaker identification: {transcript.id}")
             return transcript.id
 

@@ -70,7 +70,7 @@ def transcribe_video_task(self, video_id: str):
         logger.info(f"Generating presigned URL for S3 key: {video.s3_key}")
         presigned_url = s3_service.get_presigned_url(
             s3_key=video.s3_key,
-            expiration=7200  # 2 hours
+            expiration=14400  # 4 hours — gives AssemblyAI ample time to download
         )
 
         # Start transcription (submit only, does not block for completion)
