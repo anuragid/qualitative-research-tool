@@ -120,7 +120,7 @@ def reset_stuck_analyses(self):
             .filter(Video.status == "analyzing")
             .outerjoin(VideoAnalysis, VideoAnalysis.video_id == Video.id)
             .filter(
-                (VideoAnalysis.id == None)
+                (VideoAnalysis.id.is_(None))
                 | (VideoAnalysis.status.in_(["error", "completed"]))
             )
             .all()

@@ -55,13 +55,12 @@ def _compile_array_sqlite(type_, compiler, **kw):
 
 
 from app.database import Base  # noqa: E402
-from app.models.database_models import (  # noqa: E402
+from app.models.database_models import (  # noqa: E402, I001
     Project,
     User,
     Video,
     VideoAnalysis,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixture: lightweight ORM-aware SQLite session
