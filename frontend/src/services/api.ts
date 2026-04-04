@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import axios from "axios";
 
 export class ApiError extends Error {
@@ -41,7 +42,7 @@ const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
 
 // Validate API URL at startup
 if (!import.meta.env.VITE_API_URL && !DEV_BYPASS) {
-  console.warn("VITE_API_URL is not set — API calls will use relative paths");
+  Sentry.captureMessage("VITE_API_URL is not set — API calls will use relative paths", "warning");
 }
 
 api.interceptors.request.use(
@@ -57,7 +58,12 @@ api.interceptors.request.use(
         }
       }
     } catch (error) {
-      console.debug("Auth token unavailable, proceeding without auth:", error);
+      Sentry.addBreadcrumb({
+        category: "auth",
+        message: "Auth token unavailable, proceeding without auth",
+        level: "debug",
+        data: { error: error instanceof Error ? error.message : String(error) },
+      });
     }
     return config;
   },

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import * as Sentry from "@sentry/react";
 import { useAuth } from "./useAuth";
 import { api } from "../services/api";
 import { toast } from "sonner";
@@ -19,7 +20,7 @@ export function useUserSync() {
           await api.post("/api/users/sync");
           syncedUserIdRef.current = user.id;
         } catch (error) {
-          console.warn("User sync failed, will retry:", error);
+          Sentry.captureException(error, { tags: { operation: "user-sync" } });
           toast.warning("Failed to sync user profile. Some features may be limited.");
         }
       }
