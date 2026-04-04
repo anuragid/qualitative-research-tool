@@ -1,7 +1,6 @@
 """AssemblyAI service for transcription with speaker diarization."""
 
 import logging
-import time
 from typing import Any, Dict
 
 import assemblyai as aai
@@ -21,42 +20,63 @@ class AssemblyAIService:
         """Initialize AssemblyAI service."""
         self.transcriber = aai.Transcriber()
 
-    def start_transcription(self, audio_url: str) -> str:
+    def upload_file(self, file_path: str) -> str:
         """
-        Start transcription job with speaker diarization and identification.
+        Upload a local file to AssemblyAI's servers.
 
         Args:
-            audio_url: URL of audio/video file (can be S3 presigned URL)
+            file_path: Path to the local audio/video file
+
+        Returns:
+            AssemblyAI-hosted URL for the uploaded file
+
+        Raises:
+            Exception: If upload fails
+        """
+        try:
+            upload_url = aai.upload(file_path)
+            logger.info(f"Uploaded file to AssemblyAI: {file_path}")
+            return upload_url
+        except Exception as e:
+            logger.error(f"Error uploading to AssemblyAI: {e}")
+            raise Exception(f"Failed to upload to AssemblyAI: {str(e)}")
+
+    def start_transcription(self, audio_url: str) -> str:
+        """
+        Submit a transcription job with speaker diarization (non-blocking).
+
+        Uses submit() to return immediately after submission. The caller
+        is responsible for polling via get_transcript_status().
+
+        Args:
+            audio_url: URL of audio/video file hosted on AssemblyAI
 
         Returns:
             Transcript ID from AssemblyAI
 
         Raises:
-            Exception: If transcription start fails
+            Exception: If transcription submission fails
         """
         try:
-            # Create config with speaker labels enabled
             config = aai.TranscriptionConfig(
-                speaker_labels=True,  # Enable speaker diarization
+                speaker_labels=True,
             )
 
-            # Try to use best speech model if available (newer SDK versions)
             try:
                 config.speech_model = aai.SpeechModel.best
             except AttributeError:
                 logger.info("SpeechModel not available in this AssemblyAI version, using default")
 
-            transcript = self.transcriber.transcribe(
+            transcript = self.transcriber.submit(
                 audio_url,
-                config=config
+                config=config,
             )
 
-            # Check for errors (e.g. AssemblyAI couldn't download the file)
             if transcript.status == aai.TranscriptStatus.error:
                 error_msg = transcript.error or "Unknown transcription error"
                 raise Exception(f"Transcription submission failed: {error_msg}")
 
-            logger.info(f"Started transcription with speaker identification: {transcript.id}")
+            logger.info(f"Submitted transcription: {transcript.id}")
             return transcript.id
 
         except Exception as e:
@@ -134,45 +154,6 @@ class AssemblyAIService:
         except Exception as e:
             logger.error(f"Error retrieving transcript: {e}")
             raise Exception(f"Failed to retrieve transcript: {str(e)}")
-
-    def poll_until_complete(
-        self,
-        transcript_id: str,
-        max_wait_seconds: int = 3600,
-        poll_interval: int = 5
-    ) -> Dict[str, Any]:
-        """
-        Poll transcript until completed or timeout.
-
-        Args:
-            transcript_id: AssemblyAI transcript ID
-            max_wait_seconds: Maximum wait time in seconds
-            poll_interval: Seconds between status checks
-
-        Returns:
-            Completed transcript data
-
-        Raises:
-            Exception: If transcription fails or times out
-        """
-        start_time = time.time()
-
-        while True:
-            elapsed = time.time() - start_time
-            if elapsed > max_wait_seconds:
-                raise Exception(f"Transcription timed out after {max_wait_seconds}s")
-
-            result = self.get_transcript_status(transcript_id)
-            status = result["status"]
-            logger.info(f"Transcript {transcript_id} status: {status}")
-
-            if status == "completed":
-                return self.get_transcript(transcript_id)
-            elif status == "error":
-                error_detail = result.get("error", "Unknown error")
-                raise Exception(f"Transcription failed: {error_detail}")
-
-            time.sleep(poll_interval)
 
     @staticmethod
     def _process_words(words) -> list:

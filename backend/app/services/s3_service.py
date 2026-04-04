@@ -8,7 +8,7 @@ R2 does not support ACLs or bucket policies via the S3 API.
 import logging
 import uuid
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Optional
 
 import boto3
 from botocore.config import Config as BotoConfig
@@ -133,6 +133,28 @@ class S3Service:
             ExpiresIn=expiration,
         )
         return url
+
+    def download_file(self, s3_key: str, dest_path: str) -> None:
+        """
+        Download a file from R2 to a local path.
+
+        Args:
+            s3_key: S3 object key
+            dest_path: Local file path to write to
+
+        Raises:
+            Exception: If download fails
+        """
+        try:
+            self.s3_client.download_file(
+                self.bucket_name,
+                s3_key,
+                dest_path,
+            )
+            logger.info(f"Downloaded from R2: {s3_key} -> {dest_path}")
+        except ClientError as e:
+            logger.error(f"Error downloading from R2: {e}")
+            raise Exception(f"Failed to download from R2: {str(e)}")
 
     def head_object(self, s3_key: str) -> dict:
         """Check if an object exists in R2 and return its metadata."""

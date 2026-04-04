@@ -1,12 +1,15 @@
 """Celery tasks for video transcription using AssemblyAI.
 
 Split into two tasks for non-blocking operation:
-- transcribe_video_task: submits to AssemblyAI and returns immediately (~2s)
+- transcribe_video_task: downloads from R2, uploads to AssemblyAI, submits (~seconds)
 - check_transcription_task: polls status via Celery retry, freeing the thread between checks
 """
 
 import logging
+import os
+import tempfile
 import time
+from pathlib import Path
 from uuid import UUID
 
 from app.models.database_models import SpeakerLabel, Transcript, Video
@@ -26,23 +29,13 @@ logger = logging.getLogger(__name__)
 )
 def transcribe_video_task(self, video_id: str):
     """
-    Submit a video to AssemblyAI for transcription (non-blocking).
+    Download video from R2 and submit to AssemblyAI for transcription.
 
     This task:
-    1. Generates a presigned S3 URL for the video
-    2. Submits video to AssemblyAI for transcription
-    3. Saves assemblyai_id to transcript record
+    1. Downloads the video from R2 to a temp file
+    2. Uploads directly to AssemblyAI's servers
+    3. Submits for transcription (non-blocking)
     4. Schedules check_transcription_task to poll for completion
-    5. Returns immediately (thread freed in ~2 seconds)
-
-    Args:
-        video_id: UUID of the video to transcribe
-
-    Returns:
-        Dictionary with submission results
-
-    Raises:
-        Exception: If submission fails (triggers autoretry)
     """
     try:
         logger.info(f"Starting transcription submit task for video {video_id}")
@@ -66,16 +59,25 @@ def transcribe_video_task(self, video_id: str):
         video.status = "transcribing"
         self.db.commit()
 
-        # Generate presigned URL for AssemblyAI to access the video
-        logger.info(f"Generating presigned URL for S3 key: {video.s3_key}")
-        presigned_url = s3_service.get_presigned_url(
-            s3_key=video.s3_key,
-            expiration=14400  # 4 hours — gives AssemblyAI ample time to download
-        )
+        # Download from R2 and upload directly to AssemblyAI.
+        # R2's S3 API endpoint is not reachable by AssemblyAI's servers,
+        # so we stream through the worker instead of passing a presigned URL.
+        suffix = Path(video.s3_key).suffix or ".mp4"
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+        try:
+            os.close(tmp_fd)
+            logger.info(f"Downloading from R2: {video.s3_key}")
+            s3_service.download_file(video.s3_key, tmp_path)
 
-        # Start transcription (submit only, does not block for completion)
+            logger.info(f"Uploading to AssemblyAI for video {video_id}")
+            assemblyai_url = assemblyai_service.upload_file(tmp_path)
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+        # Submit transcription (non-blocking — check_transcription_task polls)
         logger.info(f"Submitting AssemblyAI transcription for video {video_id}")
-        assemblyai_id = assemblyai_service.start_transcription(presigned_url)
+        assemblyai_id = assemblyai_service.start_transcription(assemblyai_url)
 
         transcript.assemblyai_id = assemblyai_id
         self.db.commit()

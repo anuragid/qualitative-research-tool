@@ -238,10 +238,9 @@ class TestWatchdogFixesOrphanedAnalyzingVideo:
 
         from app.tasks.watchdog_tasks import reset_stuck_analyses
 
-        with patch("app.tasks.watchdog_tasks.sentry_sdk"):
-            # Inject our test session into the task's thread-local storage
-            reset_stuck_analyses._thread_local.db = db_session
-            reset_stuck_analyses.run()
+        # Inject our test session into the task's thread-local storage
+        reset_stuck_analyses._thread_local.db = db_session
+        reset_stuck_analyses.run()
 
         db_session.refresh(video)
         assert video.status == "error"
@@ -264,9 +263,8 @@ class TestWatchdogFixesAnalyzingWithCompletedAnalysis:
 
         from app.tasks.watchdog_tasks import reset_stuck_analyses
 
-        with patch("app.tasks.watchdog_tasks.sentry_sdk"):
-            reset_stuck_analyses._thread_local.db = db_session
-            reset_stuck_analyses.run()
+        reset_stuck_analyses._thread_local.db = db_session
+        reset_stuck_analyses.run()
 
         db_session.refresh(video)
         assert video.status == "analyzed"

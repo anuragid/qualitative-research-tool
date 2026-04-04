@@ -11,8 +11,6 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-import sentry_sdk
-
 from app.models.database_models import (
     ProjectAnalysis,
     Transcript,
@@ -210,12 +208,10 @@ def reset_stuck_analyses(self):
 
         total = videos_reset + projects_reset + transcripts_reset
         if total > 0:
-            summary_msg = (
-                f"Watchdog reset {total} stuck record(s): "
-                f"videos={videos_reset}, projects={projects_reset}, transcripts={transcripts_reset}"
+            logger.warning(
+                "Watchdog reset %d stuck record(s): videos=%d, projects=%d, transcripts=%d",
+                total, videos_reset, projects_reset, transcripts_reset,
             )
-            logger.warning(summary_msg)
-            sentry_sdk.capture_message(summary_msg, level="warning")
 
     except Exception:
         db.rollback()

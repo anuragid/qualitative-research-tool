@@ -27,6 +27,16 @@ Sentry.init({
     }),
   ],
 
+  // Drop transient Clerk session-touch network errors — these are benign
+  // keepalive failures that Clerk retries automatically.
+  beforeSend(event) {
+    const message = event.exception?.values?.[0]?.value ?? "";
+    if (message.includes("ClerkJS") && message.includes("Network error")) {
+      return null;
+    }
+    return event;
+  },
+
   // Tracing — capture everything while user base is small
   tracesSampleRate: 1.0,
   tracePropagationTargets: [
