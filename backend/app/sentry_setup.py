@@ -20,19 +20,19 @@ def init_sentry() -> None:
         dsn=dsn,
         environment=os.environ.get("SENTRY_ENVIRONMENT", os.environ.get("APP_ENV", "production")),
         release=os.environ.get("SENTRY_RELEASE", os.environ.get("RAILWAY_GIT_COMMIT_SHA")),
-        send_default_pii=True,
+        send_default_pii=False,
 
         integrations=[
             OpenAIIntegration(
-                include_prompts=True,
+                include_prompts=False,
             ),
         ],
 
-        # Tracing — capture everything while user base is small
-        traces_sample_rate=1.0,
+        # Tracing — sample 10% to balance observability vs data volume
+        traces_sample_rate=0.1,
 
         # Continuous profiling tied to active spans
-        profile_session_sample_rate=1.0,
+        profile_session_sample_rate=0.1,
         profile_lifecycle="trace",
 
         # Structured logs
