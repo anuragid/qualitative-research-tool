@@ -114,6 +114,25 @@ export function LandingFooter({ scrollToSection }: LandingFooterProps) {
               <span ref={creditsScramble.ref as React.RefObject<HTMLSpanElement>} />
             )}
           </p>
+          <div className="footer-separator" />
+          <p className="footer-attribution">
+            A{' '}
+            <a
+              href="https://id.iit.edu/people/jeremy-alexis/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Jeremy Alexis
+            </a>{' '}
+            method · Crafted with ♥ in Chicago by{' '}
+            <a
+              href="https://www.linkedin.com/in/anuragduddu/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Anurag Duddu
+            </a>
+          </p>
         </div>
       </div>
     </footer>
