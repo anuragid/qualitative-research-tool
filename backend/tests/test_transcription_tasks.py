@@ -11,7 +11,7 @@ Covers:
 """
 
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 from uuid import uuid4
 
 import pytest
@@ -148,7 +148,7 @@ class TestAssemblyAIUploadFile:
         mock_response.json.return_value = {"upload_url": "https://cdn.assemblyai.com/upload/abc123"}
 
         with patch("app.services.assemblyai_service.httpx.post", return_value=mock_response) as mock_post, \
-             patch("builtins.open", MagicMock()):
+             patch("builtins.open", mock_open(read_data=b"fake video data")):
             service = AssemblyAIService()
             url = service.upload_file("/tmp/test.mp4")
 
@@ -160,7 +160,7 @@ class TestAssemblyAIUploadFile:
         from app.services.assemblyai_service import AssemblyAIService
 
         with patch("app.services.assemblyai_service.httpx.post", side_effect=Exception("Connection refused")), \
-             patch("builtins.open", MagicMock()):
+             patch("builtins.open", mock_open(read_data=b"fake video data")):
             service = AssemblyAIService()
             with pytest.raises(Exception, match="Failed to upload to AssemblyAI"):
                 service.upload_file("/tmp/test.mp4")
