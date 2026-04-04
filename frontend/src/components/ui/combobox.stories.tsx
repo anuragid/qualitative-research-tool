@@ -10,7 +10,6 @@ import {
   ComboboxEmpty,
   ComboboxGroup,
   ComboboxLabel,
-  ComboboxSeparator,
 } from "./combobox";
 import { ModelOption } from "../settings/ModelOption";
 
@@ -183,7 +182,6 @@ const mockModels: MockModel[] = [
 ];
 
 export const ModelSearch: Story = {
-  name: "Model Search",
   parameters: {
     docs: {
       description: {
@@ -247,7 +245,6 @@ export const ModelSearch: Story = {
 };
 
 export const AsyncModelSearch: Story = {
-  name: "Async Model Search",
   parameters: {
     docs: {
       description: {
