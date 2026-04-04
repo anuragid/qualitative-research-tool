@@ -1,7 +1,8 @@
 # Railway-optimized Dockerfile
 # Build context: project root (set by railway.toml buildContext = ".")
 
-FROM python:3.11-slim as builder
+# Pinned 2026-04-04 — check for updates quarterly
+FROM python:3.11.12-slim as builder
 
 WORKDIR /app
 
@@ -15,7 +16,8 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Production stage
-FROM python:3.11-slim
+# Pinned 2026-04-04 — check for updates quarterly
+FROM python:3.11.12-slim
 
 WORKDIR /app
 
