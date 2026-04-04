@@ -221,8 +221,8 @@ export function ModelSettingsDialog({
                       items={results}
                       filteredItems={results}
                       filter={null}
-                      itemToStringLabel={(m) => m.name}
-                      itemToStringValue={(m) => m.id}
+                      itemToStringLabel={(m) => m?.name ?? ""}
+                      itemToStringValue={(m) => m?.id ?? ""}
                       onInputValueChange={setQuery}
                       onValueChange={handleModelSelect}
                     >
