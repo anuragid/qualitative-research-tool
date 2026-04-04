@@ -10,8 +10,19 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+} from "../ui/combobox";
 import { useSettings } from "../../hooks/useSettings";
-import { LockIcon } from "lucide-react";
+import { useModelSearch } from "../../hooks/useModelSearch";
+import { ModelOption } from "./ModelOption";
+import { LockIcon, LoaderIcon } from "lucide-react";
+import type { SearchModel } from "../../services/settings";
 
 interface ModelSettingsDialogProps {
   open: boolean;
@@ -35,6 +46,10 @@ export function ModelSettingsDialog({
 
   const [apiKey, setApiKey] = useState("");
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [selectedModelName, setSelectedModelName] = useState<string | null>(
+    null,
+  );
+  const { results, isSearching, query, setQuery } = useModelSearch();
 
   // Reset local state when dialog opens
   useEffect(() => {
@@ -42,8 +57,10 @@ export function ModelSettingsDialog({
       resetUpdateError();
       setApiKey("");
       setSelectedModel(null);
+      setSelectedModelName(null);
+      setQuery("");
     }
-  }, [open, resetUpdateError]);
+  }, [open, resetUpdateError, setQuery]);
 
   const currentModel = selectedModel ?? settings?.preferred_model ?? null;
 
@@ -52,6 +69,9 @@ export function ModelSettingsDialog({
     settings?.available_models.filter((m) => m.tier === "standard") ?? [];
 
   const hasKey = settings?.has_api_key || !!apiKey;
+
+  const isPremiumModel =
+    currentModel != null && !standardModels.some((m) => m.id === currentModel);
 
   const handleSave = () => {
     updateSettings(
@@ -72,9 +92,24 @@ export function ModelSettingsDialog({
     deleteApiKey(undefined, {
       onSuccess: () => {
         setSelectedModel(null);
+        setSelectedModelName(null);
         setApiKey("");
+        setQuery("");
       },
     });
+  };
+
+  const handleModelSelect = (model: SearchModel | null) => {
+    if (model) {
+      setSelectedModel(model.id);
+      setSelectedModelName(model.name);
+    }
+  };
+
+  const handleStandardModelSelect = (modelId: string) => {
+    setSelectedModel(modelId);
+    setSelectedModelName(null);
+    setQuery("");
   };
 
   if (isLoading) return null;
@@ -82,6 +117,15 @@ export function ModelSettingsDialog({
   const errorMessage = updateError
     ? (updateError as { message?: string }).message ?? String(updateError)
     : null;
+
+  const emptyMessage = isSearching
+    ? "Searching..."
+    : query.length < 2
+      ? "Type to search models"
+      : "No models found";
+
+  // Display name for the currently selected premium model
+  const premiumDisplayName = selectedModelName ?? currentModel;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,7 +138,7 @@ export function ModelSettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="flex flex-col gap-4 py-4">
           {/* Error banner */}
           {errorMessage && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -105,7 +149,7 @@ export function ModelSettingsDialog({
           {/* Model selection */}
           <RadioGroup
             value={currentModel || standardModels[0]?.id || ""}
-            onValueChange={(value) => setSelectedModel(value)}
+            onValueChange={handleStandardModelSelect}
             className="gap-4"
           >
             {/* Standard models */}
@@ -116,7 +160,7 @@ export function ModelSettingsDialog({
               <p className="mt-0.5 text-xs text-text-tertiary">
                 Included -- no API key needed
               </p>
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 flex flex-col gap-2">
                 {standardModels.map((model) => (
                   <label
                     key={model.id}
@@ -154,20 +198,60 @@ export function ModelSettingsDialog({
               </p>
               {hasKey ? (
                 <div className="mt-2">
-                  <Input
-                    placeholder="Enter any OpenRouter model ID (e.g. anthropic/claude-sonnet-4.6)"
-                    value={
-                      selectedModel && !standardModels.some((m) => m.id === selectedModel)
-                        ? selectedModel
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const val = e.target.value.trim();
-                      if (val) setSelectedModel(val);
-                    }}
-                    className="h-9 text-sm font-mono"
-                  />
-                  <p className="mt-1 text-xs text-text-tertiary">
+                  {isPremiumModel && (
+                    <div className="mb-2 rounded-lg border border-interactive-focus bg-interactive-focus-bg px-3 py-2">
+                      <div className="text-sm font-medium">
+                        {premiumDisplayName}
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-0.5 text-xs text-text-tertiary underline hover:text-text-secondary"
+                        onClick={() => {
+                          setSelectedModel(null);
+                          setSelectedModelName(null);
+                          setQuery("");
+                        }}
+                      >
+                        Change model
+                      </button>
+                    </div>
+                  )}
+                  {!isPremiumModel && (
+                    <Combobox
+                      items={results}
+                      filteredItems={results}
+                      filter={null}
+                      itemToStringLabel={(m) => m.name}
+                      itemToStringValue={(m) => m.id}
+                      onInputValueChange={setQuery}
+                      onValueChange={handleModelSelect}
+                    >
+                      <ComboboxInput placeholder="Search models..." />
+                      <ComboboxContent>
+                        <ComboboxEmpty>
+                          <span className="flex items-center gap-2">
+                            {isSearching && (
+                              <LoaderIcon className="size-3.5 animate-spin" />
+                            )}
+                            {emptyMessage}
+                          </span>
+                        </ComboboxEmpty>
+                        <ComboboxList>
+                          {(model) => (
+                            <ComboboxItem key={model.id} value={model}>
+                              <ModelOption
+                                name={model.name}
+                                provider={model.provider}
+                                isFree={model.is_free}
+                                contextLength={model.context_length}
+                              />
+                            </ComboboxItem>
+                          )}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                  )}
+                  <p className="mt-1.5 text-xs text-text-tertiary">
                     Browse models at{" "}
                     <a
                       href="https://openrouter.ai/models"

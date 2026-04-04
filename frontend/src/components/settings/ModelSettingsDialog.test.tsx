@@ -36,7 +36,6 @@ vi.mock("../../hooks/useSettings", () => ({
 const STANDARD_MODELS = [
   { id: "meta-llama/llama-4-scout", name: "Llama 4 Scout", tier: "standard", provider: "Meta" },
   { id: "nvidia/nemotron-3-super-120b-a12b", name: "Nemotron 3 Super 120B", tier: "standard", provider: "NVIDIA" },
-  { id: "mistralai/ministral-8b", name: "Ministral 8B", tier: "standard", provider: "Mistral" },
   { id: "deepseek/deepseek-chat-v3-0324", name: "DeepSeek V3", tier: "standard", provider: "DeepSeek" },
 ];
 

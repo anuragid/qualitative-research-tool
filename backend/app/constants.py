@@ -6,7 +6,6 @@
 STANDARD_MODELS = [
     {"id": "meta-llama/llama-4-scout", "name": "Llama 4 Scout", "provider": "Meta", "tier": "standard"},
     {"id": "nvidia/nemotron-3-super-120b-a12b", "name": "Nemotron 3 Super 120B", "provider": "NVIDIA", "tier": "standard"},
-    {"id": "mistralai/ministral-8b", "name": "Ministral 8B", "provider": "Mistral", "tier": "standard"},
     {"id": "deepseek/deepseek-chat-v3-0324", "name": "DeepSeek V3", "provider": "DeepSeek", "tier": "standard"},
 ]
 
