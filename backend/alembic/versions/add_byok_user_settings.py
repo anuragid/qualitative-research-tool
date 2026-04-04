@@ -1,6 +1,6 @@
 """Add BYOK user settings columns
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: ddba140526fc
 Revises: add_user_authentication
 Create Date: 2026-03-12
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a1b2c3d4e5f6'
+revision: str = 'ddba140526fc'
 down_revision: str = 'add_role_001'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
