@@ -33,6 +33,7 @@ celery_app = Celery(
         "app.tasks.analysis_tasks",
         "app.tasks.analysis_steps",
         "app.tasks.watchdog_tasks",
+        "app.tasks.model_validation_tasks",
     ]
 )
 
@@ -76,6 +77,10 @@ celery_app.conf.update(
         "watchdog-reset-stuck-analyses": {
             "task": "reset_stuck_analyses",
             "schedule": timedelta(minutes=5),
+        },
+        "validate-openrouter-models": {
+            "task": "validate_openrouter_models",
+            "schedule": timedelta(hours=6),
         },
     },
 )

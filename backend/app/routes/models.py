@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from app.auth_bridge import Permission, require_permissions
 from app.config import settings
 from app.constants import RECOMMENDED_MODELS
+from app.services.model_cache import get_valid_model_ids
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,8 +19,29 @@ logger = logging.getLogger(__name__)
 async def get_recommended_models(
     _current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
 ):
-    """Return the currently recommended standard and advanced models."""
-    return RECOMMENDED_MODELS
+    """Return the currently recommended standard and advanced models.
+
+    If the periodic validation task has flagged the standard model as
+    deprecated, falls back to the first still-valid standard model.
+    """
+    valid_ids = get_valid_model_ids()
+    result = dict(RECOMMENDED_MODELS)
+
+    if valid_ids is not None:
+        std = result["standard"]
+        if std["id"] not in valid_ids and valid_ids:
+            # Current recommended standard model is deprecated — pick first valid one
+            from app.constants import STANDARD_MODELS
+            for m in STANDARD_MODELS:
+                if m["id"] in valid_ids:
+                    result["standard"] = {
+                        "id": m["id"],
+                        "name": m["name"],
+                        "description": std["description"],
+                    }
+                    break
+
+    return result
 
 
 @router.get("/search")

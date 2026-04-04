@@ -14,6 +14,10 @@ STANDARD_MODEL_IDS = {m["id"] for m in STANDARD_MODELS}
 # Default model used when no preference is set
 DEFAULT_STANDARD_MODEL = STANDARD_MODELS[0]["id"]  # Llama 4 Scout
 
+# Ordered fallback chain for the Methodex shared key.
+# If the primary model is rate-limited/unavailable, try the next.
+FREE_MODEL_FALLBACKS = [m["id"] for m in STANDARD_MODELS]
+
 # ── Recommended model per tier (shown in the settings dialog) ────────────
 RECOMMENDED_MODELS = {
     "standard": {

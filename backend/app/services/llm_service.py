@@ -3,9 +3,9 @@
 import json
 import logging
 import re
-from typing import Any, List, Optional
+from typing import Any, Optional
 
-from openai import APIConnectionError, APIError, OpenAI, RateLimitError
+from openai import APIConnectionError, APIError, NotFoundError, OpenAI, RateLimitError
 from tenacity import (
     RetryError,
     before_sleep_log,
@@ -16,6 +16,7 @@ from tenacity import (
 )
 
 from app.config import settings
+from app.constants import FREE_MODEL_FALLBACKS
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +28,6 @@ OPENROUTER_HEADERS = {
     "HTTP-Referer": "https://methodex.ai",
     "X-Title": "Qualitative Research Tool",
 }
-
-# Standard models available to all users via the Methodex shared key.
-# Ordered by preference: if the primary model is rate-limited, try the next.
-FREE_MODEL_FALLBACKS: List[str] = [
-    "meta-llama/llama-4-scout",
-    "nvidia/nemotron-3-super-120b-a12b",
-    "deepseek/deepseek-chat-v3-0324",
-]
 
 # Set of allowed model IDs when using the Methodex (shared) key.
 # The Methodex key must never be used with premium models.
@@ -195,13 +188,18 @@ class LLMService:
             )
             chosen_model = self.default_model
 
-        # Build list of models to try: primary first, then fallbacks
+        # Build list of models to try: primary first, then fallbacks.
+        # Shared-key users get the full fallback chain for rate limits.
+        # BYOK users get the default standard model as a last resort
+        # (handles deprecated/removed models gracefully).
         models_to_try = [chosen_model]
-        # Add fallbacks when no custom api_key is provided.
         if api_key is None:
             for fallback in FREE_MODEL_FALLBACKS:
                 if fallback != chosen_model and fallback not in models_to_try:
                     models_to_try.append(fallback)
+        else:
+            if self.default_model not in models_to_try:
+                models_to_try.append(self.default_model)
 
         last_error: Optional[Exception] = None
         for model_name in models_to_try:
@@ -214,6 +212,16 @@ class LLMService:
                     model=model_name,
                     client=client,
                 )
+            except NotFoundError as e:
+                # Model was removed/deprecated on OpenRouter.  Always fall
+                # back regardless of BYOK — a missing model can't be fixed
+                # by retrying.
+                logger.warning(
+                    f"Model {model_name} not found on OpenRouter (404). "
+                    f"Falling back to next model..."
+                )
+                last_error = e
+                continue
             except (RateLimitError, RetryError) as e:
                 logger.warning(
                     f"Model {model_name} is rate-limited/failed after retries: "
