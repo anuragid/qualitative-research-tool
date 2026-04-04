@@ -5,11 +5,13 @@ import logging
 from typing import Any, Dict, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth_bridge import Permission, require_permissions
+from app.config import settings
 from app.database import get_db
+from app.main import limiter
 from app.models.database_models import Project, ProjectAnalysis, Video, VideoAnalysis
 from app.models.schemas import (
     ProjectAnalysisResponse,
@@ -331,8 +333,10 @@ async def list_project_videos(
 
 
 @router.post("/{project_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE)
 async def trigger_project_analysis(
     project_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):
