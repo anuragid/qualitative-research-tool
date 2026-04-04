@@ -10,16 +10,13 @@ Covers:
 - Watchdog no longer sends to Sentry directly
 """
 
-import os
-import tempfile
 import time
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from app.tasks.transcription_tasks import _mark_transcription_error
-
 
 # ---------------------------------------------------------------------------
 # _mark_transcription_error
@@ -119,6 +116,7 @@ class TestS3ServiceDownloadFile:
     def test_download_file_raises_on_client_error(self):
         """download_file should wrap ClientError in a descriptive exception."""
         from botocore.exceptions import ClientError
+
         from app.services.s3_service import S3Service
 
         with patch("app.services.s3_service.boto3") as mock_boto3:
@@ -378,7 +376,7 @@ class TestTranscribeVideoTaskFlow:
             mock_transcript,
         ]
 
-        with patch("app.tasks.transcription_tasks.s3_service") as mock_s3, \
+        with patch("app.tasks.transcription_tasks.s3_service"), \
              patch("app.tasks.transcription_tasks.assemblyai_service") as mock_aai, \
              patch("app.tasks.transcription_tasks.check_transcription_task"), \
              patch("app.tasks.transcription_tasks.tempfile.mkstemp") as mock_mkstemp, \
@@ -405,8 +403,9 @@ class TestWatchdogSentryNoise:
 
     def test_watchdog_does_not_import_sentry_sdk(self):
         """The watchdog module should not import sentry_sdk directly."""
-        import app.tasks.watchdog_tasks as wt
         import inspect
+
+        import app.tasks.watchdog_tasks as wt
         source = inspect.getsource(wt)
         assert "sentry_sdk" not in source, (
             "watchdog_tasks should not reference sentry_sdk — "

@@ -8,7 +8,7 @@ R2 does not support ACLs or bucket policies via the S3 API.
 import logging
 import uuid
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 
 import boto3
 from botocore.config import Config as BotoConfig
