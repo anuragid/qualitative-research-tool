@@ -1761,6 +1761,29 @@
   transition: color var(--duration-base) var(--ease-out);
 }
 .landing-page .footer-credits a:hover { color: white; }
+.landing-page .footer-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-top: 16px;
+  margin-bottom: 12px;
+}
+.landing-page .footer-attribution {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.02em;
+}
+.landing-page .footer-attribution a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 2px;
+  transition: all var(--duration-base) var(--ease-out);
+}
+.landing-page .footer-attribution a:hover {
+  background: rgba(13, 148, 136, 0.25);
+  color: rgba(255, 255, 255, 0.8);
+}
 
 /* ================================================================
    SCROLL ANIMATIONS
@@ -2186,6 +2209,9 @@
   .landing-page .footer-credits {
     font-size: 12px;
   }
+  .landing-page .footer-attribution {
+    font-size: 11px;
+  }
 
   /* About orgs: wrap better */
   .landing-page .about-orgs {
@@ -2401,6 +2427,7 @@
   .landing-page .footer-col button { font-size: 13px; }
   .landing-page .footer-copyright,
   .landing-page .footer-credits { font-size: 11px; }
+  .landing-page .footer-attribution { font-size: 10px; }
 
   /* About */
   .landing-page .about-text { font-size: 14px; }
