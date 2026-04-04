@@ -272,6 +272,10 @@ class LLMService:
 
         response = response.strip()
 
+        def _return_checked(result):
+            self._check_output_anomalies(result)
+            return result
+
         # Strategy 1: Try direct JSON parsing
         try:
             parsed = json.loads(response)
@@ -281,8 +285,8 @@ class LLMService:
                 key = next(iter(parsed))
                 if isinstance(parsed[key], list):
                     logger.debug(f"Unwrapped JSON object with single key '{key}' to array")
-                    return parsed[key]
-            return parsed
+                    return _return_checked(parsed[key])
+            return _return_checked(parsed)
         except json.JSONDecodeError:
             pass
 
@@ -292,7 +296,7 @@ class LLMService:
         if json_match:
             try:
                 parsed = json.loads(json_match.group(1))
-                return self._unwrap_single_key_object(parsed)
+                return _return_checked(self._unwrap_single_key_object(parsed))
             except json.JSONDecodeError:
                 pass
 
@@ -303,7 +307,7 @@ class LLMService:
             extracted = self._extract_balanced_json(response, array_start, "[", "]")
             if extracted:
                 try:
-                    return json.loads(extracted)
+                    return _return_checked(json.loads(extracted))
                 except json.JSONDecodeError:
                     pass
 
@@ -314,7 +318,7 @@ class LLMService:
             if extracted:
                 try:
                     parsed = json.loads(extracted)
-                    return self._unwrap_single_key_object(parsed)
+                    return _return_checked(self._unwrap_single_key_object(parsed))
                 except json.JSONDecodeError:
                     pass
 
@@ -324,7 +328,7 @@ class LLMService:
             repaired = repair_json(response, return_objects=True)
             if repaired:
                 logger.warning("Used json-repair to fix malformed JSON response")
-                return self._unwrap_single_key_object(repaired) if isinstance(repaired, dict) else repaired
+                return _return_checked(self._unwrap_single_key_object(repaired) if isinstance(repaired, dict) else repaired)
         except Exception as repair_error:
             logger.warning(f"json-repair also failed: {repair_error}")
 
@@ -382,6 +386,31 @@ class LLMService:
                     return text[start:i + 1]
 
         return None
+
+    # Patterns that may indicate prompt injection echo in LLM output
+    _SUSPICIOUS_PATTERNS = [
+        "IGNORE PREVIOUS",
+        "IGNORE ALL",
+        "SYSTEM:",
+        "ASSISTANT:",
+        "### INSTRUCTION",
+        "<script>",
+    ]
+
+    def _check_output_anomalies(self, parsed: Any) -> None:
+        """Log warnings for suspicious or anomalous LLM output. Non-blocking."""
+        if isinstance(parsed, list) and len(parsed) == 0:
+            logger.warning("LLM output anomaly: empty array returned")
+            return
+
+        content_str = json.dumps(parsed) if not isinstance(parsed, str) else parsed
+        matched = [p for p in self._SUSPICIOUS_PATTERNS if p.lower() in content_str.lower()]
+        if matched:
+            logger.warning(
+                "LLM output anomaly: suspicious injection-like pattern detected "
+                "(matched: %s). Output may have been influenced by injected content.",
+                matched,
+            )
 
     def call_with_json_response(
         self,
