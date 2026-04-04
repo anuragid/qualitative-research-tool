@@ -87,3 +87,15 @@ async def test_video_access_cross_project(client, mock_s3):
     video_resp = await client.get(f"/api/videos/{video_id}")
     # Video is in "uploading" state; GET still returns 200 with ownership check
     assert video_resp.status_code == 200
+
+
+def test_dev_bypass_token_constant_exists():
+    """The dev bypass token constant should exist and have the expected value."""
+    from app.auth import DEV_BYPASS_TOKEN
+    assert DEV_BYPASS_TOKEN == "dev-bypass"
+
+
+def test_is_dev_true_in_test_environment():
+    """In test env (APP_ENV=development), _is_dev should be True."""
+    from app.auth import _is_dev
+    assert _is_dev is True

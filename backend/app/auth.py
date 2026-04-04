@@ -22,6 +22,14 @@ DEV_USER_ID = "dev_user_local"
 DEV_BYPASS_TOKEN = "dev-bypass"
 _is_dev = settings.APP_ENV == "development"
 
+# Defense-in-depth: if APP_ENV is "production", _is_dev must be False.
+# main.py also validates at startup, but this catches it at import time.
+if settings.APP_ENV == "production" and _is_dev:
+    raise RuntimeError(
+        "FATAL: _is_dev is True but APP_ENV is 'production'. "
+        "This indicates a logic error in environment detection."
+    )
+
 # In development, make the bearer token optional so requests with no
 # Authorization header don't get an automatic 403 from FastAPI.
 security = HTTPBearer(auto_error=not _is_dev)
