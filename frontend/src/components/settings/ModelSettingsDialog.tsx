@@ -217,7 +217,7 @@ export function ModelSettingsDialog({
                     </div>
                   )}
                   {!isPremiumModel && (
-                    <Combobox
+                    <Combobox<SearchModel>
                       items={results}
                       filteredItems={results}
                       filter={null}
