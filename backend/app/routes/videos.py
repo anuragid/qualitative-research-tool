@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Any, Dict
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import Permission, require_permissions, require_permissions_upload
 from app.config import settings
+from app.main import limiter
 from app.database import get_db
 from app.models.database_models import Project, Transcript, Video, VideoAnalysis
 from app.models.schemas import TranscriptResponse, VideoAnalysisResponse, VideoResponse, VideoUploadResponse
@@ -476,8 +477,10 @@ async def get_video_transcript(
 
 
 @router.post("/{video_id}/transcribe", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def start_transcription(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):
@@ -553,8 +556,10 @@ async def start_transcription(
 
 
 @router.post("/{video_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE)
 async def trigger_video_analysis(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):
