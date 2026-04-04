@@ -138,28 +138,29 @@ class TestS3ServiceDownloadFile:
 
 
 class TestAssemblyAIUploadFile:
-    """Tests for the new upload_file method."""
+    """Tests for the upload_file method (REST API via httpx)."""
 
     def test_upload_file_returns_url(self):
-        """upload_file should call aai.upload and return the hosted URL."""
+        """upload_file should POST to AssemblyAI and return the hosted URL."""
         from app.services.assemblyai_service import AssemblyAIService
 
-        with patch("app.services.assemblyai_service.aai") as mock_aai:
-            mock_aai.upload.return_value = "https://cdn.assemblyai.com/upload/abc123"
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"upload_url": "https://cdn.assemblyai.com/upload/abc123"}
 
+        with patch("app.services.assemblyai_service.httpx.post", return_value=mock_response) as mock_post, \
+             patch("builtins.open", MagicMock()):
             service = AssemblyAIService()
             url = service.upload_file("/tmp/test.mp4")
 
-            mock_aai.upload.assert_called_once_with("/tmp/test.mp4")
+            mock_post.assert_called_once()
             assert url == "https://cdn.assemblyai.com/upload/abc123"
 
     def test_upload_file_raises_on_error(self):
         """upload_file should wrap errors with descriptive message."""
         from app.services.assemblyai_service import AssemblyAIService
 
-        with patch("app.services.assemblyai_service.aai") as mock_aai:
-            mock_aai.upload.side_effect = Exception("Connection refused")
-
+        with patch("app.services.assemblyai_service.httpx.post", side_effect=Exception("Connection refused")), \
+             patch("builtins.open", MagicMock()):
             service = AssemblyAIService()
             with pytest.raises(Exception, match="Failed to upload to AssemblyAI"):
                 service.upload_file("/tmp/test.mp4")
