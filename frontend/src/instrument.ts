@@ -11,7 +11,7 @@ Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   environment: import.meta.env.MODE,
   release: import.meta.env.VITE_SENTRY_RELEASE,
-  sendDefaultPii: true,
+  sendDefaultPii: false,
 
   integrations: [
     Sentry.reactRouterV7BrowserTracingIntegration({
@@ -22,8 +22,8 @@ Sentry.init({
       matchRoutes,
     }),
     Sentry.replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
+      maskAllText: true,
+      blockAllMedia: true,
     }),
   ],
 
@@ -38,7 +38,7 @@ Sentry.init({
   },
 
   // Tracing — capture everything while user base is small
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.1,
   tracePropagationTargets: [
     "localhost",
     /^https:\/\/api\.methodex\.ai/,
