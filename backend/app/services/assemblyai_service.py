@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict
 
 import assemblyai as aai
+import httpx
 
 from app.config import settings
 
@@ -24,6 +25,9 @@ class AssemblyAIService:
         """
         Upload a local file to AssemblyAI's servers.
 
+        Uses the REST API directly because aai.upload() is not available
+        in assemblyai==0.17.0.
+
         Args:
             file_path: Path to the local audio/video file
 
@@ -34,7 +38,16 @@ class AssemblyAIService:
             Exception: If upload fails
         """
         try:
-            upload_url = aai.upload(file_path)
+            headers = {"authorization": settings.ASSEMBLYAI_API_KEY}
+            with open(file_path, "rb") as f:
+                response = httpx.post(
+                    "https://api.assemblyai.com/v2/upload",
+                    headers=headers,
+                    content=f.read(),
+                    timeout=300.0,
+                )
+            response.raise_for_status()
+            upload_url = response.json()["upload_url"]
             logger.info(f"Uploaded file to AssemblyAI: {file_path}")
             return upload_url
         except Exception as e:
