@@ -33,7 +33,6 @@ OPENROUTER_HEADERS = {
 FREE_MODEL_FALLBACKS: List[str] = [
     "meta-llama/llama-4-scout",
     "nvidia/nemotron-3-super-120b-a12b",
-    "mistralai/ministral-8b",
     "deepseek/deepseek-chat-v3-0324",
 ]
 

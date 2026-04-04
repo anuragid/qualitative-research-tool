@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from app.auth_bridge import Permission, require_permissions, require_permissions_upload
 from app.config import settings
-from app.main import limiter
 from app.database import get_db
+from app.main import limiter
 from app.models.database_models import Project, Transcript, Video, VideoAnalysis
 from app.models.schemas import TranscriptResponse, VideoAnalysisResponse, VideoResponse, VideoUploadResponse
 from app.services.s3_service import s3_service

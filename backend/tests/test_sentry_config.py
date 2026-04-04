@@ -1,7 +1,7 @@
 """Tests for Sentry SDK configuration security."""
 
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 def test_sentry_does_not_send_pii():
@@ -9,6 +9,7 @@ def test_sentry_does_not_send_pii():
     with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1"}):
         with patch("sentry_sdk.init") as mock_init:
             import importlib
+
             import app.sentry_setup
             importlib.reload(app.sentry_setup)
             app.sentry_setup.init_sentry()
@@ -24,6 +25,7 @@ def test_sentry_does_not_include_prompts():
     with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1"}):
         with patch("sentry_sdk.init") as mock_init:
             import importlib
+
             import app.sentry_setup
             importlib.reload(app.sentry_setup)
             app.sentry_setup.init_sentry()
@@ -41,6 +43,7 @@ def test_sentry_sampling_is_reasonable():
     with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1"}):
         with patch("sentry_sdk.init") as mock_init:
             import importlib
+
             import app.sentry_setup
             importlib.reload(app.sentry_setup)
             app.sentry_setup.init_sentry()
