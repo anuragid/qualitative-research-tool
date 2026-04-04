@@ -394,7 +394,6 @@ class LLMService:
         "SYSTEM:",
         "ASSISTANT:",
         "### INSTRUCTION",
-        "{{",
         "<script>",
     ]
 
@@ -405,14 +404,13 @@ class LLMService:
             return
 
         content_str = json.dumps(parsed) if not isinstance(parsed, str) else parsed
-        for pattern in self._SUSPICIOUS_PATTERNS:
-            if pattern.lower() in content_str.lower():
-                logger.warning(
-                    "LLM output anomaly: suspicious injection-like pattern detected "
-                    "(matched: '%s'). Output may have been influenced by injected content.",
-                    pattern,
-                )
-                return
+        matched = [p for p in self._SUSPICIOUS_PATTERNS if p.lower() in content_str.lower()]
+        if matched:
+            logger.warning(
+                "LLM output anomaly: suspicious injection-like pattern detected "
+                "(matched: %s). Output may have been influenced by injected content.",
+                matched,
+            )
 
     def call_with_json_response(
         self,
