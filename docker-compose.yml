@@ -4,7 +4,8 @@
 services:
   # PostgreSQL - local dev (mirrors Railway Postgres)
   postgres:
-    image: postgres:15-alpine
+    # Pinned 2026-04-04 — check for updates quarterly
+    image: postgres:15.12-alpine
     container_name: qualitative-research-db
     environment:
       POSTGRES_DB: qualitative_research
@@ -24,7 +25,8 @@ services:
 
   # Redis - local dev (mirrors Railway Redis)
   redis:
-    image: redis:7-alpine
+    # Pinned 2026-04-04 — check for updates quarterly
+    image: redis:7.4-alpine
     container_name: qualitative-research-redis
     command: redis-server --requirepass devredispass
     ports:
