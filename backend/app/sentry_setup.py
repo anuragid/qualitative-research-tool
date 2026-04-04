@@ -28,7 +28,7 @@ def init_sentry() -> None:
             ),
         ],
 
-        # Tracing — capture everything while user base is small
+        # Tracing — sample 10% to balance observability vs data volume
         traces_sample_rate=0.1,
 
         # Continuous profiling tied to active spans

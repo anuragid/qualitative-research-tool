@@ -37,7 +37,7 @@ Sentry.init({
     return event;
   },
 
-  // Tracing — capture everything while user base is small
+  // Tracing — sample 10% to balance observability vs data volume
   tracesSampleRate: 0.1,
   tracePropagationTargets: [
     "localhost",
