@@ -139,17 +139,19 @@ async def save_speaker_labels(
                 detail="Maximum of 20 speaker labels per transcript"
             )
 
-        existing_count = db.query(SpeakerLabel).filter(
+        # Bulk-fetch all existing speaker labels for this transcript (single query)
+        existing_labels_list = db.query(SpeakerLabel).filter(
             SpeakerLabel.transcript_id == transcript_id
-        ).count()
+        ).all()
+        existing_labels_map = {
+            label.speaker_label: label for label in existing_labels_list
+        }
+
         new_labels = [
             label for label in speaker_labels
-            if not db.query(SpeakerLabel).filter(
-                SpeakerLabel.transcript_id == transcript_id,
-                SpeakerLabel.speaker_label == label.speaker_label
-            ).first()
+            if label.speaker_label not in existing_labels_map
         ]
-        if existing_count + len(new_labels) > 20:
+        if len(existing_labels_list) + len(new_labels) > 20:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Maximum of 20 speaker labels per transcript"
@@ -158,11 +160,7 @@ async def save_speaker_labels(
         saved_labels = []
 
         for label_data in speaker_labels:
-            # Check if speaker label already exists
-            existing_label = db.query(SpeakerLabel).filter(
-                SpeakerLabel.transcript_id == transcript_id,
-                SpeakerLabel.speaker_label == label_data.speaker_label
-            ).first()
+            existing_label = existing_labels_map.get(label_data.speaker_label)
 
             if existing_label:
                 # Update existing label

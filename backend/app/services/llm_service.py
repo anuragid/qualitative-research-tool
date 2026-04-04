@@ -286,7 +286,8 @@ class LLMService:
                     logger.debug(f"Unwrapped JSON object with single key '{key}' to array")
                     return _return_checked(parsed[key])
             return _return_checked(parsed)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.debug(f"Strategy 1 (direct parse) failed: {e}")
             pass
 
         # Strategy 2: Extract JSON from markdown code blocks
@@ -296,7 +297,8 @@ class LLMService:
             try:
                 parsed = json.loads(json_match.group(1))
                 return _return_checked(self._unwrap_single_key_object(parsed))
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.debug(f"Strategy 2 (markdown code block) failed: {e}")
                 pass
 
         # Strategy 3: Find outermost JSON array in text
@@ -307,7 +309,8 @@ class LLMService:
             if extracted:
                 try:
                     return _return_checked(json.loads(extracted))
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    logger.debug(f"Strategy 3 (balanced array extraction) failed: {e}")
                     pass
 
         # Strategy 4: Find outermost JSON object in text
@@ -318,7 +321,8 @@ class LLMService:
                 try:
                     parsed = json.loads(extracted)
                     return _return_checked(self._unwrap_single_key_object(parsed))
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    logger.debug(f"Strategy 4 (balanced object extraction) failed: {e}")
                     pass
 
         # Strategy 5: Use json-repair for malformed JSON from weaker models
