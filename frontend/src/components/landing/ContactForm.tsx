@@ -14,8 +14,8 @@ interface ContactFormData {
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error';
 
-const FORMSPREE_URL = import.meta.env.VITE_FORMSPREE_ENDPOINT || '';
-const IS_FORM_CONFIGURED = Boolean(FORMSPREE_URL);
+const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || '';
+const IS_FORM_CONFIGURED = Boolean(WEB3FORMS_KEY);
 
 export function ContactForm() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -33,14 +33,15 @@ export function ContactForm() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
-      const response = await fetch(FORMSPREE_URL, {
+      const response = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ access_key: WEB3FORMS_KEY, ...data }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      if (response.ok) {
+      const result = await response.json();
+      if (result.success) {
         setStatus('success');
         reset();
       } else {
