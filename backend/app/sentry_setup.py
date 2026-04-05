@@ -16,6 +16,11 @@ def init_sentry() -> None:
     if not dsn:
         return
 
+    # Only enable Sentry in production — dev errors are noise
+    app_env = os.environ.get("APP_ENV", "production")
+    if app_env == "development":
+        return
+
     sentry_sdk.init(
         dsn=dsn,
         environment=os.environ.get("SENTRY_ENVIRONMENT", os.environ.get("APP_ENV", "production")),

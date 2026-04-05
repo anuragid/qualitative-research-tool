@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 def test_sentry_does_not_send_pii():
     """Sentry must NOT send default PII (IPs, emails, cookies)."""
-    with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1"}):
+    with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1", "APP_ENV": "production"}):
         with patch("sentry_sdk.init") as mock_init:
             import importlib
 
@@ -22,7 +22,7 @@ def test_sentry_does_not_send_pii():
 
 def test_sentry_does_not_include_prompts():
     """OpenAI integration must NOT include prompts (contains research transcripts)."""
-    with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1"}):
+    with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1", "APP_ENV": "production"}):
         with patch("sentry_sdk.init") as mock_init:
             import importlib
 
@@ -40,7 +40,7 @@ def test_sentry_does_not_include_prompts():
 
 def test_sentry_sampling_is_reasonable():
     """Trace and profile sampling should not be 100% in production."""
-    with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1"}):
+    with patch.dict(os.environ, {"SENTRY_DSN": "https://fake@sentry.io/1", "APP_ENV": "production"}):
         with patch("sentry_sdk.init") as mock_init:
             import importlib
 
