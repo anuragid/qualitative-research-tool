@@ -373,3 +373,144 @@ async def test_analyze_requires_completed_transcript(tmp_path):
         assert "transcript" in response.json()["detail"].lower()
     finally:
         app.dependency_overrides.clear()
+
+
+# ----------------------------------------------------------------------------
+# Step-by-step pipeline lock tests.
+#
+# Regression coverage for the deadlock fix in commit fixing the pentest-era
+# guard.  Background: trigger_chunk_step set video.status="analyzing" and the
+# chunk task never reset it.  The other step endpoints then refused to fire
+# because they checked `video.status == "analyzing"`.  The fix is to lock on
+# `analysis.step_status` instead, so the lock only blocks while a step is
+# actually mid-execution.
+# ----------------------------------------------------------------------------
+
+
+def _seed_chunks_completed(TestSession, meta, video_uuid):
+    """Put a video in the post-chunk state: chunks present, video.status='analyzing',
+    step_status={'chunk': 'completed'} -- the exact stuck state seen in production."""
+    db = TestSession()
+    analysis_id = uuid_module.uuid4().hex
+    db.execute(
+        meta.tables["videos"].update()
+        .where(meta.tables["videos"].c.id == video_uuid.hex)
+        .values(status="analyzing")
+    )
+    db.execute(
+        meta.tables["video_analyses"].insert().values(
+            id=analysis_id,
+            video_id=video_uuid.hex,
+            status="processing",
+            current_step="chunk",
+            step_status={"chunk": "completed"},
+            chunks=[{"chunk_id": "c1", "text": "x" * 30, "type": "quote"}],
+        )
+    )
+    db.commit()
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_infer_step_unblocked_after_chunk_completes(tmp_path):
+    """POST /analyze/infer must NOT 409 just because video.status is still 'analyzing'.
+
+    Regression test: previously the step-by-step endpoints checked
+    ``video.status == 'analyzing'``, which deadlocked the pipeline because
+    the chunk task never reset video.status.  The lock should be on
+    step_status (no step currently 'processing'), not video.status.
+    """
+    TestSession, meta, video_uuid, project_uuid = _setup_test_db(tmp_path)
+    _seed_chunks_completed(TestSession, meta, video_uuid)
+
+    def override_get_db():
+        session = TestSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    import app.tasks.analysis_steps as analysis_steps
+    from app.database import get_db
+    from app.main import app
+
+    # Stub the Celery dispatch so the test doesn't try to talk to a broker.
+    original = analysis_steps.analyze_infer_step
+
+    class _StubTask:
+        id = "stub-task-id"
+
+    class _StubDispatch:
+        @staticmethod
+        def delay(*args, **kwargs):
+            return _StubTask()
+
+    analysis_steps.analyze_infer_step = _StubDispatch  # type: ignore[assignment]
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                f"/api/videos/{video_uuid}/analyze/infer",
+                headers={"Authorization": "Bearer dev-bypass"},
+            )
+        assert response.status_code == 202, (
+            f"Expected 202, got {response.status_code}: {response.json()}.  "
+            f"This means the deadlock regression is back: the step-by-step "
+            f"pipeline cannot advance past CHUNK because the lock is too coarse."
+        )
+        assert response.json()["step"] == "infer"
+    finally:
+        analysis_steps.analyze_infer_step = original
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_infer_step_409_when_another_step_processing(tmp_path):
+    """POST /analyze/infer should still return 409 if a step is mid-execution.
+
+    The new lock checks ``analysis.step_status`` for any value == 'processing'.
+    """
+    TestSession, meta, video_uuid, project_uuid = _setup_test_db(tmp_path)
+    db = TestSession()
+    analysis_id = uuid_module.uuid4().hex
+    db.execute(
+        meta.tables["videos"].update()
+        .where(meta.tables["videos"].c.id == video_uuid.hex)
+        .values(status="analyzing")
+    )
+    db.execute(
+        meta.tables["video_analyses"].insert().values(
+            id=analysis_id,
+            video_id=video_uuid.hex,
+            status="processing",
+            current_step="chunk",
+            step_status={"chunk": "processing"},  # actively running
+            chunks=[{"chunk_id": "c1", "text": "x" * 30, "type": "quote"}],
+        )
+    )
+    db.commit()
+    db.close()
+
+    def override_get_db():
+        session = TestSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                f"/api/videos/{video_uuid}/analyze/infer",
+                headers={"Authorization": "Bearer dev-bypass"},
+            )
+        assert response.status_code == 409, f"Expected 409, got {response.status_code}: {response.json()}"
+        assert "in progress" in response.json()["detail"].lower()
+    finally:
+        app.dependency_overrides.clear()
