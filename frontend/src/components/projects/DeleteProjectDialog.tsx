@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useDeleteProject } from '../../hooks/useProjects';
+import { usePostHog } from '@posthog/react';
 import {
   Dialog,
   DialogContent,
@@ -29,10 +30,15 @@ export function DeleteProjectDialog({
 }: DeleteProjectDialogProps) {
   const navigate = useNavigate();
   const { mutate: deleteProject, isPending } = useDeleteProject();
+  const posthog = usePostHog();
 
   const handleDelete = () => {
     deleteProject(project.id, {
       onSuccess: () => {
+        posthog?.capture("project_deleted", {
+          project_id: project.id,
+          video_count: project.videoCount ?? 0,
+        });
         onOpenChange(false);
         if (navigateAfterDelete) {
           navigate('/projects');

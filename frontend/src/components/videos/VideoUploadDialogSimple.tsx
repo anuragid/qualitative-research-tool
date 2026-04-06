@@ -12,6 +12,7 @@ import {
 import { Button } from "../ui/button";
 import { useUploadContext } from "../../contexts/UploadContext";
 import { useProject } from "../../hooks/useProjects";
+import { usePostHog } from "@posthog/react";
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB (must match backend MAX_FILE_SIZE_MB)
 
@@ -57,6 +58,7 @@ export default function VideoUploadDialog({
   const [isDragging, setIsDragging] = useState(false);
   const { addUploads } = useUploadContext();
   const { data: project } = useProject(projectId);
+  const posthog = usePostHog();
 
   // Process initial files when dialog opens
   // Use initialFiles.length as a dependency proxy to avoid re-running when the
@@ -136,6 +138,12 @@ export default function VideoUploadDialog({
 
   const handleUploadAll = () => {
     if (selectedFiles.length === 0 || !project || hasOversizedFiles) return;
+
+    posthog?.capture("media_upload_started", {
+      project_id: projectId,
+      file_count: selectedFiles.length,
+      total_size_bytes: selectedFiles.reduce((sum, f) => sum + f.size, 0),
+    });
 
     // Add files to global upload queue
     addUploads(projectId, project.name, selectedFiles);

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCreateProject } from "../../hooks/useProjects";
+import { usePostHog } from "@posthog/react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ export default function CreateProjectDialog() {
   const [description, setDescription] = useState("");
 
   const createProject = useCreateProject();
+  const posthog = usePostHog();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +31,14 @@ export default function CreateProjectDialog() {
     if (!name.trim()) return;
 
     try {
-      await createProject.mutateAsync({
+      const project = await createProject.mutateAsync({
         name,
         description,
+      });
+
+      posthog?.capture("project_created", {
+        project_id: project.id,
+        has_description: !!description.trim(),
       });
 
       // Reset form and close dialog

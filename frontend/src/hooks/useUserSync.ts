@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react";
 import { useAuth } from "./useAuth";
 import { api } from "../services/api";
 import { toast } from "sonner";
+import { usePostHog } from "@posthog/react";
 
 /**
  * Hook to sync user data with the backend after authentication.
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 export function useUserSync() {
   const { isLoaded, isSignedIn, user } = useAuth();
   const syncedUserIdRef = useRef<string | null>(null);
+  const posthog = usePostHog();
 
   useEffect(() => {
     const syncUser = async () => {
@@ -19,6 +21,11 @@ export function useUserSync() {
         try {
           await api.post("/api/users/sync");
           syncedUserIdRef.current = user.id;
+          posthog?.identify(user.id, {
+            email: user.email,
+            username: user.username,
+          });
+          posthog?.capture("user_signed_in");
         } catch (error) {
           Sentry.captureException(error, { tags: { operation: "user-sync" } });
           toast.warning("Failed to sync user profile. Some features may be limited.");

@@ -9,6 +9,13 @@ import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { ThemeProvider } from "./hooks/useTheme.tsx";
 import "./index.css";
 import App from "./App.tsx";
+import posthog from "posthog-js";
+import { PostHogProvider, PostHogErrorBoundary } from "@posthog/react";
+
+posthog.init(import.meta.env.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN, {
+  api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
+  defaults: "2026-01-30",
+});
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -58,14 +65,18 @@ createRoot(document.getElementById("root")!, {
   onRecoverableError: reactErrorHandler(),
 }).render(
   <StrictMode>
-    <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <App />
-          </QueryClientProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <PostHogProvider client={posthog}>
+      <PostHogErrorBoundary>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              <QueryClientProvider client={queryClient}>
+                <App />
+              </QueryClientProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
+      </PostHogErrorBoundary>
+    </PostHogProvider>
   </StrictMode>
 );

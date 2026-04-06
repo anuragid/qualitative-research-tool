@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUpdateProject } from '../../hooks/useProjects';
+import { usePostHog } from '@posthog/react';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ export function EditProjectDialog({
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description || '');
   const prevOpen = useRef(open);
+  const posthog = usePostHog();
 
   // Reset form only when dialog first opens, not on every re-render
   useEffect(() => {
@@ -61,6 +63,9 @@ export function EditProjectDialog({
       },
       {
         onSuccess: () => {
+          posthog?.capture("project_edited", {
+            project_id: project.id,
+          });
           onOpenChange(false);
         },
         onError: () => {

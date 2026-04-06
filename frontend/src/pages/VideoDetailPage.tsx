@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
+import { usePostHog } from "@posthog/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
 import { useTranscript, useSpeakerLabels, useStartTranscription, useLabelSpeaker } from "../hooks/useTranscriptions";
@@ -119,6 +120,7 @@ export default function VideoDetailPage() {
   const startTranscription = useStartTranscription();
   const startFullAnalysis = useStartFullAnalysis();
   const labelSpeaker = useLabelSpeaker();
+  const posthog = usePostHog();
 
   // Step-by-step analysis hooks
   const startChunkStep = useStartChunkStep();
@@ -151,12 +153,14 @@ export default function VideoDetailPage() {
 
   const handleStartTranscription = () => {
     if (videoId) {
+      posthog?.capture("transcription_started", { video_id: videoId });
       startTranscription.mutate(videoId);
     }
   };
 
   const handleStartFullAnalysis = () => {
     if (videoId) {
+      posthog?.capture("video_analysis_started", { video_id: videoId });
       startFullAnalysis.mutate(videoId);
     }
   };
@@ -164,12 +168,14 @@ export default function VideoDetailPage() {
   // Step-by-step analysis handlers
   const handleStartChunkStep = () => {
     if (videoId) {
+      posthog?.capture("analysis_step_started", { video_id: videoId, step: "chunk" });
       startChunkStep.mutate(videoId);
     }
   };
 
   const handleStartInferStep = () => {
     if (videoId) {
+      posthog?.capture("analysis_step_started", { video_id: videoId, step: "infer" });
       setActiveStepTab("inferences");
       startInferStep.mutate(videoId);
     }
@@ -177,6 +183,7 @@ export default function VideoDetailPage() {
 
   const handleStartRelateStep = () => {
     if (videoId) {
+      posthog?.capture("analysis_step_started", { video_id: videoId, step: "relate" });
       setActiveStepTab("patterns");
       startRelateStep.mutate(videoId);
     }
@@ -184,6 +191,7 @@ export default function VideoDetailPage() {
 
   const handleStartExplainStep = () => {
     if (videoId) {
+      posthog?.capture("analysis_step_started", { video_id: videoId, step: "explain" });
       setActiveStepTab("insights");
       startExplainStep.mutate(videoId);
     }
@@ -191,6 +199,7 @@ export default function VideoDetailPage() {
 
   const handleStartActivateStep = () => {
     if (videoId) {
+      posthog?.capture("analysis_step_started", { video_id: videoId, step: "activate" });
       setActiveStepTab("principles");
       startActivateStep.mutate(videoId);
     }

@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import type { CancelTokenSource } from 'axios';
 import { toast } from 'sonner';
+import { usePostHog } from '@posthog/react';
 
 export interface FileUploadStatus {
   id: string;
@@ -64,6 +65,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const uploadsRef = useRef<FileUploadStatus[]>([]);
   const queuePausedRef = useRef(false);
   const [isPaused, setIsPaused] = useState(false);
+  const posthog = usePostHog();
 
   // Fixed concurrent upload limit for optimal performance
   const MAX_CONCURRENT_UPLOADS = 5; // Balanced for performance without overwhelming the server
@@ -159,6 +161,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         queryKey: ['projects', pendingUpload.projectId, 'videos'],
       });
 
+      posthog?.capture("media_upload_completed", {
+        project_id: pendingUpload.projectId,
+        file_size_bytes: pendingUpload.file.size,
+      });
+
       // Show notification
       showNotification('success', `${pendingUpload.file.name} uploaded successfully`);
 
@@ -221,6 +228,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             : u
         ));
 
+        posthog?.capture("media_upload_failed", {
+          project_id: pendingUpload.projectId,
+          file_size_bytes: pendingUpload.file.size,
+          error_type: errorType,
+        });
+
         // Show error notification
         showNotification('error', `Failed to upload ${pendingUpload.file.name}`);
       }
@@ -232,7 +245,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
     // Process next uploads in queue
     setTimeout(() => processQueueRef.current?.(), 100);
-  }, [uploadMutation, queryClient]);
+  }, [uploadMutation, queryClient, posthog]);
 
   const processUploadQueue = useCallback(async () => {
     // Check if queue is paused

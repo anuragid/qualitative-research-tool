@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { usePostHog } from "@posthog/react";
 import { toast } from "sonner";
 import { useProject } from "../hooks/useProjects";
 import { useProjectVideos } from "../hooks/useVideos";
@@ -45,6 +46,7 @@ export default function ProjectDetailPage() {
   const { data: crossInsights } = useCrossInsights(projectId || null);
   const { data: systemPrinciples } = useSystemPrinciples(projectId || null);
   const startProjectAnalysis = useStartProjectAnalysis();
+  const posthog = usePostHog();
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -164,6 +166,10 @@ export default function ProjectDetailPage() {
 
   const handleRunProjectAnalysis = async () => {
     if (!projectId) return;
+    posthog?.capture("project_analysis_started", {
+      project_id: projectId,
+      is_rerun: projectAnalysis?.status === "completed",
+    });
     setAnalysisTriggered(true);
     try {
       await startProjectAnalysis.mutateAsync(projectId);
