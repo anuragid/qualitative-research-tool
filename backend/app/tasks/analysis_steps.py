@@ -17,8 +17,37 @@ from app.services.byok_service import resolve_byok as _resolve_byok
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
+from app.utils.error_classification import is_retryable
 
 logger = logging.getLogger(__name__)
+
+
+class NonRetryableAnalysisError(Exception):
+    """Pipeline error that Celery should NOT autoretry.
+
+    Raised when a node returns a result with an ``error_type`` classified
+    as non-retryable (validation_error, llm_permanent, unknown).  Combined
+    with ``dont_autoretry_for=(NonRetryableAnalysisError,)`` on the task
+    decorator, this short-circuits Celery's autoretry loop so we don't
+    waste 4 attempts × 10-minute backoffs on errors that won't get better.
+    """
+
+
+def _raise_for_node_error(step_name: str, node_result: Dict[str, Any]) -> None:
+    """Inspect a node result and raise the appropriate exception type.
+
+    Retryable node errors raise a generic ``Exception`` (caught by Celery's
+    ``autoretry_for=(Exception,)``).  Non-retryable errors raise
+    ``NonRetryableAnalysisError`` (excluded from autoretry).
+    """
+    error_msg = node_result.get("error", f"Failed to generate {step_name}")
+    error_type = node_result.get("error_type", "unknown")
+    if is_retryable(error_type):
+        raise Exception(f"{step_name.capitalize()} generation failed: {error_msg}")
+    raise NonRetryableAnalysisError(
+        f"{step_name.capitalize()} generation failed (non-retryable, "
+        f"error_type={error_type}): {error_msg}"
+    )
 
 
 def get_video_analysis_state(db: Session, video_id: UUID) -> Dict[str, Any]:
@@ -104,6 +133,7 @@ def _update_analysis_error(db: Session, video_id: str, step_name: str):
     bind=True,
     name="analyze_chunk_step",
     autoretry_for=(Exception,),
+    dont_autoretry_for=(NonRetryableAnalysisError,),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
@@ -142,8 +172,7 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
 
         # Check for errors in node result
         if result.get("error") or result.get("chunks") is None:
-            error_msg = result.get("error", "Failed to generate chunks")
-            raise Exception(f"Chunk generation failed: {error_msg}")
+            _raise_for_node_error("chunk", result)
 
         # Save results
         analysis.chunks = result.get("chunks")
@@ -169,6 +198,7 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
     bind=True,
     name="analyze_infer_step",
     autoretry_for=(Exception,),
+    dont_autoretry_for=(NonRetryableAnalysisError,),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
@@ -208,8 +238,7 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
 
         # Check if result has error
         if result.get("error") or result.get("inferences") is None:
-            error_msg = result.get("error", "Failed to generate inferences")
-            raise Exception(f"Inference generation failed: {error_msg}")
+            _raise_for_node_error("inference", result)
 
         # Save results
         analysis.inferences = result.get("inferences")
@@ -235,6 +264,7 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
     bind=True,
     name="analyze_relate_step",
     autoretry_for=(Exception,),
+    dont_autoretry_for=(NonRetryableAnalysisError,),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
@@ -273,8 +303,7 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
 
         # Check for errors in node result
         if result.get("error") or result.get("patterns") is None:
-            error_msg = result.get("error", "Failed to identify patterns")
-            raise Exception(f"Pattern analysis failed: {error_msg}")
+            _raise_for_node_error("pattern", result)
 
         # Save results
         analysis.patterns = result.get("patterns")
@@ -300,6 +329,7 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
     bind=True,
     name="analyze_explain_step",
     autoretry_for=(Exception,),
+    dont_autoretry_for=(NonRetryableAnalysisError,),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
@@ -339,8 +369,7 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
 
         # Check for errors in node result
         if result.get("error") or result.get("insights") is None:
-            error_msg = result.get("error", "Failed to generate insights")
-            raise Exception(f"Insight generation failed: {error_msg}")
+            _raise_for_node_error("insight", result)
 
         # Save results
         analysis.insights = result.get("insights")
@@ -366,6 +395,7 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
     bind=True,
     name="analyze_activate_step",
     autoretry_for=(Exception,),
+    dont_autoretry_for=(NonRetryableAnalysisError,),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
@@ -404,8 +434,7 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
 
         # Check for errors in node result
         if result.get("error") or result.get("design_principles") is None:
-            error_msg = result.get("error", "Failed to generate design principles")
-            raise Exception(f"Design principle generation failed: {error_msg}")
+            _raise_for_node_error("design principle", result)
 
         # Save results
         analysis.design_principles = result.get("design_principles")

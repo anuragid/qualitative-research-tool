@@ -5,12 +5,19 @@ import logging
 import re
 from typing import Any, Optional
 
-from openai import APIConnectionError, APIError, NotFoundError, OpenAI, RateLimitError
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    NotFoundError,
+    OpenAI,
+    RateLimitError,
+)
 from tenacity import (
     RetryError,
     before_sleep_log,
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -20,8 +27,41 @@ from app.constants import FREE_MODEL_FALLBACKS
 
 logger = logging.getLogger(__name__)
 
-# Retry-eligible exceptions
-RETRYABLE_EXCEPTIONS = (APIError, APIConnectionError, RateLimitError)
+# HTTP status codes that are PERMANENT — no retry or model fallback can fix
+# them with the same key. 404 is excluded (model removed → fallback can help)
+# and 408/429 are excluded (transient, handled by their own paths).
+_PERMANENT_HTTP_CODES = frozenset({400, 401, 402, 403, 422})
+
+
+def _is_permanent_api_error(exc: BaseException) -> bool:
+    """True iff *exc* is an APIStatusError with a permanent 4xx code."""
+    if not isinstance(exc, APIStatusError):
+        return False
+    return getattr(exc, "status_code", None) in _PERMANENT_HTTP_CODES
+
+
+def _should_retry_llm_exception(exc: BaseException) -> bool:
+    """Tenacity predicate: retry transient errors, fail fast on permanent ones.
+
+    - APIConnectionError → retry (transient network)
+    - RateLimitError (429) → retry (transient)
+    - APIStatusError with 5xx → retry (transient server)
+    - APIStatusError with 400/401/402/403/422 → DO NOT retry (permanent)
+    - APIStatusError with 404 → DO NOT retry here; let model fallback handle it
+    - APIError (no specific status) → retry (assume transient)
+    """
+    if isinstance(exc, (APIConnectionError, RateLimitError)):
+        return True
+    if isinstance(exc, NotFoundError):
+        # 404 is handled by the fallback chain in call_llm; don't retry here.
+        return False
+    if isinstance(exc, APIStatusError):
+        if _is_permanent_api_error(exc):
+            return False
+        return True  # 5xx, 408, etc.
+    if isinstance(exc, APIError):
+        return True
+    return False
 
 # OpenRouter headers for analytics
 OPENROUTER_HEADERS = {
@@ -63,7 +103,7 @@ class LLMService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=2, max=30),
-        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+        retry=retry_if_exception(_should_retry_llm_exception),
         before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     def _call_llm_single(
@@ -129,7 +169,7 @@ class LLMService:
 
             return content
 
-        except RETRYABLE_EXCEPTIONS as e:
+        except (APIError, APIConnectionError) as e:
             logger.error(f"LLM API error (model={model}): {e}")
             raise
         except Exception as e:
@@ -226,6 +266,22 @@ class LLMService:
                 logger.warning(
                     f"Model {model_name} is rate-limited/failed after retries: "
                     f"{type(e).__name__}. Trying next fallback model..."
+                )
+                last_error = e
+                continue
+            except APIStatusError as e:
+                # Permanent 4xx (insufficient credits, bad key, forbidden,
+                # etc.) cannot be fixed by trying another model with the same
+                # key — fail fast instead of walking the entire fallback chain.
+                if _is_permanent_api_error(e):
+                    logger.error(
+                        f"Model {model_name} returned permanent error "
+                        f"(status={e.status_code}): {e}. Aborting fallback chain."
+                    )
+                    raise
+                logger.warning(
+                    f"Model {model_name} API error after retries: {e}. "
+                    f"Trying next fallback model..."
                 )
                 last_error = e
                 continue

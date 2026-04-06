@@ -6,7 +6,7 @@ Covers: classify_error, is_retryable, build_structured_error, structured_error_j
 import json
 
 import httpx
-from openai import APIConnectionError, APIError, RateLimitError
+from openai import APIConnectionError, APIError, APIStatusError, RateLimitError
 
 from app.utils.error_classification import (
     ERROR_TYPE_LLM,
@@ -59,6 +59,69 @@ class TestClassifyError:
             body=None,
         )
         assert classify_error(exc) == ERROR_TYPE_LLM
+
+    def test_api_status_error_402_insufficient_credits_not_retryable(self):
+        """402 from OpenRouter ('insufficient credits') is permanent.
+
+        No amount of retrying or model fallback will fix it — the account
+        either has credits or it doesn't.  Must classify as a non-retryable
+        type so the pipeline fails fast instead of looping.
+        """
+        exc = APIStatusError(
+            message="insufficient credits",
+            response=_make_response(402),
+            body=None,
+        )
+        error_type = classify_error(exc)
+        assert is_retryable(error_type) is False, (
+            f"402 should be non-retryable, got error_type={error_type} "
+            f"which is_retryable={is_retryable(error_type)}"
+        )
+
+    def test_api_status_error_401_unauthorized_not_retryable(self):
+        """401 (bad/missing API key) is permanent."""
+        exc = APIStatusError(
+            message="unauthorized",
+            response=_make_response(401),
+            body=None,
+        )
+        assert is_retryable(classify_error(exc)) is False
+
+    def test_api_status_error_403_forbidden_not_retryable(self):
+        """403 (forbidden / no model access) is permanent."""
+        exc = APIStatusError(
+            message="forbidden",
+            response=_make_response(403),
+            body=None,
+        )
+        assert is_retryable(classify_error(exc)) is False
+
+    def test_api_status_error_400_bad_request_not_retryable(self):
+        """400 (malformed payload) is permanent."""
+        exc = APIStatusError(
+            message="bad request",
+            response=_make_response(400),
+            body=None,
+        )
+        assert is_retryable(classify_error(exc)) is False
+
+    def test_api_status_error_500_server_error_is_retryable(self):
+        """5xx is transient — server-side issue that may resolve."""
+        exc = APIStatusError(
+            message="internal server error",
+            response=_make_response(500),
+            body=None,
+        )
+        assert is_retryable(classify_error(exc)) is True
+
+    def test_api_status_error_503_service_unavailable_is_retryable(self):
+        """503 is transient."""
+        exc = APIStatusError(
+            message="service unavailable",
+            response=_make_response(503),
+            body=None,
+        )
+        assert is_retryable(classify_error(exc)) is True
 
     def test_timeout_error(self):
         assert classify_error(TimeoutError("timed out")) == ERROR_TYPE_TIMEOUT
