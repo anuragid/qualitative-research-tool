@@ -49,6 +49,20 @@ def _get_video_with_ownership(
     return video
 
 
+def _is_any_step_processing(analysis: VideoAnalysis | None) -> bool:
+    """Return True iff some pipeline step is currently 'processing'.
+
+    Used as the concurrency lock for the step-by-step analysis endpoints.
+    Prefer this over ``video.status == "analyzing"`` because step-by-step
+    tasks leave ``video.status`` as "analyzing" between steps and only the
+    final activate step resets it -- so the coarse video.status check would
+    deadlock the pipeline after CHUNK completes.
+    """
+    if analysis is None or not isinstance(analysis.step_status, dict):
+        return False
+    return any(v == "processing" for v in analysis.step_status.values())
+
+
 # --- Pydantic models for presigned upload flow ---
 
 class UploadUrlRequest(BaseModel):
@@ -847,11 +861,13 @@ async def trigger_chunk_step(
     try:
         video = _get_video_with_ownership(video_id, current_user_id, db)
 
-        # Block if already analyzing
-        if video.status in ("analyzing",):
+        # Block only if a step is currently mid-execution.  Coarser checks on
+        # video.status would deadlock the step-by-step pipeline (see _is_any_step_processing).
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Analysis is already in progress",
+                detail="An analysis step is already in progress",
             )
 
         transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
@@ -901,14 +917,13 @@ async def trigger_infer_step(
     try:
         video = _get_video_with_ownership(video_id, current_user_id, db)
 
-        # Block if already analyzing
-        if video.status in ("analyzing",):
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Analysis is already in progress",
+                detail="An analysis step is already in progress",
             )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.chunks:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -953,14 +968,13 @@ async def trigger_relate_step(
     try:
         video = _get_video_with_ownership(video_id, current_user_id, db)
 
-        # Block if already analyzing
-        if video.status in ("analyzing",):
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Analysis is already in progress",
+                detail="An analysis step is already in progress",
             )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.inferences:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1005,14 +1019,13 @@ async def trigger_explain_step(
     try:
         video = _get_video_with_ownership(video_id, current_user_id, db)
 
-        # Block if already analyzing
-        if video.status in ("analyzing",):
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Analysis is already in progress",
+                detail="An analysis step is already in progress",
             )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.patterns:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1057,14 +1070,13 @@ async def trigger_activate_step(
     try:
         video = _get_video_with_ownership(video_id, current_user_id, db)
 
-        # Block if already analyzing
-        if video.status in ("analyzing",):
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Analysis is already in progress",
+                detail="An analysis step is already in progress",
             )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
         if not analysis or not analysis.insights:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
