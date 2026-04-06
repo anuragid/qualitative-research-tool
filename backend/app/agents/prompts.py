@@ -184,6 +184,25 @@ OUTPUT FORMAT - Return ONLY a JSON array with this exact structure:
 
 Each object MUST have: "insight_id" (string like "IN001"), "headline" (string), "explanation" (string), "supporting_patterns" (array of strings), "evidence" (array of strings — use full quote text, not chunk IDs), "type" (one of: "non-consensus", "first-principles", "surprising", "revealing"), "implications" (string), "confidence" (one of: "high", "medium", "low").
 
+CRITICAL: Each item in the JSON array MUST be a JSON object with the keys above. Do NOT return bare strings.
+
+WRONG (do not do this):
+["Users distrust automation when stakes are high", "Speed beats accuracy for low-stakes tasks"]
+
+RIGHT (do this):
+[
+  {
+    "insight_id": "IN001",
+    "headline": "Users distrust automation when stakes are high",
+    "explanation": "...",
+    "supporting_patterns": ["P001"],
+    "evidence": ["full quote text here"],
+    "type": "revealing",
+    "implications": "...",
+    "confidence": "high"
+  }
+]
+
 CRITICAL: Return ONLY valid JSON, no other text. Do NOT wrap in markdown code blocks.""" + _INJECTION_GUARD
 
 

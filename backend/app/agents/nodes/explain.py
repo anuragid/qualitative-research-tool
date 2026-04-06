@@ -15,6 +15,47 @@ from app.utils.output_validator import OutputValidationError, validate_insights
 logger = logging.getLogger(__name__)
 
 
+def _coerce_insight_items(items: Any) -> Any:
+    """Coerce bare-string insight items into the expected dict shape.
+
+    Llama-class models occasionally return a list of headline strings
+    (e.g. ["insight 1", "insight 2"]) instead of a list of insight objects.
+    Wrap any such strings in a minimal valid dict so downstream validation
+    and post-processing can proceed. Non-list inputs are returned unchanged
+    so the validator can produce its normal error.
+    """
+    if not isinstance(items, list):
+        return items
+
+    coerced = []
+    coerced_count = 0
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                continue
+            coerced.append({
+                "insight_id": f"IN{i + 1:03d}",
+                "headline": text,
+                "explanation": text,
+                "supporting_patterns": [],
+                "evidence": [],
+                "type": "non-consensus",
+                "implications": "",
+                "confidence": "medium",
+            })
+            coerced_count += 1
+        else:
+            coerced.append(item)
+
+    if coerced_count > 0:
+        logger.warning(
+            f"[EXPLAIN] Coerced {coerced_count} bare-string insight item(s) into dict shape"
+        )
+
+    return coerced
+
+
 def explain_node(state: VideoAnalysisState) -> Dict[str, Any]:
     """
     Step 4: Generate insights from patterns.
@@ -71,6 +112,7 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
             model=state.get("model"),
         )
         insights = llm_service.call_with_json_list_response(**llm_kwargs)
+        insights = _coerce_insight_items(insights)
 
         # Validate response structure (retry once on failure)
         try:
@@ -78,6 +120,7 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
         except OutputValidationError as ve:
             logger.warning(f"[EXPLAIN] Output validation failed, retrying: {ve}")
             insights = llm_service.call_with_json_list_response(**llm_kwargs)
+            insights = _coerce_insight_items(insights)
             try:
                 validate_insights(insights)
             except OutputValidationError as ve2:
