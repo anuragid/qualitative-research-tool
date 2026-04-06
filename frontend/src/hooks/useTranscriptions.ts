@@ -2,11 +2,20 @@ import { useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transcriptionsService } from "../services/transcriptions";
 import type { LabelSpeakerDto } from "../types";
+import { useBackoffInterval } from "./useBackoffInterval";
 
 export function useTranscript(videoId: string | null, shouldFetch: boolean = true) {
   // Track when we first saw "completed" — the server response doesn't include
   // completed_at or speaker_labels, so we can't rely on those for the poll window.
   const completedSeenAt = useRef<number | null>(null);
+
+  // Backoff for the active processing phase (before completion).
+  // Post-completion speaker-label window stays at fixed 3s — see below.
+  const getProcessingInterval = useBackoffInterval({
+    initialMs: 6000,
+    maxMs: 18000,
+    growEvery: 6,
+  });
 
   return useQuery({
     queryKey: ["videos", videoId, "transcript"],
@@ -27,7 +36,7 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
         transcript.status === "processing"
       ) {
         completedSeenAt.current = null;
-        return 6000;
+        return getProcessingInterval(true);
       }
 
       if (transcript.status === "completed") {
@@ -42,6 +51,8 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
         }
       }
 
+      // Terminal (or post-completion window elapsed) — stop and reset backoff.
+      getProcessingInterval(false);
       return false;
     },
   });

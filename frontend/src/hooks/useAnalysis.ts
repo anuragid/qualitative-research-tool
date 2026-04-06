@@ -1,8 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { analysisService } from "../services/analysis";
+import { useBackoffInterval } from "./useBackoffInterval";
 
 // Video Analysis Status Hook (lightweight polling endpoint ~200 bytes)
 export function useVideoAnalysisStatus(videoId: string | null) {
+  const getInterval = useBackoffInterval({
+    initialMs: 3000,
+    maxMs: 15000,
+    growEvery: 6,
+  });
   return useQuery({
     queryKey: ["videos", videoId, "analysis", "status"],
     queryFn: () => analysisService.getVideoAnalysisStatus(videoId!),
@@ -16,13 +22,12 @@ export function useVideoAnalysisStatus(videoId: string | null) {
       return failureCount < 3;
     },
     refetchInterval: (query) => {
-      if (document.hidden) return false;
       const data = query.state.data;
       // Poll while processing or pending; stop for completed, error, or no data
-      if (data && (data.status === "processing" || data.status === "pending")) {
-        return 3000;
-      }
-      return false;
+      const shouldPoll = !!(
+        data && (data.status === "processing" || data.status === "pending")
+      );
+      return getInterval(shouldPoll);
     },
   });
 }
@@ -131,6 +136,11 @@ export function useStartActivateStep() {
 
 // Project Analysis Hooks (Cross-Video)
 export function useProjectAnalysis(projectId: string | null) {
+  const getInterval = useBackoffInterval({
+    initialMs: 5000,
+    maxMs: 15000,
+    growEvery: 4,
+  });
   return useQuery({
     queryKey: ["projects", projectId, "analysis"],
     queryFn: () => analysisService.getProjectAnalysis(projectId!),
@@ -144,12 +154,12 @@ export function useProjectAnalysis(projectId: string | null) {
       return failureCount < 3;
     },
     refetchInterval: (query) => {
-      if (document.hidden) return false;
       const analysis = query.state.data;
-      if (analysis && (analysis.status === "processing" || analysis.status === "pending")) {
-        return 10000;
-      }
-      return false;
+      const shouldPoll = !!(
+        analysis &&
+        (analysis.status === "processing" || analysis.status === "pending")
+      );
+      return getInterval(shouldPoll);
     },
   });
 }

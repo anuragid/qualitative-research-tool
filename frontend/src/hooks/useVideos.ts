@@ -1,40 +1,45 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CancelToken } from "axios";
 import { videosService } from "../services/videos";
+import { useBackoffInterval } from "./useBackoffInterval";
 
 export function useProjectVideos(projectId: string | null) {
+  const getInterval = useBackoffInterval({
+    initialMs: 4000,
+    maxMs: 20000,
+    growEvery: 6,
+  });
   return useQuery({
     queryKey: ["projects", projectId, "videos"],
     queryFn: () => videosService.getByProject(projectId!),
     enabled: !!projectId,
     refetchInterval: (query) => {
-      if (document.hidden) return false;
       const videos = query.state.data;
-      if (
-        videos?.some(
-          (v) =>
-            v.status === "transcribing" ||
-            v.status === "analyzing" ||
-            (v.status === "transcribed" && !v.transcript) ||
-            (v.status === "analyzed" && !v.analysis)
-        )
-      ) {
-        return 4000;
-      }
-      return false;
+      const shouldPoll = !!videos?.some(
+        (v) =>
+          v.status === "transcribing" ||
+          v.status === "analyzing" ||
+          (v.status === "transcribed" && !v.transcript) ||
+          (v.status === "analyzed" && !v.analysis)
+      );
+      return getInterval(shouldPoll);
     },
   });
 }
 
 export function useVideo(id: string | null) {
+  const getInterval = useBackoffInterval({
+    initialMs: 4000,
+    maxMs: 15000,
+    growEvery: 6,
+  });
   return useQuery({
     queryKey: ["videos", id],
     queryFn: () => videosService.getById(id!),
     enabled: !!id,
     refetchInterval: (query) => {
-      if (document.hidden) return false;
       const video = query.state.data;
-      if (!video) return false;
+      if (!video) return getInterval(false);
 
       const needsTranscriptData = video.status === "transcribing";
 
@@ -47,11 +52,10 @@ export function useVideo(id: string | null) {
         video.transcript &&
         (!video.transcript.speaker_labels || video.transcript.speaker_labels.length === 0);
 
-      if (needsTranscriptData || needsAnalysisData || needsSpeakerData) {
-        return 4000;
-      }
-
-      return false;
+      const shouldPoll = !!(
+        needsTranscriptData || needsAnalysisData || needsSpeakerData
+      );
+      return getInterval(shouldPoll);
     },
   });
 }
