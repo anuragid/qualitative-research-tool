@@ -172,9 +172,9 @@
   --z-content: 2;
   --z-sticky: 10;
   --z-sidebar: 50;
-  --z-dropdown: 60;
   --z-modal-backdrop: 90;
   --z-modal: 100;
+  --z-dropdown: 110; /* portalled popovers (combobox, select, dropdown-menu, hover-card) — must sit above modals */
   --z-toast: 200;
 
   /* ===== 16. TRANSITIONS ===== */
