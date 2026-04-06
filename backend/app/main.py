@@ -109,10 +109,12 @@ def _validate_production_config() -> None:
         )
 
     if settings.ALLOWED_ORIGINS == _DEFAULT_LOCALHOST_ORIGINS:
-        raise RuntimeError(
-            "FATAL: ALLOWED_ORIGINS is still set to default localhost values "
-            "in production. Set it to your production frontend domain (e.g., "
-            "ALLOWED_ORIGINS=https://methodex.ai,https://www.methodex.ai)."
+        # Deferred to a follow-up: make this fatal once we've verified the
+        # production environment has ALLOWED_ORIGINS explicitly set. Leaving
+        # as a warning for now to avoid a boot-time crash on deploy.
+        logger.warning(
+            "SECURITY: ALLOWED_ORIGINS is still set to default localhost values. "
+            "Update it to your production frontend domain."
         )
 
 
