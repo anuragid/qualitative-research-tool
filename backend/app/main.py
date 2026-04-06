@@ -109,9 +109,10 @@ def _validate_production_config() -> None:
         )
 
     if settings.ALLOWED_ORIGINS == _DEFAULT_LOCALHOST_ORIGINS:
-        logger.warning(
-            "SECURITY: ALLOWED_ORIGINS is still set to default localhost values. "
-            "Update it to your production frontend domain."
+        raise RuntimeError(
+            "FATAL: ALLOWED_ORIGINS is still set to default localhost values "
+            "in production. Set it to your production frontend domain (e.g., "
+            "ALLOWED_ORIGINS=https://methodex.ai,https://www.methodex.ai)."
         )
 
 
@@ -265,6 +266,7 @@ _CLERK_PROXY_ALLOWED_PATHS = {"v1/client", "v1/environment"}
 
 
 @app.api_route("/__clerk_fwd/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@limiter.limit("30/minute")
 async def clerk_proxy(path: str, request: Request):
     # Validate that the request originates from an allowed origin
     origin = request.headers.get("origin", "")

@@ -849,8 +849,10 @@ async def search_transcript_words(
 
 # Step-by-step analysis endpoints
 @router.post("/{video_id}/analyze/chunk", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
 async def trigger_chunk_step(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):
@@ -905,8 +907,10 @@ async def trigger_chunk_step(
 
 
 @router.post("/{video_id}/analyze/infer", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
 async def trigger_infer_step(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):
@@ -956,8 +960,10 @@ async def trigger_infer_step(
 
 
 @router.post("/{video_id}/analyze/relate", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
 async def trigger_relate_step(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):
@@ -1007,8 +1013,10 @@ async def trigger_relate_step(
 
 
 @router.post("/{video_id}/analyze/explain", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
 async def trigger_explain_step(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):
@@ -1058,8 +1066,10 @@ async def trigger_explain_step(
 
 
 @router.post("/{video_id}/analyze/activate", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
 async def trigger_activate_step(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
     db: Session = Depends(get_db)
 ):

@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_AUTH: str = "20/minute"
     RATE_LIMIT_TRANSCRIBE: str = "5/minute"
     RATE_LIMIT_ANALYZE: str = "5/minute"
+    RATE_LIMIT_ANALYZE_STEP: str = "10/minute"
 
     # Celery Settings
     CELERY_BROKER_URL: str = ""
