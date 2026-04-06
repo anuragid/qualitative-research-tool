@@ -14,6 +14,44 @@ from app.utils.output_validator import OutputValidationError, validate_patterns
 logger = logging.getLogger(__name__)
 
 
+def _coerce_pattern_items(items: Any) -> Any:
+    """Coerce bare-string pattern items into the expected dict shape.
+
+    Llama-class models occasionally return a list of pattern name strings
+    instead of a list of pattern objects. Wrap any such strings in a minimal
+    valid dict so downstream validation and post-processing can proceed.
+    Non-list inputs are returned unchanged so the validator can produce its
+    normal error.
+    """
+    if not isinstance(items, list):
+        return items
+
+    coerced = []
+    coerced_count = 0
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                continue
+            coerced.append({
+                "pattern_id": f"P{i + 1:03d}",
+                "pattern_name": text,
+                "description": text,
+                "supporting_inferences": [],
+                "relationship_type": "convergent",
+            })
+            coerced_count += 1
+        else:
+            coerced.append(item)
+
+    if coerced_count > 0:
+        logger.warning(
+            f"[RELATE] Coerced {coerced_count} bare-string item(s) into dict shape"
+        )
+
+    return coerced
+
+
 def relate_node(state: VideoAnalysisState) -> Dict[str, Any]:
     """
     Step 3: Find patterns across inferences.
@@ -68,6 +106,7 @@ Group related inferences into patterns and explain what each pattern represents.
             model=state.get("model"),
         )
         patterns = llm_service.call_with_json_list_response(**llm_kwargs)
+        patterns = _coerce_pattern_items(patterns)
 
         # Validate response structure (retry once on failure)
         try:
@@ -75,6 +114,7 @@ Group related inferences into patterns and explain what each pattern represents.
         except OutputValidationError as ve:
             logger.warning(f"[RELATE] Output validation failed, retrying: {ve}")
             patterns = llm_service.call_with_json_list_response(**llm_kwargs)
+            patterns = _coerce_pattern_items(patterns)
             try:
                 validate_patterns(patterns)
             except OutputValidationError as ve2:

@@ -13,6 +13,44 @@ from app.utils.output_validator import OutputValidationError, validate_cross_ins
 logger = logging.getLogger(__name__)
 
 
+def _coerce_cross_insight_items(items: Any) -> Any:
+    """Coerce bare-string cross-insight items into the expected dict shape.
+
+    Llama-class models occasionally return a list of headline strings
+    instead of a list of cross-insight objects. Wrap any such strings in a
+    minimal valid dict so downstream validation can proceed. Non-list inputs
+    are returned unchanged so the validator can produce its normal error.
+    """
+    if not isinstance(items, list):
+        return items
+
+    coerced = []
+    coerced_count = 0
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                continue
+            coerced.append({
+                "cross_insight_id": f"CI{i + 1:03d}",
+                "headline": text,
+                "explanation": text,
+                "supporting_meta_patterns": [],
+                "consistency": "medium",
+                "implications": "",
+            })
+            coerced_count += 1
+        else:
+            coerced.append(item)
+
+    if coerced_count > 0:
+        logger.warning(
+            f"[CROSS_EXPLAIN] Coerced {coerced_count} bare-string item(s) into dict shape"
+        )
+
+    return coerced
+
+
 def cross_explain_node(state: ProjectAnalysisState) -> Dict[str, Any]:
     """
     Step 7: Generate cross-video insights from meta-patterns.
@@ -64,6 +102,7 @@ Generate insights that reveal truths about the system as a whole, not just indiv
             model=state.get("model"),
         )
         cross_insights = llm_service.call_with_json_list_response(**llm_kwargs)
+        cross_insights = _coerce_cross_insight_items(cross_insights)
 
         # Validate response structure (retry once on failure)
         try:
@@ -71,6 +110,7 @@ Generate insights that reveal truths about the system as a whole, not just indiv
         except OutputValidationError as ve:
             logger.warning(f"[CROSS_EXPLAIN] Output validation failed, retrying: {ve}")
             cross_insights = llm_service.call_with_json_list_response(**llm_kwargs)
+            cross_insights = _coerce_cross_insight_items(cross_insights)
             try:
                 validate_cross_insights(cross_insights)
             except OutputValidationError as ve2:

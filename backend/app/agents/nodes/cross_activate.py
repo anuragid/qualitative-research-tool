@@ -13,6 +13,44 @@ from app.utils.output_validator import OutputValidationError, validate_system_pr
 logger = logging.getLogger(__name__)
 
 
+def _coerce_system_principle_items(items: Any) -> Any:
+    """Coerce bare-string system-principle items into the expected dict shape.
+
+    Llama-class models occasionally return a list of principle text strings
+    instead of a list of system-principle objects. Wrap any such strings in a
+    minimal valid dict so downstream validation can proceed. Non-list inputs
+    are returned unchanged so the validator can produce its normal error.
+    """
+    if not isinstance(items, list):
+        return items
+
+    coerced = []
+    coerced_count = 0
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                continue
+            coerced.append({
+                "system_principle_id": f"SP{i + 1:03d}",
+                "principle": text,
+                "source_cross_insight": "",
+                "how_might_we": "",
+                "context_adaptations": "",
+                "rationale": text,
+            })
+            coerced_count += 1
+        else:
+            coerced.append(item)
+
+    if coerced_count > 0:
+        logger.warning(
+            f"[CROSS_ACTIVATE] Coerced {coerced_count} bare-string item(s) into dict shape"
+        )
+
+    return coerced
+
+
 def cross_activate_node(state: ProjectAnalysisState) -> Dict[str, Any]:
     """
     Step 8: Create system-level design principles from cross-video insights.
@@ -58,6 +96,7 @@ Create design principles that provide strategic direction for the entire system.
             model=state.get("model"),
         )
         system_principles = llm_service.call_with_json_list_response(**llm_kwargs)
+        system_principles = _coerce_system_principle_items(system_principles)
 
         # Validate response structure (retry once on failure)
         try:
@@ -65,6 +104,7 @@ Create design principles that provide strategic direction for the entire system.
         except OutputValidationError as ve:
             logger.warning(f"[CROSS_ACTIVATE] Output validation failed, retrying: {ve}")
             system_principles = llm_service.call_with_json_list_response(**llm_kwargs)
+            system_principles = _coerce_system_principle_items(system_principles)
             try:
                 validate_system_principles(system_principles)
             except OutputValidationError as ve2:

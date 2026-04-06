@@ -13,6 +13,46 @@ from app.utils.output_validator import OutputValidationError, validate_meta_patt
 logger = logging.getLogger(__name__)
 
 
+def _coerce_meta_pattern_items(items: Any) -> Any:
+    """Coerce bare-string meta-pattern items into the expected dict shape.
+
+    Llama-class models occasionally return a list of meta-pattern name
+    strings instead of a list of meta-pattern objects. Wrap any such strings
+    in a minimal valid dict so downstream validation can proceed. Non-list
+    inputs are returned unchanged so the validator can produce its normal
+    error.
+    """
+    if not isinstance(items, list):
+        return items
+
+    coerced = []
+    coerced_count = 0
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                continue
+            coerced.append({
+                "meta_pattern_id": f"MP{i + 1:03d}",
+                "pattern_name": text,
+                "description": text,
+                "source_videos": [],
+                "source_patterns": [],
+                "variations": "",
+                "significance": "",
+            })
+            coerced_count += 1
+        else:
+            coerced.append(item)
+
+    if coerced_count > 0:
+        logger.warning(
+            f"[CROSS_RELATE] Coerced {coerced_count} bare-string item(s) into dict shape"
+        )
+
+    return coerced
+
+
 def cross_relate_node(state: ProjectAnalysisState) -> Dict[str, Any]:
     """
     Step 6: Find meta-patterns across multiple videos.
@@ -58,6 +98,7 @@ Find patterns that transcend individual videos and reveal system-level themes.""
             model=state.get("model"),
         )
         cross_patterns = llm_service.call_with_json_list_response(**llm_kwargs)
+        cross_patterns = _coerce_meta_pattern_items(cross_patterns)
 
         # Validate response structure (retry once on failure)
         try:
@@ -65,6 +106,7 @@ Find patterns that transcend individual videos and reveal system-level themes.""
         except OutputValidationError as ve:
             logger.warning(f"[CROSS_RELATE] Output validation failed, retrying: {ve}")
             cross_patterns = llm_service.call_with_json_list_response(**llm_kwargs)
+            cross_patterns = _coerce_meta_pattern_items(cross_patterns)
             try:
                 validate_meta_patterns(cross_patterns)
             except OutputValidationError as ve2:

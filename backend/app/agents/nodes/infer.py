@@ -13,6 +13,40 @@ from app.utils.output_validator import OutputValidationError, validate_inference
 logger = logging.getLogger(__name__)
 
 
+def _coerce_inference_items(items: Any) -> Any:
+    """Coerce bare-string inference items into the expected dict shape.
+
+    Llama-class models occasionally return a list of inference text strings
+    instead of a list of inference-group objects. Wrap any such strings in a
+    minimal valid dict so downstream validation can proceed. Non-list inputs
+    are returned unchanged so the validator can produce its normal error.
+    """
+    if not isinstance(items, list):
+        return items
+
+    coerced = []
+    coerced_count = 0
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                continue
+            coerced.append({
+                "chunk_id": f"C{i + 1:03d}",
+                "inferences": [text],
+            })
+            coerced_count += 1
+        else:
+            coerced.append(item)
+
+    if coerced_count > 0:
+        logger.warning(
+            f"[INFER] Coerced {coerced_count} bare-string item(s) into dict shape"
+        )
+
+    return coerced
+
+
 def infer_node(state: VideoAnalysisState) -> Dict[str, Any]:
     """
     Step 2: Infer meaning from each chunk.
@@ -57,6 +91,7 @@ Generate multiple inferences per chunk if appropriate."""
             model=state.get("model"),
         )
         inferences = llm_service.call_with_json_list_response(**llm_kwargs)
+        inferences = _coerce_inference_items(inferences)
 
         # Validate response structure (retry once on failure)
         try:
@@ -64,6 +99,7 @@ Generate multiple inferences per chunk if appropriate."""
         except OutputValidationError as ve:
             logger.warning(f"[INFER] Output validation failed, retrying: {ve}")
             inferences = llm_service.call_with_json_list_response(**llm_kwargs)
+            inferences = _coerce_inference_items(inferences)
             try:
                 validate_inferences(inferences)
             except OutputValidationError as ve2:
