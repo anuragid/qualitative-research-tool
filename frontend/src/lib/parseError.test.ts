@@ -222,6 +222,56 @@ describe("parseErrorMessage", () => {
   });
 });
 
+describe("parseErrorMessage — backend error_type contract", () => {
+  // These tests lock in the backend <-> frontend error_type string contract.
+  // They must stay aligned with backend/app/utils/error_classification.py.
+
+  it("preserves llm_permanent error_type from backend JSON", () => {
+    const raw = JSON.stringify({
+      step: "chunk",
+      error_type: "llm_permanent",
+      message: "APIStatusError: Error code: 401 - Unauthorized",
+      retryable: false,
+    });
+    const result = parseErrorMessage(raw);
+    expect(result).toEqual({
+      step: "chunk",
+      errorType: "llm_permanent",
+      message: "APIStatusError: Error code: 401 - Unauthorized",
+      retryable: false,
+    });
+  });
+
+  it("preserves insufficient_credits error_type from backend JSON", () => {
+    const raw = JSON.stringify({
+      step: "chunk",
+      error_type: "insufficient_credits",
+      message: "APIStatusError: Error code: 402 - Insufficient credits",
+      retryable: false,
+    });
+    const result = parseErrorMessage(raw);
+    expect(result).toEqual({
+      step: "chunk",
+      errorType: "insufficient_credits",
+      message: "APIStatusError: Error code: 402 - Insufficient credits",
+      retryable: false,
+    });
+  });
+
+  it("insufficient_credits from mid-pipeline (infer step) round-trips", () => {
+    const raw = JSON.stringify({
+      step: "infer",
+      error_type: "insufficient_credits",
+      message: "Your OpenRouter account ran out of credits",
+      retryable: false,
+    });
+    const result = parseErrorMessage(raw);
+    expect(result!.errorType).toBe("insufficient_credits");
+    expect(result!.step).toBe("infer");
+    expect(result!.retryable).toBe(false);
+  });
+});
+
 describe("getErrorTypeLabel", () => {
   it("returns 'Rate Limited' for rate_limit", () => {
     expect(getErrorTypeLabel("rate_limit")).toBe("Rate Limited");
@@ -233,6 +283,14 @@ describe("getErrorTypeLabel", () => {
 
   it("returns 'LLM Error' for llm_error", () => {
     expect(getErrorTypeLabel("llm_error")).toBe("LLM Error");
+  });
+
+  it("returns 'LLM Error' for llm_permanent", () => {
+    expect(getErrorTypeLabel("llm_permanent")).toBe("LLM Error");
+  });
+
+  it("returns 'Insufficient Credits' for insufficient_credits", () => {
+    expect(getErrorTypeLabel("insufficient_credits")).toBe("Insufficient Credits");
   });
 
   it("returns 'Network Error' for network", () => {

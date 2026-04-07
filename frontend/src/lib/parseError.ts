@@ -1,7 +1,22 @@
+/** Canonical error type strings emitted by the backend.
+ *
+ * Must stay in sync with `backend/app/utils/error_classification.py`
+ * (ERROR_TYPE_* constants).
+ */
+export type ErrorType =
+  | "rate_limit"
+  | "timeout"
+  | "llm_error"
+  | "llm_permanent"         // permanent 4xx other than 402 (400, 401, 403, 422)
+  | "insufficient_credits"  // 402 — user's OpenRouter key has no credits, show "Add credits" CTA
+  | "network"
+  | "validation"
+  | "unknown";
+
 /** Structured error info returned by parseErrorMessage. */
 export interface ParsedError {
   step?: string;
-  errorType?: "rate_limit" | "timeout" | "llm_error" | "network" | "validation" | "unknown";
+  errorType?: ErrorType;
   message: string;
   retryable: boolean;
 }
@@ -49,6 +64,8 @@ export function getErrorTypeLabel(errorType?: ParsedError["errorType"]): string 
     case "rate_limit": return "Rate Limited";
     case "timeout": return "Timed Out";
     case "llm_error": return "LLM Error";
+    case "llm_permanent": return "LLM Error";
+    case "insufficient_credits": return "Insufficient Credits";
     case "network": return "Network Error";
     case "validation": return "Validation Error";
     default: return "Error";

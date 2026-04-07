@@ -9,7 +9,9 @@ import httpx
 from openai import APIConnectionError, APIError, APIStatusError, RateLimitError
 
 from app.utils.error_classification import (
+    ERROR_TYPE_INSUFFICIENT_CREDITS,
     ERROR_TYPE_LLM,
+    ERROR_TYPE_LLM_PERMANENT,
     ERROR_TYPE_NETWORK,
     ERROR_TYPE_RATE_LIMIT,
     ERROR_TYPE_TIMEOUT,
@@ -60,12 +62,13 @@ class TestClassifyError:
         )
         assert classify_error(exc) == ERROR_TYPE_LLM
 
-    def test_api_status_error_402_insufficient_credits_not_retryable(self):
-        """402 from OpenRouter ('insufficient credits') is permanent.
+    def test_api_status_error_402_classifies_as_insufficient_credits(self):
+        """402 from OpenRouter classifies as ERROR_TYPE_INSUFFICIENT_CREDITS.
 
-        No amount of retrying or model fallback will fix it — the account
-        either has credits or it doesn't.  Must classify as a non-retryable
-        type so the pipeline fails fast instead of looping.
+        This is split out from ERROR_TYPE_LLM_PERMANENT so the frontend can
+        render a dedicated 'Add credits on OpenRouter' CTA instead of a
+        generic permanent-error banner. Both types are equally non-retryable
+        but the frontend UX differs.
         """
         exc = APIStatusError(
             message="insufficient credits",
@@ -73,36 +76,51 @@ class TestClassifyError:
             body=None,
         )
         error_type = classify_error(exc)
-        assert is_retryable(error_type) is False, (
-            f"402 should be non-retryable, got error_type={error_type} "
-            f"which is_retryable={is_retryable(error_type)}"
+        assert error_type == ERROR_TYPE_INSUFFICIENT_CREDITS, (
+            f"402 should classify as 'insufficient_credits', got {error_type!r}"
         )
+        # And must still be non-retryable — the original fail-fast behavior
+        # from last session's fix must be preserved.
+        assert is_retryable(error_type) is False
 
-    def test_api_status_error_401_unauthorized_not_retryable(self):
-        """401 (bad/missing API key) is permanent."""
+    def test_api_status_error_401_unauthorized_is_llm_permanent(self):
+        """401 (bad/missing API key) is permanent, classified as llm_permanent."""
         exc = APIStatusError(
             message="unauthorized",
             response=_make_response(401),
             body=None,
         )
+        assert classify_error(exc) == ERROR_TYPE_LLM_PERMANENT
         assert is_retryable(classify_error(exc)) is False
 
-    def test_api_status_error_403_forbidden_not_retryable(self):
-        """403 (forbidden / no model access) is permanent."""
+    def test_api_status_error_403_forbidden_is_llm_permanent(self):
+        """403 (forbidden / no model access) is permanent, classified as llm_permanent."""
         exc = APIStatusError(
             message="forbidden",
             response=_make_response(403),
             body=None,
         )
+        assert classify_error(exc) == ERROR_TYPE_LLM_PERMANENT
         assert is_retryable(classify_error(exc)) is False
 
-    def test_api_status_error_400_bad_request_not_retryable(self):
-        """400 (malformed payload) is permanent."""
+    def test_api_status_error_400_bad_request_is_llm_permanent(self):
+        """400 (malformed payload) is permanent, classified as llm_permanent."""
         exc = APIStatusError(
             message="bad request",
             response=_make_response(400),
             body=None,
         )
+        assert classify_error(exc) == ERROR_TYPE_LLM_PERMANENT
+        assert is_retryable(classify_error(exc)) is False
+
+    def test_api_status_error_422_unprocessable_is_llm_permanent(self):
+        """422 (validation against schema) is permanent, classified as llm_permanent."""
+        exc = APIStatusError(
+            message="unprocessable entity",
+            response=_make_response(422),
+            body=None,
+        )
+        assert classify_error(exc) == ERROR_TYPE_LLM_PERMANENT
         assert is_retryable(classify_error(exc)) is False
 
     def test_api_status_error_500_server_error_is_retryable(self):
@@ -162,6 +180,13 @@ class TestIsRetryable:
 
     def test_validation_not_retryable(self):
         assert is_retryable(ERROR_TYPE_VALIDATION) is False
+
+    def test_llm_permanent_not_retryable(self):
+        assert is_retryable(ERROR_TYPE_LLM_PERMANENT) is False
+
+    def test_insufficient_credits_not_retryable(self):
+        """402 must never autoretry — the account either has credits or it doesn't."""
+        assert is_retryable(ERROR_TYPE_INSUFFICIENT_CREDITS) is False
 
     def test_unknown_not_retryable(self):
         assert is_retryable(ERROR_TYPE_UNKNOWN) is False
