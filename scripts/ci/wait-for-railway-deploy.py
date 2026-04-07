@@ -49,6 +49,11 @@ def gql(query: str, variables: dict, token: str) -> dict:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            # Railway's Cloudflare WAF returns 403 to requests with no
+            # User-Agent. Python urllib's default UA ("Python-urllib/X.Y")
+            # is frequently blocked by WAFs, so we set an explicit UA.
+            "User-Agent": "methodex-ci-wait-for-deploy/1.0 (+https://methodex.ai)",
         },
         method="POST",
     )
@@ -57,7 +62,19 @@ def gql(query: str, variables: dict, token: str) -> dict:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         error_msg = e.read().decode('utf-8', errors='replace')
-        print(f"HTTP {e.code}: {error_msg}", file=sys.stderr)
+        if e.code == 403:
+            print(
+                f"HTTP 403 Forbidden from Railway API. Possible causes:\n"
+                f"  (1) RAILWAY_API_TOKEN scope is insufficient for this project\n"
+                f"  (2) Cloudflare WAF in front of backboard.railway.app is "
+                f"rejecting this request (User-Agent IS set — check if the "
+                f"CI runner IP range is blocked)\n"
+                f"  (3) Token is expired or revoked\n"
+                f"Response body: {error_msg[:500]}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"HTTP {e.code}: {error_msg}", file=sys.stderr)
         raise
 
 
