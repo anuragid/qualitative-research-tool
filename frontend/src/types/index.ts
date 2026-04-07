@@ -128,8 +128,14 @@ export interface LabelSpeakerDto {
 }
 
 // Analysis types
+//
+// ``id`` is optional so the shape can also model the "not_started"
+// sentinel returned by GET /api/videos/:id/analysis when the parent
+// video exists but no ``video_analyses`` row has been created yet.  See
+// backend/app/routes/videos.py :: get_video_analysis and Sentry
+// JAVASCRIPT-REACT-6.
 export interface VideoAnalysis {
-  id: string;
+  id: string | null;
   video_id: string;
   chunks: Chunk[] | null;
   chunks_completed_at: string | null;
@@ -154,7 +160,15 @@ export interface VideoAnalysis {
   activate_completed_at: string | null;
 }
 
-export type AnalysisStatus = "pending" | "processing" | "completed" | "error";
+// "not_started" is emitted by the backend when the parent video/project
+// exists but no analysis row has been created yet -- the frontend must
+// render an empty/CTA state for this status instead of crashing.
+export type AnalysisStatus =
+  | "not_started"
+  | "pending"
+  | "processing"
+  | "completed"
+  | "error";
 
 export interface AnalysisStatusResponse {
   status: AnalysisStatus;
@@ -215,8 +229,12 @@ export interface DesignPrinciple {
 }
 
 // Project Analysis (Cross-Video) types
+//
+// ``id`` and ``error_message`` may be null when the backend returns
+// the "not_started" sentinel (project exists but no project_analyses
+// row).
 export interface ProjectAnalysis {
-  id: string;
+  id: string | null;
   project_id: string;
   video_ids: string[];
   cross_video_patterns: MetaPattern[] | null;
