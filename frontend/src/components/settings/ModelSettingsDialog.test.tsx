@@ -310,6 +310,38 @@ describe("ModelSettingsDialog — Premium mode, no key", () => {
     });
     expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
   });
+
+  it("on no-credits 400, renders inline error and shows a 'Add credits' link to openrouter.ai/settings/credits", async () => {
+    vi.spyOn(settingsService, "addApiKey").mockRejectedValue({
+      response: {
+        status: 400,
+        data: { detail: "Your OpenRouter key has $0 credits. Please add credits to continue." },
+      },
+      message: "Request failed",
+    });
+
+    const user = setupUser();
+    renderDialog();
+
+    await waitFor(() => {
+      expect(getPremiumTab()).toBeDefined();
+    });
+    await user.click(getPremiumTab());
+    await user.type(
+      screen.getByPlaceholderText(/sk-or-v1/i),
+      "sk-or-v1-nocredits1234",
+    );
+    await user.click(screen.getByRole("button", { name: /validate/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/\$0 credits/i)).toBeDefined();
+    });
+
+    const link = screen.getByRole("link", { name: /add credits/i }) as HTMLAnchorElement;
+    expect(link).toBeDefined();
+    expect(link.href).toContain("openrouter.ai/settings/credits");
+    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
+  });
 });
 
 // ── Premium mode, validated key ──────────────────────────────────────────
@@ -384,6 +416,64 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
 
     await waitFor(() => {
       expect(updateSpy).toHaveBeenCalledWith("openai/gpt-4o");
+    });
+  });
+
+  it("switching tabs clears pendingModel so Save disables and original model is restored on switch back", async () => {
+    const searchResults: SearchModel[] = [
+      {
+        id: "openai/gpt-4o",
+        name: "GPT-4o",
+        provider: "OpenAI",
+        context_length: 128000,
+        is_free: false,
+      },
+    ];
+    vi.spyOn(settingsService, "searchModels").mockResolvedValue(searchResults);
+
+    const user = setupUser();
+    renderDialog();
+
+    // 1. Start in Premium mode (saved model is claude-sonnet-4.6)
+    await waitFor(() => {
+      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
+    });
+
+    // 2. Pick a different premium model from the combobox (sets pendingModel)
+    const input = await screen.findByPlaceholderText(/search models/i);
+    await user.clear(input);
+    await user.type(input, "gpt-4o");
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("option", { name: /gpt-4o/i })).toBeDefined();
+      },
+      { timeout: 2000 },
+    );
+    await user.click(screen.getByRole("option", { name: /gpt-4o/i }));
+
+    // 3. Save should be enabled (isDirty=true)
+    await waitFor(() => {
+      const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+      expect(saveBtn.disabled).toBe(false);
+    });
+
+    // 4. Switch to Standard tab — handleModeChange clears pendingModel
+    await user.click(getStandardTab());
+
+    // 5. Save should now be disabled (pendingModel cleared)
+    await waitFor(() => {
+      const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+      expect(saveBtn.disabled).toBe(true);
+    });
+
+    // 6. Switch back to Premium tab
+    await user.click(getPremiumTab());
+
+    // 7. Combobox should show the original saved model (claude), not the pending pick (gpt-4o)
+    await waitFor(() => {
+      const combobox = screen.getByRole("combobox") as HTMLInputElement;
+      expect(combobox.value).toMatch(/claude/i);
     });
   });
 

@@ -230,6 +230,12 @@ export function ModelSettingsDialog({
               ))}
             </RadioGroup>
 
+            {updateModelErrorMessage && (
+              <div className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {updateModelErrorMessage}
+              </div>
+            )}
+
             {settings.has_api_key && (
               <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs text-text-tertiary">
                 OpenRouter key on file (ending …{settings.key_hint ?? "****"}).{" "}
@@ -278,6 +284,16 @@ export function ModelSettingsDialog({
                 {addKeyErrorMessage && (
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {addKeyErrorMessage}
+                    {addKeyErrorMessage.toLowerCase().includes("$0 credits") && (
+                      <a
+                        href="https://openrouter.ai/settings/credits"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-interactive-focus underline"
+                      >
+                        Add credits on OpenRouter
+                      </a>
+                    )}
                   </div>
                 )}
                 <Button
