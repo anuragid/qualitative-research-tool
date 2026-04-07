@@ -19,6 +19,7 @@ from app.services.byok_service import (
     resolve_byok_with_preflight,
 )
 from app.services.project_state_service import ProjectStateService
+from app.tasks._pipeline_utils import build_error_json, sanitize_error
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 from app.utils.error_classification import (
@@ -27,6 +28,25 @@ from app.utils.error_classification import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _check_cancellation(db: Session, video_id: str) -> bool:
+    """Return True if the analysis should stop (watchdog error, row gone).
+
+    Called at the start of every step task in the chain so a halted
+    pipeline doesn't do redundant work on subsequent links.
+    """
+    try:
+        db.expire_all()
+        analysis = db.query(VideoAnalysis).filter(
+            VideoAnalysis.video_id == UUID(video_id)
+        ).first()
+        if analysis is None or analysis.status == "error":
+            return True
+        return False
+    except Exception:
+        logger.exception("_check_cancellation failed, proceeding")
+        return False
 
 
 class NonRetryableAnalysisError(Exception):
