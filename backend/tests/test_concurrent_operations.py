@@ -88,8 +88,14 @@ async def test_double_transcription_rejected(client, mock_s3):
     assert r2.status_code == 409
 
 
-async def test_upload_confirmation_on_already_uploaded_rejected(client, mock_s3):
-    """Confirming upload on an already-uploaded video should be rejected."""
+async def test_upload_confirmation_is_idempotent(client, mock_s3):
+    """Confirming upload on an already-uploaded video should succeed (idempotent).
+
+    The frontend uses confirm-upload as a recovery probe after XHR/network failures
+    during direct-to-R2 uploads, so repeated calls must be safe. If the bytes are
+    still in R2, the endpoint should return 200 with the video record regardless of
+    whether the video was already marked uploaded.
+    """
     r = await client.post("/api/projects/", json={"name": "Test Project"})
     project_id = r.json()["id"]
 
@@ -104,7 +110,10 @@ async def test_upload_confirmation_on_already_uploaded_rejected(client, mock_s3)
     mock_s3.head_object.return_value = {"ContentLength": 1000}
     r1 = await client.post(f"/api/videos/{video_id}/confirm-upload")
     assert r1.status_code == 200
+    assert r1.json()["status"] == "uploaded"
 
-    # Confirm again — should fail
+    # Confirm again — should succeed idempotently
     r2 = await client.post(f"/api/videos/{video_id}/confirm-upload")
-    assert r2.status_code == 400
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "uploaded"
+    assert r2.json()["id"] == r1.json()["id"]

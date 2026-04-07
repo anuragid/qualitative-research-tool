@@ -176,12 +176,29 @@ async def confirm_upload(
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.VIDEO_UPLOAD)),
     db: Session = Depends(get_db),
 ):
-    """Confirm that a direct upload to R2 completed successfully."""
+    """Confirm that a direct upload to R2 completed successfully.
+
+    Idempotent: safe to call repeatedly. This is intentional because the frontend
+    uses confirm-upload as a recovery probe after XHR/network failures during
+    direct-to-R2 uploads — an HTTP/2 idle close or flaky connection can reject
+    the XHR even though R2 already has the full object. On failure, the frontend
+    calls confirm-upload to check whether the bytes actually landed; if they did,
+    the upload is reported as successful instead of a false-negative error.
+
+    State transitions:
+      uploading -> verify bytes in R2 -> uploaded (on success) or 400 (on empty / missing)
+      uploaded  -> verify bytes still exist (defensive) -> uploaded (no-op)
+      error     -> verify bytes -> uploaded (recovery from a previous false-negative)
+      anything else -> 400
+    """
     current_user_id = current_user["id"]
     video = _get_video_with_ownership(video_id, current_user_id, db)
 
-    if video.status != "uploading":
-        raise HTTPException(status_code=400, detail="Video is not in uploading state")
+    if video.status not in ("uploading", "uploaded", "error"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Video is in '{video.status}' state, cannot confirm upload",
+        )
 
     # Verify the object actually exists in R2 and is not empty
     try:
@@ -194,11 +211,15 @@ async def confirm_upload(
     except Exception:
         raise HTTPException(status_code=400, detail="File not found in storage. Upload may not have completed.")
 
-    video.status = "uploaded"
-    db.commit()
-    db.refresh(video)
+    # Flip to "uploaded" (idempotent — safe to call repeatedly)
+    if video.status != "uploaded":
+        video.status = "uploaded"
+        db.commit()
+        db.refresh(video)
+        logger.info(f"Upload confirmed for video {video.id}")
+    else:
+        logger.info(f"Upload already confirmed for video {video.id} (idempotent call)")
 
-    logger.info(f"Upload confirmed for video {video.id}")
     return video
 
 
@@ -506,6 +527,19 @@ async def start_transcription(
     current_user_id = current_user["id"]
     try:
         video = _get_video_with_ownership(video_id, current_user_id, db)
+
+        # Reject if the upload hasn't been confirmed yet. Previously this was silently
+        # accepted, which produced a confusing UX where the upload widget showed a
+        # false-negative failure (e.g., XHR idle close) but the video was still
+        # processable through the normal flow. The frontend now has a recovery probe
+        # that flips such videos to "uploaded" via confirm-upload; if a caller still
+        # reaches this route with status="uploading", that's a real "upload hasn't
+        # finished" situation and should 409 so the user gets a clear signal.
+        if video.status == "uploading":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload has not been confirmed yet. Please wait for the upload to finish.",
+            )
 
         # Race condition: reject if already transcribing
         if video.status in ("transcribing",):
