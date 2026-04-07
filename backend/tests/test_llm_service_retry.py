@@ -129,10 +129,10 @@ class TestCallLLMNoFallbackOnPermanentError:
     def test_402_does_not_try_fallback_models(self, service, monkeypatch):
         """One 402 from the primary model should fail immediately, not
         retry across all standard fallback models."""
-        # Replace the shared client so call_llm uses our mock
+        # client is now a @property backed by _client; inject the mock directly.
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = _make_402()
-        monkeypatch.setattr(service, "client", mock_client)
+        service._client = mock_client
 
         with pytest.raises(APIStatusError) as exc_info:
             service.call_llm(
@@ -154,11 +154,12 @@ class TestCallLLMNoFallbackOnPermanentError:
         """Transient APIConnectionError should still try the fallback chain."""
         from app.constants import FREE_MODEL_FALLBACKS
 
+        # client is now a @property backed by _client; inject the mock directly.
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = APIConnectionError(
             request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
         )
-        monkeypatch.setattr(service, "client", mock_client)
+        service._client = mock_client
 
         with pytest.raises(APIConnectionError):
             service.call_llm(system_prompt="sys", user_message="msg")
