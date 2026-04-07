@@ -29,7 +29,11 @@ class TestMarkTranscriptionError:
     def test_rollback_called_before_update(self):
         mock_db = MagicMock()
         mock_video = MagicMock()
+        # Real-string starting state so VideoStateMachine.transition
+        # (TRANSCRIBE_FAILED) can coerce it into the enum.
+        mock_video.status = "transcribing"
         mock_transcript = MagicMock()
+        mock_transcript.status = "processing"
 
         mock_db.query.return_value.filter.return_value.first.side_effect = [
             mock_video,
@@ -279,11 +283,15 @@ class TestTranscribeVideoTaskFlow:
         mock_video = MagicMock()
         mock_video.id = uuid4()
         mock_video.s3_key = "projects/abc/videos/test.mov"
-        mock_video.status = "uploaded"
+        # Use TRANSCRIBING because the route normally already flipped the
+        # row before the worker runs. The state machine's self-loop makes
+        # the worker's re-assert a no-op.
+        mock_video.status = "transcribing"
 
         mock_transcript = MagicMock()
         mock_transcript.id = uuid4()
         mock_transcript.assemblyai_id = None
+        mock_transcript.status = "pending"
 
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.first.side_effect = [
@@ -335,8 +343,10 @@ class TestTranscribeVideoTaskFlow:
         mock_video = MagicMock()
         mock_video.id = uuid4()
         mock_video.s3_key = "projects/abc/videos/test.mp4"
+        mock_video.status = "transcribing"
 
         mock_transcript = MagicMock()
+        mock_transcript.status = "pending"
 
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.first.side_effect = [
@@ -368,8 +378,10 @@ class TestTranscribeVideoTaskFlow:
         mock_video = MagicMock()
         mock_video.id = uuid4()
         mock_video.s3_key = "projects/abc/videos/test.mp4"
+        mock_video.status = "transcribing"
 
         mock_transcript = MagicMock()
+        mock_transcript.status = "pending"
 
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.first.side_effect = [
