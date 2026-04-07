@@ -36,7 +36,12 @@ class ProjectStateService:
                     for v in videos
                 )
 
-                if all_completed and project.status in ("planning", "processing"):
+                # Include "ready" in the gate: a project transitions to
+                # "ready" as soon as the first video is transcribed, so by
+                # the time the LAST video's activate step finishes the
+                # project is almost always already in "ready". Excluding it
+                # here was a one-way trap (HAIC bug, 2026-04-07).
+                if all_completed and project.status in ("planning", "processing", "ready"):
                     project.status = "completed"
                     db.commit()
                     logger.info(f"Project {project_id} marked as 'completed'")
