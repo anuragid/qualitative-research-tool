@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from sqlalchemy import text
 
 from app.config import settings
 from app.database import Base, engine
@@ -239,6 +240,28 @@ async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": detail})
 
 
+def _probe_db() -> None:
+    """Raise if the DB is not reachable. Used by /health/ready.
+
+    Uses a fresh SessionLocal so the probe never holds a session checked
+    out from a long-running request handler.
+    """
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        db.execute(text("SELECT 1"))
+
+
+def _probe_redis() -> None:
+    """Raise if Redis (Celery broker) is not reachable. Used by /health/ready.
+
+    Imported lazily so importing app.main during tests doesn't pull in
+    Celery — the celery_app module is heavy and sets up signal handlers.
+    """
+    from app.tasks.celery_app import celery_app
+    with celery_app.broker_connection() as conn:
+        conn.ensure_connection(max_retries=1)
+
+
 @app.get("/")
 async def root():
     """Root endpoint."""
@@ -247,8 +270,50 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Backwards-compatible liveness alias for the old single /health probe.
+
+    Existing monitoring (UptimeRobot, etc.) is still pointed at this URL,
+    so we keep it returning the original payload. Railway's
+    healthcheckPath has moved to /health/ready in Task 4.7.
+    """
     return {"status": "healthy"}
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness — is the process running and able to answer HTTP?
+
+    Always returns 200 as long as the FastAPI event loop is alive. Used
+    by Railway's process supervisor and any external uptime checks that
+    don't care about downstream dependencies.
+    """
+    return {"status": "alive"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness — can this replica actually serve traffic?
+
+    Verifies the things a request handler needs in order to do useful
+    work: a working DB session and a reachable Celery broker. If either
+    probe fails the response is 503 with a status string identifying
+    which dependency is down, and Railway's load balancer pulls this
+    replica out of rotation until the next /health/ready succeeds.
+
+    DB is checked before Redis because it's the more fundamental
+    dependency — there's no useful work to do without it.
+    """
+    try:
+        _probe_db()
+    except Exception:
+        logger.exception("Readiness probe failed: DB unreachable")
+        return JSONResponse(status_code=503, content={"status": "db_down"})
+    try:
+        _probe_redis()
+    except Exception:
+        logger.exception("Readiness probe failed: Redis unreachable")
+        return JSONResponse(status_code=503, content={"status": "redis_down"})
+    return {"status": "ready"}
 
 
 # Clerk Frontend API proxy — used by Cloudflare Pages Function to avoid
