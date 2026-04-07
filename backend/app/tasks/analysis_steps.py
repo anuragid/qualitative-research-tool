@@ -1,5 +1,6 @@
 """Separate Celery tasks for step-by-step analysis."""
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
@@ -13,11 +14,17 @@ from app.agents.nodes.explain import explain_node
 from app.agents.nodes.infer import infer_node
 from app.agents.nodes.relate import relate_node
 from app.models.database_models import SpeakerLabel, Transcript, Video, VideoAnalysis
-from app.services.byok_service import resolve_byok as _resolve_byok
+from app.services.byok_service import (
+    InsufficientCreditsError,
+    resolve_byok_with_preflight,
+)
 from app.services.project_state_service import ProjectStateService
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
-from app.utils.error_classification import is_retryable
+from app.utils.error_classification import (
+    ERROR_TYPE_INSUFFICIENT_CREDITS,
+    is_retryable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +38,55 @@ class NonRetryableAnalysisError(Exception):
     decorator, this short-circuits Celery's autoretry loop so we don't
     waste 4 attempts × 10-minute backoffs on errors that won't get better.
     """
+
+
+class InsufficientCreditsNonRetryable(NonRetryableAnalysisError):
+    """Specialised non-retryable error for the BYOK 0-balance case.
+
+    Raised by the step tasks when ``resolve_byok_with_preflight`` reports
+    that the user's OpenRouter key has zero credits **before** any LLM
+    call is made. Carries the structured ``BalanceInfo`` so the error
+    writer can stamp ``error_type=insufficient_credits`` on
+    ``video.error_message`` and the frontend can render the dedicated
+    "Add credits" alert with the user's actual balance.
+    """
+
+    def __init__(self, message: str, balance: Any | None = None):
+        super().__init__(message)
+        self.balance = balance
+
+
+def _resolve_byok_or_raise_credits_error(
+    db: Session,
+    user_id: str | None,
+    step_name: str,
+    *,
+    force_refresh: bool,
+) -> tuple[str | None, str | None]:
+    """Pre-flight resolver wrapper used by every step task.
+
+    Calls :func:`resolve_byok_with_preflight` and converts the
+    :class:`InsufficientCreditsError` into the step-task-specific
+    :class:`InsufficientCreditsNonRetryable` so it flows through the
+    existing ``except`` blocks unchanged and the error writer can stamp
+    ``error_type=insufficient_credits`` on ``video.error_message``.
+
+    Returns:
+        ``(api_key, model)`` — the ``BalanceInfo`` is intentionally
+        dropped because nothing in the step body needs it. The pre-flight
+        check was the only reason to fetch it.
+    """
+    try:
+        api_key, model, _balance = resolve_byok_with_preflight(
+            db, user_id, force_refresh=force_refresh
+        )
+    except InsufficientCreditsError as exc:
+        raise InsufficientCreditsNonRetryable(
+            f"{step_name.capitalize()} step failed: insufficient credits "
+            f"(balance_remaining=${exc.balance.balance_remaining:.4f})",
+            balance=exc.balance,
+        ) from exc
+    return api_key, model
 
 
 def _raise_for_node_error(step_name: str, node_result: Dict[str, Any]) -> None:
@@ -95,7 +151,40 @@ def get_video_analysis_state(db: Session, video_id: UUID) -> Dict[str, Any]:
     }
 
 
-def _update_analysis_error(db: Session, video_id: str, step_name: str):
+def _build_insufficient_credits_error_json(step_name: str, exc: "InsufficientCreditsNonRetryable") -> str:
+    """Build a structured error_message JSON payload for the
+    insufficient-credits case.
+
+    Mirrors the shape used by ``analysis_tasks._build_pipeline_error_json``
+    so the frontend's ``parseError`` consumer doesn't have to special-case
+    step-task errors. Includes the ``balance`` block so
+    ``InsufficientCreditsAlert.tsx`` can render the user's actual numbers
+    without an extra round-trip.
+    """
+    payload: Dict[str, Any] = {
+        "step": step_name,
+        "error_type": ERROR_TYPE_INSUFFICIENT_CREDITS,
+        "retryable": False,
+        "message": (
+            "Your OpenRouter key has no remaining credits. "
+            "Add credits at https://openrouter.ai/settings/credits and try again."
+        ),
+        "details": str(exc),
+    }
+    if exc.balance is not None:
+        try:
+            payload["balance"] = exc.balance.as_dict()
+        except Exception:  # pragma: no cover - defensive: balance shape mismatch
+            pass
+    return json.dumps(payload)
+
+
+def _update_analysis_error(
+    db: Session,
+    video_id: str,
+    step_name: str,
+    exc: Exception | None = None,
+):
     """Safely update analysis record to error state.
 
     Rolls back any dirty session state before querying, ensuring the
@@ -104,6 +193,14 @@ def _update_analysis_error(db: Session, video_id: str, step_name: str):
 
     Uses a fresh query to avoid UnboundLocalError if the analysis variable
     was never assigned in the calling scope.
+
+    When *exc* is an :class:`InsufficientCreditsNonRetryable`, the
+    structured "insufficient_credits" payload is written to
+    ``video.error_message`` so the frontend can render the dedicated
+    "Add credits" alert. For other exception types this preserves the
+    historical behaviour of leaving ``error_message`` untouched (the
+    full-pipeline path in ``analysis_tasks.analyze_video_task`` writes
+    its own structured payload).
     """
     try:
         db.rollback()
@@ -118,6 +215,11 @@ def _update_analysis_error(db: Session, video_id: str, step_name: str):
         video = db.query(Video).filter(Video.id == UUID(video_id)).first()
         if video and video.status == "analyzing":
             video.status = "error"
+
+        # Stamp structured error_type for the BYOK 0-balance case so the
+        # frontend can render the dedicated "Add credits" alert.
+        if video is not None and isinstance(exc, InsufficientCreditsNonRetryable):
+            video.error_message = _build_insufficient_credits_error_json(step_name, exc)
 
         db.commit()
     except Exception as commit_error:
@@ -150,8 +252,13 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
         state = get_video_analysis_state(self.db, UUID(video_id))
         analysis = state["analysis"]
 
-        # Resolve BYOK API key and preferred model
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model and pre-flight the
+        # OpenRouter balance. ``force_refresh=True`` ensures the very
+        # first step in the pipeline always sees a live balance number,
+        # not a 60s-stale cache. Subsequent steps reuse the cached value.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "chunk", force_refresh=True,
+        )
 
         # Update status
         analysis.status = "processing"
@@ -189,7 +296,7 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"CHUNK step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "chunk")
+        _update_analysis_error(self.db, video_id, "chunk", exc=e)
         raise
 
 
@@ -220,8 +327,12 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
         if not analysis or not analysis.chunks:
             raise Exception("No chunks available for inference")
 
-        # Resolve BYOK API key and preferred model
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model with balance pre-flight.
+        # Steps 2-5 use ``force_refresh=False`` because step 1 already
+        # burned credits and a 60s-stale value is acceptable.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "infer", force_refresh=False,
+        )
 
         # Update status
         analysis.current_step = "infer"
@@ -255,7 +366,7 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"INFER step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "infer")
+        _update_analysis_error(self.db, video_id, "infer", exc=e)
         raise
 
 
@@ -285,8 +396,10 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
         if not analysis or not analysis.inferences:
             raise Exception("No inferences available for pattern analysis")
 
-        # Resolve BYOK API key and preferred model
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model with balance pre-flight.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "relate", force_refresh=False,
+        )
 
         # Update status
         analysis.current_step = "relate"
@@ -320,7 +433,7 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"RELATE step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "relate")
+        _update_analysis_error(self.db, video_id, "relate", exc=e)
         raise
 
 
@@ -350,8 +463,10 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
         if not analysis or not analysis.patterns:
             raise Exception("No patterns available for insight generation")
 
-        # Resolve BYOK API key and preferred model
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model with balance pre-flight.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "explain", force_refresh=False,
+        )
 
         # Update status
         analysis.current_step = "explain"
@@ -386,7 +501,7 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"EXPLAIN step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "explain")
+        _update_analysis_error(self.db, video_id, "explain", exc=e)
         raise
 
 
@@ -416,8 +531,10 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
         if not analysis or not analysis.insights:
             raise Exception("No insights available for design principle generation")
 
-        # Resolve BYOK API key and preferred model
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model with balance pre-flight.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "activate", force_refresh=False,
+        )
 
         # Update status
         analysis.current_step = "activate"
@@ -466,5 +583,5 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"ACTIVATE step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "activate")
+        _update_analysis_error(self.db, video_id, "activate", exc=e)
         raise

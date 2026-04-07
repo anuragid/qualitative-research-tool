@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth_bridge import Permission, require_permissions
 from app.config import settings
 from app.database import get_db
+from app.dependencies.byok_gate import require_byok_credits
 from app.main import limiter
 from app.models.database_models import Project, ProjectAnalysis, Video, VideoAnalysis
 from app.models.schemas import (
@@ -20,6 +21,7 @@ from app.models.schemas import (
     ProjectUpdate,
     VideoResponse,
 )
+from app.services.openrouter_balance import BalanceInfo
 from app.services.s3_service import s3_service
 
 logger = logging.getLogger(__name__)
@@ -338,7 +340,8 @@ async def trigger_project_analysis(
     project_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    balance: BalanceInfo | None = Depends(require_byok_credits),
 ):
     """
     Trigger cross-video analysis for a project.
