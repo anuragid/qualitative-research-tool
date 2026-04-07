@@ -99,7 +99,6 @@ celery_app = Celery(
     backend=settings.CELERY_RESULT_BACKEND,
     include=[
         "app.tasks.transcription_tasks",
-        "app.tasks.analysis_tasks",
         "app.tasks.analysis_steps",
         "app.tasks.project_analysis_steps",
         "app.tasks.pipeline_errors",

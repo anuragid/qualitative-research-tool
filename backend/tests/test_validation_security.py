@@ -103,9 +103,14 @@ class TestApiKeySanitization:
     """Error messages must have API keys redacted before storage."""
 
     def _sanitize(self, message: str) -> str:
-        """Import and call the sanitizer from analysis_tasks."""
-        from app.tasks.analysis_tasks import _sanitize_error
-        return _sanitize_error(message)
+        """Import and call the sanitizer from _pipeline_utils.
+
+        Relocated from app.tasks.analysis_tasks._sanitize_error to
+        app.tasks._pipeline_utils.sanitize_error as part of the WS3
+        chain refactor.
+        """
+        from app.tasks._pipeline_utils import sanitize_error
+        return sanitize_error(message)
 
     def test_openrouter_key_redacted(self):
         msg = "API error with key sk-or-v1-abc123456789012345678901234567890"

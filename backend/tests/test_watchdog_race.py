@@ -135,73 +135,54 @@ def _make_video_analysis(db, video_id, va_id=None, status="pending", started_at=
 # ---------------------------------------------------------------------------
 
 
-class TestIsCancelledDetectsWatchdogError:
-    def test_is_cancelled_detects_watchdog_error(self, db_session):
-        from app.tasks.analysis_tasks import _is_cancelled
+class TestCheckCancellationDetectsWatchdogError:
+    """After the WS3 chain refactor, the monolithic _run_video_pipeline /
+    _is_cancelled functions are gone. Each per-step Celery task calls
+    _check_cancellation at the top of its body and returns {status:
+    skipped} if the watchdog (or a prior link) already marked the
+    VideoAnalysis row as error."""
+
+    def test_check_cancellation_detects_watchdog_error(self, db_session):
+        from app.tasks.analysis_steps import _check_cancellation
 
         project = _make_project(db_session)
         video = _make_video(db_session, project.id, status="analyzing")
-        va = _make_video_analysis(db_session, video.id, status="processing")
+        _make_video_analysis(db_session, video.id, status="processing")
 
         # Should NOT be cancelled yet
-        assert _is_cancelled(db_session, va.id) is False
+        assert _check_cancellation(db_session, str(video.id)) is False
 
         # Simulate watchdog setting status to "error"
+        va = db_session.query(VideoAnalysis).filter_by(video_id=video.id).first()
         va.status = "error"
         db_session.commit()
 
         # Should now be detected as cancelled
-        assert _is_cancelled(db_session, va.id) is True
+        assert _check_cancellation(db_session, str(video.id)) is True
 
 
-# ---------------------------------------------------------------------------
-# Test 2: Pipeline stops when cancelled
-# ---------------------------------------------------------------------------
+class TestStepTaskShortCircuitsWhenCancelled:
+    """The chain-style replacement for the old
+    TestPipelineStopsWhenCancelled: instead of one pipeline function
+    halting early, individual step tasks short-circuit via
+    _check_cancellation. Covered in detail by
+    test_analysis_chain.py::TestStepTasksShortCircuitWhenCancelled —
+    this test is a narrow sanity check that exercises the precheck
+    against the real DatabaseTask flow used in watchdog scenarios."""
 
+    def test_chunk_step_returns_skipped_when_watchdog_marked_error(self, db_session):
+        from app.tasks import analysis_steps
 
-class TestPipelineStopsWhenCancelled:
-    def test_pipeline_stops_when_cancelled(self):
-        from app.tasks.analysis_tasks import _run_video_pipeline
+        project = _make_project(db_session)
+        video = _make_video(db_session, project.id, status="analyzing")
+        _make_video_analysis(db_session, video.id, status="error")
 
-        mock_db = MagicMock()
-        va_id = uuid.uuid4()
+        mock_self = MagicMock()
+        mock_self.db = db_session
+        unbound = analysis_steps.analyze_chunk_step._orig_run.__func__
+        result = unbound(mock_self, str(video.id), None)
 
-        initial_state = {
-            "video_id": str(uuid.uuid4()),
-            "transcript": [],
-            "speaker_labels": {},
-            "speaker_roles": {},
-            "project_description": None,
-            "chunks": None,
-            "inferences": None,
-            "patterns": None,
-            "insights": None,
-            "design_principles": None,
-            "api_key": None,
-            "model": None,
-            "current_step": "chunk",
-            "error": None,
-        }
-
-        with patch("app.tasks.analysis_tasks._is_cancelled", return_value=True), \
-             patch("app.tasks.analysis_tasks.chunk_node") as mock_chunk, \
-             patch("app.tasks.analysis_tasks.infer_node") as mock_infer, \
-             patch("app.tasks.analysis_tasks.relate_node") as mock_relate, \
-             patch("app.tasks.analysis_tasks.explain_node") as mock_explain, \
-             patch("app.tasks.analysis_tasks.activate_node") as mock_activate:
-
-            result = _run_video_pipeline(initial_state, db=mock_db, video_analysis_id=va_id)
-
-            # Pipeline should have halted with watchdog cancellation error
-            assert result["error"] == "Analysis cancelled by watchdog (timeout)"
-            assert result["error_type"] == "timeout"
-
-            # No node should have been called (cancelled before first step)
-            mock_chunk.assert_not_called()
-            mock_infer.assert_not_called()
-            mock_relate.assert_not_called()
-            mock_explain.assert_not_called()
-            mock_activate.assert_not_called()
+        assert result == {"video_id": str(video.id), "status": "skipped"}
 
 
 # ---------------------------------------------------------------------------
