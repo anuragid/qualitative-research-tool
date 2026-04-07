@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import {
   Combobox,
   ComboboxInput,
@@ -22,12 +23,27 @@ import { useSettings } from "../../hooks/useSettings";
 import { useModelSearch } from "../../hooks/useModelSearch";
 import { ModelOption } from "./ModelOption";
 import { BalanceDisplay } from "./BalanceDisplay";
-import { LockIcon, LoaderIcon } from "lucide-react";
-import type { SearchModel } from "../../services/settings";
+import { LoaderIcon } from "lucide-react";
+import type { SearchModel, UserSettings } from "../../services/settings";
+
+type Mode = "standard" | "premium";
 
 interface ModelSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function deriveInitialMode(settings: UserSettings | undefined): Mode {
+  if (!settings) return "standard";
+  const standardIds = new Set(
+    settings.available_models
+      .filter((m) => m.tier === "standard")
+      .map((m) => m.id),
+  );
+  if (settings.preferred_model && !standardIds.has(settings.preferred_model)) {
+    return "premium";
+  }
+  return "standard";
 }
 
 export function ModelSettingsDialog({
@@ -37,98 +53,135 @@ export function ModelSettingsDialog({
   const {
     settings,
     isLoading,
-    updateSettings,
-    isUpdating,
-    updateError,
-    resetUpdateError,
+    addApiKey,
+    isAddingKey,
+    addKeyError,
+    resetAddKeyError,
+    updatePreferredModel,
+    isUpdatingModel,
+    updateModelError,
+    resetUpdateModelError,
     deleteApiKey,
     isDeletingKey,
     refreshBalance,
     isRefreshingBalance,
   } = useSettings();
 
-  const [apiKey, setApiKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const [selectedModelName, setSelectedModelName] = useState<string | null>(
-    null,
-  );
+  const [mode, setMode] = useState<Mode>("standard");
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const [pendingModel, setPendingModel] = useState<string | null>(null);
   const { results, isSearching, query, setQuery } = useModelSearch();
 
-  // Reset local state when dialog opens
-  useEffect(() => {
-    if (open) {
-      resetUpdateError();
-      setApiKey("");
-      setSelectedModel(null);
-      setSelectedModelName(null);
-      setQuery("");
-    }
-  }, [open, resetUpdateError, setQuery]);
-
-  const currentModel = selectedModel ?? settings?.preferred_model ?? null;
-
-  // Separate standard (included) from premium models
   const standardModels =
     settings?.available_models.filter((m) => m.tier === "standard") ?? [];
 
-  const hasKey = settings?.has_api_key || !!apiKey;
+  // ── Reset on open ────────────────────────────────────────────────────
+  // Initialize the dialog state ONCE per "open=true session". The ref
+  // guard ensures that background `["user-settings"]` refetches do not
+  // re-derive `mode` or clobber `pendingModel` mid-session — they only
+  // update the cached settings the dialog reads from.
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      initializedRef.current = false;
+      return;
+    }
+    if (initializedRef.current || !settings) return;
+    initializedRef.current = true;
+    setApiKeyDraft("");
+    setPendingModel(null);
+    setQuery("");
+    resetAddKeyError();
+    resetUpdateModelError();
+    setMode(deriveInitialMode(settings));
+    // We intentionally exclude the reset/setQuery callbacks from deps —
+    // they're stable identities from the hook and including them would
+    // not change behavior given the ref guard above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, settings]);
 
-  const isPremiumModel =
-    currentModel != null && !standardModels.some((m) => m.id === currentModel);
+  if (isLoading || !settings) return null;
 
-  const handleSave = () => {
-    updateSettings(
-      {
-        preferred_model: currentModel,
-        api_key: apiKey || undefined,
-      },
-      {
-        onSuccess: () => {
-          setApiKey("");
-          onOpenChange(false);
-        },
-      },
-    );
+  // ── Derived values (no local mirrors of saved state) ─────────────────
+  const effectiveModel = pendingModel ?? settings.preferred_model;
+  const isDirty =
+    pendingModel != null && pendingModel !== settings.preferred_model;
+
+  // ── Handlers ─────────────────────────────────────────────────────────
+  const handleModeChange = (next: string) => {
+    setMode(next as Mode);
+    // Switching tabs clears any pending pick to avoid carrying a premium
+    // pick into Standard mode (or vice versa).
+    setPendingModel(null);
+    resetAddKeyError();
+    resetUpdateModelError();
   };
 
-  const handleRemoveKey = () => {
-    deleteApiKey(undefined, {
-      onSuccess: () => {
-        setSelectedModel(null);
-        setSelectedModelName(null);
-        setApiKey("");
-        setQuery("");
-      },
-    });
+  const handleStandardPick = (id: string) => {
+    setPendingModel(id);
+    resetUpdateModelError();
   };
 
-  const handleModelSelect = (model: SearchModel | null) => {
-    if (model) {
-      setSelectedModel(model.id);
-      setSelectedModelName(model.name);
+  const handlePremiumPick = (model: SearchModel | null) => {
+    if (!model) return;
+    setPendingModel(model.id);
+    resetUpdateModelError();
+  };
+
+  const handleAddKey = async () => {
+    if (apiKeyDraft.length < 10) return;
+    try {
+      await addApiKey(apiKeyDraft);
+      setApiKeyDraft("");
+    } catch {
+      // addKeyError is set by the mutation; the inline error renders it.
     }
   };
 
-  const handleStandardModelSelect = (modelId: string) => {
-    setSelectedModel(modelId);
-    setSelectedModelName(null);
-    setQuery("");
+  const handleRemoveKey = async () => {
+    try {
+      await deleteApiKey();
+      setMode("standard");
+      setPendingModel(null);
+      setApiKeyDraft("");
+    } catch {
+      // surfaced via updateModelError or a future toast
+    }
   };
 
-  if (isLoading) return null;
+  const handleSave = async () => {
+    if (!isDirty || pendingModel == null) {
+      onOpenChange(false);
+      return;
+    }
+    try {
+      await updatePreferredModel(pendingModel);
+      onOpenChange(false);
+    } catch {
+      // updateModelError is set; user retries
+    }
+  };
 
-  const errorMessage = updateError
-    ? (updateError as { message?: string }).message ?? String(updateError)
+  // ── Render ───────────────────────────────────────────────────────────
+  const addKeyErrorMessage = addKeyError
+    ? extractErrorMessage(addKeyError, "Could not save the API key.")
+    : null;
+  const updateModelErrorMessage = updateModelError
+    ? extractErrorMessage(updateModelError, "Could not update the model.")
     : null;
 
-  const emptyMessage = isSearching
-    ? "Searching..."
-    : query.length < 2
-      ? "Type to search models"
-      : "No models found";
-
-  // Display name for the currently selected premium model
-  const premiumDisplayName = selectedModelName ?? currentModel;
+  // Controlled value for the premium combobox: prefer the matching item
+  // from the current search results, otherwise synthesize a SearchModel-shaped
+  // placeholder so the input still displays the saved id.
+  const comboboxValue: SearchModel | null = effectiveModel
+    ? results.find((m) => m.id === effectiveModel) ?? {
+        id: effectiveModel,
+        name: effectiveModel,
+        provider: "",
+        context_length: null,
+        is_free: false,
+      }
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -136,217 +189,219 @@ export function ModelSettingsDialog({
         <DialogHeader>
           <DialogTitle>Model Settings</DialogTitle>
           <DialogDescription>
-            Standard models are included. Bring your own OpenRouter API key to
-            use any premium model.
+            Choose between the included standard models, or bring your own
+            OpenRouter key to use any premium model.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 py-4">
-          {/* Error banner */}
-          {errorMessage && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorMessage}
-            </div>
-          )}
+        <Tabs value={mode} onValueChange={handleModeChange} className="py-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="standard">Standard</TabsTrigger>
+            <TabsTrigger value="premium">Premium</TabsTrigger>
+          </TabsList>
 
-          {/* Model selection */}
-          <RadioGroup
-            value={currentModel || standardModels[0]?.id || ""}
-            onValueChange={handleStandardModelSelect}
-            className="gap-4"
-          >
-            {/* Standard models */}
-            <div>
-              <span className="text-section text-text-tertiary">
-                Standard Models
-              </span>
-              <p className="mt-0.5 text-xs text-text-tertiary">
-                Included -- no API key needed
-              </p>
-              <div className="mt-2 flex flex-col gap-2">
-                {standardModels.map((model) => (
-                  <label
-                    key={model.id}
-                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                      currentModel === model.id ||
-                      (!currentModel && model === standardModels[0])
-                        ? "border-interactive-focus bg-interactive-focus-bg"
-                        : "border-border hover:bg-interactive-fill"
-                    }`}
-                  >
-                    <RadioGroupItem value={model.id} />
-                    <div>
-                      <div className="font-medium text-sm">{model.name}</div>
-                      <div className="text-xs text-text-tertiary">
-                        {model.provider ?? "Open source"}
-                      </div>
+          {/* ── STANDARD MODE ───────────────────────────────────────── */}
+          <TabsContent value="standard" className="mt-4">
+            <RadioGroup
+              value={effectiveModel ?? ""}
+              onValueChange={handleStandardPick}
+              className="flex flex-col gap-2"
+            >
+              {standardModels.map((model) => (
+                <label
+                  key={model.id}
+                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
+                    effectiveModel === model.id
+                      ? "border-interactive-focus bg-interactive-focus-bg"
+                      : "border-border hover:bg-interactive-fill"
+                  }`}
+                >
+                  <RadioGroupItem
+                    value={model.id}
+                    aria-label={model.name}
+                  />
+                  <div>
+                    <div className="font-medium text-sm">{model.name}</div>
+                    <div className="text-xs text-text-tertiary">
+                      {model.provider ?? "Open source"}
                     </div>
-                  </label>
-                ))}
-              </div>
-            </div>
+                  </div>
+                </label>
+              ))}
+            </RadioGroup>
 
-            {/* Premium section */}
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-section text-text-tertiary">
-                  Premium Models
-                </span>
-                {!hasKey && (
-                  <LockIcon className="size-3 text-text-tertiary" />
-                )}
-              </div>
-              <p className="mt-0.5 text-xs text-text-tertiary">
-                Bring your own OpenRouter API key to use any model
-              </p>
-              {hasKey ? (
-                <div className="mt-2">
-                  {isPremiumModel && (
-                    <div className="mb-2 rounded-lg border border-interactive-focus bg-interactive-focus-bg px-3 py-2">
-                      <div className="text-sm font-medium">
-                        {premiumDisplayName}
-                      </div>
-                      <button
-                        type="button"
-                        className="mt-0.5 text-xs text-text-tertiary underline hover:text-text-secondary"
-                        onClick={() => {
-                          setSelectedModel(null);
-                          setSelectedModelName(null);
-                          setQuery("");
-                        }}
-                      >
-                        Change model
-                      </button>
-                    </div>
-                  )}
-                  {!isPremiumModel && (
-                    <Combobox<SearchModel>
-                      items={results}
-                      filteredItems={results}
-                      filter={null}
-                      itemToStringLabel={(m) => m?.name ?? ""}
-                      itemToStringValue={(m) => m?.id ?? ""}
-                      onInputValueChange={setQuery}
-                      onValueChange={handleModelSelect}
-                    >
-                      <ComboboxInput placeholder="Search models..." />
-                      <ComboboxContent>
-                        <ComboboxEmpty>
-                          <span className="flex items-center gap-2">
-                            {isSearching && (
-                              <LoaderIcon className="size-3.5 animate-spin" />
-                            )}
-                            {emptyMessage}
-                          </span>
-                        </ComboboxEmpty>
-                        <ComboboxList>
-                          {(model) => (
-                            <ComboboxItem key={model.id} value={model}>
-                              <ModelOption
-                                name={model.name}
-                                provider={model.provider}
-                                isFree={model.is_free}
-                                contextLength={model.context_length}
-                              />
-                            </ComboboxItem>
-                          )}
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
-                  )}
-                  <p className="mt-1.5 text-xs text-text-tertiary">
-                    Browse models at{" "}
-                    <a
-                      href="https://openrouter.ai/models"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-interactive-focus underline"
-                    >
-                      openrouter.ai/models
-                    </a>
-                  </p>
-                </div>
-              ) : (
-                <p className="mt-2 text-xs text-text-placeholder">
-                  Add your API key below to unlock premium models.
-                </p>
-              )}
-            </div>
-          </RadioGroup>
-
-          {/* API Key */}
-          <div>
-            <span className="text-section text-text-tertiary">
-              OpenRouter API Key (BYOK)
-            </span>
-            {settings?.has_api_key ? (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-                  Key ending in ...{settings.key_hint ?? "****"}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+            {settings.has_api_key && (
+              <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs text-text-tertiary">
+                OpenRouter key on file (ending …{settings.key_hint ?? "****"}).{" "}
+                <button
+                  type="button"
+                  className="underline hover:text-text-secondary"
                   onClick={handleRemoveKey}
                   disabled={isDeletingKey}
                 >
-                  Remove
+                  Remove key
+                </button>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── PREMIUM MODE ───────────────────────────────────────── */}
+          <TabsContent value="premium" className="mt-4">
+            {!settings.has_api_key ? (
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="api-key-input"
+                  className="text-section text-text-tertiary"
+                >
+                  OpenRouter API Key
+                </label>
+                <Input
+                  id="api-key-input"
+                  type="password"
+                  placeholder="sk-or-v1-..."
+                  value={apiKeyDraft}
+                  onChange={(e) => setApiKeyDraft(e.target.value)}
+                  minLength={10}
+                  maxLength={500}
+                />
+                <p className="text-xs text-text-tertiary">
+                  Get your key at{" "}
+                  <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-interactive-focus underline"
+                  >
+                    openrouter.ai/keys
+                  </a>
+                </p>
+                {addKeyErrorMessage && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {addKeyErrorMessage}
+                  </div>
+                )}
+                <Button
+                  onClick={handleAddKey}
+                  disabled={apiKeyDraft.length < 10 || isAddingKey}
+                  className="w-fit"
+                >
+                  {isAddingKey ? "Validating..." : "Validate & Save Key"}
                 </Button>
               </div>
             ) : (
-              <Input
-                id="api-key"
-                type="password"
-                placeholder="sk-or-v1-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                minLength={10}
-                maxLength={500}
-                className="mt-2"
-              />
-            )}
-            <p className="mt-1 text-xs text-text-tertiary">
-              Get your key at{" "}
-              <a
-                href="https://openrouter.ai/keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-interactive-focus underline"
-              >
-                openrouter.ai/keys
-              </a>
-            </p>
-            {/* Balance display — null-renders for non-BYOK users */}
-            {settings?.has_api_key && (
-              <div className="mt-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                    Key ending in …{settings.key_hint ?? "****"}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveKey}
+                    disabled={isDeletingKey}
+                  >
+                    Remove
+                  </Button>
+                </div>
+
                 <BalanceDisplay
-                  balance={settings?.balance ?? null}
+                  balance={settings.balance ?? null}
                   onRefresh={() => {
                     void refreshBalance().catch(() => {
-                      // Errors are surfaced via the hook's refreshBalanceError
-                      // and a future toast layer; swallow here so the click
-                      // handler can't throw.
+                      // surfaced by stale flag in the component
                     });
                   }}
                   isRefreshing={isRefreshingBalance}
-                  // TODO: source from settings.low_balance_threshold_usd once
-                  // Worktree A's GET /settings response exposes the constant.
-                  lowThresholdUsd={settings?.low_balance_threshold_usd ?? 0.5}
+                  lowThresholdUsd={settings.low_balance_threshold_usd ?? 0.5}
                 />
+
+                <Combobox<SearchModel>
+                  items={results}
+                  filteredItems={results}
+                  filter={null}
+                  itemToStringLabel={(m) => m?.name ?? ""}
+                  itemToStringValue={(m) => m?.id ?? ""}
+                  isItemEqualToValue={(a, b) => a?.id === b?.id}
+                  // Controlled: the displayed value is always the
+                  // current effective model (pending OR saved).
+                  value={comboboxValue}
+                  onInputValueChange={setQuery}
+                  onValueChange={handlePremiumPick}
+                >
+                  <ComboboxInput placeholder="Search models..." />
+                  <ComboboxContent>
+                    <ComboboxEmpty>
+                      <span className="flex items-center gap-2">
+                        {isSearching && (
+                          <LoaderIcon className="size-3.5 animate-spin" />
+                        )}
+                        {isSearching
+                          ? "Searching..."
+                          : query.length < 2
+                            ? "Type to search models"
+                            : "No models found"}
+                      </span>
+                    </ComboboxEmpty>
+                    <ComboboxList>
+                      {(model) => (
+                        <ComboboxItem key={model.id} value={model}>
+                          <ModelOption
+                            name={model.name}
+                            provider={model.provider}
+                            isFree={model.is_free}
+                            contextLength={model.context_length}
+                          />
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+
+                {updateModelErrorMessage && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {updateModelErrorMessage}
+                  </div>
+                )}
+
+                <p className="text-xs text-text-tertiary">
+                  Browse models at{" "}
+                  <a
+                    href="https://openrouter.ai/models"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-interactive-focus underline"
+                  >
+                    openrouter.ai/models
+                  </a>
+                </p>
               </div>
             )}
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isUpdating}>
-            {isUpdating ? "Validating..." : "Save"}
+          <Button
+            onClick={handleSave}
+            disabled={!isDirty || isUpdatingModel}
+          >
+            {isUpdatingModel ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "object" && err !== null) {
+    const e = err as {
+      response?: { data?: { detail?: string } };
+      message?: string;
+    };
+    return e.response?.data?.detail ?? e.message ?? fallback;
+  }
+  return fallback;
 }
