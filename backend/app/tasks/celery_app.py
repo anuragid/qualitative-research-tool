@@ -122,8 +122,12 @@ celery_app.conf.update(
 
     # Task execution settings
     task_track_started=True,
-    task_time_limit=1800,  # 30 minutes max per task
-    task_soft_time_limit=1700,  # Soft limit at ~28 minutes
+    # PR #19: tight lifecycle bounds. Chain steps are designed to be small
+    # (one LLM call + DB write, ~1-5 min). A 6-minute hard kill with a
+    # 30-second soft warning means a stuck step fails fast instead of
+    # hanging out for half an hour and blocking the watchdog.
+    task_time_limit=360,  # 6 min hard kill
+    task_soft_time_limit=330,  # 5.5 min soft warning (SIGUSR1 before SIGKILL)
     task_acks_late=True,  # Acknowledge tasks after execution (survives worker crash)
     task_reject_on_worker_lost=True,  # Re-queue tasks if worker dies mid-execution
 
@@ -137,6 +141,21 @@ celery_app.conf.update(
     broker_connection_retry=True,  # Retry on connection loss during operation
     broker_connection_max_retries=10,  # Max retries before giving up
     broker_connection_timeout=30,  # Timeout per connection attempt
+
+    # PR #19: broker visibility timeout.
+    # Celery's Redis broker leaves unacked messages in the pending queue
+    # until this many seconds have passed, then re-delivers them. Default
+    # is 3600s (1 hour) — far longer than our old 35-min watchdog, so an
+    # orphaned task (e.g. worker SIGTERM mid-LLM call during a deploy)
+    # would sit stranded in Redis while the watchdog stamped the user's
+    # analysis errored. 600s (10 min) is safely > task_time_limit (6 min)
+    # so in-flight tasks aren't double-delivered while still running on
+    # the original worker, and safely < watchdog _ANALYSIS_TIMEOUT (15 min)
+    # so orphans get recovered before the watchdog intervenes.
+    # See tests/test_celery_lifecycle.py for the locked invariants.
+    broker_transport_options={
+        "visibility_timeout": 600,  # 10 min — must be > task_time_limit, < watchdog
+    },
 
     # Logging
     worker_hijack_root_logger=False,
