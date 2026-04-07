@@ -220,7 +220,7 @@ export function TranscriptSidePanel({
       <SpeakerRoleEditor {...speakerEditorProps} />
 
       {/* Transcript content — flex-1 h-0 for proper scroll containment */}
-      <ScrollArea className="flex-1 h-0 [&_[data-slot=scroll-area-viewport]>div]:!block [&_[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
+      <ScrollArea className="flex-1 h-0 [&_[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
         <TranscriptViewer
           transcript={transcript}
           speakerLabels={speakerLabels}
