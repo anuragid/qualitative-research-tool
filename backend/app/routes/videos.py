@@ -655,6 +655,34 @@ async def trigger_video_analysis(
         # reassignment later is idempotent and harmless.
         video.status = "analyzing"
         video.error_message = None
+
+        # Retry path: if a VideoAnalysis row exists in "error" state, reset it
+        # before dispatching the chain. Otherwise the chain's defensive
+        # skip-if-errored check (in each step task) silently short-circuits
+        # every step and the retry is a no-op. See
+        # docs/production-readiness/prs/pr19-5-retry-swallow.md and PR #19.5
+        # for the full root-cause story (Kathleen video 4b1f4b25, 2026-04-07).
+        analysis = db.query(VideoAnalysis).filter(
+            VideoAnalysis.video_id == video_id
+        ).first()
+        if analysis and analysis.status == "error":
+            analysis.status = "pending"
+            analysis.current_step = None
+            analysis.started_at = None
+            analysis.completed_at = None
+            analysis.chunk_completed_at = None
+            analysis.infer_completed_at = None
+            analysis.relate_completed_at = None
+            analysis.explain_completed_at = None
+            analysis.activate_completed_at = None
+            analysis.step_status = {}
+            # Clear jsonb payload — chunk step is idempotent and will repopulate.
+            analysis.chunks = None
+            analysis.inferences = None
+            analysis.patterns = None
+            analysis.insights = None
+            analysis.design_principles = None
+
         db.commit()
 
         # Dispatch the chain
