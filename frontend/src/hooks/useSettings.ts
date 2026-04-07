@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsService } from "../services/settings";
-import type { UserSettings, UserSettingsUpdate } from "../services/settings";
+import type { UserSettings } from "../services/settings";
 import type { BalanceInfo } from "../types";
 
 export function useSettings() {
@@ -17,10 +17,21 @@ export function useSettings() {
     staleTime: 5 * 60 * 1000, // 5 minutes — these rarely change
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (settings: UserSettingsUpdate) =>
-      settingsService.updateSettings(settings),
-    onSuccess: () => {
+  /** Add or replace the BYOK key. On success, writes the fresh settings into the cache. */
+  const addApiKeyMutation = useMutation<UserSettings, Error, string>({
+    mutationFn: (apiKey: string) => settingsService.addApiKey(apiKey),
+    onSuccess: (data) => {
+      queryClient.setQueryData<UserSettings>(["user-settings"], data);
+      queryClient.invalidateQueries({ queryKey: ["user-settings"] });
+    },
+  });
+
+  /** Set the preferred model. On success, writes the fresh settings into the cache. */
+  const updatePreferredModelMutation = useMutation<UserSettings, Error, string>({
+    mutationFn: (modelId: string) =>
+      settingsService.updatePreferredModel(modelId),
+    onSuccess: (data) => {
+      queryClient.setQueryData<UserSettings>(["user-settings"], data);
       queryClient.invalidateQueries({ queryKey: ["user-settings"] });
     },
   });
@@ -53,12 +64,22 @@ export function useSettings() {
     isLoading: settingsQuery.isLoading,
     recommended: recommendedQuery.data,
     isLoadingRecommended: recommendedQuery.isLoading,
-    updateSettings: updateMutation.mutate,
-    isUpdating: updateMutation.isPending,
-    updateError: updateMutation.error,
-    resetUpdateError: updateMutation.reset,
-    deleteApiKey: deleteKeyMutation.mutate,
+
+    addApiKey: addApiKeyMutation.mutateAsync,
+    isAddingKey: addApiKeyMutation.isPending,
+    addKeyError: addApiKeyMutation.error,
+    resetAddKeyError: addApiKeyMutation.reset,
+
+    updatePreferredModel: updatePreferredModelMutation.mutateAsync,
+    isUpdatingModel: updatePreferredModelMutation.isPending,
+    updateModelError: updatePreferredModelMutation.error,
+    resetUpdateModelError: updatePreferredModelMutation.reset,
+
+    deleteApiKey: deleteKeyMutation.mutateAsync,
     isDeletingKey: deleteKeyMutation.isPending,
+    deleteKeyError: deleteKeyMutation.error,
+    resetDeleteKeyError: deleteKeyMutation.reset,
+
     /** Returns the fresh balance via the mutation's promise. */
     refreshBalance: refreshBalanceMutation.mutateAsync,
     isRefreshingBalance: refreshBalanceMutation.isPending,

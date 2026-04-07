@@ -87,7 +87,7 @@ async def test_unicode_project_name_accepted(client):
 async def test_settings_model_id_invalid_format(client):
     """An invalid model ID format should be rejected."""
     response = await client.put(
-        "/api/users/settings",
+        "/api/users/settings/preferred-model",
         json={"preferred_model": "invalid-no-slash"},
     )
     assert response.status_code == 422
@@ -96,10 +96,11 @@ async def test_settings_model_id_invalid_format(client):
 async def test_settings_model_id_valid_format(client):
     """A valid model ID format should be accepted (may fail tier check but not format)."""
     response = await client.put(
-        "/api/users/settings",
+        "/api/users/settings/preferred-model",
         json={"preferred_model": "openai/gpt-4"},
     )
-    # May be 403 (tier check for non-BYOK user) but not 422 (format validation)
+    # May be 403 (tier check for non-BYOK user) or 404 (user row not seeded)
+    # but not 422 (format validation)
     assert response.status_code != 422
 
 

@@ -39,31 +39,6 @@ class UserResponse(BaseModel):
     last_seen: Optional[datetime] = None
 
 
-class UserSettingsUpdate(BaseModel):
-    """Schema for updating user LLM settings."""
-    preferred_model: Optional[str] = Field(default=None, max_length=255)
-    api_key: Optional[str] = Field(default=None, min_length=10, max_length=500)  # Raw key, will be encrypted before storage
-
-    @field_validator("api_key")
-    @classmethod
-    def validate_api_key(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and not v.strip():
-            raise ValueError("API key cannot be blank or whitespace-only")
-        return v
-
-    @field_validator("preferred_model")
-    @classmethod
-    def validate_preferred_model(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            v = _strip_control_chars(v).strip()
-            if not v:
-                raise ValueError("Model ID cannot be blank")
-            # Model IDs follow the format "provider/model-name"
-            if not re.match(r'^[a-zA-Z0-9_\-]+/[a-zA-Z0-9._\-:]+$', v):
-                raise ValueError("Invalid model ID format. Expected format: provider/model-name")
-        return v
-
-
 class BalanceInfoResponse(BaseModel):
     """Pydantic mirror of BalanceInfo.as_dict() — shape locked by
     docs/byok-balance-contract.md. Frontend imports the matching TS
@@ -91,6 +66,44 @@ class UserSettingsResponse(BaseModel):
     # never successfully fetched their balance. Stale=True when the
     # last refresh failed but we still have a cached value to show.
     balance: Optional[BalanceInfoResponse] = None
+
+
+class ApiKeyAddRequest(BaseModel):
+    """Schema for POST /api/users/settings/api-key.
+
+    Sole purpose: add or replace the user's BYOK key. Validation +
+    balance check happen server-side; this schema only enforces shape.
+    """
+    api_key: str = Field(..., min_length=10, max_length=500)
+
+    @field_validator("api_key")
+    @classmethod
+    def validate_api_key(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("API key cannot be blank or whitespace-only")
+        return v
+
+
+class PreferredModelUpdateRequest(BaseModel):
+    """Schema for PUT /api/users/settings/preferred-model.
+
+    Sole purpose: set the active model. Tier enforcement is in the route
+    (no key → must be a standard model id).
+    """
+    preferred_model: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("preferred_model")
+    @classmethod
+    def validate_preferred_model(cls, v: str) -> str:
+        v = _strip_control_chars(v).strip()
+        if not v:
+            raise ValueError("Model ID cannot be blank")
+        # Model IDs follow the format "provider/model-name"
+        if not re.match(r'^[a-zA-Z0-9_\-]+/[a-zA-Z0-9._\-:]+$', v):
+            raise ValueError(
+                "Invalid model ID format. Expected format: provider/model-name"
+            )
+        return v
 
 
 # ========== Project Schemas ==========

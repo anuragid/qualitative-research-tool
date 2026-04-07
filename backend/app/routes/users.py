@@ -8,15 +8,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
-from app.constants import STANDARD_MODEL_IDS, STANDARD_MODELS
+from app.constants import DEFAULT_STANDARD_MODEL, STANDARD_MODEL_IDS, STANDARD_MODELS
 from app.database import get_db
 from app.main import limiter
 from app.models import database_models
 from app.models.schemas import (
+    ApiKeyAddRequest,
     BalanceInfoResponse,
+    PreferredModelUpdateRequest,
     UserResponse,
     UserSettingsResponse,
-    UserSettingsUpdate,
 )
 from app.services.clerk_service import fetch_clerk_user
 from app.services.encryption_service import encryption_service
@@ -28,12 +29,6 @@ from app.services.openrouter_balance import (
     get_cached_balance,
     refresh_and_persist,
 )
-
-# NOTE: openrouter_validation.validate_openrouter_key is no longer imported
-# here — PUT /settings now uses fetch_balance_sync which doubles as a
-# liveness check AND gives us the data needed to reject 0-credit keys.
-# byok_service.resolve_byok still uses validate_openrouter_key_sync, so
-# the legacy module is intentionally left in place.
 
 logger = logging.getLogger(__name__)
 
@@ -219,15 +214,20 @@ async def get_user_settings(
     )
 
 
-@router.put("/settings", response_model=UserSettingsResponse)
+@router.post("/settings/api-key", response_model=UserSettingsResponse)
 @limiter.limit("5/minute")
-async def update_user_settings(
+async def add_api_key(
     request: Request,
-    settings: UserSettingsUpdate,
+    payload: ApiKeyAddRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update the current user's LLM settings (model preference and/or API key)."""
+    """Add or replace the user's BYOK API key.
+
+    Validates the key against OpenRouter and rejects keys with no
+    credits before persisting. Does NOT touch preferred_model — that's
+    a separate endpoint (Task 3).
+    """
     user_id = current_user["id"]
     db_user = db.query(database_models.User).filter(
         database_models.User.id == user_id
@@ -236,76 +236,115 @@ async def update_user_settings(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Validate and store API key
-    if settings.api_key is not None:
-        # Fetch the balance directly — this also doubles as key validation
-        # (a 401/invalid key fails fetch_balance_sync the same way) AND
-        # gives us the data we need to reject 0-balance keys at save time.
-        try:
-            balance = fetch_balance_sync(settings.api_key)
-        except OpenRouterBalanceError as exc:
-            logger.info(f"BYOK key save failed validation for user {user_id}: {exc}")
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Invalid API key or OpenRouter is temporarily unreachable. "
-                    "Check your key on the OpenRouter dashboard and try again."
-                ),
-            ) from exc
+    try:
+        balance = fetch_balance_sync(payload.api_key)
+    except OpenRouterBalanceError as exc:
+        logger.info(f"BYOK key save failed validation for user {user_id}: {exc}")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid API key or OpenRouter is temporarily unreachable. "
+                "Check your key on the OpenRouter dashboard and try again."
+            ),
+        ) from exc
 
-        if not balance.has_credits:
-            # The Baffour Adu case — paste a brand-new zero-credit key,
-            # get an actionable error before any analysis even starts.
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Your OpenRouter key has $0 credits. Add credits at "
-                    "https://openrouter.ai/settings/credits, then save again."
-                ),
-            )
+    if not balance.has_credits:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Your OpenRouter key has $0 credits. Add credits at "
+                "https://openrouter.ai/settings/credits, then save again."
+            ),
+        )
 
-        db_user.encrypted_api_key = encryption_service.encrypt(settings.api_key)
-        db_user.key_hint = settings.api_key[-4:] if len(settings.api_key) > 8 else "****"
-        db_user.key_validated_at = datetime.now(timezone.utc)
+    db_user.encrypted_api_key = encryption_service.encrypt(payload.api_key)
+    db_user.key_hint = (
+        payload.api_key[-4:] if len(payload.api_key) > 8 else "****"
+    )
+    db_user.key_validated_at = datetime.now(timezone.utc)
 
-        # Persist the freshly-fetched balance fields so the immediate
-        # GET /settings round-trip after save shows the live numbers.
-        db_user.key_total_credits = balance.total_credits
-        db_user.key_total_usage = balance.total_usage
-        db_user.key_limit = balance.key_limit
-        db_user.key_limit_remaining = balance.key_limit_remaining
-        db_user.key_is_free_tier = balance.is_free_tier
-        db_user.key_balance_checked_at = balance.checked_at
-        db_user.key_balance_error = None
-
-    # Enforce model tier:
-    # - BYOK users: allow ANY model ID (they're paying with their own key)
-    # - Non-BYOK users: only allow models from our curated standard list
-    if settings.preferred_model is not None:
-        has_key = bool(db_user.encrypted_api_key)
-        if not has_key:
-            if settings.preferred_model not in STANDARD_MODEL_IDS:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Add your OpenRouter API key in Settings to unlock premium models.",
-                )
-        db_user.preferred_model = settings.preferred_model
+    # Persist the freshly-fetched balance fields so the immediate
+    # GET /settings round-trip after save shows the live numbers.
+    db_user.key_total_credits = balance.total_credits
+    db_user.key_total_usage = balance.total_usage
+    db_user.key_limit = balance.key_limit
+    db_user.key_limit_remaining = balance.key_limit_remaining
+    db_user.key_is_free_tier = balance.is_free_tier
+    db_user.key_balance_checked_at = balance.checked_at
+    db_user.key_balance_error = None
 
     db.commit()
 
     # Re-read balance from cache (no HTTP — we just persisted it on save).
+    fresh_balance: Optional[BalanceInfo] = None
+    try:
+        fresh_balance = get_cached_balance(db, db_user)
+    except Exception as exc:  # noqa: BLE001 — never block POST response
+        logger.warning(
+            f"Unexpected error reading balance after api-key save for user {user_id}: {exc}"
+        )
+
+    return UserSettingsResponse(
+        preferred_model=db_user.preferred_model,
+        has_api_key=True,
+        key_hint=db_user.key_hint,
+        key_validated_at=db_user.key_validated_at,
+        available_models=STANDARD_MODELS,
+        balance=_balance_to_response(fresh_balance),
+    )
+
+
+@router.put(
+    "/settings/preferred-model",
+    response_model=UserSettingsResponse,
+)
+@limiter.limit("20/minute")
+async def update_preferred_model(
+    request: Request,
+    payload: PreferredModelUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set the user's preferred model.
+
+    Tier enforcement: a user without a BYOK key can only pick a model
+    from STANDARD_MODEL_IDS. With a key on file, any model id is allowed.
+    Does NOT touch the API key.
+    """
+    user_id = current_user["id"]
+    db_user = db.query(database_models.User).filter(
+        database_models.User.id == user_id
+    ).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    has_key = bool(db_user.encrypted_api_key)
+    if not has_key and payload.preferred_model not in STANDARD_MODEL_IDS:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Add your OpenRouter API key in Settings to unlock "
+                "premium models."
+            ),
+        )
+
+    db_user.preferred_model = payload.preferred_model
+    db.commit()
+
     fresh_balance: Optional[BalanceInfo] = None
     if db_user.encrypted_api_key:
         try:
             fresh_balance = get_cached_balance(db, db_user)
         except Exception as exc:  # noqa: BLE001 — never block PUT response
             logger.warning(
-                f"Unexpected error reading balance after settings update for user {user_id}: {exc}"
+                f"Unexpected error reading balance after preferred-model "
+                f"update for user {user_id}: {exc}"
             )
 
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
-        has_api_key=bool(db_user.encrypted_api_key),
+        has_api_key=has_key,
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
         available_models=STANDARD_MODELS,
@@ -394,7 +433,7 @@ async def delete_api_key(
     db_user.encrypted_api_key = None
     db_user.key_hint = None
     db_user.key_validated_at = None
-    db_user.preferred_model = None
+    db_user.preferred_model = DEFAULT_STANDARD_MODEL
     # Also clear balance snapshot fields — they reference a key that no
     # longer exists, and leaving them set would let the next GET /settings
     # render stale BYOK balance data for a non-BYOK user.

@@ -7,9 +7,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.schemas import (
+    ApiKeyAddRequest,
     ProjectCreate,
     ProjectUpdate,
-    UserSettingsUpdate,
     VideoBase,
     VideoResponse,
     VideoUploadResponse,
@@ -79,31 +79,26 @@ class TestProjectSchemas:
             ProjectCreate(name="Test", description="a" * 5001)
 
 
-class TestUserSettingsSchemas:
+class TestApiKeyAddRequestSchemas:
     def test_short_api_key_rejected(self):
         """P2-3: API keys shorter than 10 chars should be rejected."""
         with pytest.raises(ValidationError):
-            UserSettingsUpdate(api_key="short")
+            ApiKeyAddRequest(api_key="short")
 
     def test_whitespace_api_key_rejected(self):
         """P2-3: Whitespace-only API keys should be rejected."""
         with pytest.raises(ValidationError):
-            UserSettingsUpdate(api_key="          ")  # 10 spaces
+            ApiKeyAddRequest(api_key="          ")  # 10 spaces
 
     def test_valid_api_key_accepted(self):
         """Valid API key should pass validation."""
-        settings = UserSettingsUpdate(api_key="sk-or-v1-1234567890")
-        assert settings.api_key == "sk-or-v1-1234567890"
-
-    def test_none_api_key_accepted(self):
-        """None API key (not updating) should be accepted."""
-        settings = UserSettingsUpdate(api_key=None)
-        assert settings.api_key is None
+        req = ApiKeyAddRequest(api_key="sk-or-v1-1234567890")
+        assert req.api_key == "sk-or-v1-1234567890"
 
     def test_api_key_max_length(self):
         """API key exceeding max_length should be rejected."""
         with pytest.raises(ValidationError):
-            UserSettingsUpdate(api_key="a" * 501)
+            ApiKeyAddRequest(api_key="a" * 501)
 
 
 class TestVideoSchemas:

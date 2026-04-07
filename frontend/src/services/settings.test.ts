@@ -12,7 +12,7 @@ vi.mock("./api", () => {
 
 import { api } from "./api";
 import { settingsService } from "./settings";
-import type { UserSettings, UserSettingsUpdate } from "./settings";
+import type { UserSettings } from "./settings";
 import type { BalanceInfo } from "../types";
 
 const mockedApi = vi.mocked(api);
@@ -78,60 +78,72 @@ describe("settingsService", () => {
     });
   });
 
-  describe("updateSettings", () => {
-    it("puts updated settings to /api/users/settings", async () => {
-      const update: UserSettingsUpdate = {
-        preferred_model: "anthropic/claude-3",
-      };
-      const updatedSettings: UserSettings = {
-        ...mockSettings,
-        preferred_model: "anthropic/claude-3",
-      };
-      mockedApi.put.mockResolvedValue({ data: updatedSettings });
-
-      const result = await settingsService.updateSettings(update);
-
-      expect(mockedApi.put).toHaveBeenCalledWith("/api/users/settings", update);
-      expect(result.preferred_model).toBe("anthropic/claude-3");
-    });
-
-    it("updates api_key", async () => {
-      const update: UserSettingsUpdate = { api_key: "sk-test-key-123" };
+  describe("addApiKey", () => {
+    it("POSTs to /api/users/settings/api-key with the key", async () => {
       const updatedSettings: UserSettings = {
         ...mockSettings,
         has_api_key: true,
+        key_hint: "1234",
+        key_validated_at: "2026-04-06T12:00:00Z",
+        balance: {
+          total_credits: 10,
+          total_usage: 1.48,
+          balance_remaining: 8.52,
+          has_credits: true,
+          is_free_tier: false,
+          checked_at: "2026-04-06T12:00:00Z",
+          stale: false,
+        } as BalanceInfo,
       };
-      mockedApi.put.mockResolvedValue({ data: updatedSettings });
+      mockedApi.post.mockResolvedValue({ data: updatedSettings });
 
-      const result = await settingsService.updateSettings(update);
+      const result = await settingsService.addApiKey("sk-or-v1-test1234");
 
-      expect(mockedApi.put).toHaveBeenCalledWith("/api/users/settings", update);
+      expect(mockedApi.post).toHaveBeenCalledWith("/api/users/settings/api-key", {
+        api_key: "sk-or-v1-test1234",
+      });
       expect(result.has_api_key).toBe(true);
+      expect(result.balance?.balance_remaining).toBe(8.52);
     });
 
-    it("clears preferred_model by setting to null", async () => {
-      const update: UserSettingsUpdate = { preferred_model: null };
-      const updatedSettings: UserSettings = {
-        ...mockSettings,
-        preferred_model: null,
-      };
-      mockedApi.put.mockResolvedValue({ data: updatedSettings });
-
-      const result = await settingsService.updateSettings(update);
-
-      expect(mockedApi.put).toHaveBeenCalledWith("/api/users/settings", update);
-      expect(result.preferred_model).toBeNull();
-    });
-
-    it("propagates errors from api", async () => {
-      mockedApi.put.mockRejectedValue({ status: 500, message: "Server error" });
+    it("propagates 400 errors from the server", async () => {
+      mockedApi.post.mockRejectedValue({
+        response: { status: 400, data: { detail: "Your OpenRouter key has $0 credits..." } },
+      });
 
       await expect(
-        settingsService.updateSettings({ preferred_model: "test" })
-      ).rejects.toEqual({
-        status: 500,
-        message: "Server error",
-      });
+        settingsService.addApiKey("sk-or-v1-empty1234"),
+      ).rejects.toMatchObject({ response: { status: 400 } });
+    });
+  });
+
+  describe("updatePreferredModel", () => {
+    it("PUTs to /api/users/settings/preferred-model", async () => {
+      const updatedSettings: UserSettings = {
+        ...mockSettings,
+        preferred_model: "anthropic/claude-sonnet-4.6",
+        has_api_key: true,
+        key_hint: "1234",
+        key_validated_at: "2026-04-06T12:00:00Z",
+      };
+      mockedApi.put.mockResolvedValue({ data: updatedSettings });
+
+      const result = await settingsService.updatePreferredModel(
+        "anthropic/claude-sonnet-4.6",
+      );
+
+      expect(mockedApi.put).toHaveBeenCalledWith(
+        "/api/users/settings/preferred-model",
+        { preferred_model: "anthropic/claude-sonnet-4.6" },
+      );
+      expect(result.preferred_model).toBe("anthropic/claude-sonnet-4.6");
+    });
+  });
+
+  describe("removed updateSettings", () => {
+    it("no longer exists on the service surface", () => {
+      // @ts-expect-error - updateSettings is removed
+      expect(settingsService.updateSettings).toBeUndefined();
     });
   });
 

@@ -12,9 +12,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.schemas import (
+    PreferredModelUpdateRequest,
     SpeakerLabelCreate,
     SpeakerLabelUpdate,
-    UserSettingsUpdate,
 )
 
 
@@ -71,32 +71,28 @@ class TestPreferredModelValidation:
     """Preferred model IDs must follow provider/model-name format."""
 
     def test_valid_model_id(self):
-        settings = UserSettingsUpdate(preferred_model="anthropic/claude-sonnet-4.6")
-        assert settings.preferred_model == "anthropic/claude-sonnet-4.6"
+        req = PreferredModelUpdateRequest(preferred_model="anthropic/claude-sonnet-4.6")
+        assert req.preferred_model == "anthropic/claude-sonnet-4.6"
 
     def test_valid_model_id_with_colons(self):
-        settings = UserSettingsUpdate(preferred_model="meta-llama/llama-4-scout:free")
-        assert settings.preferred_model == "meta-llama/llama-4-scout:free"
+        req = PreferredModelUpdateRequest(preferred_model="meta-llama/llama-4-scout:free")
+        assert req.preferred_model == "meta-llama/llama-4-scout:free"
 
     def test_blank_model_rejected(self):
         with pytest.raises(ValidationError, match="blank"):
-            UserSettingsUpdate(preferred_model="   ")
+            PreferredModelUpdateRequest(preferred_model="   ")
 
     def test_no_slash_rejected(self):
         with pytest.raises(ValidationError, match="Invalid model ID format"):
-            UserSettingsUpdate(preferred_model="just-a-model-name")
+            PreferredModelUpdateRequest(preferred_model="just-a-model-name")
 
     def test_script_injection_rejected(self):
         with pytest.raises(ValidationError, match="Invalid model ID format"):
-            UserSettingsUpdate(preferred_model="<script>alert(1)</script>")
-
-    def test_none_model_accepted(self):
-        settings = UserSettingsUpdate(preferred_model=None)
-        assert settings.preferred_model is None
+            PreferredModelUpdateRequest(preferred_model="<script>alert(1)</script>")
 
     def test_model_with_dots(self):
-        settings = UserSettingsUpdate(preferred_model="deepseek/deepseek-chat-v3-0324")
-        assert settings.preferred_model == "deepseek/deepseek-chat-v3-0324"
+        req = PreferredModelUpdateRequest(preferred_model="deepseek/deepseek-chat-v3-0324")
+        assert req.preferred_model == "deepseek/deepseek-chat-v3-0324"
 
 
 class TestApiKeySanitization:
