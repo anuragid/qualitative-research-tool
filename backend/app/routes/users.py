@@ -374,9 +374,16 @@ async def add_api_key(
     db_user.key_balance_error = None
 
     db.commit()
-    db.refresh(db_user)
 
-    fresh_balance = get_cached_balance(db, db_user)
+    # Re-read balance from cache (no HTTP — we just persisted it on save).
+    fresh_balance: Optional[BalanceInfo] = None
+    try:
+        fresh_balance = get_cached_balance(db, db_user)
+    except Exception as exc:  # noqa: BLE001 — never block POST response
+        logger.warning(
+            f"Unexpected error reading balance after api-key save for user {user_id}: {exc}"
+        )
+
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
         has_api_key=True,
