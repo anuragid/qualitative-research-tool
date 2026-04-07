@@ -30,10 +30,13 @@ const chunkColumns: TableColumn<Chunk>[] = [
 ];
 
 export function ChunksList({ chunks, viewMode = "list", sort, onSort }: ChunksListProps) {
+  // Defensive guard — prop may be null/undefined. See PR #21.
+  const safeChunks = chunks ?? [];
+
   if (viewMode === "grid") {
     return (
       <CardView columns={3}>
-        {chunks.map((chunk, i) => (
+        {safeChunks.map((chunk, i) => (
           <ChunkCard key={chunk.chunk_id || i} chunk={chunk} compact />
         ))}
       </CardView>
@@ -43,7 +46,7 @@ export function ChunksList({ chunks, viewMode = "list", sort, onSort }: ChunksLi
   if (viewMode === "table") {
     return (
       <TableView
-        data={chunks}
+        data={safeChunks}
         columns={chunkColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
@@ -55,7 +58,7 @@ export function ChunksList({ chunks, viewMode = "list", sort, onSort }: ChunksLi
   // Default: list view
   return (
     <div className="space-y-3">
-      {chunks.map((chunk, i) => (
+      {safeChunks.map((chunk, i) => (
         <ChunkCard key={chunk.chunk_id || i} chunk={chunk} />
       ))}
     </div>

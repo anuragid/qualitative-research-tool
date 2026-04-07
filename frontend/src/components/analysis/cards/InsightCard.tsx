@@ -9,6 +9,9 @@ interface InsightCardProps {
 }
 
 export function InsightCard({ insight, compact = false }: InsightCardProps) {
+  // Defensive guards — jsonb fields may be null at runtime. See PR #21.
+  const evidence = insight.evidence ?? [];
+  const supportingPatterns = insight.supporting_patterns ?? [];
   const typeStyle = insightTypeStyles[insight.type] || "";
   const confStyle = confidenceStyles[insight.confidence] || "";
 
@@ -31,7 +34,7 @@ export function InsightCard({ insight, compact = false }: InsightCardProps) {
       </p>
       {!compact && (
         <div className="mt-2 text-label text-text-placeholder">
-          {insight.evidence.length} evidence &middot; {insight.supporting_patterns.length} pattern{insight.supporting_patterns.length !== 1 ? "s" : ""}
+          {evidence.length} evidence &middot; {supportingPatterns.length} pattern{supportingPatterns.length !== 1 ? "s" : ""}
         </div>
       )}
     </div>

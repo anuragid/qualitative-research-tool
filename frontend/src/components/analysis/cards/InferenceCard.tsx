@@ -10,6 +10,8 @@ interface InferenceCardProps {
 }
 
 export function InferenceCard({ inference, chunk, compact = false }: InferenceCardProps) {
+  // Defensive guard — jsonb field may be null at runtime. See PR #21.
+  const items = inference.inferences ?? [];
   const badgeStyle = chunk
     ? chunkTypeStyles[chunk.type]?.badge || "bg-interactive-fill text-text-tertiary"
     : "bg-interactive-fill text-text-tertiary";
@@ -30,7 +32,7 @@ export function InferenceCard({ inference, chunk, compact = false }: InferenceCa
 
       {compact ? (
         <p className="text-sm text-text-primary">
-          {inference.inferences.length} inference{inference.inferences.length !== 1 ? "s" : ""}
+          {items.length} inference{items.length !== 1 ? "s" : ""}
           {chunk && (
             <span className="text-text-placeholder ml-1 line-clamp-1">
               &mdash; {chunk.text}
@@ -44,7 +46,7 @@ export function InferenceCard({ inference, chunk, compact = false }: InferenceCa
               {chunk.text}
             </p>
           )}
-          {inference.inferences.map((item) => (
+          {items.map((item) => (
             <div
               key={item.inference_id}
               className="border-l-2 border-brand-mustard/40 pl-3 py-1"

@@ -9,6 +9,9 @@ interface CrossInsightCardProps {
 }
 
 export function CrossInsightCard({ insight, compact = false }: CrossInsightCardProps) {
+  // Defensive guards — jsonb fields may be null at runtime. See PR #21.
+  const evidence = insight.evidence ?? [];
+  const supportingMetaPatterns = insight.supporting_meta_patterns ?? [];
   const scStyle = scopeStyles[insight.scope] || "";
   const consStyle = consistencyStyles[insight.consistency_across_videos] || "";
   const confStyle = confidenceStyles[insight.confidence] || "";
@@ -37,7 +40,7 @@ export function CrossInsightCard({ insight, compact = false }: CrossInsightCardP
       </p>
       {!compact && (
         <div className="mt-2 text-label text-text-placeholder">
-          {insight.evidence.length} evidence &middot; {insight.supporting_meta_patterns.length} meta-pattern{insight.supporting_meta_patterns.length !== 1 ? "s" : ""}
+          {evidence.length} evidence &middot; {supportingMetaPatterns.length} meta-pattern{supportingMetaPatterns.length !== 1 ? "s" : ""}
         </div>
       )}
     </div>

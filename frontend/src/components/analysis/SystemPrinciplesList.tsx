@@ -61,10 +61,14 @@ const systemPrincipleColumns: TableColumn<SystemPrinciple>[] = [
 ];
 
 export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort, onSort }: SystemPrinciplesListProps) {
+  // Defensive guard — jsonb columns can arrive null, prop may be
+  // undefined during loading races. See PR #21.
+  const safeSystemPrinciples = systemPrinciples ?? [];
+
   if (viewMode === "grid") {
     return (
       <CardView columns={2}>
-        {systemPrinciples.map((principle) => (
+        {safeSystemPrinciples.map((principle) => (
           <SystemPrincipleCard key={principle.system_principle_id} principle={principle} compact />
         ))}
       </CardView>
@@ -74,7 +78,7 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
   if (viewMode === "table") {
     return (
       <TableView
-        data={systemPrinciples}
+        data={safeSystemPrinciples}
         columns={systemPrincipleColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
@@ -88,11 +92,11 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-h4 text-foreground">
-          System-Level Design Principles ({systemPrinciples.length})
+          System-Level Design Principles ({safeSystemPrinciples.length})
         </h3>
         <div className="flex gap-2 text-sm">
           {Object.entries(priorityStyles)
-            .filter(([priority]) => systemPrinciples.some((sp) => sp.priority === priority))
+            .filter(([priority]) => safeSystemPrinciples.some((sp) => sp.priority === priority))
             .map(([priority, style]) => (
               <Badge key={priority} className={style.badge}>
                 {priority}
@@ -102,7 +106,7 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
       </div>
 
       <Accordion type="multiple" className="space-y-3">
-        {systemPrinciples.map((principle) => {
+        {safeSystemPrinciples.map((principle) => {
           const pStyle = priorityStyles[principle.priority] || priorityStyles.medium;
           return (
             <AccordionItem key={principle.system_principle_id} value={principle.system_principle_id}>

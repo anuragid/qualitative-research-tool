@@ -9,6 +9,9 @@ interface MetaPatternCardProps {
 }
 
 export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCardProps) {
+  // Defensive guards — jsonb fields may be null at runtime. See PR #21.
+  const appearsIn = metaPattern.appears_in_videos ?? [];
+  const relatedPatterns = metaPattern.related_patterns ?? [];
   const normalized = normalizeConsistency(metaPattern.consistency);
   const consStyle = consistencyStyles[normalized] || "";
 
@@ -27,7 +30,7 @@ export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCar
               {normalized}
             </Badge>
             <Badge className="bg-interactive-focus-bg text-interactive-focus text-label">
-              {metaPattern.appears_in_videos.length} video{metaPattern.appears_in_videos.length !== 1 ? "s" : ""}
+              {appearsIn.length} video{appearsIn.length !== 1 ? "s" : ""}
             </Badge>
           </div>
         </div>
@@ -37,7 +40,7 @@ export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCar
       </p>
       {!compact && (
         <div className="mt-2 text-label text-text-placeholder">
-          {metaPattern.related_patterns.length} related pattern{metaPattern.related_patterns.length !== 1 ? "s" : ""}
+          {relatedPatterns.length} related pattern{relatedPatterns.length !== 1 ? "s" : ""}
         </div>
       )}
     </div>

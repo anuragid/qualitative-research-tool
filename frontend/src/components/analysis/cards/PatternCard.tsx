@@ -9,6 +9,8 @@ interface PatternCardProps {
 }
 
 export function PatternCard({ pattern, compact = false }: PatternCardProps) {
+  // Defensive guard — jsonb field may be null at runtime. See PR #21.
+  const relatedInferences = pattern.related_inferences ?? [];
   const relStyle = relationshipTypeStyles[pattern.relationship_type] || "";
   const freqStyle = frequencyStyles[pattern.frequency] || "";
 
@@ -37,7 +39,7 @@ export function PatternCard({ pattern, compact = false }: PatternCardProps) {
       </p>
       {!compact && (
         <div className="mt-2 text-label text-text-placeholder">
-          {pattern.related_inferences.length} related inference{pattern.related_inferences.length !== 1 ? "s" : ""}
+          {relatedInferences.length} related inference{relatedInferences.length !== 1 ? "s" : ""}
         </div>
       )}
     </div>
