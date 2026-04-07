@@ -268,6 +268,11 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
     try:
         logger.info(f"Starting CHUNK step for video {video_id}")
 
+        # Cancellation precheck — watchdog or prior halted step
+        if _check_cancellation(self.db, video_id):
+            logger.info(f"Skipping chunk for {video_id} — already in error state")
+            return {"video_id": video_id, "status": "skipped"}
+
         # Get state from database
         state = get_video_analysis_state(self.db, UUID(video_id))
         analysis = state["analysis"]
@@ -339,6 +344,11 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
     try:
         logger.info(f"Starting INFER step for video {video_id}")
 
+        # Cancellation precheck — watchdog or prior halted step
+        if _check_cancellation(self.db, video_id):
+            logger.info(f"Skipping infer for {video_id} — already in error state")
+            return {"video_id": video_id, "status": "skipped"}
+
         # Get analysis record
         analysis = self.db.query(VideoAnalysis).filter(
             VideoAnalysis.video_id == UUID(video_id)
@@ -408,6 +418,11 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
     try:
         logger.info(f"Starting RELATE step for video {video_id}")
 
+        # Cancellation precheck — watchdog or prior halted step
+        if _check_cancellation(self.db, video_id):
+            logger.info(f"Skipping relate for {video_id} — already in error state")
+            return {"video_id": video_id, "status": "skipped"}
+
         # Get analysis record
         analysis = self.db.query(VideoAnalysis).filter(
             VideoAnalysis.video_id == UUID(video_id)
@@ -474,6 +489,11 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
     """
     try:
         logger.info(f"Starting EXPLAIN step for video {video_id}")
+
+        # Cancellation precheck — watchdog or prior halted step
+        if _check_cancellation(self.db, video_id):
+            logger.info(f"Skipping explain for {video_id} — already in error state")
+            return {"video_id": video_id, "status": "skipped"}
 
         # Get analysis record
         analysis = self.db.query(VideoAnalysis).filter(
@@ -542,6 +562,11 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
     """
     try:
         logger.info(f"Starting ACTIVATE step for video {video_id}")
+
+        # Cancellation precheck — watchdog or prior halted step
+        if _check_cancellation(self.db, video_id):
+            logger.info(f"Skipping activate for {video_id} — already in error state")
+            return {"video_id": video_id, "status": "skipped"}
 
         # Get analysis record
         analysis = self.db.query(VideoAnalysis).filter(
