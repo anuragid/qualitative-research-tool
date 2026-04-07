@@ -60,17 +60,19 @@ if [ $retries -eq $max_retries ]; then
     exit 1
 fi
 
-# Only run migrations from the API service to avoid race conditions
-# When both API and worker start simultaneously, concurrent alembic runs can deadlock
-if [ "$SERVICE" != "worker" ]; then
+# Only run migrations from the API service to avoid race conditions.
+# When API + worker + beat start simultaneously, concurrent alembic runs
+# can deadlock. The API service is the single source of truth for schema
+# migrations; worker and beat skip the alembic step entirely.
+if [ "$SERVICE" != "worker" ] && [ "$SERVICE" != "beat" ]; then
     echo "🔄 Running database migrations..."
     alembic upgrade head
 else
-    echo "⏭️  Skipping migrations (worker service — API handles migrations)"
+    echo "⏭️  Skipping migrations ($SERVICE service — API handles migrations)"
 fi
 
-# Wait for Redis to be ready (required for Celery broker)
-if [ "$SERVICE" = "worker" ]; then
+# Wait for Redis to be ready (required for Celery broker, beat scheduler)
+if [ "$SERVICE" = "worker" ] || [ "$SERVICE" = "beat" ]; then
     echo "⏳ Waiting for Redis..."
     REDIS_RETRIES=0
     REDIS_MAX_RETRIES=30
@@ -118,25 +120,42 @@ if [ "$SERVICE" = "worker" ]; then
     #   AssemblyAI polling, R2 uploads). Threads share process memory so cost
     #   is ~$0 extra vs solo. Sleeping threads (time.sleep in poll loops)
     #   don't consume CPU — Railway only bills active CPU.
-    # --concurrency: Number of concurrent tasks. Default 8 handles mix of
-    #   transcriptions (long, mostly sleeping) + analyses (5 LLM calls each).
-    # --without-heartbeat: Disables worker heartbeat (single worker instance)
+    # --concurrency: Number of concurrent tasks. Default 16 post-scaling
+    #   handles mix of transcriptions (long, mostly sleeping) + analyses
+    #   (chained LLM calls each).
+    # --without-heartbeat: Disables worker heartbeat
     # --without-mingle: Skip synchronizing with other workers on startup
     # --without-gossip: Disable worker-to-worker communication
+    # -Q analyze,transcribe,celery: consume from all three queues. Beat
+    #   moved to its own dedicated service (see "beat" branch below) so
+    #   --beat is intentionally omitted here.
     exec celery -A app.tasks.celery_app worker \
-        --beat \
         --pool=threads \
-        --concurrency=${CELERY_CONCURRENCY:-8} \
+        --concurrency=${CELERY_CONCURRENCY:-16} \
         --loglevel=info \
         --without-heartbeat \
         --without-mingle \
-        --without-gossip
+        --without-gossip \
+        -Q analyze,transcribe,celery
+elif [ "$SERVICE" = "beat" ]; then
+    echo "⏰ Starting Celery beat scheduler..."
+    # Beat service runs ONLY the scheduler. Hard-pinned to 1 replica.
+    # Periodic tasks fire exactly once per schedule regardless of how
+    # many worker replicas are running.
+    exec celery -A app.tasks.celery_app beat --loglevel=info
 else
     echo "🌐 Starting API server..."
     if [ "$IS_PRODUCTION" = true ]; then
-        # Production: no reload, use PORT env var (Railway sets this)
+        # Production: 2 uvicorn workers per replica for within-replica
+        # request concurrency. Combined with numReplicas=2 in the Railway
+        # service config, this gives 4 api processes total.
         # --proxy-headers ensures correct scheme (https) behind Railway's reverse proxy
-        exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'
+        exec uvicorn app.main:app \
+            --host 0.0.0.0 \
+            --port ${PORT:-8000} \
+            --workers 2 \
+            --proxy-headers \
+            --forwarded-allow-ips='*'
     else
         # Development: with reload
         exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
