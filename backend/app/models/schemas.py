@@ -307,10 +307,19 @@ class SpeakerLabelResponse(BaseModel):
 # ========== Video Analysis Schemas ==========
 
 class VideoAnalysisResponse(BaseModel):
-    """Schema for video analysis response."""
+    """Schema for video analysis response.
+
+    ``id`` and the step tracking fields are Optional so the same schema can
+    model the "not_started" sentinel payload emitted when the parent video
+    exists but no ``video_analyses`` row has been created yet.  See
+    ``app.routes.videos.get_video_analysis`` for the producer side and
+    ``backend/tests/test_videos_routes_analysis_not_started.py`` for the
+    contract lock.
+    """
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
+    # Optional when status == "not_started" -- no row exists yet.
+    id: Optional[UUID] = None
     video_id: UUID
     chunks: Optional[List[Dict[str, Any]]] = None
     inferences: Optional[List[Dict[str, Any]]] = None
@@ -322,7 +331,7 @@ class VideoAnalysisResponse(BaseModel):
     completed_at: Optional[datetime] = None
 
     # Step-by-step tracking fields
-    current_step: Optional[str] = "chunk"
+    current_step: Optional[str] = None
     step_status: Optional[Dict[str, str]] = None
     chunk_completed_at: Optional[datetime] = None
     infer_completed_at: Optional[datetime] = None
@@ -334,12 +343,17 @@ class VideoAnalysisResponse(BaseModel):
 # ========== Project Analysis Schemas ==========
 
 class ProjectAnalysisResponse(BaseModel):
-    """Schema for project analysis response."""
+    """Schema for project analysis response.
+
+    Same story as ``VideoAnalysisResponse`` — ``id`` is Optional so the
+    schema models the "not_started" sentinel.  ``video_ids`` defaults to
+    an empty list for the same reason.
+    """
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
+    id: Optional[UUID] = None
     project_id: UUID
-    video_ids: List[UUID]
+    video_ids: List[UUID] = []
     cross_video_patterns: Optional[List[Dict[str, Any]]] = None
     cross_video_insights: Optional[List[Dict[str, Any]]] = None
     cross_video_principles: Optional[List[Dict[str, Any]]] = None

@@ -444,12 +444,20 @@ async def get_project_analysis(
     """
     Get cross-video analysis results for a project.
 
+    When the project exists but no ``project_analyses`` row has been
+    created yet, this returns a 200 with ``status="not_started"`` and
+    empty list fields so the frontend can render an empty/CTA state
+    without crashing on ``Array.map`` over undefined.  The 404 is still
+    returned when the project itself doesn't exist or isn't owned by
+    the caller.  See Sentry JAVASCRIPT-REACT-6 for the crash this
+    prevents.
+
     Args:
         project_id: Project UUID
         db: Database session
 
     Returns:
-        Project analysis results
+        Project analysis results (possibly a "not_started" sentinel)
     """
     current_user_id = current_user["id"]
     try:
@@ -471,9 +479,20 @@ async def get_project_analysis(
             .first()
 
         if not project_analysis:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No analysis found for project {project_id}"
+            logger.info(
+                "No project_analyses row for project %s — returning not_started sentinel",
+                project_id,
+            )
+            return ProjectAnalysisResponse(
+                id=None,
+                project_id=project_id,
+                video_ids=[],
+                cross_video_patterns=[],
+                cross_video_insights=[],
+                cross_video_principles=[],
+                status="not_started",
+                started_at=None,
+                completed_at=None,
             )
 
         logger.info(f"Retrieved project analysis for project {project_id}")
