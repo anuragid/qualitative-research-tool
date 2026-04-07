@@ -275,7 +275,19 @@ def _decrypt_user_api_key(user: User) -> Optional[str]:
     return plaintext
 
 
-def _build_balance_from_persisted(user: User, *, stale: bool) -> Optional[BalanceInfo]:
+def _ensure_aware_utc(dt: datetime) -> datetime:
+    """Coerce naive datetimes to UTC-aware.
+
+    Postgres `DateTime(timezone=True)` round-trips with tz info, but
+    SQLite (used by the test suite) silently drops it. Tolerate both
+    so the same code path works in tests and in prod.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def build_balance_from_persisted(user: User, *, stale: bool) -> Optional[BalanceInfo]:
     """Reconstruct BalanceInfo from persisted columns. Returns None if not enough data."""
     if (
         user.key_total_credits is None
@@ -302,7 +314,7 @@ def _build_balance_from_persisted(user: User, *, stale: bool) -> Optional[Balanc
         key_limit=float(user.key_limit) if user.key_limit is not None else None,
         key_limit_remaining=key_limit_remaining,
         has_credits=_compute_has_credits(balance_remaining, key_limit_remaining),
-        checked_at=user.key_balance_checked_at,
+        checked_at=_ensure_aware_utc(user.key_balance_checked_at),
         stale=stale,
     )
 
@@ -362,7 +374,7 @@ def get_cached_balance(
     if max_age_seconds is None:
         max_age_seconds = settings.BALANCE_CACHE_TTL_SECONDS
 
-    cached = _build_balance_from_persisted(user, stale=False)
+    cached = build_balance_from_persisted(user, stale=False)
 
     if cached is not None and max_age_seconds > 0:
         age = datetime.now(timezone.utc) - cached.checked_at
