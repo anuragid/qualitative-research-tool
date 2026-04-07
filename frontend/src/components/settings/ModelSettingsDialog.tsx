@@ -35,7 +35,7 @@ interface ModelSettingsDialogProps {
 }
 
 function deriveInitialMode(settings: UserSettings | undefined): Mode {
-  if (!settings) return "standard";
+  if (!settings || !settings.available_models) return "standard";
   const standardIds = new Set(
     settings.available_models
       .filter((m) => m.tier === "standard")
@@ -76,7 +76,7 @@ export function ModelSettingsDialog({
   const { results, isSearching, query, setQuery } = useModelSearch();
 
   const standardModels =
-    settings?.available_models.filter((m) => m.tier === "standard") ?? [];
+    settings?.available_models?.filter((m) => m.tier === "standard") ?? [];
 
   // ── Reset on open ────────────────────────────────────────────────────
   // Initialize the dialog state ONCE per "open=true session". The ref
