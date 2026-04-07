@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useUploadContext } from '../../contexts/UploadContext';
+import { useCallback, useState } from 'react';
+import { useUploadContext, type FileUploadStatus } from '../../contexts/UploadContext';
 import {
   Trash2,
   ChevronDown,
@@ -19,8 +19,13 @@ import {
   FileX,
   CheckCircle2,
   Circle,
-  CircleDot
+  CircleDot,
+  Flag,
+  Check,
 } from 'lucide-react';
+import * as Sentry from '@sentry/react';
+import { usePostHog } from '@posthog/react';
+import { toast } from 'sonner';
 import { Progress } from '../ui/progress';
 import { ScrollArea } from '../ui/scroll-area';
 import {
@@ -50,6 +55,50 @@ export function UploadManager() {
   } = useUploadContext();
   const [isExpanded, setIsExpanded] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState<string | null>(null);
+  const [reportedIds, setReportedIds] = useState<Set<string>>(() => new Set());
+  const posthog = usePostHog();
+
+  const handleReportIssue = useCallback((upload: FileUploadStatus) => {
+    // Don't double-report the same row
+    if (reportedIds.has(upload.id)) return;
+
+    const reportPayload = {
+      file_name: upload.file.name,
+      file_size_bytes: upload.file.size,
+      file_type: upload.file.type || 'unknown',
+      project_id: upload.projectId,
+      project_name: upload.projectName,
+      error_type: upload.errorType ?? 'unknown',
+      error_message: upload.error ?? '(no message)',
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    };
+
+    // Sentry: surfaces in triage dashboard with full context. Use captureMessage
+    // (not captureException) because we don't have a live Error stack at report
+    // time — we have post-hoc metadata. Tag user_reported=true so triage can
+    // distinguish user-flagged reports from background auto-capture.
+    Sentry.captureMessage(
+      `Upload error reported by user: ${upload.errorType ?? 'unknown'}`,
+      {
+        level: 'error',
+        tags: {
+          feature: 'upload',
+          error_type: upload.errorType ?? 'unknown',
+          user_reported: 'true',
+        },
+        extra: reportPayload,
+      }
+    );
+
+    // PostHog: product analytics signal — which errors users care enough to flag
+    posthog?.capture('media_upload_error_reported', reportPayload);
+
+    setReportedIds(prev => new Set(prev).add(upload.id));
+
+    toast.success('Report sent', {
+      description: 'Thanks — our team will take a look.',
+    });
+  }, [posthog, reportedIds]);
 
   if (uploads.length === 0) {
     return null;
@@ -106,10 +155,6 @@ export function UploadManager() {
 
   const confirmCancel = (uploadId: string) => {
     cancelUpload(uploadId);
-    setConfirmingCancel(null);
-  };
-
-  const cancelConfirmation = () => {
     setConfirmingCancel(null);
   };
 
@@ -270,30 +315,6 @@ export function UploadManager() {
                   key={upload.id}
                   className={`relative flex items-start gap-3 px-4 py-3 transition-colors hover:bg-interactive-fill/60 ${isCancelled ? 'opacity-60' : ''}`}
                 >
-                  {/* Confirmation dialog */}
-                  <AlertDialog
-                    open={confirmingCancel === upload.id}
-                    onOpenChange={(open) => { if (!open) cancelConfirmation(); }}
-                  >
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Cancel this upload?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Progress will be lost and cannot be recovered.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Keep</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          onClick={() => confirmCancel(upload.id)}
-                        >
-                          Cancel Upload
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
                   {/* Status icon — single source of state, monochrome unless meaningful */}
                   <div className="mt-0.5 shrink-0">
                     {upload.status === 'uploading' && (
@@ -387,33 +408,38 @@ export function UploadManager() {
                         {upload.errorType === 'timeout' && ' — try a smaller file'}
                         {upload.errorType === 'server' && ' — wait a moment and retry'}
                         {upload.errorType === 'validation' && ' — check file requirements'}
+                        {(!upload.errorType || upload.errorType === 'unknown') && ' — try retry, or report this issue'}
                       </p>
                     )}
                   </div>
 
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-0.5 shrink-0 -mr-1">
+                  {/* Action buttons. All buttons use the design-system --size-touch
+                      (44px) for invisible-padding hit areas, so they're reliable to
+                      click even though the visible icon is just 14px. Color cues on
+                      hover communicate intent: pause → warning, resume → success,
+                      retry → warning, cancel → destructive, report → info. */}
+                  <div className="flex items-center gap-0.5 shrink-0 -mr-2">
                     {/* Pause button for uploading */}
                     {upload.status === 'uploading' && (
                       <button
                         onClick={() => pauseUpload(upload.id)}
-                        className="p-1.5 rounded-md hover:bg-interactive-hover transition-colors group"
+                        className="min-h-[var(--size-touch)] min-w-[var(--size-touch)] inline-flex items-center justify-center rounded-md hover:bg-interactive-hover transition-colors group"
                         title="Pause upload"
                         aria-label="Pause upload"
                       >
-                        <Pause className="h-3.5 w-3.5 text-text-tertiary group-hover:text-foreground" />
+                        <Pause className="h-3.5 w-3.5 text-text-tertiary group-hover:text-warning transition-colors" />
                       </button>
                     )}
 
-                    {/* Resume button for paused */}
+                    {/* Resume button for paused — static green so it's distinct from pause */}
                     {upload.status === 'paused' && (
                       <button
                         onClick={() => resumeUpload(upload.id)}
-                        className="p-1.5 rounded-md hover:bg-interactive-hover transition-colors group"
+                        className="min-h-[var(--size-touch)] min-w-[var(--size-touch)] inline-flex items-center justify-center rounded-md hover:bg-interactive-hover transition-colors group"
                         title="Resume upload"
                         aria-label="Resume upload"
                       >
-                        <Play className="h-3.5 w-3.5 text-text-tertiary group-hover:text-foreground" />
+                        <Play className="h-3.5 w-3.5 text-success group-hover:text-success transition-colors" />
                       </button>
                     )}
 
@@ -421,11 +447,11 @@ export function UploadManager() {
                     {(upload.status === 'uploading' || upload.status === 'pending' || upload.status === 'paused') && (
                       <button
                         onClick={() => handleCancelClick(upload.id)}
-                        className="p-1.5 rounded-md hover:bg-interactive-hover transition-colors group"
+                        className="min-h-[var(--size-touch)] min-w-[var(--size-touch)] inline-flex items-center justify-center rounded-md hover:bg-interactive-hover transition-colors group"
                         title="Cancel upload"
                         aria-label="Cancel upload"
                       >
-                        <X className="h-3.5 w-3.5 text-text-tertiary group-hover:text-destructive" />
+                        <X className="h-3.5 w-3.5 text-text-tertiary group-hover:text-destructive transition-colors" />
                       </button>
                     )}
 
@@ -433,11 +459,28 @@ export function UploadManager() {
                     {upload.status === 'error' && (
                       <button
                         onClick={() => retryUpload(upload.id)}
-                        className="p-1.5 rounded-md hover:bg-interactive-hover transition-colors group"
+                        className="min-h-[var(--size-touch)] min-w-[var(--size-touch)] inline-flex items-center justify-center rounded-md hover:bg-interactive-hover transition-colors group"
                         title="Retry upload"
                         aria-label="Retry upload"
                       >
-                        <RotateCw className="h-3.5 w-3.5 text-text-tertiary group-hover:text-foreground" />
+                        <RotateCw className="h-3.5 w-3.5 text-text-tertiary group-hover:text-warning transition-colors" />
+                      </button>
+                    )}
+
+                    {/* Report button for errors — sends a Sentry event + PostHog signal */}
+                    {upload.status === 'error' && (
+                      <button
+                        onClick={() => handleReportIssue(upload)}
+                        disabled={reportedIds.has(upload.id)}
+                        className="min-h-[var(--size-touch)] min-w-[var(--size-touch)] inline-flex items-center justify-center rounded-md hover:bg-interactive-hover transition-colors group disabled:opacity-60 disabled:cursor-default"
+                        title={reportedIds.has(upload.id) ? 'Report sent' : 'Report this issue'}
+                        aria-label={reportedIds.has(upload.id) ? 'Report sent' : 'Report this issue'}
+                      >
+                        {reportedIds.has(upload.id) ? (
+                          <Check className="h-3.5 w-3.5 text-success transition-colors" />
+                        ) : (
+                          <Flag className="h-3.5 w-3.5 text-text-tertiary group-hover:text-info transition-colors" />
+                        )}
                       </button>
                     )}
 
@@ -445,11 +488,11 @@ export function UploadManager() {
                     {(upload.status === 'completed' || upload.status === 'cancelled' || upload.status === 'error') && (
                       <button
                         onClick={() => removeUpload(upload.id)}
-                        className="p-1.5 rounded-md hover:bg-interactive-hover transition-colors group"
+                        className="min-h-[var(--size-touch)] min-w-[var(--size-touch)] inline-flex items-center justify-center rounded-md hover:bg-interactive-hover transition-colors group"
                         title="Remove from list"
                         aria-label="Remove from list"
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-text-tertiary group-hover:text-foreground" />
+                        <Trash2 className="h-3.5 w-3.5 text-text-tertiary group-hover:text-foreground transition-colors" />
                       </button>
                     )}
                   </div>
@@ -459,6 +502,48 @@ export function UploadManager() {
           </div>
         </ScrollArea>
       )}
+
+      {/* Cancel confirmation — a SINGLE dialog hoisted out of the row loop.
+          Previously this was mounted inside every row, which caused the retry
+          button to become unclickable: if the user clicked Cancel on an uploading
+          row that then transitioned to 'error', the dialog's overlay (z=90) was
+          still rendered above the widget (z=50), blocking clicks on the new
+          retry button. Hoisting it + deriving `open` from the current status
+          means a state transition naturally closes the dialog. */}
+      {(() => {
+        const cancellingUpload = confirmingCancel
+          ? uploads.find(u =>
+              u.id === confirmingCancel &&
+              (u.status === 'uploading' || u.status === 'pending' || u.status === 'paused')
+            )
+          : undefined;
+        return (
+          <AlertDialog
+            open={!!cancellingUpload}
+            onOpenChange={(open) => { if (!open) setConfirmingCancel(null); }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel this upload?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {cancellingUpload
+                    ? `Progress on ${cancellingUpload.file.name} will be lost and cannot be recovered.`
+                    : 'Progress will be lost and cannot be recovered.'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={() => { if (cancellingUpload) confirmCancel(cancellingUpload.id); }}
+                >
+                  Cancel Upload
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        );
+      })()}
     </div>
   );
 }
