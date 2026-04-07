@@ -613,35 +613,48 @@ async def trigger_video_analysis(
                 detail="Video must have a completed transcript before analysis"
             )
 
-        # Create or get existing video analysis
+        # Dispatch the analysis chain. The route is now a pure dispatcher:
+        # the first chain link (analyze_chunk_step) is responsible for
+        # creating or resetting the VideoAnalysis row, initializing
+        # step_status, flipping video.status to "analyzing", and clearing
+        # any previous video.error_message. Keeping the route body small
+        # limits the surface for partial-commit races between the request
+        # and the chain start.
+        from celery import chain
+
+        from app.tasks.analysis_steps import (
+            analyze_activate_step,
+            analyze_chunk_step,
+            analyze_explain_step,
+            analyze_infer_step,
+            analyze_relate_step,
+        )
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        pipeline = chain(
+            analyze_chunk_step.si(video_id_str, current_user_id),
+            analyze_infer_step.si(video_id_str, current_user_id),
+            analyze_relate_step.si(video_id_str, current_user_id),
+            analyze_explain_step.si(video_id_str, current_user_id),
+            analyze_activate_step.si(video_id_str, current_user_id),
+        ).on_error(handle_pipeline_error.s(video_id=video_id_str))
+
+        task = pipeline.apply_async()
+
+        # Fetch (or create) the VideoAnalysis row so we can return its id
+        # in the response. This read is side-effect free — the chain's
+        # chunk step still owns the authoritative state transitions.
         video_analysis = db.query(VideoAnalysis)\
             .filter(VideoAnalysis.video_id == video_id)\
             .first()
+        analysis_id = str(video_analysis.id) if video_analysis else None
 
-        if not video_analysis:
-            video_analysis = VideoAnalysis(
-                video_id=video_id,
-                status="pending"
-            )
-            db.add(video_analysis)
-        else:
-            video_analysis.status = "pending"
-
-        # Update video status (clear previous error if retrying)
-        video.status = "analyzing"
-        video.error_message = None
-        db.commit()
-        db.refresh(video_analysis)
-
-        # Trigger Celery task (pass user_id so BYOK key can be looked up)
-        from app.tasks.analysis_tasks import analyze_video_task
-        task = analyze_video_task.delay(str(video_id), current_user_id)
-
-        logger.info(f"Video analysis task started for video {video_id}, task_id: {task.id}")
+        logger.info(f"Video analysis chain started for video {video_id}, task_id: {task.id}")
         return {
             "message": "Video analysis task started",
-            "video_id": str(video_id),
-            "analysis_id": str(video_analysis.id),
+            "video_id": video_id_str,
+            "analysis_id": analysis_id,
             "task_id": task.id,
             "status": "processing"
         }
