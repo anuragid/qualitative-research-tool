@@ -16,11 +16,17 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        // Override Radix's inline `display: table` on the inner wrapper so children
-        // inherit the viewport width (lets `truncate` / `min-w-0` work). Children with
-        // explicit widths still overflow into the viewport's scrollWidth, so horizontal
-        // scrolling continues to work for callers that opt into it.
-        className="size-full rounded-[inherit] [&>div]:!block"
+        // Two overrides on top of Radix's defaults:
+        //  1. `[&>div]:!block` overrides Radix's inline `display: table` on the inner
+        //     wrapper so children inherit the viewport width (lets `truncate` / `min-w-0`
+        //     work and stops long unbreakable text from blowing out the panel width).
+        //  2. `max-h-[inherit]` makes the viewport inherit the Root's max-height so a
+        //     consumer using `max-h-*` on the ScrollArea actually caps the viewport,
+        //     not just the visual outer box. Without this, `size-full` (height: 100%)
+        //     can't resolve against an indefinite parent height and the viewport
+        //     collapses to its content height — content overflows the rounded panel
+        //     and the scrollbar never engages.
+        className="size-full max-h-[inherit] rounded-[inherit] [&>div]:!block"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
