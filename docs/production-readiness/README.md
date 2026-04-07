@@ -21,10 +21,30 @@ These are minimums, not aspirations.
 
 | Phase | Theme | Target date | Status |
 |---|---|---|---|
-| Phase 1 | Stop the bleeding — correctness + deploy lifecycle + frontend robustness | 2026-04-07 (today) | **In progress** |
-| Phase 2 | Know before they do — observability, alerting, staging, state machine centralization | 2026-04-14 | Not started |
-| Phase 3 | Prove it under load — load test harness, query audit, queue tuning, chaos test | 2026-04-21 | Not started |
-| Phase 4 | Polish — feature flags, admin dashboard, backups, runbooks, secret rotation | Ongoing | Not started |
+| Phase 1 | Stop the bleeding — correctness + deploy lifecycle + frontend robustness | 2026-04-07 | **✅ COMPLETE** — 5 PRs shipped + 6 runbooks + state machine centralization as stretch |
+| Phase 2 | Know before they do — observability, alerting, staging, DB CHECK constraints, SLO instrumentation | TBD | **Next — spec to be written** |
+| Phase 3 | Prove it under load — load test harness, query audit, queue tuning, chaos test | After Phase 2 | Not started |
+| Phase 4 | Polish — feature flags, admin dashboard, backups, secret rotation, dep CVE scans | Ongoing | Not started |
+
+### Phase 1 score card
+
+Measured against the 13 invariants in this README. **8 green, 4 yellow, 1 red** (up from 2/5/6 at start of 2026-04-07).
+
+| Invariant | Score | How |
+|---|---|---|
+| 1. DB state matches reality | 🟢 | 17-min watchdog + 10-min broker sweep (PR #19) |
+| 2. Impossible states rejected | 🟡 | SQLEnum ORM-layer enforcement (PR #24); DB CHECK constraints deferred to Phase 2 |
+| 3. Single state-machine owner | 🟢 | PR #24 — all ~40 status writes go through `app/state/` |
+| 4. Idempotent Celery tasks | 🟢 | PR #21 retry-reset + existing `task_acks_late` |
+| 5. Invisible deploys | 🟢 | PR #19 celery lifecycle tuning (REQUIRES `scripts/railway-service-config.py --apply`) |
+| 6. Dependency failure = user-visible error | 🟡 | BYOK 402 handling solid; other deps → Phase 2 circuit breakers |
+| 7. Frontend never crashes | 🟢 | PR #23 zod + defensive codemod + route error boundaries |
+| 8. Request tracing end-to-end | 🟡 | Sentry session replay works; request-ID propagation → Phase 2 |
+| 9. Alerts before user notices | 🔴 | Phase 2 |
+| 10. Runbooks exist | 🟢 | 6 runbooks committed 2026-04-07 |
+| 11. API ≤ 500ms | 🟢 | Most routes sub-100ms |
+| 12. SLO for chain completion | 🟡 | SLOs defined, not yet instrumented → Phase 2 |
+| 13. Users don't degrade each other | 🟡 | 32 worker slots handle target-B; not load-tested → Phase 3 |
 
 ## How to resume this work in a fresh session
 
@@ -37,15 +57,26 @@ These are minimums, not aspirations.
 7. Execute the brief in isolation. Do not touch files outside the brief's scope.
 8. Open the PR, update the status tracker in this file, report back.
 
-## Status tracker — Phase 1 PRs
+## Status tracker — Phase 1 PRs (all merged)
 
-| PR | Name | Owner | Branch | Status |
-|---|---|---|---|---|
-| #19 | Celery lifecycle tuning | dispatched subagent `pr19-celery-lifecycle` | `fix/celery-lifecycle-tuning` | **In flight** (see `prs/pr19-celery-lifecycle.md`) |
-| #19.5 | Retry-swallow fix | unclaimed | `fix/retry-reset-analysis` | See `prs/pr19-5-retry-swallow.md` |
-| #20 | Auto-dispatch analyze after transcription | unclaimed | `fix/auto-dispatch-analyze` | See `prs/pr20-auto-dispatch.md` |
-| #21 | Frontend defensive rendering + zod | unclaimed | `fix/frontend-defensive` | See `prs/pr21-frontend-defensive.md` |
-| #22 | Status enums + centralized state machine (stretch) | unclaimed | `fix/state-machine` | See `prs/pr22-state-machine-enums.md` |
+| Spec name | GH PR | Commit | Brief |
+|---|---|---|---|
+| Celery lifecycle tuning | #19 | `a6c3638` | `prs/pr19-celery-lifecycle.md` |
+| Retry-swallow fix | #21 | `be8efa9` | `prs/pr19-5-retry-swallow.md` |
+| Auto-dispatch analyze after transcription | #22 | `2a8fc27` | `prs/pr20-auto-dispatch.md` |
+| Frontend defensive rendering + zod | #23 | `0d291c6` | `prs/pr21-frontend-defensive.md` |
+| State machine enums (stretch) | #24 | `8f1ecfd` | `prs/pr22-state-machine-enums.md` |
+
+Plus the user's own **PR #20** (`9edac89`, upload false-negative + retry clickability + Report feature) shipped in parallel and is on the same production build.
+
+Phase 1 docs commits: `abdb402` (spec), `02452c6` (runbooks).
+
+## Open follow-ups from Phase 1
+
+1. **Apply Railway config:** run `python3 scripts/railway-service-config.py --apply` with `RAILWAY_API_TOKEN` set to push `worker.drainingSeconds=900` to Railway. Script change is in the repo but the Railway API call is gated behind `--apply` per safety convention.
+2. **Verify cross-video retry** — 5-min smoke test. PR #24 routed `project_analysis_steps.py` through the new `ProjectAnalysisStateMachine`; confirm a retry on an `error`-state ProjectAnalysis raises `InvalidTransitionError` (visible failure) instead of silently skipping.
+3. **Wire `validateResponse()` into per-service frontend files** — PR #23 left `projects.ts`, `analysis.ts`, `transcriptions.ts`, `settings.ts` without the schema wrapper. Mechanical follow-up, small.
+4. **Watch `task_time_limit=6min` for legitimate long steps** — any chain step that exceeds 6 min will now fail-fast. Monitor the first dozen real chains post-deploy.
 
 ## Execution model for today
 

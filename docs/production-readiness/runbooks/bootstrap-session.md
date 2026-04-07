@@ -76,17 +76,37 @@ If `/tmp/methodex-live-monitor.py` doesn't exist, it was deleted between session
 - Celery queue questions → `redis-inspect.md`
 - Need to query prod DB → `db-snapshot.md`
 
-## Step 7 — Understand the 4 things that break in production
+## Step 7 — What Phase 1 (2026-04-07) fixed, and what's still risky
 
-Before touching anything, read this list. It's the cause of 90% of recent incidents:
+Before touching anything, read this list. These are the bugs and the fixes.
 
-1. **State machine writes are scattered.** ~20 places write `video.status = "X"` directly. PR #22 (state-machine-enums, in progress as of 2026-04-07) centralizes this. Until it lands, grep before you write.
+**Phase 1 shipped these 5 fixes (all deployed; all now on main):**
 
-2. **Celery chain steps are interrupted by deploys.** Pre-PR #19 they sat orphaned for 1 hour before re-delivery. Post-PR #19, they recover in 10 min. Always check `railway-deploy.md` if you're doing infra work.
+| PR | Fix | Where |
+|---|---|---|
+| #19 (`a6c3638`) | Celery lifecycle: `task_time_limit=6min`, `visibility_timeout=10min`, watchdog=17min, drainingSeconds=900 | `backend/app/tasks/celery_app.py`, `backend/app/tasks/watchdog_tasks.py`, `scripts/railway-service-config.py` |
+| #21 (`be8efa9`) | Retry resets `VideoAnalysis` row so chain doesn't skip-swallow | `backend/app/routes/videos.py` analyze handler |
+| #22 (`2a8fc27`) | Auto-dispatch analyze chain after transcription | `backend/app/tasks/transcription_tasks.py` |
+| #23 (`0d291c6`) | Zod schemas at API boundary + defensive rendering + route error boundaries | `frontend/src/schemas/`, `frontend/src/services/api.ts`, `frontend/src/components/` |
+| #24 (`8f1ecfd`) | Status enums + `backend/app/state/` centralized state machines + SQLEnum ORM enforcement | ~20 call sites across routes + tasks + services |
 
-3. **Frontend crashes on unexpected API shapes.** PR #21 (frontend-defensive) adds zod schemas at the API boundary. Until it lands, any new backend response field that might be null/undefined can crash a React `.map()`.
+**Things to still be careful about:**
 
-4. **The retry path used to silently swallow clicks** (fixed in PR #21 retry-reset-analysis on 2026-04-07). If you see a video stuck after a retry, check `stuck-video.md` — the cross-video chain has the same bug still open (follow-up task #16).
+1. **DB CHECK constraints are NOT yet in place** (invariant #2 is 🟡). SQLAlchemy's `SQLEnum` enforces at the ORM layer, not the DB layer. Raw SQL inserts or a different ORM could still write an invalid value. Phase 2 fixes this.
+
+2. **Observability is still thin** (invariants #8, #9, #12 are 🟡/🔴). We find out about regressions when users tell us. Phase 2 fixes this with structured logging + request IDs + Sentry alert rules + synthetic canary.
+
+3. **No staging environment.** Every PR today went from dev → main → production with no intermediate soak. Phase 2 adds a staging env.
+
+4. **Railway `drainingSeconds=900` is in the script but NOT applied to Railway yet.** Until the user runs `scripts/railway-service-config.py --apply`, the worker drains in 60s during deploys and in-flight chain steps can still be killed (though they'll be re-delivered within 10 min by the new `visibility_timeout=600`, so it's degraded, not broken).
+
+5. **Cross-video retry is untested post-PR-#24.** Task #16. 5-min smoke test: confirm retrying an errored cross-video chain either succeeds or raises `InvalidTransitionError`, not silently skips.
+
+6. **Legacy behaviors to preserve when refactoring:**
+   - `transcribe_video_task` can fail before flipping `UPLOADED → TRANSCRIBING` (R2 download errors). State machine has `(UPLOADED, TRANSCRIBE_FAILED) → ERROR` and `(PENDING, TRANSCRIBE_FAILED) → ERROR` edges.
+   - Legacy `/upload` route jumps `UPLOADED` directly without passing through `UPLOADING`. State machine fires two events back-to-back to preserve this.
+   - Historical `archived` project status exists in some rows. `ProjectStatus.ARCHIVED` has ZERO transition edges — firing any event from ARCHIVED raises `InvalidTransitionError`.
+   - `NOT_STARTED` is an API sentinel, NOT a persisted state. Lives as `VIDEO_ANALYSIS_NOT_STARTED_SENTINEL: str = "not_started"` in `backend/app/state/statuses.py`, not in the enum.
 
 ## Rules of engagement
 
