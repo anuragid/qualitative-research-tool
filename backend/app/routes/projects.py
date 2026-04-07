@@ -386,34 +386,39 @@ async def trigger_project_analysis(
 
         video_ids = [video.id for video in analyzed_videos]
 
-        # Create or get existing project analysis
+        # Dispatch the cross-video analysis chain. The first chain link
+        # (analyze_cross_relate_step) is responsible for creating or
+        # resetting the ProjectAnalysis row — this route is now a pure
+        # dispatcher.
+        from celery import chain
+
+        from app.tasks.pipeline_errors import handle_project_pipeline_error
+        from app.tasks.project_analysis_steps import (
+            analyze_cross_activate_step,
+            analyze_cross_explain_step,
+            analyze_cross_relate_step,
+        )
+
+        project_id_str = str(project_id)
+        pipeline = chain(
+            analyze_cross_relate_step.si(project_id_str, current_user_id),
+            analyze_cross_explain_step.si(project_id_str, current_user_id),
+            analyze_cross_activate_step.si(project_id_str, current_user_id),
+        ).on_error(handle_project_pipeline_error.s(project_id=project_id_str))
+
+        task = pipeline.apply_async()
+
+        # Fetch (or None) the ProjectAnalysis id for the response shape.
         project_analysis = db.query(ProjectAnalysis)\
             .filter(ProjectAnalysis.project_id == project_id)\
             .first()
+        analysis_id = str(project_analysis.id) if project_analysis else None
 
-        if not project_analysis:
-            project_analysis = ProjectAnalysis(
-                project_id=project_id,
-                video_ids=video_ids,
-                status="pending"
-            )
-            db.add(project_analysis)
-        else:
-            project_analysis.status = "pending"
-            project_analysis.video_ids = video_ids
-
-        db.commit()
-        db.refresh(project_analysis)
-
-        # Trigger Celery task (pass user_id so BYOK key can be looked up)
-        from app.tasks.analysis_tasks import analyze_project_task
-        task = analyze_project_task.delay(str(project_id), current_user_id)
-
-        logger.info(f"Project analysis task started for project {project_id}, task_id: {task.id}")
+        logger.info(f"Project analysis chain started for project {project_id}, task_id: {task.id}")
         return {
             "message": "Project analysis task started",
-            "project_id": str(project_id),
-            "analysis_id": str(project_analysis.id),
+            "project_id": project_id_str,
+            "analysis_id": analysis_id,
             "video_count": len(video_ids),
             "task_id": task.id,
             "status": "processing"

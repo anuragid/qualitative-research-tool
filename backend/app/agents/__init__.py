@@ -1,18 +1,15 @@
-"""LangGraph agents for qualitative research analysis."""
+"""Agents package for qualitative research analysis.
 
-from app.agents.graph import (
-    create_project_analysis_graph,
-    create_video_analysis_graph,
-    project_analysis_graph,
-    video_analysis_graph,
-)
+The analysis pipeline no longer uses LangGraph at runtime — each step
+runs as an independent Celery task (see app.tasks.analysis_steps and
+app.tasks.project_analysis_steps). Only the state TypedDicts are
+re-exported here; node imports should go through app.agents.nodes
+directly.
+"""
+
 from app.agents.states import ProjectAnalysisState, VideoAnalysisState
 
 __all__ = [
-    "video_analysis_graph",
-    "project_analysis_graph",
-    "create_video_analysis_graph",
-    "create_project_analysis_graph",
     "VideoAnalysisState",
     "ProjectAnalysisState",
 ]
