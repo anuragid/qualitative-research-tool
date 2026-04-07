@@ -19,6 +19,13 @@ from app.services.byok_service import (
     resolve_byok_with_preflight,
 )
 from app.services.project_state_service import ProjectStateService
+from app.state import (
+    InvalidTransitionError,
+    VideoAnalysisEvent,
+    VideoAnalysisStateMachine,
+    VideoEvent,
+    VideoStateMachine,
+)
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 from app.utils.error_classification import (
@@ -165,9 +172,13 @@ def get_video_analysis_state(db: Session, video_id: UUID) -> Dict[str, Any]:
     if not analysis:
         analysis = VideoAnalysis(
             video_id=video_id,
-            status="pending",
             current_step="chunk",
             step_status={}
+        )
+        # Route the initial status write through the state machine so the
+        # transition table owns the (None -> PENDING) edge.
+        VideoAnalysisStateMachine.transition(
+            analysis, VideoAnalysisEvent.ROW_CREATED, db=db
         )
         db.add(analysis)
         db.commit()
@@ -237,19 +248,43 @@ def _update_analysis_error(
         analysis = db.query(VideoAnalysis).filter(
             VideoAnalysis.video_id == UUID(video_id)
         ).first()
+        if analysis and analysis.status != "error":
+            try:
+                VideoAnalysisStateMachine.transition(
+                    analysis, VideoAnalysisEvent.CHAIN_FAILED, db=db
+                )
+            except InvalidTransitionError as exc_trans:
+                logger.warning(
+                    f"_update_analysis_error: invalid VideoAnalysis "
+                    f"transition for {video_id}: {exc_trans}"
+                )
         if analysis:
-            analysis.status = "error"
             analysis.step_status = {**(analysis.step_status or {}), step_name: "error"}
 
-        # Also reset video status from "analyzing" so it's not stuck
-        video = db.query(Video).filter(Video.id == UUID(video_id)).first()
-        if video and video.status == "analyzing":
-            video.status = "error"
-
         # Stamp structured error_type for the BYOK 0-balance case so the
-        # frontend can render the dedicated "Add credits" alert.
+        # frontend can render the dedicated "Add credits" alert. This must
+        # happen BEFORE the video state transition so the error_message is
+        # carried into it (the state machine preserves a pre-stamped
+        # error_message when no explicit one is passed).
+        video = db.query(Video).filter(Video.id == UUID(video_id)).first()
+        credits_error_json: str | None = None
         if video is not None and isinstance(exc, InsufficientCreditsNonRetryable):
-            video.error_message = _build_insufficient_credits_error_json(step_name, exc)
+            credits_error_json = _build_insufficient_credits_error_json(step_name, exc)
+
+        # Also reset video status from "analyzing" so it's not stuck.
+        if video and video.status == "analyzing":
+            try:
+                VideoStateMachine.transition(
+                    video,
+                    VideoEvent.CHAIN_FAILED,
+                    db=db,
+                    error_message=credits_error_json,
+                )
+            except InvalidTransitionError as exc_trans:
+                logger.warning(
+                    f"_update_analysis_error: invalid Video transition "
+                    f"for {video_id}: {exc_trans}"
+                )
 
         db.commit()
     except Exception as commit_error:
@@ -303,8 +338,12 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
             self.db, user_id, "chunk", force_refresh=True,
         )
 
-        # Chain-start transitions — previously done in the route handler
-        analysis.status = "processing"
+        # Chain-start transitions — previously done in the route handler.
+        # CHAIN_STARTED: pending -> processing (or processing -> processing
+        # if the chunk step is idempotently re-running).
+        VideoAnalysisStateMachine.transition(
+            analysis, VideoAnalysisEvent.CHAIN_STARTED, db=self.db
+        )
         analysis.current_step = "chunk"
         analysis.step_status = {
             "chunk": "processing",
@@ -315,11 +354,15 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
         }
         analysis.started_at = datetime.now(timezone.utc)
 
-        # Mark the video as analyzing and clear any previous error
+        # Mark the video as analyzing and clear any previous error. The
+        # route-level handler has usually already done this, but the
+        # ANALYZING -> ANALYZING self-loop in the transition table keeps
+        # this call idempotent.
         video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
         if video:
-            video.status = "analyzing"
-            video.error_message = None
+            VideoStateMachine.transition(
+                video, VideoEvent.ANALYZE_DISPATCHED, db=self.db
+            )
         self.db.commit()
 
         # Run chunk node
@@ -632,13 +675,19 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
         analysis.design_principles = result.get("design_principles")
         analysis.activate_completed_at = datetime.now(timezone.utc)
         analysis.step_status = {**(analysis.step_status or {}), "activate": "completed"}
-        analysis.status = "completed"
+        # CHAIN_SUCCEEDED: processing -> completed
+        VideoAnalysisStateMachine.transition(
+            analysis, VideoAnalysisEvent.CHAIN_SUCCEEDED, db=self.db
+        )
         analysis.completed_at = datetime.now(timezone.utc)
 
         # Get video object and update status to analyzed
         video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
         if video:
-            video.status = "analyzed"
+            # CHAIN_SUCCEEDED: analyzing -> analyzed
+            VideoStateMachine.transition(
+                video, VideoEvent.CHAIN_SUCCEEDED, db=self.db
+            )
 
         self.db.commit()
 

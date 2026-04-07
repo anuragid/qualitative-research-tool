@@ -70,6 +70,12 @@ def _make_video_state(video_id: str):
     """Minimal state get_video_analysis_state would return."""
     analysis = MagicMock()
     analysis.step_status = {}
+    # Seed with a real string status so VideoAnalysisStateMachine.transition()
+    # can coerce ``analysis.status`` into ``VideoAnalysisStatus`` during the
+    # CHAIN_STARTED event fired by the chunk step. Without this, the
+    # MagicMock's auto-generated ``.status`` attribute is a MagicMock
+    # instance which the enum constructor rejects with ``ValueError``.
+    analysis.status = "pending"
     return {
         "video_id": video_id,
         "transcript": {"utterances": [{"speaker": "A", "start": 0, "text": "hi"}]},
@@ -92,6 +98,14 @@ def _run_chunk_step_with_node_result(node_result: dict, video_id: str | None = N
     video_id = video_id or str(uuid4())
     mock_self = MagicMock()
     mock_self.db = MagicMock()
+    # The chunk step fetches the video from the DB and routes the status
+    # write through VideoStateMachine, which requires a real-string status
+    # on the row. Seed the mock-chain-terminator with a legal source state
+    # so ``VideoStateMachine.transition(video, ANALYZE_DISPATCHED)`` is
+    # accepted (TRANSCRIBED is the normal precursor in production).
+    mock_video = MagicMock()
+    mock_video.status = "transcribed"
+    mock_self.db.query.return_value.filter.return_value.first.return_value = mock_video
 
     state = _make_video_state(video_id)
 
