@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsService } from "../services/settings";
-import type { UserSettingsUpdate } from "../services/settings";
+import type { UserSettings, UserSettingsUpdate } from "../services/settings";
+import type { BalanceInfo } from "../types";
 
 export function useSettings() {
   const queryClient = useQueryClient();
@@ -31,6 +32,22 @@ export function useSettings() {
     },
   });
 
+  /**
+   * Force-refresh the user's OpenRouter balance.
+   *
+   * On success, merges the fresh `BalanceInfo` into the cached `user-settings`
+   * query so consumers re-render without a full refetch round-trip.
+   */
+  const refreshBalanceMutation = useMutation<BalanceInfo, Error, void>({
+    mutationFn: () => settingsService.refreshBalance(),
+    onSuccess: (balance) => {
+      queryClient.setQueryData<UserSettings | undefined>(
+        ["user-settings"],
+        (prev) => (prev ? { ...prev, balance } : prev),
+      );
+    },
+  });
+
   return {
     settings: settingsQuery.data,
     isLoading: settingsQuery.isLoading,
@@ -42,5 +59,9 @@ export function useSettings() {
     resetUpdateError: updateMutation.reset,
     deleteApiKey: deleteKeyMutation.mutate,
     isDeletingKey: deleteKeyMutation.isPending,
+    /** Returns the fresh balance via the mutation's promise. */
+    refreshBalance: refreshBalanceMutation.mutateAsync,
+    isRefreshingBalance: refreshBalanceMutation.isPending,
+    refreshBalanceError: refreshBalanceMutation.error,
   };
 }

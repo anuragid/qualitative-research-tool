@@ -1,3 +1,36 @@
+// BYOK balance types
+/**
+ * Balance info matching backend `BalanceInfo.as_dict()`.
+ *
+ * Source of truth: `docs/byok-balance-contract.md`. Verified live against
+ * OpenRouter on 2026-04-06.
+ */
+export interface BalanceInfo {
+  /** Account-level topped-up allotment in USD (from /credits). */
+  total_credits: number;
+  /** Account-level lifetime spend in USD (from /credits). */
+  total_usage: number;
+  /** Spendable amount: total_credits - total_usage. */
+  balance_remaining: number;
+  /** True iff the account has never purchased credits. */
+  is_free_tier: boolean;
+  /** Masked OpenRouter key label, e.g. "sk-or-v1-abc...xyz". */
+  key_label: string;
+  /** Per-key cap in USD, null if no cap is set. */
+  key_limit: number | null;
+  /** Per-key cap remaining in USD, null if no cap is set. */
+  key_limit_remaining: number | null;
+  /**
+   * True iff the user can spend right now: balance_remaining > 0
+   * AND (key_limit_remaining is null OR key_limit_remaining > 0).
+   */
+  has_credits: boolean;
+  /** ISO8601 timestamp of when this snapshot was checked. */
+  checked_at: string;
+  /** True if this is a stale value returned because a fresh fetch failed. */
+  stale: boolean;
+}
+
 // Project types
 export type ProjectStatus =
   | "planning"    // Project created, no files yet
