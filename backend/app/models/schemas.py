@@ -123,9 +123,10 @@ class PreferredModelUpdateRequest(BaseModel):
         v = _strip_control_chars(v).strip()
         if not v:
             raise ValueError("Model ID cannot be blank")
+        # Model IDs follow the format "provider/model-name"
         if not re.match(r'^[a-zA-Z0-9_\-]+/[a-zA-Z0-9._\-:]+$', v):
             raise ValueError(
-                "Model ID must follow the format 'provider/model-name'"
+                "Invalid model ID format. Expected format: provider/model-name"
             )
         return v
 
