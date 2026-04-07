@@ -13,6 +13,7 @@ from app.database import get_db
 from app.main import limiter
 from app.models import database_models
 from app.models.schemas import (
+    ApiKeyAddRequest,
     BalanceInfoResponse,
     UserResponse,
     UserSettingsResponse,
@@ -306,6 +307,79 @@ async def update_user_settings(
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
         has_api_key=bool(db_user.encrypted_api_key),
+        key_hint=db_user.key_hint,
+        key_validated_at=db_user.key_validated_at,
+        available_models=STANDARD_MODELS,
+        balance=_balance_to_response(fresh_balance),
+    )
+
+
+@router.post("/settings/api-key", response_model=UserSettingsResponse)
+@limiter.limit("5/minute")
+async def add_api_key(
+    request: Request,
+    payload: ApiKeyAddRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add or replace the user's BYOK API key.
+
+    Validates the key against OpenRouter and rejects keys with no
+    credits before persisting. Does NOT touch preferred_model — that's
+    a separate endpoint (Task 3).
+    """
+    user_id = current_user["id"]
+    db_user = db.query(database_models.User).filter(
+        database_models.User.id == user_id
+    ).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        balance = fetch_balance_sync(payload.api_key)
+    except OpenRouterBalanceError as exc:
+        logger.info(f"BYOK key save failed validation for user {user_id}: {exc}")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid API key or OpenRouter is temporarily unreachable. "
+                "Check your key on the OpenRouter dashboard and try again."
+            ),
+        ) from exc
+
+    if not balance.has_credits:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Your OpenRouter key has $0 credits. Add credits at "
+                "https://openrouter.ai/settings/credits, then save again."
+            ),
+        )
+
+    db_user.encrypted_api_key = encryption_service.encrypt(payload.api_key)
+    db_user.key_hint = (
+        payload.api_key[-4:] if len(payload.api_key) > 8 else "****"
+    )
+    db_user.key_validated_at = datetime.now(timezone.utc)
+
+    # Persist the freshly-fetched balance fields so the immediate
+    # GET /settings round-trip after save shows the live numbers.
+    db_user.key_total_credits = balance.total_credits
+    db_user.key_total_usage = balance.total_usage
+    db_user.key_limit = balance.key_limit
+    db_user.key_limit_remaining = balance.key_limit_remaining
+    db_user.key_is_free_tier = balance.is_free_tier
+    db_user.key_balance_checked_at = balance.checked_at
+    db_user.key_balance_error = None
+
+    db.commit()
+    db.refresh(db_user)
+
+    fresh_balance = get_cached_balance(db, db_user)
+    return UserSettingsResponse(
+        preferred_model=db_user.preferred_model,
+        has_api_key=True,
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
         available_models=STANDARD_MODELS,
