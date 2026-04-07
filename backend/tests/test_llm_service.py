@@ -5,7 +5,7 @@ Covers: parse_json_response, call_with_json_list_response,
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,9 +14,13 @@ from app.services.llm_service import LLMService
 
 @pytest.fixture
 def svc():
-    """Create an LLMService instance with mocked client."""
-    with patch("app.services.llm_service.OpenAI"):
-        service = LLMService()
+    """Create an LLMService instance with mocked client.
+
+    openai is now lazy-imported inside the client property; inject the mock
+    directly via _client so tests don't need to patch the module-level name.
+    """
+    service = LLMService()
+    service._client = MagicMock()
     return service
 
 

@@ -5,14 +5,6 @@ import logging
 import re
 from typing import Any, Optional
 
-from openai import (
-    APIConnectionError,
-    APIError,
-    APIStatusError,
-    NotFoundError,
-    OpenAI,
-    RateLimitError,
-)
 from tenacity import (
     RetryError,
     before_sleep_log,
@@ -23,7 +15,7 @@ from tenacity import (
 )
 
 from app.config import settings
-from app.constants import FREE_MODEL_FALLBACKS
+from app.constants import STANDARD_MODEL_FALLBACKS
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +27,7 @@ _PERMANENT_HTTP_CODES = frozenset({400, 401, 402, 403, 422})
 
 def _is_permanent_api_error(exc: BaseException) -> bool:
     """True iff *exc* is an APIStatusError with a permanent 4xx code."""
+    from openai import APIStatusError
     if not isinstance(exc, APIStatusError):
         return False
     return getattr(exc, "status_code", None) in _PERMANENT_HTTP_CODES
@@ -50,6 +43,7 @@ def _should_retry_llm_exception(exc: BaseException) -> bool:
     - APIStatusError with 404 → DO NOT retry here; let model fallback handle it
     - APIError (no specific status) → retry (assume transient)
     """
+    from openai import APIConnectionError, APIError, APIStatusError, NotFoundError, RateLimitError
     if isinstance(exc, (APIConnectionError, RateLimitError)):
         return True
     if isinstance(exc, NotFoundError):
@@ -71,29 +65,36 @@ OPENROUTER_HEADERS = {
 
 # Set of allowed model IDs when using the Methodex (shared) key.
 # The Methodex key must never be used with premium models.
-_METHODEX_ALLOWED_MODELS = set(FREE_MODEL_FALLBACKS)
+_METHODEX_ALLOWED_MODELS = set(STANDARD_MODEL_FALLBACKS)
 
 
 class LLMService:
     """Service for interacting with LLMs via OpenRouter (OpenAI-compatible API)."""
 
     def __init__(self):
-        """Initialize OpenRouter client (sync, for Celery workers)."""
+        """Initialize OpenRouter client config (openai SDK imported lazily on first use)."""
         self.api_key = settings.OPENROUTER_API_KEY
         self.base_url = settings.OPENROUTER_BASE_URL
         self.default_model = settings.DEFAULT_MODEL
         self.max_tokens = settings.LLM_MAX_TOKENS
         self.temperature = settings.LLM_TEMPERATURE
+        self._client = None
 
-        # Sync client (for use in Celery workers / LangGraph nodes)
-        self.client = OpenAI(
-            base_url=self.base_url,
-            api_key=self.api_key,
-        )
+    @property
+    def client(self):
+        """Return a cached OpenAI client for the Methodex shared key."""
+        if self._client is None:
+            from openai import OpenAI
+            self._client = OpenAI(
+                base_url=self.base_url,
+                api_key=self.api_key,
+            )
+        return self._client
 
-    def _get_client(self, api_key: Optional[str] = None) -> OpenAI:
+    def _get_client(self, api_key: Optional[str] = None):
         """Get a sync client, optionally with a BYOK API key."""
         if api_key and api_key != self.api_key:
+            from openai import OpenAI
             return OpenAI(
                 base_url=self.base_url,
                 api_key=api_key,
@@ -113,13 +114,14 @@ class LLMService:
         max_tokens: int,
         temperature: float,
         model: str,
-        client: OpenAI,
+        client: Any,
     ) -> str:
         """
         Single LLM call with retries (used internally).
 
         Raises retryable exceptions so tenacity can handle them.
         """
+        from openai import APIConnectionError, APIError
         try:
             kwargs = {
                 "model": model,
@@ -196,8 +198,8 @@ class LLMService:
         system prompt to instruct the model to return valid JSON, and use robust
         parsing in ``parse_json_response``.
 
-        When the primary model is persistently rate-limited (common with free
-        OpenRouter models), this method automatically tries fallback models.
+        When the primary model is persistently rate-limited, this method
+        automatically tries fallback models from STANDARD_MODEL_FALLBACKS.
 
         Args:
             system_prompt: System prompt/instructions
@@ -215,6 +217,7 @@ class LLMService:
             APIError: If API call fails after retries on all models
             ValueError: If response has no content
         """
+        from openai import APIConnectionError, APIError, APIStatusError, NotFoundError, RateLimitError
         client = self._get_client(api_key)
         chosen_model = model or self.default_model
         effective_max_tokens = max_tokens or self.max_tokens
@@ -234,7 +237,7 @@ class LLMService:
         # (handles deprecated/removed models gracefully).
         models_to_try = [chosen_model]
         if api_key is None:
-            for fallback in FREE_MODEL_FALLBACKS:
+            for fallback in STANDARD_MODEL_FALLBACKS:
                 if fallback != chosen_model and fallback not in models_to_try:
                     models_to_try.append(fallback)
         else:
@@ -293,8 +296,8 @@ class LLMService:
                 last_error = e
                 continue
             except ValueError as e:
-                # Free models may return null content (e.g. finish_reason: length
-                # with no output). Fall back to next model when using shared key.
+                # Open-source models may return null content (e.g. finish_reason:
+                # length with no output). Fall back to next model when using shared key.
                 if api_key is None:
                     logger.warning(
                         f"Model {model_name} returned unusable response: {e}. "

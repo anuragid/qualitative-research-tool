@@ -8,10 +8,9 @@ sqlalchemy==2.0.36
 alembic==1.14.1
 psycopg2-binary==2.9.10
 
-# AI & LangGraph
+# AI
 openai==2.14.0
 json-repair==0.58.7
-langgraph==1.0.10
 
 # AssemblyAI
 assemblyai==0.35.1
@@ -45,4 +44,4 @@ cryptography==45.0.0
 slowapi==0.1.9
 
 # Error Monitoring & Observability
-sentry-sdk[fastapi,celery,openai]>=2.41.0
+sentry-sdk[fastapi,celery]>=2.41.0

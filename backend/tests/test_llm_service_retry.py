@@ -19,7 +19,7 @@ import httpx
 import pytest
 from openai import APIConnectionError, APIStatusError
 
-from app.constants import FREE_MODEL_FALLBACKS
+from app.constants import STANDARD_MODEL_FALLBACKS
 from app.services.llm_service import LLMService
 
 
@@ -64,10 +64,10 @@ def service():
     The local .env may set DEFAULT_MODEL to a premium model that the
     server-side enforcement re-adds to the fallback chain, which would
     inflate the expected call counts in fallback tests.  Force a known
-    standard model so the fallback chain is exactly FREE_MODEL_FALLBACKS.
+    standard model so the fallback chain is exactly STANDARD_MODEL_FALLBACKS.
     """
     s = LLMService()
-    s.default_model = FREE_MODEL_FALLBACKS[0]
+    s.default_model = STANDARD_MODEL_FALLBACKS[0]
     return s
 
 
@@ -129,10 +129,10 @@ class TestCallLLMNoFallbackOnPermanentError:
     def test_402_does_not_try_fallback_models(self, service, monkeypatch):
         """One 402 from the primary model should fail immediately, not
         retry across all standard fallback models."""
-        # Replace the shared client so call_llm uses our mock
+        # client is now a @property backed by _client; inject the mock directly.
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = _make_402()
-        monkeypatch.setattr(service, "client", mock_client)
+        service._client = mock_client
 
         with pytest.raises(APIStatusError) as exc_info:
             service.call_llm(
@@ -152,22 +152,23 @@ class TestCallLLMNoFallbackOnPermanentError:
 
     def test_connection_error_still_walks_fallback(self, service, monkeypatch):
         """Transient APIConnectionError should still try the fallback chain."""
-        from app.constants import FREE_MODEL_FALLBACKS
+        from app.constants import STANDARD_MODEL_FALLBACKS
 
+        # client is now a @property backed by _client; inject the mock directly.
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = APIConnectionError(
             request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
         )
-        monkeypatch.setattr(service, "client", mock_client)
+        service._client = mock_client
 
         with pytest.raises(APIConnectionError):
             service.call_llm(system_prompt="sys", user_message="msg")
 
         # Each model gets 3 tenacity retries; with N fallback models we
         # expect 3 * N calls total.
-        expected_min_calls = 3 * len(FREE_MODEL_FALLBACKS)
+        expected_min_calls = 3 * len(STANDARD_MODEL_FALLBACKS)
         assert mock_client.chat.completions.create.call_count == expected_min_calls, (
             f"Expected {expected_min_calls} calls (3 retries × "
-            f"{len(FREE_MODEL_FALLBACKS)} fallback models), "
+            f"{len(STANDARD_MODEL_FALLBACKS)} fallback models), "
             f"got {mock_client.chat.completions.create.call_count}"
         )

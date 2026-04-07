@@ -3,13 +3,12 @@
 import logging
 import os
 
-from cryptography.fernet import Fernet, InvalidToken, MultiFernet
-
 logger = logging.getLogger(__name__)
 
 
 class EncryptionService:
     def __init__(self):
+        from cryptography.fernet import Fernet, MultiFernet
         key_str = os.getenv("ENCRYPTION_KEY")
         if not key_str:
             app_env = os.getenv("APP_ENV", "development")
@@ -40,6 +39,7 @@ class EncryptionService:
 
     def decrypt(self, ciphertext: str) -> str | None:
         """Decrypt using any known key."""
+        from cryptography.fernet import InvalidToken
         try:
             return self._multi_fernet.decrypt(ciphertext.encode()).decode()
         except InvalidToken:
@@ -52,6 +52,7 @@ class EncryptionService:
         Useful when rotating keys: decrypt with old key, re-encrypt with new primary.
         Raises ValueError if decryption fails.
         """
+        from cryptography.fernet import InvalidToken
         try:
             return self._multi_fernet.rotate(ciphertext.encode()).decode()
         except InvalidToken:
