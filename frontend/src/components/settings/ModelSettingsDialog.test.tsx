@@ -7,16 +7,28 @@ import { ModelSettingsDialog } from "./ModelSettingsDialog";
 const mockUpdateSettings = vi.fn();
 const mockDeleteApiKey = vi.fn();
 const mockResetUpdateError = vi.fn();
-let mockSettings: {
-  preferred_model: string | null;
-  has_api_key: boolean;
-  key_hint?: string | null;
-  available_models: { id: string; name: string; tier: string; provider?: string }[];
-} | undefined = undefined;
+const mockRefreshBalance = vi.fn();
+let mockSettings:
+  | {
+      preferred_model: string | null;
+      has_api_key: boolean;
+      key_hint?: string | null;
+      available_models: {
+        id: string;
+        name: string;
+        tier: string;
+        provider?: string;
+      }[];
+      balance?: import("../../types").BalanceInfo | null;
+      low_balance_threshold_usd?: number;
+    }
+  | undefined = undefined;
 let mockIsLoading = false;
 let mockIsUpdating = false;
 let mockIsDeletingKey = false;
+let mockIsRefreshingBalance = false;
 let mockUpdateError: Error | null = null;
+let mockRefreshBalanceError: Error | null = null;
 
 vi.mock("../../hooks/useSettings", () => ({
   useSettings: () => ({
@@ -30,6 +42,9 @@ vi.mock("../../hooks/useSettings", () => ({
     resetUpdateError: mockResetUpdateError,
     deleteApiKey: mockDeleteApiKey,
     isDeletingKey: mockIsDeletingKey,
+    refreshBalance: mockRefreshBalance,
+    isRefreshingBalance: mockIsRefreshingBalance,
+    refreshBalanceError: mockRefreshBalanceError,
   }),
 }));
 
@@ -62,17 +77,22 @@ describe("ModelSettingsDialog", () => {
     mockUpdateSettings.mockReset();
     mockDeleteApiKey.mockReset();
     mockResetUpdateError.mockReset();
+    mockRefreshBalance.mockReset();
+    mockRefreshBalance.mockResolvedValue(null);
     mockUpdateSettings.mockImplementation((_data: unknown, opts?: { onSuccess?: () => void }) => {
       opts?.onSuccess?.();
     });
     mockIsLoading = false;
     mockIsUpdating = false;
     mockIsDeletingKey = false;
+    mockIsRefreshingBalance = false;
     mockUpdateError = null;
+    mockRefreshBalanceError = null;
     mockSettings = {
       preferred_model: null,
       has_api_key: false,
       available_models: STANDARD_MODELS,
+      balance: null,
     };
   });
 
@@ -250,5 +270,107 @@ describe("ModelSettingsDialog", () => {
   it("resets error state on dialog open", () => {
     renderDialog();
     expect(mockResetUpdateError).toHaveBeenCalled();
+  });
+
+  // ---- BalanceDisplay integration ----
+
+  it("does not render BalanceDisplay when has_api_key is false", () => {
+    mockSettings = {
+      ...mockSettings!,
+      has_api_key: false,
+      balance: null,
+    };
+    renderDialog();
+    const dialog = getDialogContent();
+    expect(
+      dialog.querySelector('[data-slot="balance-display"]'),
+    ).toBeNull();
+    expect(
+      dialog.querySelector('[data-slot="alert-banner"]'),
+    ).toBeNull();
+  });
+
+  it("renders BalanceDisplay healthy state when has_api_key with positive balance", () => {
+    mockSettings = {
+      ...mockSettings!,
+      has_api_key: true,
+      key_hint: "abcd",
+      balance: {
+        total_credits: 10,
+        total_usage: 2.75,
+        balance_remaining: 7.25,
+        is_free_tier: false,
+        key_label: "sk-or-v1-abc...xyz",
+        key_limit: null,
+        key_limit_remaining: null,
+        has_credits: true,
+        checked_at: new Date().toISOString(),
+        stale: false,
+      },
+    };
+    renderDialog();
+    const dialog = getDialogContent();
+    expect(
+      dialog.querySelector('[data-slot="balance-display"]'),
+    ).not.toBeNull();
+  });
+
+  it("renders BalanceDisplay error state when balance has no credits", () => {
+    mockSettings = {
+      ...mockSettings!,
+      has_api_key: true,
+      key_hint: "abcd",
+      balance: {
+        total_credits: 10,
+        total_usage: 10,
+        balance_remaining: 0,
+        is_free_tier: false,
+        key_label: "sk-or-v1-abc...xyz",
+        key_limit: null,
+        key_limit_remaining: null,
+        has_credits: false,
+        checked_at: new Date().toISOString(),
+        stale: false,
+      },
+    };
+    renderDialog();
+    const dialog = getDialogContent();
+    const errorBanner = dialog.querySelector(
+      '[data-slot="alert-banner"][data-variant="error"]',
+    );
+    expect(errorBanner).not.toBeNull();
+    expect(errorBanner!.textContent).toMatch(/no credits/i);
+  });
+
+  it("clicking refresh in BalanceDisplay calls refreshBalance from hook", async () => {
+    mockSettings = {
+      ...mockSettings!,
+      has_api_key: true,
+      key_hint: "abcd",
+      balance: {
+        total_credits: 10,
+        total_usage: 2.75,
+        balance_remaining: 7.25,
+        is_free_tier: false,
+        key_label: "sk-or-v1-abc...xyz",
+        key_limit: null,
+        key_limit_remaining: null,
+        has_credits: true,
+        checked_at: new Date().toISOString(),
+        stale: false,
+      },
+    };
+    const user = userEvent.setup();
+    renderDialog();
+    const dialog = getDialogContent();
+
+    const display = dialog.querySelector('[data-slot="balance-display"]');
+    expect(display).not.toBeNull();
+    const refreshBtn = display!.querySelector(
+      "button",
+    ) as HTMLButtonElement | null;
+    expect(refreshBtn).not.toBeNull();
+    await user.click(refreshBtn!);
+    expect(mockRefreshBalance).toHaveBeenCalled();
   });
 });
