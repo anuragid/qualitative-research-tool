@@ -32,8 +32,12 @@ from app.agents.nodes import (
 )
 from app.agents.states import ProjectAnalysisState, VideoAnalysisState
 from app.models.database_models import Project, ProjectAnalysis, SpeakerLabel, Transcript, Video, VideoAnalysis
-from app.services.byok_service import resolve_byok as _resolve_byok
+from app.services.byok_service import (
+    InsufficientCreditsError,
+    resolve_byok_with_preflight,
+)
 from app.services.project_state_service import ProjectStateService
+from app.tasks.analysis_steps import InsufficientCreditsNonRetryable
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 from app.utils.error_classification import (
@@ -263,6 +267,37 @@ def _build_pipeline_error_json(failed_step: str, error_str: str, error_type: str
     })
 
 
+def _build_insufficient_credits_pipeline_json(
+    failed_step: str,
+    exc: "InsufficientCreditsNonRetryable",
+) -> str:
+    """Build the structured ``video.error_message`` payload for the
+    BYOK 0-balance pre-flight failure.
+
+    Mirrors the shape of :func:`_build_pipeline_error_json` so the
+    frontend ``parseError`` consumer doesn't have to special-case
+    pre-flight errors. Includes the ``balance`` block so
+    ``InsufficientCreditsAlert.tsx`` can render the user's actual
+    numbers without an extra round-trip.
+    """
+    payload: dict = {
+        "step": failed_step,
+        "error_type": "insufficient_credits",
+        "retryable": False,
+        "message": (
+            "Your OpenRouter key has no remaining credits. "
+            "Add credits at https://openrouter.ai/settings/credits and try again."
+        ),
+        "details": _sanitize_error(str(exc)),
+    }
+    if exc.balance is not None:
+        try:
+            payload["balance"] = exc.balance.as_dict()
+        except Exception:  # pragma: no cover - defensive
+            pass
+    return json.dumps(payload)
+
+
 @celery_app.task(base=DatabaseTask, bind=True, name="analyze_video")
 def analyze_video_task(self, video_id: str, user_id: str | None = None):
     """
@@ -351,8 +386,19 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         video.status = "analyzing"
         self.db.commit()
 
-        # Resolve BYOK API key and preferred model for this user
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model and pre-flight the
+        # OpenRouter balance. ``force_refresh=True`` so the very first
+        # check at pipeline entry sees a live number, not a cached one.
+        try:
+            byok_api_key, byok_model, _balance = resolve_byok_with_preflight(
+                self.db, user_id, force_refresh=True,
+            )
+        except InsufficientCreditsError as credits_exc:
+            raise InsufficientCreditsNonRetryable(
+                "Video analysis failed: insufficient credits "
+                f"(balance_remaining=${credits_exc.balance.balance_remaining:.4f})",
+                balance=credits_exc.balance,
+            ) from credits_exc
 
         # Prepare initial state for the pipeline
         initial_state: VideoAnalysisState = {
@@ -444,6 +490,10 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
         # Use structured JSON if the exception carries it, otherwise build one
         if isinstance(e, _PipelineError) and e.structured_json:
             error_json = _sanitize_error(e.structured_json)
+        elif isinstance(e, InsufficientCreditsNonRetryable):
+            # Pre-flight failure: stamp the dedicated error_type so the
+            # frontend renders the "Add credits" alert.
+            error_json = _build_insufficient_credits_pipeline_json("chunk", e)
         else:
             safe_msg = _sanitize_error(str(e))
             error_json = json.dumps(build_structured_error(
@@ -492,6 +542,7 @@ def analyze_video_task(self, video_id: str, user_id: str | None = None):
     bind=True,
     name="analyze_project",
     autoretry_for=(Exception,),
+    dont_autoretry_for=(InsufficientCreditsNonRetryable,),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
@@ -571,8 +622,17 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
 
         self.db.commit()
 
-        # Resolve BYOK API key and preferred model for this user
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model with balance pre-flight.
+        try:
+            byok_api_key, byok_model, _balance = resolve_byok_with_preflight(
+                self.db, user_id, force_refresh=True,
+            )
+        except InsufficientCreditsError as credits_exc:
+            raise InsufficientCreditsNonRetryable(
+                "Project analysis failed: insufficient credits "
+                f"(balance_remaining=${credits_exc.balance.balance_remaining:.4f})",
+                balance=credits_exc.balance,
+            ) from credits_exc
 
         # Prepare initial state for the pipeline
         initial_state: ProjectAnalysisState = {
@@ -632,6 +692,10 @@ def analyze_project_task(self, project_id: str, user_id: str | None = None):
         # Use structured JSON if the exception carries it, otherwise build one
         if isinstance(e, _PipelineError) and e.structured_json:
             error_json = _sanitize_error(e.structured_json)
+        elif isinstance(e, InsufficientCreditsNonRetryable):
+            # Pre-flight failure: stamp the dedicated error_type so the
+            # frontend renders the "Add credits" alert.
+            error_json = _build_insufficient_credits_pipeline_json("cross_relate", e)
         else:
             safe_msg = _sanitize_error(str(e))
             error_json = json.dumps(build_structured_error(

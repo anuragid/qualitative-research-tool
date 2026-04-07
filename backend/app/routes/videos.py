@@ -15,9 +15,11 @@ from sqlalchemy.orm import Session
 from app.auth_bridge import Permission, require_permissions, require_permissions_upload
 from app.config import settings
 from app.database import get_db
+from app.dependencies.byok_gate import require_byok_credits
 from app.main import limiter
 from app.models.database_models import Project, Transcript, Video, VideoAnalysis
 from app.models.schemas import TranscriptResponse, VideoAnalysisResponse, VideoResponse, VideoUploadResponse
+from app.services.openrouter_balance import BalanceInfo
 from app.services.s3_service import s3_service
 
 logger = logging.getLogger(__name__)
@@ -575,7 +577,8 @@ async def trigger_video_analysis(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    balance: BalanceInfo | None = Depends(require_byok_credits),
 ):
     """
     Trigger the 5-step analysis process for a video (must be owned by the current user).
@@ -854,7 +857,8 @@ async def trigger_chunk_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    balance: BalanceInfo | None = Depends(require_byok_credits),
 ):
     """
     Trigger CHUNK step (must be owned by the current user).
@@ -912,7 +916,8 @@ async def trigger_infer_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    balance: BalanceInfo | None = Depends(require_byok_credits),
 ):
     """
     Trigger INFER step (must be owned by the current user).
@@ -965,7 +970,8 @@ async def trigger_relate_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    balance: BalanceInfo | None = Depends(require_byok_credits),
 ):
     """
     Trigger RELATE step (must be owned by the current user).
@@ -1018,7 +1024,8 @@ async def trigger_explain_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    balance: BalanceInfo | None = Depends(require_byok_credits),
 ):
     """
     Trigger EXPLAIN step (must be owned by the current user).
@@ -1071,7 +1078,8 @@ async def trigger_activate_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    balance: BalanceInfo | None = Depends(require_byok_credits),
 ):
     """
     Trigger ACTIVATE step (must be owned by the current user).

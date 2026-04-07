@@ -96,7 +96,7 @@ def _run_chunk_step_with_node_result(node_result: dict, video_id: str | None = N
     state = _make_video_state(video_id)
 
     with patch.object(analysis_steps, "get_video_analysis_state", return_value=state), \
-         patch.object(analysis_steps, "_resolve_byok", return_value=(None, None)), \
+         patch.object(analysis_steps, "resolve_byok_with_preflight", return_value=(None, None, None)), \
          patch.object(analysis_steps, "chunk_node", return_value=node_result), \
          patch.object(analysis_steps, "_update_analysis_error"):
         # ``_orig_run`` is a bound method on the task instance.  Use
@@ -161,6 +161,34 @@ def test_chunk_step_validation_error_is_non_retryable():
         "chunks": None,
         "error": "Transcript contains no utterances",
         "error_type": "validation_error",
+    }
+    with pytest.raises(NonRetryableAnalysisError):
+        _run_chunk_step_with_node_result(node_result)
+
+
+# ---------- Mid-pipeline 402 classification regression --------------------
+#
+# Phase 0 added the ``insufficient_credits`` error type. Worktree B's
+# pre-flight is the *fast path*, but the slow path (mid-task 402 from a
+# real LLM call) must continue to flow through the existing
+# ``_raise_for_node_error`` plumbing as ``NonRetryableAnalysisError``.
+# These tests lock that in so subsequent refactors can't regress it.
+
+
+def test_chunk_step_insufficient_credits_node_error_classifies_as_non_retryable():
+    """Slow path: chunk_node returns ``error_type='insufficient_credits'``
+    (mid-call 402 from OpenRouter). The task body must raise
+    ``NonRetryableAnalysisError`` so celery autoretry skips it. The
+    pre-flight gate (``InsufficientCreditsNonRetryable``) is the *fast
+    path*; this test guards the *slow path* still works.
+    """
+    node_result = {
+        "chunks": None,
+        "error": (
+            "APIStatusError: Error code: 402 - {'error': {'message': "
+            "'Insufficient credits...', 'code': 402}}"
+        ),
+        "error_type": "insufficient_credits",
     }
     with pytest.raises(NonRetryableAnalysisError):
         _run_chunk_step_with_node_result(node_result)
