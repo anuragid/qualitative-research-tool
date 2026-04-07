@@ -107,15 +107,32 @@ def _run_chunk_step_with_node_result(node_result: dict, video_id: str | None = N
 
 
 def test_chunk_step_raises_non_retryable_on_permanent_error():
-    """When chunk_node returns error_type='llm_permanent', task raises
-    NonRetryableAnalysisError so celery autoretry skips it."""
+    """When chunk_node returns error_type='llm_permanent' (e.g. 401/403),
+    task raises NonRetryableAnalysisError so celery autoretry skips it."""
+    node_result = {
+        "chunks": None,
+        "error": "APIStatusError: Error code: 403 - {'error': 'forbidden'}",
+        "error_type": "llm_permanent",
+    }
+    with pytest.raises(NonRetryableAnalysisError):
+        _run_chunk_step_with_node_result(node_result)
+
+
+def test_chunk_step_raises_non_retryable_on_insufficient_credits():
+    """When chunk_node returns error_type='insufficient_credits' (402),
+    task raises NonRetryableAnalysisError so celery autoretry skips it.
+
+    This is the split-out-of-llm_permanent case: 402 is its own error
+    type so the frontend can render a dedicated 'Add credits' CTA, but
+    the task-level behavior must remain fail-fast.
+    """
     node_result = {
         "chunks": None,
         "error": (
             "APIStatusError: Error code: 402 - {'error': {'message': "
             "'Insufficient credits...', 'code': 402}}"
         ),
-        "error_type": "llm_permanent",
+        "error_type": "insufficient_credits",
     }
     with pytest.raises(NonRetryableAnalysisError):
         _run_chunk_step_with_node_result(node_result)

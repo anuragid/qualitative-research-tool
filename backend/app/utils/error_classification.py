@@ -18,6 +18,7 @@ ERROR_TYPE_RATE_LIMIT = "rate_limit"
 ERROR_TYPE_NETWORK = "network_error"
 ERROR_TYPE_LLM = "llm_error"
 ERROR_TYPE_LLM_PERMANENT = "llm_permanent"  # 4xx that no retry/fallback can fix
+ERROR_TYPE_INSUFFICIENT_CREDITS = "insufficient_credits"  # 402 — user needs to top up
 ERROR_TYPE_TIMEOUT = "timeout"
 ERROR_TYPE_UNKNOWN = "unknown"
 
@@ -25,8 +26,10 @@ ERROR_TYPE_UNKNOWN = "unknown"
 # falling back to another model with the same key won't help. 404 is *not*
 # in this set because model fallback can recover from a removed model.
 # 408 (request timeout) and 429 (rate limit) are also excluded — those are
-# handled as transient via dedicated paths.
-_PERMANENT_HTTP_CODES = frozenset({400, 401, 402, 403, 422})
+# handled as transient via dedicated paths. 402 is split out separately
+# as ERROR_TYPE_INSUFFICIENT_CREDITS so the frontend can show a dedicated
+# "add credits" UI instead of a generic permanent-error banner.
+_PERMANENT_HTTP_CODES = frozenset({400, 401, 403, 422})
 
 
 def classify_error(exc: Exception) -> str:
@@ -37,7 +40,8 @@ def classify_error(exc: Exception) -> str:
 
     Returns:
         One of: "validation_error", "rate_limit", "network_error",
-        "llm_error", "llm_permanent", "timeout", "unknown".
+        "llm_error", "llm_permanent", "insufficient_credits", "timeout",
+        "unknown".
     """
     if isinstance(exc, ValueError):
         return ERROR_TYPE_VALIDATION
@@ -47,9 +51,12 @@ def classify_error(exc: Exception) -> str:
         return ERROR_TYPE_NETWORK
     # APIStatusError carries an HTTP status_code; permanent 4xx (other than
     # 404/408/429) cannot be fixed by retrying — classify as permanent so
-    # the retry layer fails fast.
+    # the retry layer fails fast. 402 is split out as "insufficient_credits"
+    # so the UI can offer a dedicated "Add credits" CTA.
     if isinstance(exc, APIStatusError):
         code = getattr(exc, "status_code", None)
+        if code == 402:
+            return ERROR_TYPE_INSUFFICIENT_CREDITS
         if code in _PERMANENT_HTTP_CODES:
             return ERROR_TYPE_LLM_PERMANENT
         return ERROR_TYPE_LLM
