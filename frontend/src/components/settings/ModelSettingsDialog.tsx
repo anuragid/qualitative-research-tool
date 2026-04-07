@@ -34,17 +34,15 @@ interface ModelSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function deriveInitialMode(settings: UserSettings | undefined): Mode {
-  if (!settings || !settings.available_models) return "standard";
-  const standardIds = new Set(
-    settings.available_models
-      .filter((m) => m.tier === "standard")
-      .map((m) => m.id),
-  );
-  if (settings.preferred_model && !standardIds.has(settings.preferred_model)) {
-    return "premium";
-  }
-  return "standard";
+/**
+ * The default premium model selected when a user enters Premium mode without
+ * an existing premium pick. Latest Anthropic Sonnet on OpenRouter as of 2026-04.
+ */
+const DEFAULT_PREMIUM_MODEL = "anthropic/claude-sonnet-4.6";
+
+function isStandardId(id: string | null | undefined, settings: UserSettings | undefined): boolean {
+  if (!id || !settings?.available_models) return false;
+  return settings.available_models.some((m) => m.id === id && m.tier === "standard");
 }
 
 export function ModelSettingsDialog({
@@ -83,6 +81,11 @@ export function ModelSettingsDialog({
   // guard ensures that background `["user-settings"]` refetches do not
   // re-derive `mode` or clobber `pendingModel` mid-session — they only
   // update the cached settings the dialog reads from.
+  //
+  // Mode rule: presence of an API key is the binary toggle.
+  //   has_api_key === true  → Premium (Standard tab disabled)
+  //   has_api_key === false → Standard (Premium tab opens the add-key form)
+  // To go back to Standard once you've added a key you must remove it.
   const initializedRef = useRef(false);
   useEffect(() => {
     if (!open) {
@@ -92,17 +95,45 @@ export function ModelSettingsDialog({
     if (initializedRef.current || !settings) return;
     initializedRef.current = true;
     setApiKeyDraft("");
-    setPendingModel(null);
     setQuery("");
     resetAddKeyError();
     resetUpdateModelError();
     resetDeleteKeyError();
-    setMode(deriveInitialMode(settings));
+
+    const initialMode: Mode = settings.has_api_key ? "premium" : "standard";
+    setMode(initialMode);
+
+    // If we're entering Premium and the saved model is null or a standard
+    // model (i.e. user just validated their key but never picked a premium
+    // model), pre-populate `pendingModel` with the latest Anthropic Sonnet
+    // so the Save button is dirty and a single click commits a sane default.
+    if (initialMode === "premium") {
+      const savedIsPremium =
+        settings.preferred_model != null &&
+        !isStandardId(settings.preferred_model, settings);
+      setPendingModel(savedIsPremium ? null : DEFAULT_PREMIUM_MODEL);
+    } else {
+      setPendingModel(null);
+    }
     // We intentionally exclude the reset/setQuery callbacks from deps —
     // they're stable identities from the hook and including them would
     // not change behavior given the ref guard above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, settings]);
+
+  // If has_api_key flips true mid-session (e.g. via the add-key flow or a
+  // background refetch from another tab) while the dialog is showing the
+  // Standard tab, auto-switch to Premium since Standard is now disabled.
+  useEffect(() => {
+    if (!open || !settings) return;
+    if (settings.has_api_key && mode === "standard") {
+      setMode("premium");
+      // Pre-pop the default if their saved model isn't already premium.
+      if (!settings.preferred_model || isStandardId(settings.preferred_model, settings)) {
+        setPendingModel(DEFAULT_PREMIUM_MODEL);
+      }
+    }
+  }, [open, settings, mode]);
 
   if (isLoading || !settings) return null;
 
@@ -113,10 +144,12 @@ export function ModelSettingsDialog({
 
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleModeChange = (next: string) => {
+    // Once a key is on file, Standard is unreachable until the user removes
+    // the key. Belt-and-suspenders alongside the disabled tab trigger.
+    if (next === "standard" && settings.has_api_key) return;
     setMode(next as Mode);
-    // Switching tabs clears any pending pick to avoid carrying a premium
-    // pick into Standard mode (or vice versa).
     setPendingModel(null);
+    setQuery("");
     resetAddKeyError();
     resetUpdateModelError();
   };
@@ -135,8 +168,14 @@ export function ModelSettingsDialog({
   const handleAddKey = async () => {
     if (apiKeyDraft.length < 10) return;
     try {
-      await addApiKey(apiKeyDraft);
+      const updated = await addApiKey(apiKeyDraft);
       setApiKeyDraft("");
+      // After validating, default to the latest Anthropic Sonnet if their
+      // saved model is null or still a standard one. The user is committing
+      // to premium by adding a key — a sensible default makes Save one click.
+      if (!updated.preferred_model || isStandardId(updated.preferred_model, updated)) {
+        setPendingModel(DEFAULT_PREMIUM_MODEL);
+      }
     } catch {
       // addKeyError is set by the mutation; the inline error renders it.
     }
@@ -177,19 +216,6 @@ export function ModelSettingsDialog({
     ? extractErrorDetail(deleteKeyError, "Could not remove the API key.")
     : null;
 
-  // Controlled value for the premium combobox: prefer the matching item
-  // from the current search results, otherwise synthesize a SearchModel-shaped
-  // placeholder so the input still displays the saved id.
-  const comboboxValue: SearchModel | null = effectiveModel
-    ? results.find((m) => m.id === effectiveModel) ?? {
-        id: effectiveModel,
-        name: effectiveModel,
-        provider: "",
-        context_length: null,
-        is_free: false,
-      }
-    : null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -203,7 +229,17 @@ export function ModelSettingsDialog({
 
         <Tabs value={mode} onValueChange={handleModeChange} className="py-4">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="standard">Standard</TabsTrigger>
+            <TabsTrigger
+              value="standard"
+              disabled={settings.has_api_key}
+              title={
+                settings.has_api_key
+                  ? "Remove your OpenRouter key to use a standard model"
+                  : undefined
+              }
+            >
+              Standard
+            </TabsTrigger>
             <TabsTrigger value="premium">Premium</TabsTrigger>
           </TabsList>
 
@@ -356,16 +392,32 @@ export function ModelSettingsDialog({
                   lowThresholdUsd={settings.low_balance_threshold_usd ?? 0.5}
                 />
 
+                <div
+                  data-testid="selected-model-display"
+                  className="rounded-lg border border-border bg-card px-3 py-2"
+                >
+                  <div className="text-xs text-text-tertiary">
+                    Selected model
+                  </div>
+                  <div className="mt-0.5 font-mono text-sm text-foreground break-all">
+                    {effectiveModel ?? "—"}
+                  </div>
+                </div>
+
                 <Combobox<SearchModel>
                   items={results}
                   filteredItems={results}
                   filter={null}
                   itemToStringLabel={(m) => m?.name ?? ""}
                   itemToStringValue={(m) => m?.id ?? ""}
-                  isItemEqualToValue={(a, b) => a?.id === b?.id}
-                  // Controlled: the displayed value is always the
-                  // current effective model (pending OR saved).
-                  value={comboboxValue}
+                  // The combobox is purely a search-and-pick surface; the
+                  // currently-selected model lives in `pendingModel` /
+                  // `effectiveModel` and is shown in the "Selected model"
+                  // row above. Controlling `value` from `effectiveModel`
+                  // would resync the input on every keystroke and clobber
+                  // typing, so we leave `value` uncontrolled and only
+                  // control `inputValue` (the search query).
+                  inputValue={query}
                   onInputValueChange={setQuery}
                   onValueChange={handlePremiumPick}
                 >
