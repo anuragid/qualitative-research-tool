@@ -21,6 +21,14 @@ from app.models.schemas import TranscriptResponse, VideoAnalysisResponse, VideoR
 from app.rate_limit import limiter
 from app.services.openrouter_balance import BalanceInfo
 from app.services.s3_service import s3_service
+from app.state import (
+    TranscriptEvent,
+    TranscriptStateMachine,
+    VideoAnalysisEvent,
+    VideoAnalysisStateMachine,
+    VideoEvent,
+    VideoStateMachine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,15 +161,17 @@ async def get_upload_url(
             detail="Failed to generate upload URL",
         )
 
-    # Create video record in "uploading" state
+    # Create video record and route its initial state through the state
+    # machine so the (None -> UPLOADING) edge is captured in the
+    # transition table rather than a bare string literal.
     video = Video(
         project_id=project_id,
         filename=safe_filename,
         s3_key=s3_key,
         s3_url=f"https://{settings.R2_BUCKET_NAME}.r2.cloudflarestorage.com/{s3_key}",
         file_size_bytes=request_body.file_size,
-        status="uploading",
     )
+    VideoStateMachine.transition(video, VideoEvent.UPLOAD_URL_REQUESTED, db=db)
     db.add(video)
     db.commit()
     db.refresh(video)
@@ -211,9 +221,13 @@ async def confirm_upload(
     except Exception:
         raise HTTPException(status_code=400, detail="File not found in storage. Upload may not have completed.")
 
-    # Flip to "uploaded" (idempotent — safe to call repeatedly)
-    if video.status != "uploaded":
-        video.status = "uploaded"
+    # Flip to "uploaded". The state machine handles all three legal
+    # source states in its transition table (UPLOADING, UPLOADED,
+    # ERROR) so this single call covers the normal path, the idempotent
+    # replay, and the PR #20 false-negative recovery from ERROR.
+    prior_status = video.status
+    VideoStateMachine.transition(video, VideoEvent.UPLOAD_CONFIRMED, db=db)
+    if prior_status != "uploaded":
         db.commit()
         db.refresh(video)
         logger.info(f"Upload confirmed for video {video.id}")
@@ -343,15 +357,19 @@ async def upload_video(
             project_id=str(project_id),
         )
 
-        # Create video record in database
+        # Create video record in database. The legacy /upload path skips
+        # the presigned two-step flow and promotes directly through
+        # UPLOADING -> UPLOADED so the transition table still owns both
+        # edges.
         video = Video(
             project_id=project_id,
             filename=safe_filename,
             s3_key=s3_key,
             s3_url=s3_url,
             file_size_bytes=file_size,
-            status="uploaded"
         )
+        VideoStateMachine.transition(video, VideoEvent.UPLOAD_URL_REQUESTED, db=db)
+        VideoStateMachine.transition(video, VideoEvent.UPLOAD_CONFIRMED, db=db)
 
         db.add(video)
         db.commit()
@@ -569,17 +587,21 @@ async def start_transcription(
 
         # Create or update transcript record
         if not existing_transcript:
-            transcript = Transcript(
-                video_id=video_id,
-                status="pending"
+            transcript = Transcript(video_id=video_id)
+            TranscriptStateMachine.transition(
+                transcript, TranscriptEvent.ROW_CREATED, db=db
             )
             db.add(transcript)
         else:
-            existing_transcript.status = "pending"
+            TranscriptStateMachine.transition(
+                existing_transcript, TranscriptEvent.ROW_CREATED, db=db
+            )
 
-        # Update video status (clear previous error if retrying)
-        video.status = "transcribing"
-        video.error_message = None
+        # Update video status — TRANSCRIBE_REQUESTED clears error_message as
+        # a side effect so the retry path doesn't carry a stale banner.
+        VideoStateMachine.transition(
+            video, VideoEvent.TRANSCRIBE_REQUESTED, db=db
+        )
         db.commit()
 
         # Trigger Celery task
@@ -652,9 +674,10 @@ async def trigger_video_analysis(
         # back-to-back will both reach this point, but only one will win the
         # commit — the other will see status == "analyzing" on its next read
         # and reject via the status check above. The chunk step's matching
-        # reassignment later is idempotent and harmless.
-        video.status = "analyzing"
-        video.error_message = None
+        # reassignment later is idempotent (ANALYZING -> ANALYZING self-loop).
+        VideoStateMachine.transition(
+            video, VideoEvent.ANALYZE_DISPATCHED, db=db
+        )
 
         # Retry path: if a VideoAnalysis row exists in "error" state, reset it
         # before dispatching the chain. Otherwise the chain's defensive
@@ -666,7 +689,11 @@ async def trigger_video_analysis(
             VideoAnalysis.video_id == video_id
         ).first()
         if analysis and analysis.status == "error":
-            analysis.status = "pending"
+            # RETRY_RESET: error -> pending. The companion JSONB clears
+            # stay here — they're not state-machine concerns.
+            VideoAnalysisStateMachine.transition(
+                analysis, VideoAnalysisEvent.RETRY_RESET, db=db
+            )
             analysis.current_step = None
             analysis.started_at = None
             analysis.completed_at = None
@@ -999,9 +1026,12 @@ async def trigger_chunk_step(
             )
 
         # Set video status to "analyzing" before dispatching task to prevent
-        # concurrent requests from passing the status check
-        video.status = "analyzing"
-        video.error_message = None
+        # concurrent requests from passing the status check. The state
+        # machine's ANALYZE_DISPATCHED self-loop makes this idempotent
+        # when the video is already ANALYZING between step calls.
+        VideoStateMachine.transition(
+            video, VideoEvent.ANALYZE_DISPATCHED, db=db
+        )
         db.commit()
 
         from app.tasks.analysis_steps import analyze_chunk_step
@@ -1054,8 +1084,9 @@ async def trigger_infer_step(
                 detail="CHUNK step must be completed first"
             )
 
-        video.status = "analyzing"
-        video.error_message = None
+        VideoStateMachine.transition(
+            video, VideoEvent.ANALYZE_DISPATCHED, db=db
+        )
         db.commit()
 
         from app.tasks.analysis_steps import analyze_infer_step
@@ -1108,8 +1139,9 @@ async def trigger_relate_step(
                 detail="INFER step must be completed first"
             )
 
-        video.status = "analyzing"
-        video.error_message = None
+        VideoStateMachine.transition(
+            video, VideoEvent.ANALYZE_DISPATCHED, db=db
+        )
         db.commit()
 
         from app.tasks.analysis_steps import analyze_relate_step
@@ -1162,8 +1194,9 @@ async def trigger_explain_step(
                 detail="RELATE step must be completed first"
             )
 
-        video.status = "analyzing"
-        video.error_message = None
+        VideoStateMachine.transition(
+            video, VideoEvent.ANALYZE_DISPATCHED, db=db
+        )
         db.commit()
 
         from app.tasks.analysis_steps import analyze_explain_step
@@ -1216,8 +1249,9 @@ async def trigger_activate_step(
                 detail="EXPLAIN step must be completed first"
             )
 
-        video.status = "analyzing"
-        video.error_message = None
+        VideoStateMachine.transition(
+            video, VideoEvent.ANALYZE_DISPATCHED, db=db
+        )
         db.commit()
 
         from app.tasks.analysis_steps import analyze_activate_step
