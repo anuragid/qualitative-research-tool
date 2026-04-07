@@ -16,7 +16,11 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="size-full rounded-[inherit]"
+        // Override Radix's inline `display: table` on the inner wrapper so children
+        // inherit the viewport width (lets `truncate` / `min-w-0` work). Children with
+        // explicit widths still overflow into the viewport's scrollWidth, so horizontal
+        // scrolling continues to work for callers that opt into it.
+        className="size-full rounded-[inherit] [&>div]:!block"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
