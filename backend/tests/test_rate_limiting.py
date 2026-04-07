@@ -36,7 +36,8 @@ def test_rate_limit_auth_setting():
 
 def test_limiter_uses_custom_key_func():
     """Rate limiter should use the custom key function that extracts user_id from JWT."""
-    from app.main import _get_rate_limit_key, limiter
+    from app.main import limiter
+    from app.rate_limit import _get_rate_limit_key
 
     assert limiter._key_func is _get_rate_limit_key
 
@@ -45,7 +46,7 @@ def test_rate_limit_key_falls_back_to_ip():
     """Without a JWT, rate limit key should fall back to IP address."""
     from unittest.mock import MagicMock
 
-    from app.main import _get_rate_limit_key
+    from app.rate_limit import _get_rate_limit_key
 
     request = MagicMock()
     request.headers = {}
@@ -61,7 +62,7 @@ def test_rate_limit_key_extracts_user_id():
     import json
     from unittest.mock import MagicMock
 
-    from app.main import _get_rate_limit_key
+    from app.rate_limit import _get_rate_limit_key
 
     # Build a fake JWT with sub claim
     header = base64.urlsafe_b64encode(json.dumps({"alg": "RS256"}).encode()).rstrip(b"=").decode()
@@ -80,7 +81,7 @@ def test_rate_limit_key_handles_invalid_jwt():
     """With an invalid JWT, rate limit key should fall back to IP."""
     from unittest.mock import MagicMock
 
-    from app.main import _get_rate_limit_key
+    from app.rate_limit import _get_rate_limit_key
 
     request = MagicMock()
     request.headers = {"authorization": "Bearer not.a.valid-jwt"}
