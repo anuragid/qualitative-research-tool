@@ -70,9 +70,9 @@ _DEV_USER_ID = "dev_user_local"
 async def ensure_user(client):
     """Make sure the dev user exists in the test DB before settings calls.
 
-    The PUT/GET /settings handlers expect the user row to already exist
-    (the /me endpoint creates it on first auth). We hit /me here as a
-    one-time setup so the test body can focus on settings behavior.
+    The POST/GET/DELETE /settings handlers expect the user row to already
+    exist (the /me endpoint creates it on first auth). We hit /me here as
+    a one-time setup so the test body can focus on settings behavior.
     """
     response = await client.get("/api/users/me", headers=_AUTH)
     assert response.status_code == 200, f"failed to bootstrap user: {response.text}"
