@@ -126,3 +126,24 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist/ --project-name=methodex-frontend --branch=main --commit-dirty=true
           workingDirectory: frontend
+
+  wait-backend-deploy:
+    name: Wait for Railway Backend Deploy
+    needs: backend-ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Wait for Railway deployment to reach SUCCESS
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: "154d302f-8609-4897-a10c-1f0d5bfc4f06"
+          RAILWAY_BACKEND_SERVICE_ID: "2b70a900-042c-4083-b00b-0d01f3ece5dc"
+          COMMIT_SHA: ${{ github.sha }}
+        run: python3 scripts/ci/wait-for-railway-deploy.py
