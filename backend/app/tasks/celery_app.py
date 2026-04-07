@@ -101,6 +101,8 @@ celery_app = Celery(
         "app.tasks.transcription_tasks",
         "app.tasks.analysis_tasks",
         "app.tasks.analysis_steps",
+        "app.tasks.project_analysis_steps",
+        "app.tasks.pipeline_errors",
         "app.tasks.watchdog_tasks",
         "app.tasks.model_validation_tasks",
     ]
@@ -140,6 +142,27 @@ celery_app.conf.update(
     # Logging
     worker_hijack_root_logger=False,
     worker_log_format="[%(asctime)s: %(levelname)s/%(processName)s] %(message)s",
+
+    # Queue routing — analyze step tasks + chain error handler on their
+    # own "analyze" queue so they can be scaled/isolated independently.
+    # transcription pushes to "transcribe"; watchdog and model-validation
+    # stay on the default "celery" queue. The worker will need to consume
+    # from -Q analyze,transcribe,celery (that change lands in WS4).
+    task_default_queue="celery",
+    task_routes={
+        "analyze_chunk_step":            {"queue": "analyze"},
+        "analyze_infer_step":            {"queue": "analyze"},
+        "analyze_relate_step":           {"queue": "analyze"},
+        "analyze_explain_step":          {"queue": "analyze"},
+        "analyze_activate_step":         {"queue": "analyze"},
+        "analyze_cross_relate_step":     {"queue": "analyze"},
+        "analyze_cross_explain_step":    {"queue": "analyze"},
+        "analyze_cross_activate_step":   {"queue": "analyze"},
+        "handle_pipeline_error":         {"queue": "analyze"},
+        "transcribe_video":              {"queue": "transcribe"},
+        "check_transcription":           {"queue": "transcribe"},
+        # watchdog + model validation use the default "celery" queue
+    },
 
     # Celery Beat schedule for periodic tasks
     beat_schedule={
