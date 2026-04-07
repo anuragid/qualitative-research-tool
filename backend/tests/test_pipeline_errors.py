@@ -19,8 +19,10 @@ os.environ.setdefault("OPENROUTER_API_KEY", "test-openrouter-key")
 os.environ.setdefault("ASSEMBLYAI_API_KEY", "test-assemblyai-key")
 os.environ.setdefault("ENCRYPTION_KEY", "9px3YGa-Z2bljdtUKpLhqzl9IaGdf2RgrCI-zOTrUug=")
 
+import json  # noqa: E402
+
 import pytest  # noqa: E402
-from sqlalchemy import ARRAY, create_engine  # noqa: E402
+from sqlalchemy import ARRAY, create_engine, event  # noqa: E402
 from sqlalchemy.dialects.postgresql import JSONB  # noqa: E402
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.compiler import compiles  # noqa: E402
@@ -42,8 +44,45 @@ def _compile_array_sqlite(type_, compiler, **kw):
     return "JSON"
 
 
+# SQLite can't bind raw Python lists through the ARRAY column type — JSON
+# columns are fine because SQLAlchemy's JSON type has a bind processor that
+# serializes to string, but ARRAY is Postgres-only and has no SQLite bind
+# processor. As a test-only workaround, install a before_cursor_execute
+# hook that JSON-encodes any remaining list parameters that reach the cursor.
+def _install_array_json_adapter(engine):
+    @event.listens_for(engine, "before_cursor_execute", retval=True)
+    def _jsonify_lists(conn, cursor, statement, parameters, context, executemany):
+        import uuid as _uuid
+
+        def _default(o):
+            if isinstance(o, _uuid.UUID):
+                return str(o)
+            raise TypeError(f"not serializable: {type(o).__name__}")
+
+        def _conv(v):
+            return json.dumps(v, default=_default) if isinstance(v, list) else v
+
+        if parameters is None:
+            return statement, parameters
+        if executemany:
+            new_params = []
+            for row in parameters:
+                if isinstance(row, (list, tuple)):
+                    new_params.append(type(row)(_conv(p) for p in row))
+                elif isinstance(row, dict):
+                    new_params.append({k: _conv(v) for k, v in row.items()})
+                else:
+                    new_params.append(row)
+            return statement, new_params
+        if isinstance(parameters, (list, tuple)):
+            return statement, type(parameters)(_conv(p) for p in parameters)
+        if isinstance(parameters, dict):
+            return statement, {k: _conv(v) for k, v in parameters.items()}
+        return statement, parameters
+
+
 from app.database import Base  # noqa: E402
-from app.models.database_models import Project, User, Video, VideoAnalysis  # noqa: E402
+from app.models.database_models import Project, ProjectAnalysis, User, Video, VideoAnalysis  # noqa: E402
 
 
 @pytest.fixture
@@ -51,6 +90,7 @@ def db_session(tmp_path):
     """Create a SQLite DB with all ORM tables and yield a session."""
     db_path = tmp_path / "pipeline_errors_test.db"
     engine = create_engine(f"sqlite:///{db_path}")
+    _install_array_json_adapter(engine)
     Base.metadata.create_all(bind=engine)
 
     Session = sessionmaker(bind=engine)
@@ -175,3 +215,60 @@ class TestHandlePipelineError:
         db_session.refresh(video)
         db_session.refresh(analysis)
         assert video.status == "analyzed"
+
+
+def _seed_project_analysis_in_processing(db_session, user_id="dev_user_local"):
+    project = Project(name="test-proj", user_id=user_id)
+    db_session.add(project)
+    db_session.flush()
+    pa = ProjectAnalysis(
+        project_id=project.id,
+        status="processing",
+        video_ids=[],
+    )
+    db_session.add(pa)
+    db_session.commit()
+    return project, pa
+
+
+def test_handle_project_pipeline_error_marks_analysis_error(db_session):
+    """When a project chain link fails, the handler marks ProjectAnalysis as error."""
+    from unittest.mock import MagicMock
+
+    from app.tasks.pipeline_errors import handle_project_pipeline_error
+
+    project, pa = _seed_project_analysis_in_processing(db_session)
+    fake_exc = RuntimeError("cross_relate LLM timeout")
+    fake_request = MagicMock()
+    fake_request.task = "analyze_cross_relate_step"
+
+    task_self = type("T", (), {"db": db_session})()
+    handle_project_pipeline_error.run.__func__(
+        task_self, fake_request, fake_exc, "fake_traceback", str(project.id)
+    )
+
+    db_session.refresh(pa)
+    assert pa.status == "error"
+    assert pa.completed_at is not None
+
+
+def test_handle_project_pipeline_error_is_idempotent(db_session):
+    """Running the project handler twice should not change state after the first."""
+    from unittest.mock import MagicMock
+
+    from app.tasks.pipeline_errors import handle_project_pipeline_error
+
+    project, pa = _seed_project_analysis_in_processing(db_session)
+    fake_exc = RuntimeError("boom")
+    fake_request = MagicMock()
+    fake_request.task = "analyze_cross_relate_step"
+    task_self = type("T", (), {"db": db_session})()
+
+    handle_project_pipeline_error.run.__func__(task_self, fake_request, fake_exc, "tb", str(project.id))
+    db_session.refresh(pa)
+    first_completed_at = pa.completed_at
+
+    handle_project_pipeline_error.run.__func__(task_self, fake_request, fake_exc, "tb", str(project.id))
+    db_session.refresh(pa)
+    assert pa.status == "error"
+    assert pa.completed_at == first_completed_at  # unchanged on second call

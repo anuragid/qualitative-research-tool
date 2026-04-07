@@ -158,6 +158,7 @@ celery_app.conf.update(
         "analyze_cross_explain_step":    {"queue": "analyze"},
         "analyze_cross_activate_step":   {"queue": "analyze"},
         "handle_pipeline_error":         {"queue": "analyze"},
+        "handle_project_pipeline_error": {"queue": "analyze"},
         "transcribe_video":              {"queue": "transcribe"},
         "check_transcription":           {"queue": "transcribe"},
         # watchdog + model validation use the default "celery" queue

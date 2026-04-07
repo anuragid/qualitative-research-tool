@@ -392,7 +392,7 @@ async def trigger_project_analysis(
         # dispatcher.
         from celery import chain
 
-        from app.tasks.pipeline_errors import handle_pipeline_error
+        from app.tasks.pipeline_errors import handle_project_pipeline_error
         from app.tasks.project_analysis_steps import (
             analyze_cross_activate_step,
             analyze_cross_explain_step,
@@ -400,15 +400,11 @@ async def trigger_project_analysis(
         )
 
         project_id_str = str(project_id)
-        # NOTE: handle_pipeline_error's video_id parameter is a slight
-        # misnomer for projects — leave it for now; it'll just tag the
-        # error log with the project_id. Rename to record_id as future
-        # cleanup.
         pipeline = chain(
             analyze_cross_relate_step.si(project_id_str, current_user_id),
             analyze_cross_explain_step.si(project_id_str, current_user_id),
             analyze_cross_activate_step.si(project_id_str, current_user_id),
-        ).on_error(handle_pipeline_error.s(video_id=project_id_str))
+        ).on_error(handle_project_pipeline_error.s(project_id=project_id_str))
 
         task = pipeline.apply_async()
 
