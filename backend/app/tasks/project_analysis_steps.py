@@ -16,8 +16,11 @@ from app.agents.nodes.cross_activate import cross_activate_node
 from app.agents.nodes.cross_explain import cross_explain_node
 from app.agents.nodes.cross_relate import cross_relate_node
 from app.models.database_models import ProjectAnalysis, Video, VideoAnalysis
-from app.services.byok_service import resolve_byok as _resolve_byok
-from app.tasks.analysis_steps import NonRetryableAnalysisError, _raise_for_node_error
+from app.tasks.analysis_steps import (
+    NonRetryableAnalysisError,
+    _raise_for_node_error,
+    _resolve_byok_or_raise_credits_error,
+)
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
@@ -146,7 +149,12 @@ def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None)
             if va.design_principles:
                 all_principles.extend(va.design_principles)
 
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Resolve BYOK API key + preferred model with balance pre-flight.
+        # First chain link uses ``force_refresh=True`` so the user sees a
+        # live OpenRouter balance, not a 60s-stale cache.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "cross_relate", force_refresh=True,
+        )
 
         result = cross_relate_node({
             "project_id": project_id,
@@ -202,7 +210,10 @@ def analyze_cross_explain_step(self, project_id: str, user_id: str | None = None
         if not pa or not pa.cross_video_patterns:
             raise Exception("No cross-video patterns available for cross_explain")
 
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Downstream chain link reuses cached balance from cross_relate.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "cross_explain", force_refresh=False,
+        )
 
         result = cross_explain_node({
             "project_id": project_id,
@@ -254,7 +265,10 @@ def analyze_cross_activate_step(self, project_id: str, user_id: str | None = Non
         if not pa or not pa.cross_video_insights:
             raise Exception("No cross-video insights available for cross_activate")
 
-        byok_api_key, byok_model = _resolve_byok(self.db, user_id)
+        # Downstream chain link reuses cached balance from cross_relate.
+        byok_api_key, byok_model = _resolve_byok_or_raise_credits_error(
+            self.db, user_id, "cross_activate", force_refresh=False,
+        )
 
         result = cross_activate_node({
             "project_id": project_id,

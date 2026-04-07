@@ -153,8 +153,13 @@ class TestCrossRelateStep:
             return {"cross_video_patterns": [{"id": "CP1", "text": "cross pattern"}]}
 
         monkeypatch.setattr(project_analysis_steps, "cross_relate_node", fake_cross_relate)
+        # After BYOK PR #6, project step tasks call
+        # _resolve_byok_or_raise_credits_error (re-exported from
+        # analysis_steps), which returns a 2-tuple (api_key, model).
         monkeypatch.setattr(
-            project_analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
         )
 
         mock_self = MagicMock()
@@ -191,8 +196,13 @@ class TestCrossExplainStep:
             return {"cross_video_insights": [{"id": "CI1", "text": "cross insight"}]}
 
         monkeypatch.setattr(project_analysis_steps, "cross_explain_node", fake_cross_explain)
+        # After BYOK PR #6, project step tasks call
+        # _resolve_byok_or_raise_credits_error (re-exported from
+        # analysis_steps), which returns a 2-tuple (api_key, model).
         monkeypatch.setattr(
-            project_analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
         )
 
         mock_self = MagicMock()
@@ -228,8 +238,13 @@ class TestCrossActivateStep:
         monkeypatch.setattr(
             project_analysis_steps, "cross_activate_node", fake_cross_activate
         )
+        # After BYOK PR #6, project step tasks call
+        # _resolve_byok_or_raise_credits_error (re-exported from
+        # analysis_steps), which returns a 2-tuple (api_key, model).
         monkeypatch.setattr(
-            project_analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
         )
 
         mock_self = MagicMock()
@@ -263,8 +278,13 @@ class TestCrossProjectCancellationPrecheck:
             return {"cross_video_patterns": [{"id": "CP1"}]}
 
         monkeypatch.setattr(project_analysis_steps, "cross_relate_node", fake_cross_relate)
+        # After BYOK PR #6, project step tasks call
+        # _resolve_byok_or_raise_credits_error (re-exported from
+        # analysis_steps), which returns a 2-tuple (api_key, model).
         monkeypatch.setattr(
-            project_analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
         )
 
         mock_self = MagicMock()

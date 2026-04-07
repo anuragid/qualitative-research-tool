@@ -602,22 +602,29 @@ def _override_get_db(TestSession):
 
 @pytest.fixture
 def patched_celery():
-    """Stop ``.delay()`` from actually enqueueing.
+    """Stop task dispatch from actually enqueueing to a real broker.
 
-    Step routes import their task lazily inside the handler body, so we
-    patch each task callable in the source modules.
+    After the WS3 chain refactor:
+      * Per-step routes (``/analyze/chunk`` etc.) still call ``.delay()``
+        on the per-step task, so we patch those callables directly.
+      * The full ``/analyze`` route (video and project) now dispatches a
+        ``celery.chain(...).on_error(...).apply_async()`` pipeline
+        instead of a single monolithic task. We intercept that by
+        patching ``celery.canvas._chain.apply_async`` to return our
+        fake task without ever touching Redis.
     """
     fake_task = MagicMock()
     fake_task.id = "fake-task-id"
 
     patches = [
-        patch("app.tasks.analysis_tasks.analyze_video_task.delay", return_value=fake_task),
-        patch("app.tasks.analysis_tasks.analyze_project_task.delay", return_value=fake_task),
+        # Step routes — still .delay()-based
         patch("app.tasks.analysis_steps.analyze_chunk_step.delay", return_value=fake_task),
         patch("app.tasks.analysis_steps.analyze_infer_step.delay", return_value=fake_task),
         patch("app.tasks.analysis_steps.analyze_relate_step.delay", return_value=fake_task),
         patch("app.tasks.analysis_steps.analyze_explain_step.delay", return_value=fake_task),
         patch("app.tasks.analysis_steps.analyze_activate_step.delay", return_value=fake_task),
+        # Full-pipeline + project routes — chain dispatch
+        patch("celery.canvas._chain.apply_async", return_value=fake_task),
     ]
     for p in patches:
         p.start()

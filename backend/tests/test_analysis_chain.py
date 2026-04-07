@@ -214,8 +214,13 @@ class TestChunkStepInitialStateSetup:
             return {"chunks": [{"id": "C001", "text": "hello"}], "current_step": "chunk"}
 
         monkeypatch.setattr(analysis_steps, "chunk_node", fake_chunk_node)
+        # After BYOK PR #6 the chunk step calls resolve_byok_with_preflight,
+        # which returns a 3-tuple (api_key, model, balance_info). Stub it
+        # as a non-BYOK user (no key configured).
         monkeypatch.setattr(
-            analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+            analysis_steps,
+            "resolve_byok_with_preflight",
+            lambda db, user_id, force_refresh=False: (None, None, None),
         )
 
         mock_self = MagicMock()
@@ -259,8 +264,13 @@ class TestChunkStepInitialStateSetup:
             return {"chunks": [{"id": "C001", "text": "hello"}], "current_step": "chunk"}
 
         monkeypatch.setattr(analysis_steps, "chunk_node", fake_chunk_node)
+        # After BYOK PR #6 the chunk step calls resolve_byok_with_preflight,
+        # which returns a 3-tuple (api_key, model, balance_info). Stub it
+        # as a non-BYOK user (no key configured).
         monkeypatch.setattr(
-            analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+            analysis_steps,
+            "resolve_byok_with_preflight",
+            lambda db, user_id, force_refresh=False: (None, None, None),
         )
 
         mock_self = MagicMock()
