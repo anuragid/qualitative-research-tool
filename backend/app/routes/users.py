@@ -395,6 +395,16 @@ async def delete_api_key(
     db_user.key_hint = None
     db_user.key_validated_at = None
     db_user.preferred_model = None
+    # Also clear balance snapshot fields — they reference a key that no
+    # longer exists, and leaving them set would let the next GET /settings
+    # render stale BYOK balance data for a non-BYOK user.
+    db_user.key_total_credits = None
+    db_user.key_total_usage = None
+    db_user.key_limit = None
+    db_user.key_limit_remaining = None
+    db_user.key_is_free_tier = None
+    db_user.key_balance_checked_at = None
+    db_user.key_balance_error = None
     db.commit()
 
     return {"message": "API key removed"}

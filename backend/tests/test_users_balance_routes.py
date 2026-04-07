@@ -222,6 +222,38 @@ async def test_get_settings_for_byok_user_includes_balance(
 # =============================================================================
 
 
+async def test_delete_api_key_clears_balance_fields(
+    client, ensure_user, reset_limiter
+):
+    """DELETE /settings/api-key must also wipe the balance snapshot.
+
+    Otherwise the next GET /settings would render BYOK-shaped balance data
+    for a user who no longer has a BYOK key — confusing UX and a stale
+    information leak.
+    """
+    # Save a key + balance first
+    responses = _mock_responses(HEALTHY_AUTH_KEY, HEALTHY_CREDITS)
+    with _patch_httpx(get_side_effect=responses):
+        save_resp = await client.put(
+            "/api/users/settings",
+            headers=_AUTH,
+            json={"api_key": "sk-or-v1-tobedelete"},
+        )
+    assert save_resp.status_code == 200
+    assert save_resp.json()["balance"]["total_credits"] == 10.0
+
+    # Delete
+    delete_resp = await client.delete("/api/users/settings/api-key", headers=_AUTH)
+    assert delete_resp.status_code == 200
+
+    # GET should now show no key and no balance
+    get_resp = await client.get("/api/users/settings", headers=_AUTH)
+    assert get_resp.status_code == 200
+    body = get_resp.json()
+    assert body["has_api_key"] is False
+    assert body["balance"] is None
+
+
 async def test_refresh_balance_no_byok_key_returns_400(client, ensure_user, reset_limiter):
     response = await client.post("/api/users/settings/refresh-balance", headers=_AUTH)
     assert response.status_code == 400
