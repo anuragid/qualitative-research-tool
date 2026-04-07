@@ -3,11 +3,33 @@
 import uuid
 
 from sqlalchemy import ARRAY, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+
+# Import directly from the leaf module (``app.state.statuses``) instead of
+# ``app.state`` — the package ``__init__.py`` imports the state machines,
+# which in turn import from this very module, creating a cycle at
+# application import time.
+from app.state.statuses import (
+    ProjectStatus,
+    TranscriptStatus,
+    VideoAnalysisStatus,
+    VideoStatus,
+)
+
+
+def _enum_values(enum_cls):
+    """``values_callable`` for ``SQLEnum`` — returns the list of string values
+    to use in the underlying VARCHAR column (with ``native_enum=False``).
+
+    This keeps the on-disk representation identical to the pre-enum code
+    (plain strings) while getting Python-side validation on every write.
+    """
+    return [m.value for m in enum_cls]
 
 
 class User(Base):
@@ -59,7 +81,19 @@ class Project(Base):
     user_id = Column(String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
-    status = Column(String(50), default="planning", index=True)  # planning, ready, processing, completed, archived, error
+    # Status enforced at the SQLAlchemy layer by ProjectStatus.  ``native_enum=False``
+    # keeps the on-disk type as VARCHAR so existing rows and the Alembic chain
+    # stay compatible — see docs/production-readiness/prs/pr22-state-machine-enums.md.
+    status = Column(
+        SQLEnum(
+            ProjectStatus,
+            native_enum=False,
+            values_callable=_enum_values,
+            length=50,
+        ),
+        default=ProjectStatus.PLANNING.value,
+        index=True,
+    )
     error_message = Column(Text)  # For error state details
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -83,7 +117,16 @@ class Video(Base):
     file_size_bytes = Column(Integer)
     duration_seconds = Column(Integer)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
-    status = Column(String(50), default="uploaded", index=True)  # uploaded, transcribing, transcribed, analyzing, analyzed, error
+    status = Column(
+        SQLEnum(
+            VideoStatus,
+            native_enum=False,
+            values_callable=_enum_values,
+            length=50,
+        ),
+        default=VideoStatus.UPLOADED.value,
+        index=True,
+    )
     error_message = Column(Text)
 
     # Relationships
@@ -102,7 +145,15 @@ class Transcript(Base):
     assemblyai_id = Column(String(255), unique=True)
     raw_transcript = Column(JSONB)  # Full response from AssemblyAI
     processed_transcript = Column(JSONB)  # Cleaned/formatted transcript
-    status = Column(String(50), default="pending")  # pending, processing, completed, error
+    status = Column(
+        SQLEnum(
+            TranscriptStatus,
+            native_enum=False,
+            values_callable=_enum_values,
+            length=50,
+        ),
+        default=TranscriptStatus.PENDING.value,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -137,7 +188,15 @@ class VideoAnalysis(Base):
     patterns = Column(JSONB)  # Step 3: List of patterns
     insights = Column(JSONB)  # Step 4: List of insights
     design_principles = Column(JSONB)  # Step 5: List of design principles
-    status = Column(String(50), default="pending")  # pending, processing, completed, error
+    status = Column(
+        SQLEnum(
+            VideoAnalysisStatus,
+            native_enum=False,
+            values_callable=_enum_values,
+            length=50,
+        ),
+        default=VideoAnalysisStatus.PENDING.value,
+    )
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
 
@@ -167,7 +226,16 @@ class ProjectAnalysis(Base):
     cross_video_patterns = Column(JSONB)  # Meta-patterns across videos
     cross_video_insights = Column(JSONB)  # Cross-video insights
     cross_video_principles = Column(JSONB)  # System-level design principles
-    status = Column(String(50), default="pending")  # pending, processing, completed, error
+    # Shares VideoAnalysisStatus with VideoAnalysis — same four live states.
+    status = Column(
+        SQLEnum(
+            VideoAnalysisStatus,
+            native_enum=False,
+            values_callable=_enum_values,
+            length=50,
+        ),
+        default=VideoAnalysisStatus.PENDING.value,
+    )
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
 
