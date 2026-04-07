@@ -181,3 +181,97 @@ class TestStepTasksShortCircuitWhenCancelled:
         result = unbound(mock_self, str(video.id), None)
 
         assert result == {"video_id": str(video.id), "status": "skipped"}
+
+
+class TestChunkStepInitialStateSetup:
+    """Task 3.4: analyze_chunk_step takes over the chain-start state
+    transitions that used to live in the route handler."""
+
+    def test_chunk_step_initializes_step_status_and_sets_processing(
+        self, db_session, monkeypatch
+    ):
+        """First chain link should init step_status, mark processing, clear error_message."""
+        from unittest.mock import MagicMock
+
+        from app.tasks import analysis_steps
+
+        _, video = _seed_project_video_transcript(db_session)
+        # Ensure video has a stale error message from a previous failed run
+        video.error_message = "old error"
+        video.status = "error"
+        db_session.commit()
+
+        # Pre-create an analysis row with an older step_status so we can
+        # verify the reset on re-run.
+        analysis = VideoAnalysis(
+            video_id=video.id,
+            status="pending",
+            step_status={"chunk": "error"},
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        # Stub chunk_node so we don't hit the LLM
+        def fake_chunk_node(state):
+            return {"chunks": [{"id": "C001", "text": "hello"}], "current_step": "chunk"}
+
+        monkeypatch.setattr(analysis_steps, "chunk_node", fake_chunk_node)
+        monkeypatch.setattr(
+            analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+        )
+
+        mock_self = MagicMock()
+        mock_self.db = db_session
+        unbound = analysis_steps.analyze_chunk_step._orig_run.__func__
+        result = unbound(mock_self, str(video.id), "dev_user_local")
+
+        assert result["status"] == "success"
+        assert result["chunks_count"] == 1
+
+        db_session.refresh(analysis)
+        db_session.refresh(video)
+
+        # chunk finished, others should be pending
+        assert analysis.status == "processing"
+        assert analysis.step_status["chunk"] == "completed"
+        assert analysis.step_status["infer"] == "pending"
+        assert analysis.step_status["relate"] == "pending"
+        assert analysis.step_status["explain"] == "pending"
+        assert analysis.step_status["activate"] == "pending"
+        assert analysis.started_at is not None
+        assert analysis.chunks == [{"id": "C001", "text": "hello"}]
+
+        # Video should be flipped to "analyzing" and old error cleared
+        assert video.status == "analyzing"
+        assert video.error_message is None
+
+    def test_chunk_step_creates_analysis_row_if_missing(
+        self, db_session, monkeypatch
+    ):
+        """If no VideoAnalysis row exists yet, chunk step should create one."""
+        from unittest.mock import MagicMock
+
+        from app.tasks import analysis_steps
+
+        _, video = _seed_project_video_transcript(db_session)
+        # Intentionally NOT creating a VideoAnalysis row — route no longer
+        # does this, so the first chain link must handle it.
+
+        def fake_chunk_node(state):
+            return {"chunks": [{"id": "C001", "text": "hello"}], "current_step": "chunk"}
+
+        monkeypatch.setattr(analysis_steps, "chunk_node", fake_chunk_node)
+        monkeypatch.setattr(
+            analysis_steps, "_resolve_byok", lambda db, user_id: (None, None)
+        )
+
+        mock_self = MagicMock()
+        mock_self.db = db_session
+        unbound = analysis_steps.analyze_chunk_step._orig_run.__func__
+        unbound(mock_self, str(video.id), "dev_user_local")
+
+        analysis = db_session.query(VideoAnalysis).filter_by(video_id=video.id).first()
+        assert analysis is not None
+        assert analysis.status == "processing"
+        assert analysis.step_status["chunk"] == "completed"
+        assert analysis.step_status["infer"] == "pending"

@@ -30,18 +30,29 @@ from app.utils.error_classification import (
 logger = logging.getLogger(__name__)
 
 
-def _check_cancellation(db: Session, video_id: str) -> bool:
+def _check_cancellation(db: Session, video_id: str, require_existing: bool = True) -> bool:
     """Return True if the analysis should stop (watchdog error, row gone).
 
     Called at the start of every step task in the chain so a halted
     pipeline doesn't do redundant work on subsequent links.
+
+    Args:
+        db: SQLAlchemy session.
+        video_id: Video UUID string.
+        require_existing: When True (default), a missing VideoAnalysis row
+            is treated as cancelled (the chain cannot make progress without
+            it). When False, a missing row is treated as "not cancelled" —
+            used by analyze_chunk_step, which is the first chain link and
+            is responsible for creating the row if it doesn't yet exist.
     """
     try:
         db.expire_all()
         analysis = db.query(VideoAnalysis).filter(
             VideoAnalysis.video_id == UUID(video_id)
         ).first()
-        if analysis is None or analysis.status == "error":
+        if analysis is None:
+            return require_existing
+        if analysis.status == "error":
             return True
         return False
     except Exception:
@@ -264,16 +275,24 @@ def _update_analysis_error(
 def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
     """
     Step 1: CHUNK - Break transcript into discrete pieces.
+
+    Also responsible for chain-start state transitions: create or reset
+    the VideoAnalysis row, mark all steps pending, set status=processing,
+    clear any previous error_message on the Video. This logic moved out
+    of the route handler into this first chain link as part of the WS3
+    chain refactor so the route stays a pure dispatcher.
     """
     try:
         logger.info(f"Starting CHUNK step for video {video_id}")
 
-        # Cancellation precheck — watchdog or prior halted step
-        if _check_cancellation(self.db, video_id):
+        # Cancellation precheck — watchdog or prior halted step. First
+        # chain link: tolerate missing VideoAnalysis row (we'll create it
+        # below via get_video_analysis_state).
+        if _check_cancellation(self.db, video_id, require_existing=False):
             logger.info(f"Skipping chunk for {video_id} — already in error state")
             return {"video_id": video_id, "status": "skipped"}
 
-        # Get state from database
+        # Get state from database (also creates VideoAnalysis row if missing)
         state = get_video_analysis_state(self.db, UUID(video_id))
         analysis = state["analysis"]
 
@@ -285,11 +304,23 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
             self.db, user_id, "chunk", force_refresh=True,
         )
 
-        # Update status
+        # Chain-start transitions — previously done in the route handler
         analysis.status = "processing"
         analysis.current_step = "chunk"
-        analysis.step_status = {**(analysis.step_status or {}), "chunk": "processing"}
+        analysis.step_status = {
+            "chunk": "processing",
+            "infer": "pending",
+            "relate": "pending",
+            "explain": "pending",
+            "activate": "pending",
+        }
         analysis.started_at = datetime.now(timezone.utc)
+
+        # Mark the video as analyzing and clear any previous error
+        video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
+        if video:
+            video.status = "analyzing"
+            video.error_message = None
         self.db.commit()
 
         # Run chunk node
