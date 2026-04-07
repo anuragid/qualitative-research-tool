@@ -19,7 +19,6 @@ from app.services.byok_service import (
     resolve_byok_with_preflight,
 )
 from app.services.project_state_service import ProjectStateService
-from app.tasks._pipeline_utils import build_error_json, sanitize_error
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 from app.utils.error_classification import (

@@ -23,7 +23,8 @@ from unittest.mock import MagicMock  # noqa: E402
 
 import pytest  # noqa: E402
 from sqlalchemy import ARRAY, create_engine, event  # noqa: E402
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID  # noqa: E402
+from sqlalchemy.dialects.postgresql import JSONB  # noqa: E402
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.compiler import compiles  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 

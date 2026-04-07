@@ -1,7 +1,6 @@
 """Tests for the chain error handler."""
 
 import os
-import uuid
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -22,7 +21,8 @@ os.environ.setdefault("ENCRYPTION_KEY", "9px3YGa-Z2bljdtUKpLhqzl9IaGdf2RgrCI-zOT
 
 import pytest  # noqa: E402
 from sqlalchemy import ARRAY, create_engine  # noqa: E402
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID  # noqa: E402
+from sqlalchemy.dialects.postgresql import JSONB  # noqa: E402
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.compiler import compiles  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 

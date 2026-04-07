@@ -1,7 +1,6 @@
 """Tests for the Celery chain-based analysis pipeline."""
 
 import os
-import uuid
 from uuid import uuid4
 
 # --- Env vars must be set before any app.* import ---
@@ -21,7 +20,8 @@ os.environ.setdefault("ENCRYPTION_KEY", "9px3YGa-Z2bljdtUKpLhqzl9IaGdf2RgrCI-zOT
 
 import pytest  # noqa: E402
 from sqlalchemy import ARRAY, create_engine  # noqa: E402
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID  # noqa: E402
+from sqlalchemy.dialects.postgresql import JSONB  # noqa: E402
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.compiler import compiles  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
@@ -47,14 +47,12 @@ def _compile_array_sqlite(type_, compiler, **kw):
 from app.database import Base  # noqa: E402
 from app.models.database_models import (  # noqa: E402
     Project,
-    SpeakerLabel,
     Transcript,
     User,
     Video,
     VideoAnalysis,
 )
 from app.tasks.analysis_steps import _check_cancellation  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Fixture: ORM-backed SQLite session (same pattern as test_watchdog_race.py)
