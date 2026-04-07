@@ -12,7 +12,7 @@ from typing import List, Optional, Set
 import redis
 
 from app.config import settings
-from app.constants import FREE_MODEL_FALLBACKS, STANDARD_MODELS
+from app.constants import STANDARD_MODEL_FALLBACKS, STANDARD_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +57,11 @@ def get_valid_standard_models() -> list:
 
 
 def get_valid_fallbacks() -> List[str]:
-    """Return FREE_MODEL_FALLBACKS filtered to only currently valid ones.
+    """Return STANDARD_MODEL_FALLBACKS filtered to only currently valid ones.
 
     Falls back to the full hardcoded list when the cache is unavailable.
     """
     valid_ids = get_valid_model_ids()
     if valid_ids is None:
-        return FREE_MODEL_FALLBACKS
-    return [m for m in FREE_MODEL_FALLBACKS if m in valid_ids]
+        return STANDARD_MODEL_FALLBACKS
+    return [m for m in STANDARD_MODEL_FALLBACKS if m in valid_ids]

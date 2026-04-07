@@ -15,7 +15,7 @@ from tenacity import (
 )
 
 from app.config import settings
-from app.constants import FREE_MODEL_FALLBACKS
+from app.constants import STANDARD_MODEL_FALLBACKS
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ OPENROUTER_HEADERS = {
 
 # Set of allowed model IDs when using the Methodex (shared) key.
 # The Methodex key must never be used with premium models.
-_METHODEX_ALLOWED_MODELS = set(FREE_MODEL_FALLBACKS)
+_METHODEX_ALLOWED_MODELS = set(STANDARD_MODEL_FALLBACKS)
 
 
 class LLMService:
@@ -237,7 +237,7 @@ class LLMService:
         # (handles deprecated/removed models gracefully).
         models_to_try = [chosen_model]
         if api_key is None:
-            for fallback in FREE_MODEL_FALLBACKS:
+            for fallback in STANDARD_MODEL_FALLBACKS:
                 if fallback != chosen_model and fallback not in models_to_try:
                     models_to_try.append(fallback)
         else:
