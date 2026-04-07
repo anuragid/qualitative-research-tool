@@ -17,11 +17,6 @@ export interface UserSettings {
   low_balance_threshold_usd?: number;
 }
 
-export interface UserSettingsUpdate {
-  preferred_model?: string | null;
-  api_key?: string | null;
-}
-
 export interface RecommendedModel {
   id: string;
   name: string;
@@ -47,8 +42,19 @@ export const settingsService = {
     return response.data;
   },
 
-  updateSettings: async (settings: UserSettingsUpdate): Promise<UserSettings> => {
-    const response = await api.put("/api/users/settings", settings);
+  /** Add or replace the user's BYOK key. Validates + balance-checks server-side. */
+  addApiKey: async (apiKey: string): Promise<UserSettings> => {
+    const response = await api.post("/api/users/settings/api-key", {
+      api_key: apiKey,
+    });
+    return response.data;
+  },
+
+  /** Set the user's preferred model. Server enforces tier (no key → standard only). */
+  updatePreferredModel: async (modelId: string): Promise<UserSettings> => {
+    const response = await api.put("/api/users/settings/preferred-model", {
+      preferred_model: modelId,
+    });
     return response.data;
   },
 
