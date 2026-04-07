@@ -833,6 +833,11 @@ async def test_video_analyze_degraded_balance_fetch_passes_through(
 def _make_video_state(video_id: str) -> dict[str, Any]:
     analysis = MagicMock()
     analysis.step_status = {}
+    # Seed with a real string status so VideoAnalysisStateMachine can
+    # coerce ``analysis.status`` into the enum when the chunk step fires
+    # CHAIN_STARTED. Without this the MagicMock's auto ``.status`` is a
+    # MagicMock instance and the enum constructor rejects it.
+    analysis.status = "pending"
     return {
         "video_id": video_id,
         "transcript": {"utterances": [{"speaker": "A", "start": 0, "text": "hi"}]},
@@ -852,6 +857,12 @@ def _run_chunk_step(*, preflight_side_effect=None, preflight_return=None):
     video_id = str(uuid_module.uuid4())
     mock_self = MagicMock()
     mock_self.db = MagicMock()
+    # The chunk step fetches the video from the DB and routes the status
+    # write through VideoStateMachine — feed a real-string starting state
+    # so the transition is legal.
+    mock_video = MagicMock()
+    mock_video.status = "transcribed"
+    mock_self.db.query.return_value.filter.return_value.first.return_value = mock_video
 
     state = _make_video_state(video_id)
 
@@ -949,6 +960,9 @@ def test_update_analysis_error_writes_insufficient_credits_payload():
 
     fake_analysis = MagicMock()
     fake_analysis.step_status = {}
+    # Real-string status so VideoAnalysisStateMachine.transition(CHAIN_FAILED)
+    # can coerce it into the enum.
+    fake_analysis.status = "processing"
 
     # Two query() calls in _update_analysis_error: VideoAnalysis then Video
     db.query.return_value.filter.return_value.first.side_effect = [

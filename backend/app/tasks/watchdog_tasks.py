@@ -17,6 +17,17 @@ from app.models.database_models import (
     Video,
     VideoAnalysis,
 )
+from app.state import (
+    InvalidTransitionError,
+    ProjectAnalysisEvent,
+    ProjectAnalysisStateMachine,
+    TranscriptEvent,
+    TranscriptStateMachine,
+    VideoAnalysisEvent,
+    VideoAnalysisStateMachine,
+    VideoEvent,
+    VideoStateMachine,
+)
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
@@ -72,14 +83,28 @@ def reset_stuck_analyses(self):
             error_msg = _watchdog_error_json(
                 f"Stuck in processing state for over {int(_ANALYSIS_TIMEOUT.total_seconds() // 60)} minutes"
             )
-            va.status = "error"
+            VideoAnalysisStateMachine.transition(
+                va, VideoAnalysisEvent.WATCHDOG_TIMEOUT, db=db
+            )
             va.completed_at = now
 
             # Also mark the parent Video as errored.
             video = db.query(Video).filter(Video.id == va.video_id).first()
             if video and video.status not in ("analyzed", "error"):
-                video.status = "error"
-                video.error_message = error_msg
+                try:
+                    VideoStateMachine.transition(
+                        video,
+                        VideoEvent.WATCHDOG_TIMEOUT,
+                        db=db,
+                        error_message=error_msg,
+                    )
+                except InvalidTransitionError as exc:
+                    # Defensive: if the video was somehow not in a state
+                    # from which WATCHDOG_TIMEOUT is legal, log and skip.
+                    logger.warning(
+                        "Watchdog could not transition Video %s via WATCHDOG_TIMEOUT: %s",
+                        video.id, exc,
+                    )
 
             videos_reset += 1
             logger.warning(
@@ -108,8 +133,12 @@ def reset_stuck_analyses(self):
             error_msg = _watchdog_error_json(
                 f"Stuck in analyzing state for over {int(_ANALYSIS_TIMEOUT.total_seconds() // 60)} minutes"
             )
-            video.status = "error"
-            video.error_message = error_msg
+            VideoStateMachine.transition(
+                video,
+                VideoEvent.WATCHDOG_TIMEOUT,
+                db=db,
+                error_message=error_msg,
+            )
             videos_reset += 1
             logger.warning(
                 "Watchdog reset stuck Video %s — linked VideoAnalysis exceeded timeout",
@@ -135,8 +164,12 @@ def reset_stuck_analyses(self):
                 VideoAnalysis.video_id == video.id
             ).first()
             if va and va.status == "completed":
-                # Analysis actually completed but video status wasn't synced
-                video.status = "analyzed"
+                # Analysis actually completed but video status wasn't synced.
+                # WATCHDOG_CLEANUP: analyzing -> analyzed (and clears
+                # error_message as a side effect).
+                VideoStateMachine.transition(
+                    video, VideoEvent.WATCHDOG_CLEANUP, db=db
+                )
                 logger.warning(
                     "Watchdog fixed orphaned Video %s: analyzing -> analyzed "
                     "(analysis was completed)",
@@ -146,8 +179,12 @@ def reset_stuck_analyses(self):
                 error_msg = _watchdog_error_json(
                     "Video stuck in 'analyzing' with no active analysis"
                 )
-                video.status = "error"
-                video.error_message = error_msg
+                VideoStateMachine.transition(
+                    video,
+                    VideoEvent.WATCHDOG_TIMEOUT,
+                    db=db,
+                    error_message=error_msg,
+                )
                 logger.warning(
                     "Watchdog fixed orphaned Video %s: analyzing -> error "
                     "(analysis was %s)",
@@ -167,10 +204,12 @@ def reset_stuck_analyses(self):
         )
 
         for pa in stuck_project_analyses:
-            error_msg = _watchdog_error_json(
-                f"Stuck in processing state for over {int(_ANALYSIS_TIMEOUT.total_seconds() // 60)} minutes"
+            # ProjectAnalysis has no error_message column, so unlike the
+            # Video path we don't pass a payload — the status change is
+            # the only observable side effect.
+            ProjectAnalysisStateMachine.transition(
+                pa, ProjectAnalysisEvent.WATCHDOG_TIMEOUT, db=db
             )
-            pa.status = "error"
             pa.completed_at = now
             projects_reset += 1
             logger.warning(
@@ -194,13 +233,19 @@ def reset_stuck_analyses(self):
             error_msg = _watchdog_error_json(
                 f"Stuck in processing state for over {int(_TRANSCRIPT_TIMEOUT.total_seconds() // 60)} minutes"
             )
-            t.status = "error"
+            TranscriptStateMachine.transition(
+                t, TranscriptEvent.WATCHDOG_TIMEOUT, db=db
+            )
 
             # Also mark the parent Video as errored.
             video = db.query(Video).filter(Video.id == t.video_id).first()
             if video and video.status in ("transcribing",):
-                video.status = "error"
-                video.error_message = error_msg
+                VideoStateMachine.transition(
+                    video,
+                    VideoEvent.WATCHDOG_TIMEOUT,
+                    db=db,
+                    error_message=error_msg,
+                )
 
             transcripts_reset += 1
             logger.warning(

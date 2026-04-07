@@ -24,6 +24,13 @@ from app.models.database_models import (
 )
 from app.services.assemblyai_service import assemblyai_service
 from app.services.s3_service import s3_service
+from app.state import (
+    InvalidTransitionError,
+    TranscriptEvent,
+    TranscriptStateMachine,
+    VideoEvent,
+    VideoStateMachine,
+)
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
@@ -87,9 +94,9 @@ def _maybe_auto_dispatch_analyze_chain(db: Session, video: Video) -> None:
     current_user_id = project.user_id
 
     # Flip video.status to "analyzing" in the same transaction so the
-    # concurrent-double-click race is closed (mirrors routes/videos.py:656).
-    video.status = "analyzing"
-    video.error_message = None
+    # concurrent-double-click race is closed (mirrors the /analyze route).
+    # ANALYZE_DISPATCHED: transcribed -> analyzing (and clears error_message).
+    VideoStateMachine.transition(video, VideoEvent.ANALYZE_DISPATCHED, db=db)
     db.commit()
 
     # Dispatch the chain. Imports are local to avoid circulars between
@@ -146,15 +153,31 @@ def transcribe_video_task(self, video_id: str):
         # Get or create transcript record
         transcript = self.db.query(Transcript).filter(Transcript.video_id == video.id).first()
         if not transcript:
-            transcript = Transcript(
-                video_id=video.id,
-                status="processing"
+            transcript = Transcript(video_id=video.id)
+            # ROW_CREATED: None -> PENDING, then TRANSCRIBE_STARTED:
+            # PENDING -> PROCESSING. Two events to match the existing
+            # two-step "new row in processing" semantic.
+            TranscriptStateMachine.transition(
+                transcript, TranscriptEvent.ROW_CREATED, db=self.db
+            )
+            TranscriptStateMachine.transition(
+                transcript, TranscriptEvent.TRANSCRIBE_STARTED, db=self.db
             )
             self.db.add(transcript)
         else:
-            transcript.status = "processing"
+            # Existing row — promote to processing (handles both
+            # pending -> processing on first run and the idempotent
+            # processing -> processing self-loop on retry).
+            TranscriptStateMachine.transition(
+                transcript, TranscriptEvent.TRANSCRIBE_STARTED, db=self.db
+            )
 
-        video.status = "transcribing"
+        # Worker re-asserts the Video row is in TRANSCRIBING. The route
+        # normally already flipped it; the self-loop in the transition
+        # table makes this idempotent.
+        VideoStateMachine.transition(
+            video, VideoEvent.TRANSCRIBE_REQUESTED, db=self.db
+        )
         self.db.commit()
 
         # Download from R2 and upload directly to AssemblyAI.
@@ -210,10 +233,28 @@ def transcribe_video_task(self, video_id: str):
             ).first()
 
             if video:
-                video.status = "error"
-                video.error_message = str(e)
+                try:
+                    VideoStateMachine.transition(
+                        video,
+                        VideoEvent.TRANSCRIBE_FAILED,
+                        db=self.db,
+                        error_message=str(e),
+                    )
+                except InvalidTransitionError as trans_err:
+                    logger.warning(
+                        f"transcribe_video_task: invalid Video transition "
+                        f"for {video_id}: {trans_err}"
+                    )
             if transcript:
-                transcript.status = "error"
+                try:
+                    TranscriptStateMachine.transition(
+                        transcript, TranscriptEvent.TRANSCRIBE_FAILED, db=self.db
+                    )
+                except InvalidTransitionError as trans_err:
+                    logger.warning(
+                        f"transcribe_video_task: invalid Transcript "
+                        f"transition for {video_id}: {trans_err}"
+                    )
 
             self.db.commit()
         except Exception as cleanup_error:
@@ -289,7 +330,10 @@ def check_transcription_task(self, video_id: str, started_at: float | None = Non
             # Save transcripts to database
             transcript.raw_transcript = raw_transcript
             transcript.processed_transcript = processed_transcript
-            transcript.status = "completed"
+            # TRANSCRIBE_SUCCEEDED: processing -> completed.
+            TranscriptStateMachine.transition(
+                transcript, TranscriptEvent.TRANSCRIBE_SUCCEEDED, db=self.db
+            )
 
             # Extract unique speakers and create speaker label records
             speakers = set()
@@ -312,13 +356,14 @@ def check_transcription_task(self, video_id: str, started_at: float | None = Non
                     )
                     self.db.add(speaker_label)
 
-            # Update video status and persist duration
+            # Update video status and persist duration. TRANSCRIBE_SUCCEEDED
+            # clears error_message as a state-machine side effect so the UI
+            # doesn't keep showing a stale banner after a successful retry.
             video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
             if video:
-                video.status = "transcribed"
-                # Clear any prior transcription error so the UI doesn't keep
-                # showing a stale error banner once the retry succeeds.
-                video.error_message = None
+                VideoStateMachine.transition(
+                    video, VideoEvent.TRANSCRIBE_SUCCEEDED, db=self.db
+                )
                 duration = processed_transcript.get("duration_seconds")
                 if duration:
                     video.duration_seconds = int(round(duration))
@@ -408,10 +453,28 @@ def _mark_transcription_error(db, video_id: str, error_message: str):
         ).first()
 
         if video:
-            video.status = "error"
-            video.error_message = error_message
+            try:
+                VideoStateMachine.transition(
+                    video,
+                    VideoEvent.TRANSCRIBE_FAILED,
+                    db=db,
+                    error_message=error_message,
+                )
+            except InvalidTransitionError as trans_err:
+                logger.warning(
+                    f"_mark_transcription_error: invalid Video transition "
+                    f"for {video_id}: {trans_err}"
+                )
         if transcript:
-            transcript.status = "error"
+            try:
+                TranscriptStateMachine.transition(
+                    transcript, TranscriptEvent.TRANSCRIBE_FAILED, db=db
+                )
+            except InvalidTransitionError as trans_err:
+                logger.warning(
+                    f"_mark_transcription_error: invalid Transcript "
+                    f"transition for {video_id}: {trans_err}"
+                )
 
         db.commit()
     except Exception as cleanup_error:

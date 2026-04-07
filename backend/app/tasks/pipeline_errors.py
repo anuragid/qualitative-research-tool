@@ -14,6 +14,15 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from app.models.database_models import Video, VideoAnalysis
+from app.state import (
+    InvalidTransitionError,
+    ProjectAnalysisEvent,
+    ProjectAnalysisStateMachine,
+    VideoAnalysisEvent,
+    VideoAnalysisStateMachine,
+    VideoEvent,
+    VideoStateMachine,
+)
 from app.tasks._pipeline_utils import build_error_json, sanitize_error
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
@@ -51,12 +60,22 @@ def handle_pipeline_error(self, request, exc, traceback, video_id: str):
 
         # Idempotent update: only set error state if not already set
         if video and video.status not in ("error", "analyzed"):
-            video.status = "error"
-            video.error_message = error_json
-            logger.info(
-                f"handle_pipeline_error: marked video {video_id} as error "
-                f"(step={failed_step})"
-            )
+            try:
+                VideoStateMachine.transition(
+                    video,
+                    VideoEvent.CHAIN_FAILED,
+                    db=self.db,
+                    error_message=error_json,
+                )
+                logger.info(
+                    f"handle_pipeline_error: marked video {video_id} as error "
+                    f"(step={failed_step})"
+                )
+            except InvalidTransitionError as exc:
+                logger.warning(
+                    f"handle_pipeline_error: could not transition video "
+                    f"{video_id} via CHAIN_FAILED: {exc}"
+                )
         elif video:
             logger.info(
                 f"handle_pipeline_error: video {video_id} already in "
@@ -64,7 +83,15 @@ def handle_pipeline_error(self, request, exc, traceback, video_id: str):
             )
 
         if analysis and analysis.status != "error":
-            analysis.status = "error"
+            try:
+                VideoAnalysisStateMachine.transition(
+                    analysis, VideoAnalysisEvent.CHAIN_FAILED, db=self.db
+                )
+            except InvalidTransitionError as exc:
+                logger.warning(
+                    f"handle_pipeline_error: could not transition "
+                    f"VideoAnalysis for video {video_id}: {exc}"
+                )
             analysis.completed_at = datetime.now(timezone.utc)
 
         self.db.commit()
@@ -102,12 +129,20 @@ def handle_project_pipeline_error(self, request, exc, traceback, project_id: str
                 failed_step = task_name.replace("analyze_", "").replace("_step", "")
 
         if pa and pa.status != "error":
-            pa.status = "error"
-            pa.completed_at = datetime.now(timezone.utc)
-            logger.info(
-                f"handle_project_pipeline_error: marked ProjectAnalysis "
-                f"{project_id} as error (step={failed_step})"
-            )
+            try:
+                ProjectAnalysisStateMachine.transition(
+                    pa, ProjectAnalysisEvent.CHAIN_FAILED, db=self.db
+                )
+                pa.completed_at = datetime.now(timezone.utc)
+                logger.info(
+                    f"handle_project_pipeline_error: marked ProjectAnalysis "
+                    f"{project_id} as error (step={failed_step})"
+                )
+            except InvalidTransitionError as exc:
+                logger.warning(
+                    f"handle_project_pipeline_error: could not transition "
+                    f"ProjectAnalysis for {project_id}: {exc}"
+                )
         elif pa:
             logger.info(
                 f"handle_project_pipeline_error: PA {project_id} already in error, no-op"

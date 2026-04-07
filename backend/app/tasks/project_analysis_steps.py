@@ -16,6 +16,11 @@ from app.agents.nodes.cross_activate import cross_activate_node
 from app.agents.nodes.cross_explain import cross_explain_node
 from app.agents.nodes.cross_relate import cross_relate_node
 from app.models.database_models import ProjectAnalysis, Video, VideoAnalysis
+from app.state import (
+    InvalidTransitionError,
+    ProjectAnalysisEvent,
+    ProjectAnalysisStateMachine,
+)
 from app.tasks.analysis_steps import (
     NonRetryableAnalysisError,
     _raise_for_node_error,
@@ -67,8 +72,13 @@ def _get_or_create_project_analysis(db: Session, project_id: UUID) -> ProjectAna
         pa = ProjectAnalysis(
             project_id=project_id,
             video_ids=video_ids,
-            status="processing",
             started_at=datetime.now(timezone.utc),
+        )
+        # ROW_CREATED: None -> PROCESSING. The transition table captures
+        # the "ProjectAnalysis is born already running" semantic (unlike
+        # VideoAnalysis which has a separate PENDING state).
+        ProjectAnalysisStateMachine.transition(
+            pa, ProjectAnalysisEvent.ROW_CREATED, db=db
         )
         db.add(pa)
         db.commit()
@@ -84,7 +94,15 @@ def _update_project_analysis_error(db: Session, project_id: str, step_name: str)
             ProjectAnalysis.project_id == UUID(project_id)
         ).first()
         if pa:
-            pa.status = "error"
+            try:
+                ProjectAnalysisStateMachine.transition(
+                    pa, ProjectAnalysisEvent.CHAIN_FAILED, db=db
+                )
+            except InvalidTransitionError as exc:
+                logger.warning(
+                    f"_update_project_analysis_error: invalid transition "
+                    f"for {project_id} ({step_name}): {exc}"
+                )
             pa.completed_at = datetime.now(timezone.utc)
         db.commit()
     except Exception as commit_error:
@@ -170,7 +188,11 @@ def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None)
             _raise_for_node_error("cross_relate", result)
 
         pa.cross_video_patterns = result.get("cross_video_patterns")
-        pa.status = "processing"
+        # CHAIN_STEP_PROGRESS: idempotent processing -> processing. Keeps the
+        # state machine as the single source of truth even for no-op writes.
+        ProjectAnalysisStateMachine.transition(
+            pa, ProjectAnalysisEvent.CHAIN_STEP_PROGRESS, db=self.db
+        )
         self.db.commit()
 
         logger.info(f"CROSS_RELATE step completed for project {project_id}")
@@ -281,7 +303,10 @@ def analyze_cross_activate_step(self, project_id: str, user_id: str | None = Non
             _raise_for_node_error("cross_activate", result)
 
         pa.cross_video_principles = result.get("cross_video_principles")
-        pa.status = "completed"
+        # Final step: CHAIN_SUCCEEDED -> completed.
+        ProjectAnalysisStateMachine.transition(
+            pa, ProjectAnalysisEvent.CHAIN_SUCCEEDED, db=self.db
+        )
         pa.completed_at = datetime.now(timezone.utc)
         self.db.commit()
 
