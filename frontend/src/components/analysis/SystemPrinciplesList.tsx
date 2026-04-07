@@ -54,7 +54,7 @@ const systemPrincipleColumns: TableColumn<SystemPrinciple>[] = [
     label: "HMW Questions",
     sortable: true,
     render: (sp) => (
-      <span className="text-sm text-text-tertiary">{sp.how_might_we.length}</span>
+      <span className="text-sm text-text-tertiary">{(sp.how_might_we ?? []).length}</span>
     ),
     className: "w-32",
   },
@@ -158,10 +158,10 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
                     <div>
                       <div className="text-label text-text-placeholder uppercase mb-2 flex items-center gap-2">
                         <Lightbulb className="h-4 w-4" />
-                        Strategic How Might We... ({principle.how_might_we.length})
+                        Strategic How Might We... ({(principle.how_might_we ?? []).length})
                       </div>
                       <ul className="space-y-3">
-                        {principle.how_might_we.map((hmw, idx) => (
+                        {(principle.how_might_we ?? []).map((hmw, idx) => (
                           <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl border border-interactive-focus-border/20">
                             <span className="text-interactive-focus font-semibold">{idx + 1}.</span>
                             <span className="text-text-primary">{hmw}</span>

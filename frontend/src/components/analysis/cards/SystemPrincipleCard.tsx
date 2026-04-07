@@ -33,7 +33,7 @@ export function SystemPrincipleCard({ principle, compact = false }: SystemPrinci
       </p>
       {!compact && (
         <div className="mt-2 text-label text-text-placeholder">
-          {principle.how_might_we.length} HMW question{principle.how_might_we.length !== 1 ? "s" : ""}
+          {(principle.how_might_we ?? []).length} HMW question{(principle.how_might_we ?? []).length !== 1 ? "s" : ""}
         </div>
       )}
     </div>

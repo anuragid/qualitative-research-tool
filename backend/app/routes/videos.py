@@ -680,7 +680,15 @@ async def get_video_analysis_status(
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db),
 ):
-    """Lightweight status check for polling (returns ~200 bytes instead of 50+ KB)."""
+    """Lightweight status check for polling (returns ~200 bytes instead of 50+ KB).
+
+    When the parent video exists but no ``video_analyses`` row has been
+    created yet (e.g. transcribed video awaiting first run), this returns
+    a 200 with ``status="not_started"`` instead of a 404.  The 404 is
+    reserved for the "video doesn't exist or isn't owned by the caller"
+    path driven by ``_get_video_with_ownership``.  See Sentry
+    JAVASCRIPT-REACT-6 for the frontend crash this prevents.
+    """
     current_user_id = current_user["id"]
     _get_video_with_ownership(video_id, current_user_id, db)
 
@@ -689,10 +697,13 @@ async def get_video_analysis_status(
         .first()
 
     if not video_analysis:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No analysis found for video {video_id}",
-        )
+        return {
+            "status": "not_started",
+            "current_step": None,
+            "step_status": None,
+            "started_at": None,
+            "completed_at": None,
+        }
 
     return {
         "status": video_analysis.status,
@@ -711,6 +722,12 @@ async def get_video_analysis(
 ):
     """
     Get analysis results for a video (must be owned by the current user).
+
+    When no ``video_analyses`` row exists for the video yet, this returns
+    a 200 with ``status="not_started"`` and empty list fields, so the
+    frontend can render an empty/CTA state without crashing on
+    ``Array.map`` over undefined.  The 404 is still returned when the
+    video itself doesn't exist or isn't owned by the caller.
     """
     current_user_id = current_user["id"]
     try:
@@ -721,9 +738,28 @@ async def get_video_analysis(
             .first()
 
         if not video_analysis:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No analysis found for video {video_id}"
+            logger.info(
+                "No video_analyses row for video %s — returning not_started sentinel",
+                video_id,
+            )
+            return VideoAnalysisResponse(
+                id=None,
+                video_id=video_id,
+                chunks=[],
+                inferences=[],
+                patterns=[],
+                insights=[],
+                design_principles=[],
+                status="not_started",
+                started_at=None,
+                completed_at=None,
+                current_step=None,
+                step_status=None,
+                chunk_completed_at=None,
+                infer_completed_at=None,
+                relate_completed_at=None,
+                explain_completed_at=None,
+                activate_completed_at=None,
             )
 
         logger.info(f"Retrieved video analysis for video {video_id}")

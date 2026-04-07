@@ -118,8 +118,15 @@ export function AnalysisSection({
 
   if (!hasTranscript) return null;
 
-  const hasAnalysis = analysis && analysis.status === "completed";
-  const isStepByStepMode = analysis && analysis.status !== "completed";
+  // "not_started" is the sentinel the backend returns when the video row
+  // exists but no video_analyses row has been created yet.  Treat it the
+  // same as "no analysis" for UI purposes -- show the start buttons and
+  // the empty state instead of the step-by-step progress tabs.  See
+  // Sentry JAVASCRIPT-REACT-6 for the crash this guards against.
+  const hasStartedAnalysis = !!analysis && analysis.status !== "not_started";
+  const hasAnalysis = hasStartedAnalysis && analysis?.status === "completed";
+  const isStepByStepMode =
+    hasStartedAnalysis && analysis?.status !== "completed";
 
   // Parse the analysis error_message once so we can branch into
   // InsufficientCreditsAlert when error_type === "insufficient_credits".
@@ -206,8 +213,9 @@ export function AnalysisSection({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
       <h2 className="text-h3 text-foreground">Analysis</h2>
       <div className="flex items-center gap-2">
-        {/* Show start buttons if no analysis yet */}
-        {!analysis && (
+        {/* Show start buttons if no analysis yet (including backend
+            "not_started" sentinel). */}
+        {!hasStartedAnalysis && (
           <>
             <SimpleTooltip
               content={canStartAnalysis
@@ -280,7 +288,7 @@ export function AnalysisSection({
 
   // Prerequisite warning
   const renderPrerequisiteWarning = () => {
-    if (!workflowBlockerMessage || analysis) return null;
+    if (!workflowBlockerMessage || hasStartedAnalysis) return null;
     return (
       <AlertBanner variant="warning" title="Speaker roles required" className="mb-6">
         {workflowBlockerMessage}
@@ -704,9 +712,10 @@ export function AnalysisSection({
     );
   };
 
-  // Empty state when no analysis
+  // Empty state when no analysis (also covers the backend "not_started"
+  // sentinel -- video exists but analysis has never been triggered).
   const renderEmptyState = () => {
-    if (analysis || analysisLoading) return null;
+    if (hasStartedAnalysis || analysisLoading) return null;
     return (
       <EmptyState
         icon={Lightbulb}

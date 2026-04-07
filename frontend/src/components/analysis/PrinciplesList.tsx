@@ -27,7 +27,7 @@ const principleColumns: TableColumn<DesignPrinciple>[] = [
     <p className="text-sm text-text-tertiary line-clamp-2">{p.rationale}</p>
   ) },
   { key: "how_might_we", label: "HMWs", sortable: false, render: (p) => (
-    <span className="text-sm text-text-placeholder">{p.how_might_we.length}</span>
+    <span className="text-sm text-text-placeholder">{(p.how_might_we ?? []).length}</span>
   ), className: "w-20" },
   { key: "insight_id", label: "Insight", sortable: false, render: (p) => (
     <span className="text-label text-text-placeholder font-mono">{p.insight_id}</span>
@@ -120,10 +120,10 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
                   <div>
                     <div className="text-label text-text-placeholder uppercase mb-2 flex items-center gap-2">
                       <Lightbulb className="h-4 w-4" />
-                      How Might We... ({principle.how_might_we.length})
+                      How Might We... ({(principle.how_might_we ?? []).length})
                     </div>
                     <ul className="space-y-3">
-                      {principle.how_might_we.map((hmw, idx) => (
+                      {(principle.how_might_we ?? []).map((hmw, idx) => (
                         <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl border border-interactive-focus-border/20">
                           <span className="text-interactive-focus font-semibold">{idx + 1}.</span>
                           <span className="text-text-primary">{hmw}</span>
