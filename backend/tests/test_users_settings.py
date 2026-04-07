@@ -18,6 +18,7 @@ from unittest.mock import patch
 import pytest
 from fastapi import status
 
+from app.constants import DEFAULT_STANDARD_MODEL
 from app.services.openrouter_balance import BalanceInfo, OpenRouterBalanceError
 
 pytestmark = pytest.mark.anyio
@@ -90,6 +91,9 @@ def db_user_factory(client):
         encrypted_api_key=None,
         key_hint=None,
         preferred_model=None,
+        key_total_credits=None,
+        key_total_usage=None,
+        key_is_free_tier=None,
     ):
         # Use the override that ``client`` installed on the app — that's
         # the session pointing at the per-test SQLite file.
@@ -107,6 +111,12 @@ def db_user_factory(client):
                 user.key_hint = key_hint
             if preferred_model is not None:
                 user.preferred_model = preferred_model
+            if key_total_credits is not None:
+                user.key_total_credits = key_total_credits
+            if key_total_usage is not None:
+                user.key_total_usage = key_total_usage
+            if key_is_free_tier is not None:
+                user.key_is_free_tier = key_is_free_tier
             db.add(user)
             db.commit()
             db.refresh(user)
@@ -310,3 +320,99 @@ class TestPutPreferredModel:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["has_api_key"] is True
         assert response.json()["key_hint"] == "zzzz"
+
+
+# ── DELETE /settings/api-key ─────────────────────────────────────────────
+
+
+class TestDeleteApiKey:
+    async def test_with_key_and_premium_model_resets_to_default(
+        self, client, db_user_factory
+    ):
+        db_user_factory(
+            encrypted_api_key=b"will-be-cleared",
+            key_hint="abcd",
+            preferred_model="anthropic/claude-sonnet-4.6",
+        )
+        response = await client.delete(
+            "/api/users/settings/api-key",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        from app.database import get_db
+        from app.main import app
+        from app.models.database_models import User
+
+        override = app.dependency_overrides.get(get_db, get_db)
+        db = next(override())
+        try:
+            refreshed = db.query(User).filter(User.id == _DEV_USER_ID).first()
+            assert refreshed.encrypted_api_key is None
+            assert refreshed.key_hint is None
+            assert refreshed.preferred_model == DEFAULT_STANDARD_MODEL
+        finally:
+            db.close()
+
+    async def test_with_key_and_standard_model_still_resets_to_default(
+        self, client, db_user_factory
+    ):
+        """Always reset on delete — even from a non-default standard."""
+        db_user_factory(
+            encrypted_api_key=b"will-be-cleared",
+            key_hint="abcd",
+            preferred_model="deepseek/deepseek-chat-v3-0324",
+        )
+        response = await client.delete(
+            "/api/users/settings/api-key",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        from app.database import get_db
+        from app.main import app
+        from app.models.database_models import User
+
+        override = app.dependency_overrides.get(get_db, get_db)
+        db = next(override())
+        try:
+            refreshed = db.query(User).filter(User.id == _DEV_USER_ID).first()
+            assert refreshed.preferred_model == DEFAULT_STANDARD_MODEL
+        finally:
+            db.close()
+
+    async def test_without_key_is_idempotent(self, client, db_user_factory):
+        db_user_factory()
+        response = await client.delete(
+            "/api/users/settings/api-key",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+    async def test_balance_columns_cleared(self, client, db_user_factory):
+        db_user_factory(
+            encrypted_api_key=b"will-be-cleared",
+            key_hint="abcd",
+            key_total_credits=10.0,
+            key_total_usage=2.0,
+            key_is_free_tier=False,
+        )
+        response = await client.delete(
+            "/api/users/settings/api-key",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        from app.database import get_db
+        from app.main import app
+        from app.models.database_models import User
+
+        override = app.dependency_overrides.get(get_db, get_db)
+        db = next(override())
+        try:
+            refreshed = db.query(User).filter(User.id == _DEV_USER_ID).first()
+            assert refreshed.key_total_credits is None
+            assert refreshed.key_total_usage is None
+            assert refreshed.key_is_free_tier is None
+        finally:
+            db.close()

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
-from app.constants import STANDARD_MODEL_IDS, STANDARD_MODELS
+from app.constants import DEFAULT_STANDARD_MODEL, STANDARD_MODEL_IDS, STANDARD_MODELS
 from app.database import get_db
 from app.main import limiter
 from app.models import database_models
@@ -534,7 +534,7 @@ async def delete_api_key(
     db_user.encrypted_api_key = None
     db_user.key_hint = None
     db_user.key_validated_at = None
-    db_user.preferred_model = None
+    db_user.preferred_model = DEFAULT_STANDARD_MODEL
     # Also clear balance snapshot fields — they reference a key that no
     # longer exists, and leaving them set would let the next GET /settings
     # render stale BYOK balance data for a non-BYOK user.
