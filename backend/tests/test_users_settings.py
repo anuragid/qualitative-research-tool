@@ -231,3 +231,82 @@ class TestPostApiKey:
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+# ── PUT /settings/preferred-model ────────────────────────────────────────
+
+
+class TestPutPreferredModel:
+    async def test_no_key_standard_model_returns_200(self, client, db_user_factory):
+        db_user_factory()  # no key
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "meta-llama/llama-4-scout"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["preferred_model"] == "meta-llama/llama-4-scout"
+
+    async def test_no_key_premium_model_returns_403(self, client, db_user_factory):
+        db_user_factory()
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "anthropic/claude-sonnet-4.6"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "openrouter api key" in response.json()["detail"].lower()
+
+    async def test_with_key_premium_model_returns_200(
+        self, client, db_user_factory
+    ):
+        db_user_factory(
+            encrypted_api_key=b"some-encrypted",
+            key_hint="abcd",
+        )
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "anthropic/claude-sonnet-4.6"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["preferred_model"] == "anthropic/claude-sonnet-4.6"
+
+    async def test_with_key_standard_model_returns_200(
+        self, client, db_user_factory
+    ):
+        """A BYOK user can fall back to a standard model."""
+        db_user_factory(
+            encrypted_api_key=b"some-encrypted",
+            key_hint="abcd",
+        )
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "deepseek/deepseek-chat-v3-0324"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["preferred_model"] == "deepseek/deepseek-chat-v3-0324"
+
+    async def test_invalid_format_returns_422(self, client, db_user_factory):
+        db_user_factory()
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "no-slash-here"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    async def test_does_not_touch_api_key(self, client, db_user_factory):
+        db_user_factory(
+            encrypted_api_key=b"keep-me",
+            key_hint="zzzz",
+        )
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "meta-llama/llama-4-scout"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["has_api_key"] is True
+        assert response.json()["key_hint"] == "zzzz"

@@ -15,6 +15,7 @@ from app.models import database_models
 from app.models.schemas import (
     ApiKeyAddRequest,
     BalanceInfoResponse,
+    PreferredModelUpdateRequest,
     UserResponse,
     UserSettingsResponse,
     UserSettingsUpdate,
@@ -387,6 +388,64 @@ async def add_api_key(
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
         has_api_key=True,
+        key_hint=db_user.key_hint,
+        key_validated_at=db_user.key_validated_at,
+        available_models=STANDARD_MODELS,
+        balance=_balance_to_response(fresh_balance),
+    )
+
+
+@router.put(
+    "/settings/preferred-model",
+    response_model=UserSettingsResponse,
+)
+@limiter.limit("20/minute")
+async def update_preferred_model(
+    request: Request,
+    payload: PreferredModelUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set the user's preferred model.
+
+    Tier enforcement: a user without a BYOK key can only pick a model
+    from STANDARD_MODEL_IDS. With a key on file, any model id is allowed.
+    Does NOT touch the API key.
+    """
+    user_id = current_user["id"]
+    db_user = db.query(database_models.User).filter(
+        database_models.User.id == user_id
+    ).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    has_key = bool(db_user.encrypted_api_key)
+    if not has_key and payload.preferred_model not in STANDARD_MODEL_IDS:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Add your OpenRouter API key in Settings to unlock "
+                "premium models."
+            ),
+        )
+
+    db_user.preferred_model = payload.preferred_model
+    db.commit()
+
+    fresh_balance: Optional[BalanceInfo] = None
+    if db_user.encrypted_api_key:
+        try:
+            fresh_balance = get_cached_balance(db, db_user)
+        except Exception as exc:  # noqa: BLE001 — never block PUT response
+            logger.warning(
+                f"Unexpected error reading balance after preferred-model "
+                f"update for user {user_id}: {exc}"
+            )
+
+    return UserSettingsResponse(
+        preferred_model=db_user.preferred_model,
+        has_api_key=has_key,
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
         available_models=STANDARD_MODELS,
