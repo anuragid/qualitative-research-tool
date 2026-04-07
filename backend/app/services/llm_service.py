@@ -198,8 +198,8 @@ class LLMService:
         system prompt to instruct the model to return valid JSON, and use robust
         parsing in ``parse_json_response``.
 
-        When the primary model is persistently rate-limited (common with free
-        OpenRouter models), this method automatically tries fallback models.
+        When the primary model is persistently rate-limited, this method
+        automatically tries fallback models from STANDARD_MODEL_FALLBACKS.
 
         Args:
             system_prompt: System prompt/instructions
@@ -296,8 +296,8 @@ class LLMService:
                 last_error = e
                 continue
             except ValueError as e:
-                # Free models may return null content (e.g. finish_reason: length
-                # with no output). Fall back to next model when using shared key.
+                # Open-source models may return null content (e.g. finish_reason:
+                # length with no output). Fall back to next model when using shared key.
                 if api_key is None:
                     logger.warning(
                         f"Model {model_name} returned unusable response: {e}. "
