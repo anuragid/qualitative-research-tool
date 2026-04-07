@@ -613,13 +613,17 @@ async def trigger_video_analysis(
                 detail="Video must have a completed transcript before analysis"
             )
 
-        # Dispatch the analysis chain. The route is now a pure dispatcher:
-        # the first chain link (analyze_chunk_step) is responsible for
-        # creating or resetting the VideoAnalysis row, initializing
-        # step_status, flipping video.status to "analyzing", and clearing
-        # any previous video.error_message. Keeping the route body small
-        # limits the surface for partial-commit races between the request
-        # and the chain start.
+        # Set video status to "analyzing" inside the request transaction to close
+        # the concurrent-double-click race. Two requests hitting this endpoint
+        # back-to-back will both reach this point, but only one will win the
+        # commit — the other will see status == "analyzing" on its next read
+        # and reject via the status check above. The chunk step's matching
+        # reassignment later is idempotent and harmless.
+        video.status = "analyzing"
+        video.error_message = None
+        db.commit()
+
+        # Dispatch the chain
         from celery import chain
 
         from app.tasks.analysis_steps import (
