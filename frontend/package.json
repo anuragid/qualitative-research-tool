@@ -42,6 +42,7 @@
     "radix-ui": "^1.4.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-error-boundary": "^6.1.1",
     "react-hook-form": "^7.71.2",
     "react-resizable-panels": "^4.7.3",
     "react-router-dom": "^7.13.2",
