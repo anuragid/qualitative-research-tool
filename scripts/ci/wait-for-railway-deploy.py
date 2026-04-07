@@ -17,7 +17,6 @@ import time
 import json
 import urllib.request
 import urllib.error
-import ssl
 
 RAILWAY_API = "https://backboard.railway.app/graphql/v2"
 POLL_INTERVAL_SECONDS = 15
@@ -54,11 +53,7 @@ def gql(query: str, variables: dict, token: str) -> dict:
         method="POST",
     )
     try:
-        # Create context that allows self-signed certs for local testing
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=30, context=context) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         error_msg = e.read().decode('utf-8', errors='replace')
