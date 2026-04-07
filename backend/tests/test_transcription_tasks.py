@@ -100,18 +100,20 @@ class TestS3ServiceDownloadFile:
         """download_file should call s3_client.download_file with correct args."""
         from app.services.s3_service import S3Service
 
-        with patch("app.services.s3_service.boto3") as mock_boto3:
-            mock_client = MagicMock()
-            mock_boto3.client.return_value = mock_client
+        # boto3 is now lazy-imported inside s3_client property; mock the
+        # cached client directly via the internal attribute so we don't need
+        # to intercept the module-level boto3 name.
+        service = S3Service()
+        mock_client = MagicMock()
+        service._s3_client = mock_client
 
-            service = S3Service()
-            service.download_file("videos/test.mp4", "/tmp/test.mp4")
+        service.download_file("videos/test.mp4", "/tmp/test.mp4")
 
-            mock_client.download_file.assert_called_once_with(
-                service.bucket_name,
-                "videos/test.mp4",
-                "/tmp/test.mp4",
-            )
+        mock_client.download_file.assert_called_once_with(
+            service.bucket_name,
+            "videos/test.mp4",
+            "/tmp/test.mp4",
+        )
 
     def test_download_file_raises_on_client_error(self):
         """download_file should wrap ClientError in a descriptive exception."""
@@ -119,17 +121,17 @@ class TestS3ServiceDownloadFile:
 
         from app.services.s3_service import S3Service
 
-        with patch("app.services.s3_service.boto3") as mock_boto3:
-            mock_client = MagicMock()
-            mock_boto3.client.return_value = mock_client
-            mock_client.download_file.side_effect = ClientError(
-                {"Error": {"Code": "NoSuchKey", "Message": "Not found"}},
-                "GetObject",
-            )
+        # boto3 is now lazy-imported; inject a pre-built mock client directly.
+        service = S3Service()
+        mock_client = MagicMock()
+        mock_client.download_file.side_effect = ClientError(
+            {"Error": {"Code": "NoSuchKey", "Message": "Not found"}},
+            "GetObject",
+        )
+        service._s3_client = mock_client
 
-            service = S3Service()
-            with pytest.raises(Exception, match="Failed to download from R2"):
-                service.download_file("videos/missing.mp4", "/tmp/out.mp4")
+        with pytest.raises(Exception, match="Failed to download from R2"):
+            service.download_file("videos/missing.mp4", "/tmp/out.mp4")
 
 
 # ---------------------------------------------------------------------------

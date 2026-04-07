@@ -10,10 +10,6 @@ import uuid
 from pathlib import Path
 from typing import BinaryIO
 
-import boto3
-from botocore.config import Config as BotoConfig
-from botocore.exceptions import ClientError
-
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -23,19 +19,28 @@ class S3Service:
     """Service for interacting with Cloudflare R2 (S3-compatible)."""
 
     def __init__(self):
-        """Initialize R2-compatible S3 client."""
-        self.s3_client = boto3.client(
-            "s3",
-            endpoint_url=settings.R2_ENDPOINT_URL,
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-            region_name="auto",
-            config=BotoConfig(
-                signature_version="s3v4",
-                retries={"max_attempts": 3, "mode": "standard"},
-            ),
-        )
+        """Initialize R2-compatible S3 client (boto3 imported lazily on first use)."""
+        self._s3_client = None
         self.bucket_name = settings.R2_BUCKET_NAME
+
+    @property
+    def s3_client(self):
+        """Return a cached boto3 S3 client, creating it on first access."""
+        if self._s3_client is None:
+            import boto3
+            from botocore.config import Config as BotoConfig
+            self._s3_client = boto3.client(
+                "s3",
+                endpoint_url=settings.R2_ENDPOINT_URL,
+                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                region_name="auto",
+                config=BotoConfig(
+                    signature_version="s3v4",
+                    retries={"max_attempts": 3, "mode": "standard"},
+                ),
+            )
+        return self._s3_client
 
     def upload_video(
         self,
@@ -57,6 +62,7 @@ class S3Service:
         Raises:
             Exception: If upload fails
         """
+        from botocore.exceptions import ClientError
         try:
             # Generate unique S3 key
             file_extension = Path(filename).suffix
@@ -105,6 +111,7 @@ class S3Service:
         Raises:
             Exception: If URL generation fails
         """
+        from botocore.exceptions import ClientError
         try:
             url = self.s3_client.generate_presigned_url(
                 "get_object",
@@ -145,6 +152,7 @@ class S3Service:
         Raises:
             Exception: If download fails
         """
+        from botocore.exceptions import ClientError
         try:
             self.s3_client.download_file(
                 self.bucket_name,
@@ -173,6 +181,7 @@ class S3Service:
         Raises:
             Exception: If deletion fails
         """
+        from botocore.exceptions import ClientError
         try:
             self.s3_client.delete_object(
                 Bucket=self.bucket_name,
