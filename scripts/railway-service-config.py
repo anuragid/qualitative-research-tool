@@ -68,7 +68,11 @@ TARGET: dict[str, dict[str, Any]] = {
         "numReplicas": 2,
         # workers have no HTTP endpoint — leave healthcheckPath unset
         "healthcheckPath": None,
-        "drainingSeconds": 60,
+        # PR #19: must allow in-flight chain steps (up to task_time_limit=360s)
+        # to finish gracefully and give the broker visibility_timeout (600s)
+        # room to re-deliver any stranded unacked messages before SIGKILL.
+        # 900s (15 min) = task_time_limit + visibility_timeout + slack.
+        "drainingSeconds": 900,
     },
     "beat": {
         # id is populated at runtime if the service already exists,

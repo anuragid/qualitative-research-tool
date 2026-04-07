@@ -23,7 +23,13 @@ from app.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 # How long a record can sit in "processing" before the watchdog resets it.
-_ANALYSIS_TIMEOUT = timedelta(minutes=35)  # Must exceed Celery task_time_limit (30 min) so Celery kills the task first
+# Must exceed Celery task_time_limit (6 min) + broker visibility_timeout (10 min)
+# so Celery gets a chance to kill AND re-deliver orphaned tasks before the
+# watchdog stamps them errored. 17 min = 6 + 10 + 1 min slack; locked by
+# tests/test_celery_lifecycle.py. See PR #19 (post-mortem on Kathleen video
+# 4b1f4b25 — stuck `unacked` for 61 min because the default 3600s visibility
+# timeout exceeded the old 35-min watchdog threshold).
+_ANALYSIS_TIMEOUT = timedelta(minutes=17)
 _TRANSCRIPT_TIMEOUT = timedelta(minutes=60)
 
 
