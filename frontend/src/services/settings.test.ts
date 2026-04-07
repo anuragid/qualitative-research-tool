@@ -13,8 +13,22 @@ vi.mock("./api", () => {
 import { api } from "./api";
 import { settingsService } from "./settings";
 import type { UserSettings, UserSettingsUpdate } from "./settings";
+import type { BalanceInfo } from "../types";
 
 const mockedApi = vi.mocked(api);
+
+const mockBalance: BalanceInfo = {
+  total_credits: 10,
+  total_usage: 2.75,
+  balance_remaining: 7.25,
+  is_free_tier: false,
+  key_label: "sk-or-v1-abc...xyz",
+  key_limit: null,
+  key_limit_remaining: null,
+  has_credits: true,
+  checked_at: "2026-04-06T22:00:00Z",
+  stale: false,
+};
 
 const mockSettings: UserSettings = {
   preferred_model: "openai/gpt-4",
@@ -118,6 +132,70 @@ describe("settingsService", () => {
         status: 500,
         message: "Server error",
       });
+    });
+  });
+
+  describe("refreshBalance", () => {
+    it("posts to /api/users/settings/refresh-balance and returns BalanceInfo", async () => {
+      mockedApi.post.mockResolvedValue({ data: mockBalance });
+
+      const result = await settingsService.refreshBalance();
+
+      expect(mockedApi.post).toHaveBeenCalledWith(
+        "/api/users/settings/refresh-balance",
+      );
+      expect(result).toEqual(mockBalance);
+    });
+
+    it("propagates 429 rate-limit errors from api", async () => {
+      mockedApi.post.mockRejectedValue({
+        status: 429,
+        message: "Too Many Requests",
+      });
+
+      await expect(settingsService.refreshBalance()).rejects.toEqual({
+        status: 429,
+        message: "Too Many Requests",
+      });
+    });
+
+    it("propagates 503 OpenRouter unreachable errors from api", async () => {
+      mockedApi.post.mockRejectedValue({
+        status: 503,
+        message: "Service Unavailable",
+      });
+
+      await expect(settingsService.refreshBalance()).rejects.toEqual({
+        status: 503,
+        message: "Service Unavailable",
+      });
+    });
+  });
+
+  describe("getSettings (with balance)", () => {
+    it("returns settings with balance field for BYOK users", async () => {
+      const settings: UserSettings = {
+        ...mockSettings,
+        balance: mockBalance,
+      };
+      mockedApi.get.mockResolvedValue({ data: settings });
+
+      const result = await settingsService.getSettings();
+
+      expect(result.balance).toEqual(mockBalance);
+    });
+
+    it("returns settings with null balance for non-BYOK users", async () => {
+      const settings: UserSettings = {
+        ...mockSettings,
+        has_api_key: false,
+        balance: null,
+      };
+      mockedApi.get.mockResolvedValue({ data: settings });
+
+      const result = await settingsService.getSettings();
+
+      expect(result.balance).toBeNull();
     });
   });
 

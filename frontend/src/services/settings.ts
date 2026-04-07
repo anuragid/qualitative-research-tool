@@ -1,4 +1,5 @@
 import { api } from "./api";
+import type { BalanceInfo } from "../types";
 
 export interface UserSettings {
   preferred_model: string | null;
@@ -6,6 +7,14 @@ export interface UserSettings {
   key_hint: string | null;
   key_validated_at: string | null;
   available_models: { id: string; name: string; tier: string; provider?: string }[];
+  /** OpenRouter balance for BYOK users. `null` for non-BYOK users or when never refreshed. */
+  balance?: BalanceInfo | null;
+  /**
+   * Backend-configured low-balance threshold in USD. Used by `BalanceDisplay`
+   * to decide when to show the yellow warning state. Optional — falls back
+   * to the hardcoded $0.50 default in the component if absent.
+   */
+  low_balance_threshold_usd?: number;
 }
 
 export interface UserSettingsUpdate {
@@ -45,6 +54,18 @@ export const settingsService = {
 
   deleteApiKey: async (): Promise<void> => {
     await api.delete("/api/users/settings/api-key");
+  },
+
+  /**
+   * Force-refresh the OpenRouter balance for the current user from upstream.
+   *
+   * Backed by `POST /api/users/settings/refresh-balance` (added by Worktree A).
+   * Rate-limited to 10 requests/minute/user — callers should expect 429s
+   * during pathological polling.
+   */
+  refreshBalance: async (): Promise<BalanceInfo> => {
+    const response = await api.post("/api/users/settings/refresh-balance");
+    return response.data;
   },
 
   getRecommendedModels: async (): Promise<RecommendedModels> => {

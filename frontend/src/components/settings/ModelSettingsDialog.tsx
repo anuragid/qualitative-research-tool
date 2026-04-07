@@ -21,6 +21,7 @@ import {
 import { useSettings } from "../../hooks/useSettings";
 import { useModelSearch } from "../../hooks/useModelSearch";
 import { ModelOption } from "./ModelOption";
+import { BalanceDisplay } from "./BalanceDisplay";
 import { LockIcon, LoaderIcon } from "lucide-react";
 import type { SearchModel } from "../../services/settings";
 
@@ -42,6 +43,8 @@ export function ModelSettingsDialog({
     resetUpdateError,
     deleteApiKey,
     isDeletingKey,
+    refreshBalance,
+    isRefreshingBalance,
   } = useSettings();
 
   const [apiKey, setApiKey] = useState("");
@@ -313,6 +316,25 @@ export function ModelSettingsDialog({
                 openrouter.ai/keys
               </a>
             </p>
+            {/* Balance display — null-renders for non-BYOK users */}
+            {settings?.has_api_key && (
+              <div className="mt-3">
+                <BalanceDisplay
+                  balance={settings?.balance ?? null}
+                  onRefresh={() => {
+                    void refreshBalance().catch(() => {
+                      // Errors are surfaced via the hook's refreshBalanceError
+                      // and a future toast layer; swallow here so the click
+                      // handler can't throw.
+                    });
+                  }}
+                  isRefreshing={isRefreshingBalance}
+                  // TODO: source from settings.low_balance_threshold_usd once
+                  // Worktree A's GET /settings response exposes the constant.
+                  lowThresholdUsd={settings?.low_balance_threshold_usd ?? 0.5}
+                />
+              </div>
+            )}
           </div>
         </div>
 

@@ -7,6 +7,43 @@ import type { VideoAnalysis } from "../../types";
 
 // ---- Mocks ----
 
+// useSettings is invoked by AnalysisSection for the InsufficientCreditsAlert
+// refresh-and-retry flow. We mock it so tests don't need a QueryClientProvider.
+const mockRefreshBalance = vi.fn().mockResolvedValue(null);
+vi.mock("../../hooks/useSettings", () => ({
+  useSettings: () => ({
+    settings: undefined,
+    isLoading: false,
+    recommended: undefined,
+    isLoadingRecommended: false,
+    updateSettings: vi.fn(),
+    isUpdating: false,
+    updateError: null,
+    resetUpdateError: vi.fn(),
+    deleteApiKey: vi.fn(),
+    isDeletingKey: false,
+    refreshBalance: mockRefreshBalance,
+    isRefreshingBalance: false,
+    refreshBalanceError: null,
+  }),
+}));
+
+// Stub the InsufficientCreditsAlert so its 30s polling doesn't interfere with
+// fake timers from sibling tests, and so we can assert it appears.
+vi.mock("./InsufficientCreditsAlert", () => ({
+  InsufficientCreditsAlert: ({
+    errorMessage,
+    videoId,
+  }: {
+    errorMessage: string;
+    videoId: string;
+  }) => (
+    <div data-testid="insufficient-credits-alert" data-video-id={videoId}>
+      {errorMessage}
+    </div>
+  ),
+}));
+
 vi.mock("./ChunksList", () => ({
   ChunksList: () => <div data-testid="chunks-list">Chunks</div>,
 }));
@@ -562,5 +599,165 @@ describe("AnalysisSection", () => {
     expect(patternsTab).toBeDefined();
     // The patterns tab should NOT be disabled when step has error
     expect(patternsTab!.getAttribute("data-disabled")).not.toBe("true");
+  });
+
+  // ---- BYOK insufficient_credits branching ----
+
+  // 25. Step error with insufficient_credits → renders InsufficientCreditsAlert
+  it("renders InsufficientCreditsAlert when step error has error_type insufficient_credits", () => {
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+    analysis.error_message = JSON.stringify({
+      step: "infer",
+      error_type: "insufficient_credits",
+      message: "OpenRouter returned 402 — insufficient credits",
+      retryable: false,
+    });
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+      activeStepTab: "inferences",
+      onRetryInferStep: vi.fn(),
+    });
+
+    expect(
+      container.querySelector('[data-testid="insufficient-credits-alert"]'),
+    ).not.toBeNull();
+    // The generic step-failed banner should NOT appear in its place
+    const errorBanner = container.querySelector(
+      '[data-slot="alert-banner"][data-variant="error"]',
+    );
+    // It is allowed to be null OR contain a different title; the InsufficientCreditsAlert
+    // is the rendered branch.
+    if (errorBanner) {
+      expect(errorBanner.textContent).not.toContain("Infer step failed");
+    }
+  });
+
+  // 26. Step error with llm_permanent → renders generic banner (regression guard)
+  it("renders generic error banner when error_type is llm_permanent (not insufficient_credits)", () => {
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+    analysis.error_message = JSON.stringify({
+      step: "infer",
+      error_type: "llm_permanent",
+      message: "401 Unauthorized",
+      retryable: false,
+    });
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+      activeStepTab: "inferences",
+      onRetryInferStep: vi.fn(),
+    });
+
+    expect(
+      container.querySelector('[data-testid="insufficient-credits-alert"]'),
+    ).toBeNull();
+    const errorBanner = container.querySelector('[data-variant="error"]');
+    expect(errorBanner).not.toBeNull();
+    expect(errorBanner!.textContent).toContain("Infer step failed");
+  });
+
+  // 27. Step error with llm_error → renders generic banner (regression guard)
+  it("renders generic error banner when error_type is llm_error (regression guard)", () => {
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+    analysis.error_message = JSON.stringify({
+      step: "infer",
+      error_type: "llm_error",
+      message: "Internal server error",
+      retryable: true,
+    });
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+      activeStepTab: "inferences",
+      onRetryInferStep: vi.fn(),
+    });
+
+    expect(
+      container.querySelector('[data-testid="insufficient-credits-alert"]'),
+    ).toBeNull();
+    const errorBanner = container.querySelector('[data-variant="error"]');
+    expect(errorBanner).not.toBeNull();
+    expect(errorBanner!.textContent).toContain("Infer step failed");
+  });
+
+  // 28. Full-analysis error with insufficient_credits → renders InsufficientCreditsAlert
+  it("renders InsufficientCreditsAlert when full analysis fails with insufficient_credits", () => {
+    const analysis = createCompletedAnalysis({
+      status: "error",
+      current_step: null,
+      error_message: JSON.stringify({
+        error_type: "insufficient_credits",
+        message: "Your OpenRouter key has no credits.",
+        retryable: false,
+      }),
+    });
+
+    const { container } = renderSection({ analysis });
+
+    expect(
+      container.querySelector('[data-testid="insufficient-credits-alert"]'),
+    ).not.toBeNull();
+    // Generic "Analysis failed" banner should NOT appear
+    const genericBanner = container.querySelector('[data-variant="error"]');
+    if (genericBanner) {
+      expect(genericBanner.textContent).not.toContain("Analysis failed");
+    }
+  });
+
+  // 29. Non-error analysis → no insufficient_credits alert
+  it("does not render InsufficientCreditsAlert when analysis has no error", () => {
+    const { container } = renderSection({ analysis: createCompletedAnalysis() });
+    expect(
+      container.querySelector('[data-testid="insufficient-credits-alert"]'),
+    ).toBeNull();
+  });
+
+  // 30. Step error with no error_message → falls back to generic banner
+  it("falls back to generic banner when step error_message is missing", () => {
+    const analysis = createStepByStepAnalysis("infer");
+    analysis.step_status = {
+      chunk: "completed",
+      infer: "error",
+      relate: "pending",
+      explain: "pending",
+      activate: "pending",
+    };
+    analysis.error_message = null;
+
+    const { container } = renderSection({
+      analysis,
+      stepInfo: { name: "Infer", number: 2, nextStep: "relate", handler: vi.fn() },
+      activeStepTab: "inferences",
+      onRetryInferStep: vi.fn(),
+    });
+
+    expect(
+      container.querySelector('[data-testid="insufficient-credits-alert"]'),
+    ).toBeNull();
   });
 });

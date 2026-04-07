@@ -4,8 +4,11 @@ import { PatternsList } from "./PatternsList";
 import { InsightsList } from "./InsightsList";
 import { PrinciplesList } from "./PrinciplesList";
 import { ContinueStepButton } from "./ContinueStepButton";
+import { InsufficientCreditsAlert } from "./InsufficientCreditsAlert";
 import { AnalysisToolbar } from "./display/AnalysisToolbar";
 import { useAnalysisDisplay } from "./hooks/useAnalysisDisplay";
+import { useSettings } from "../../hooks/useSettings";
+import { parseErrorMessage } from "../../lib/parseError";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -29,7 +32,7 @@ import {
   Zap,
   RotateCcw,
 } from "lucide-react";
-import type { VideoAnalysis } from "../../types";
+import type { VideoAnalysis, BalanceInfo } from "../../types";
 
 interface AnalysisSectionProps {
   analysis: VideoAnalysis | undefined;
@@ -107,10 +110,32 @@ export function AnalysisSection({
   onRetryExplainStep,
   onRetryActivateStep,
 }: AnalysisSectionProps) {
+  // Pulled in for the InsufficientCreditsAlert refresh-and-retry flow.
+  // For non-BYOK users this is a no-op (refreshBalance returns null + the
+  // alert never renders because the backend doesn't emit
+  // error_type: "insufficient_credits" for them).
+  const { refreshBalance } = useSettings();
+
   if (!hasTranscript) return null;
 
   const hasAnalysis = analysis && analysis.status === "completed";
   const isStepByStepMode = analysis && analysis.status !== "completed";
+
+  // Parse the analysis error_message once so we can branch into
+  // InsufficientCreditsAlert when error_type === "insufficient_credits".
+  const parsedError = analysis?.error_message
+    ? parseErrorMessage(analysis.error_message)
+    : null;
+  const isInsufficientCredits =
+    parsedError?.errorType === "insufficient_credits";
+
+  const handleRefreshBalance = async (): Promise<BalanceInfo | null> => {
+    try {
+      return await refreshBalance();
+    } catch {
+      return null;
+    }
+  };
 
   // Map step names to their retry handlers
   const stepRetryHandlers: Record<string, (() => void) | undefined> = {
@@ -134,6 +159,25 @@ export function AnalysisSection({
     if (!analysis?.step_status || analysis.step_status[stepKey] !== "error") return null;
     const retryHandler = stepRetryHandlers[stepKey];
     const stepLabel = stepNameLabels[stepKey] || stepKey;
+
+    // Branch on insufficient_credits — render the dedicated alert with
+    // step-status detail + Add credits CTA + refresh-and-retry flow.
+    if (isInsufficientCredits && retryHandler) {
+      return (
+        <div className="mb-4">
+          <InsufficientCreditsAlert
+            errorMessage={parsedError?.message ?? ""}
+            stepStatus={analysis.step_status ?? undefined}
+            currentStep={analysis.current_step ?? stepKey}
+            videoId={analysis.video_id}
+            onRefreshBalance={handleRefreshBalance}
+            onRetry={async () => {
+              retryHandler();
+            }}
+          />
+        </div>
+      );
+    }
 
     return (
       <AlertBanner
@@ -616,6 +660,24 @@ export function AnalysisSection({
   // Full-analysis error state (non-step-by-step mode)
   const renderFullAnalysisError = () => {
     if (!analysis || analysis.status !== "error" || analysis.current_step) return null;
+
+    if (isInsufficientCredits) {
+      return (
+        <div className="mb-4">
+          <InsufficientCreditsAlert
+            errorMessage={parsedError?.message ?? ""}
+            stepStatus={analysis.step_status ?? undefined}
+            currentStep={analysis.current_step ?? undefined}
+            videoId={analysis.video_id}
+            onRefreshBalance={handleRefreshBalance}
+            onRetry={async () => {
+              onStartFullAnalysis();
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <AlertBanner
         variant="error"
