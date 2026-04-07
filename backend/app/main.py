@@ -5,8 +5,6 @@
 from app.sentry_setup import init_sentry  # noqa: E402, I001 — must run before other imports
 init_sentry()
 
-import base64
-import json
 import logging
 import re
 from contextlib import asynccontextmanager
@@ -17,13 +15,13 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sqlalchemy import text
 
 from app.config import settings
 from app.database import Base, engine
+from app.rate_limit import limiter
 
 # Configure logging
 logging.basicConfig(
@@ -34,49 +32,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _DEFAULT_LOCALHOST_ORIGINS = "http://localhost:5173,http://localhost:3000"
-
-
-def _get_rate_limit_key(request: Request) -> str:
-    """Extract a rate-limit key from the request.
-
-    For authenticated requests, use the user's ID (``sub`` claim from the JWT)
-    so rate limits are per-user rather than per-IP.  This prevents all users
-    behind a shared proxy/CDN (e.g. Cloudflare) from sharing one bucket.
-
-    For unauthenticated endpoints (health, Clerk proxy), fall back to IP.
-
-    This function intentionally does *not* verify the JWT signature -- it only
-    base64-decodes the payload to read the ``sub`` claim.  This is acceptable
-    because rate limiting is a best-effort defense, not an auth mechanism.
-    """
-    auth_header = request.headers.get("authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-        try:
-            # JWT structure: header.payload.signature
-            parts = token.split(".")
-            if len(parts) == 3:
-                payload_b64 = parts[1]
-                # Add padding for base64
-                padding = 4 - len(payload_b64) % 4
-                if padding != 4:
-                    payload_b64 += "=" * padding
-                payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-                sub = payload.get("sub")
-                if sub and isinstance(sub, str):
-                    return f"user:{sub}"
-        except Exception:
-            # Any decode error -- fall back to IP silently.
-            pass
-
-    return get_remote_address(request)
-
-
-# Rate limiter — uses settings for default limit
-limiter = Limiter(
-    key_func=_get_rate_limit_key,
-    default_limits=[settings.RATE_LIMIT_DEFAULT],
-)
 
 
 def _validate_production_config() -> None:

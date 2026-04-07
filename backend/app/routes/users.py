@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.auth_bridge import get_current_user
 from app.constants import DEFAULT_STANDARD_MODEL, STANDARD_MODEL_IDS, STANDARD_MODELS
 from app.database import get_db
-from app.main import limiter
 from app.models import database_models
 from app.models.schemas import (
     ApiKeyAddRequest,
@@ -19,6 +18,7 @@ from app.models.schemas import (
     UserResponse,
     UserSettingsResponse,
 )
+from app.rate_limit import limiter
 from app.services.clerk_service import fetch_clerk_user
 from app.services.encryption_service import encryption_service
 from app.services.openrouter_balance import (
