@@ -93,6 +93,43 @@ class UserSettingsResponse(BaseModel):
     balance: Optional[BalanceInfoResponse] = None
 
 
+class ApiKeyAddRequest(BaseModel):
+    """Schema for POST /api/users/settings/api-key.
+
+    Sole purpose: add or replace the user's BYOK key. Validation +
+    balance check happen server-side; this schema only enforces shape.
+    """
+    api_key: str = Field(..., min_length=10, max_length=500)
+
+    @field_validator("api_key")
+    @classmethod
+    def validate_api_key(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("API key cannot be blank or whitespace-only")
+        return v
+
+
+class PreferredModelUpdateRequest(BaseModel):
+    """Schema for PUT /api/users/settings/preferred-model.
+
+    Sole purpose: set the active model. Tier enforcement is in the route
+    (no key → must be a standard model id).
+    """
+    preferred_model: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("preferred_model")
+    @classmethod
+    def validate_preferred_model(cls, v: str) -> str:
+        v = _strip_control_chars(v).strip()
+        if not v:
+            raise ValueError("Model ID cannot be blank")
+        if not re.match(r'^[a-zA-Z0-9_\-]+/[a-zA-Z0-9._\-:]+$', v):
+            raise ValueError(
+                "Model ID must follow the format 'provider/model-name'"
+            )
+        return v
+
+
 # ========== Project Schemas ==========
 
 _VALID_PROJECT_STATUSES = {"planning", "ready", "processing", "completed", "archived", "error"}
