@@ -12,13 +12,111 @@ import time
 from pathlib import Path
 from uuid import UUID
 
-from app.models.database_models import SpeakerLabel, Transcript, Video
+from celery import chain
+from sqlalchemy.orm import Session
+
+from app.models.database_models import (
+    Project,
+    SpeakerLabel,
+    Transcript,
+    Video,
+    VideoAnalysis,
+)
 from app.services.assemblyai_service import assemblyai_service
 from app.services.s3_service import s3_service
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+def _maybe_auto_dispatch_analyze_chain(db: Session, video: Video) -> None:
+    """Dispatch the analyze chain for a newly-transcribed video if no chain
+    is already running or completed.
+
+    Called from check_transcription_task after transcription completes. The
+    user would otherwise have to click "Analyze" manually, which is the gap
+    where frontend 404 crashes (Sentry JAVASCRIPT-REACT-6) and stuck-video
+    symptoms live. See docs/production-readiness/prs/pr20-auto-dispatch.md.
+
+    Idempotency rules:
+    - Skip if video.status is not "transcribed" (something else is in progress
+      or failed).
+    - Skip if a VideoAnalysis row exists with status in
+      ("processing", "completed") — chain is running or already done.
+    - OK to dispatch if no VideoAnalysis row exists (fresh case) or if one
+      exists with status in ("pending", "error", None) — the chunk step is
+      idempotent and will take over (after fix/retry-reset-analysis lands).
+
+    BYOK note: this path bypasses the FastAPI dependency injection used by
+    routes/videos.py for `require_byok_credits`. The chain steps themselves
+    call `_resolve_byok_or_raise_credits_error` at every step, so a user
+    without credits will see a clear `insufficient_credits` failure surfaced
+    in the analysis row. No additional preflight here is needed; this matches
+    the existing chain pattern intentionally.
+    """
+    if video.status != "transcribed":
+        logger.info(
+            f"[auto-dispatch] Skipping analyze for video {video.id}: "
+            f"video.status={video.status!r} (expected 'transcribed')"
+        )
+        return
+
+    existing = (
+        db.query(VideoAnalysis)
+        .filter(VideoAnalysis.video_id == video.id)
+        .first()
+    )
+    if existing and existing.status in ("processing", "completed"):
+        logger.info(
+            f"[auto-dispatch] Skipping analyze for video {video.id}: "
+            f"VideoAnalysis.status={existing.status!r} (chain in flight or done)"
+        )
+        return
+
+    # Resolve the user_id. Transcription tasks don't receive user_id directly;
+    # it comes from video.project.user_id. Load the project explicitly to avoid
+    # relying on lazy-loaded relationships from a possibly-detached video.
+    project = db.query(Project).filter(Project.id == video.project_id).first()
+    if not project:
+        logger.error(
+            f"[auto-dispatch] Cannot dispatch analyze for video {video.id}: "
+            f"project {video.project_id} not found"
+        )
+        return
+    current_user_id = project.user_id
+
+    # Flip video.status to "analyzing" in the same transaction so the
+    # concurrent-double-click race is closed (mirrors routes/videos.py:656).
+    video.status = "analyzing"
+    video.error_message = None
+    db.commit()
+
+    # Dispatch the chain. Imports are local to avoid circulars between
+    # transcription_tasks and analysis_steps at module-load time.
+    from app.tasks.analysis_steps import (
+        analyze_activate_step,
+        analyze_chunk_step,
+        analyze_explain_step,
+        analyze_infer_step,
+        analyze_relate_step,
+    )
+    from app.tasks.pipeline_errors import handle_pipeline_error
+
+    video_id_str = str(video.id)
+    pipeline = chain(
+        analyze_chunk_step.si(video_id_str, current_user_id),
+        analyze_infer_step.si(video_id_str, current_user_id),
+        analyze_relate_step.si(video_id_str, current_user_id),
+        analyze_explain_step.si(video_id_str, current_user_id),
+        analyze_activate_step.si(video_id_str, current_user_id),
+    ).on_error(handle_pipeline_error.s(video_id=video_id_str))
+
+    task = pipeline.apply_async()
+    logger.info(
+        f"[auto-dispatch] Dispatched analyze chain for video {video.id}, "
+        f"task_id: {task.id}"
+    )
 
 
 @celery_app.task(
@@ -218,12 +316,34 @@ def check_transcription_task(self, video_id: str, started_at: float | None = Non
             video = self.db.query(Video).filter(Video.id == UUID(video_id)).first()
             if video:
                 video.status = "transcribed"
+                # Clear any prior transcription error so the UI doesn't keep
+                # showing a stale error banner once the retry succeeds.
+                video.error_message = None
                 duration = processed_transcript.get("duration_seconds")
                 if duration:
                     video.duration_seconds = int(round(duration))
             self.db.commit()
 
             logger.info(f"Transcription completed for video {video_id}")
+
+            # PR #20: Auto-dispatch the analyze chain so the user doesn't have
+            # to click "Analyze" manually. Eliminates the
+            # transcribed-but-no-analysis-row window that caused frontend
+            # crashes (Sentry JAVASCRIPT-REACT-6) and made videos look stuck.
+            # The helper guards against double-dispatch via DB status checks.
+            if video:
+                try:
+                    _maybe_auto_dispatch_analyze_chain(self.db, video)
+                except Exception as dispatch_err:
+                    # Auto-dispatch is best-effort: a failure here must NOT
+                    # mark the transcription itself as errored — the manual
+                    # "Analyze" button remains as a retry affordance. Log
+                    # loudly so we notice in Sentry / logs.
+                    logger.exception(
+                        f"[auto-dispatch] Failed to dispatch analyze chain "
+                        f"for video {video_id}: {dispatch_err}"
+                    )
+
             return {
                 "video_id": video_id,
                 "transcript_id": str(transcript.id),
