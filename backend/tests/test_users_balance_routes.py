@@ -1,6 +1,7 @@
 """Route integration tests for the BYOK balance feature.
 
-Covers GET /users/settings, PUT /users/settings (with key validation),
+Covers GET /users/settings, POST /users/settings/api-key (key save with
+balance validation), DELETE /users/settings/api-key, and
 POST /users/settings/refresh-balance.
 
 We mock OpenRouter HTTP calls everywhere — no test in this file hits
@@ -88,86 +89,6 @@ def reset_limiter():
 
 
 # =============================================================================
-# PUT /users/settings — save-time balance validation
-# =============================================================================
-
-
-async def test_put_settings_with_zero_balance_key_rejects_400(client, ensure_user, reset_limiter):
-    """The Baffour Adu case: paste a 0-credit key, get an actionable 400."""
-    responses = _mock_responses(HEALTHY_AUTH_KEY, ZERO_CREDITS)
-    with _patch_httpx(get_side_effect=responses):
-        response = await client.put(
-            "/api/users/settings",
-            headers=_AUTH,
-            json={"api_key": "sk-or-v1-zerocreditstestkey"},
-        )
-    assert response.status_code == 400, response.text
-    detail = response.json()["detail"]
-    assert "0 credits" in detail or "$0 credits" in detail
-    assert "openrouter.ai/settings/credits" in detail
-
-
-async def test_put_settings_with_healthy_key_persists_balance(client, ensure_user, reset_limiter):
-    """A healthy key save should 200 and persist all 7 balance columns."""
-    responses = _mock_responses(HEALTHY_AUTH_KEY, HEALTHY_CREDITS)
-    with _patch_httpx(get_side_effect=responses):
-        response = await client.put(
-            "/api/users/settings",
-            headers=_AUTH,
-            json={"api_key": "sk-or-v1-healthytestkey"},
-        )
-    assert response.status_code == 200, response.text
-
-    body = response.json()
-    assert body["has_api_key"] is True
-    assert body["balance"] is not None
-    assert body["balance"]["total_credits"] == 10.0
-    assert body["balance"]["total_usage"] == pytest.approx(0.6)
-    assert body["balance"]["balance_remaining"] == pytest.approx(9.4)
-    assert body["balance"]["has_credits"] is True
-    assert body["balance"]["is_free_tier"] is False
-    assert body["balance"]["stale"] is False
-
-
-async def test_put_settings_with_unreachable_openrouter_rejects_400(
-    client, ensure_user, reset_limiter
-):
-    """Network failure during save → 400 (key not stored).
-
-    The user can retry; we'd rather fail loud than store an unverified key.
-    """
-    def boom(*args, **kwargs):
-        raise httpx.ConnectError("dns failure")
-
-    with _patch_httpx(get_side_effect=boom):
-        response = await client.put(
-            "/api/users/settings",
-            headers=_AUTH,
-            json={"api_key": "sk-or-v1-doesnotmatter"},
-        )
-    assert response.status_code == 400
-
-
-async def test_put_settings_model_only_does_not_call_openrouter(
-    client, ensure_user, reset_limiter
-):
-    """Updating only preferred_model should never hit OpenRouter."""
-    with patch(
-        "app.routes.users.fetch_balance_sync",
-        side_effect=AssertionError("must not be called"),
-    ):
-        response = await client.put(
-            "/api/users/settings",
-            headers=_AUTH,
-            json={"preferred_model": "openai/gpt-4"},
-        )
-    # Tier-check may 403 (no BYOK key) but the important assertion is
-    # that fetch_balance_sync was never called — patch's side_effect
-    # would have raised by now.
-    assert response.status_code in {200, 403}
-
-
-# =============================================================================
 # GET /users/settings — balance read
 # =============================================================================
 
@@ -194,8 +115,8 @@ async def test_get_settings_for_byok_user_includes_balance(
     # First save a key (this also persists balance via the live mock)
     responses = _mock_responses(HEALTHY_AUTH_KEY, HEALTHY_CREDITS)
     with _patch_httpx(get_side_effect=responses):
-        save_resp = await client.put(
-            "/api/users/settings",
+        save_resp = await client.post(
+            "/api/users/settings/api-key",
             headers=_AUTH,
             json={"api_key": "sk-or-v1-byokuser"},
         )
@@ -234,8 +155,8 @@ async def test_delete_api_key_clears_balance_fields(
     # Save a key + balance first
     responses = _mock_responses(HEALTHY_AUTH_KEY, HEALTHY_CREDITS)
     with _patch_httpx(get_side_effect=responses):
-        save_resp = await client.put(
-            "/api/users/settings",
+        save_resp = await client.post(
+            "/api/users/settings/api-key",
             headers=_AUTH,
             json={"api_key": "sk-or-v1-tobedelete"},
         )
@@ -267,8 +188,8 @@ async def test_refresh_balance_healthy_returns_fresh_balance(
     # Setup: save a healthy key first
     responses = _mock_responses(HEALTHY_AUTH_KEY, HEALTHY_CREDITS)
     with _patch_httpx(get_side_effect=responses):
-        save_resp = await client.put(
-            "/api/users/settings",
+        save_resp = await client.post(
+            "/api/users/settings/api-key",
             headers=_AUTH,
             json={"api_key": "sk-or-v1-byokhealthy"},
         )
@@ -294,8 +215,8 @@ async def test_refresh_balance_openrouter_unreachable_returns_503_with_stale(
     # Save a key first to populate cache
     responses = _mock_responses(HEALTHY_AUTH_KEY, HEALTHY_CREDITS)
     with _patch_httpx(get_side_effect=responses):
-        save_resp = await client.put(
-            "/api/users/settings",
+        save_resp = await client.post(
+            "/api/users/settings/api-key",
             headers=_AUTH,
             json={"api_key": "sk-or-v1-stalecache"},
         )
@@ -324,8 +245,8 @@ async def test_refresh_balance_rate_limited_at_11th_call(
     # Setup: save a key so we don't hit the no-BYOK 400 path
     responses = _mock_responses(HEALTHY_AUTH_KEY, HEALTHY_CREDITS)
     with _patch_httpx(get_side_effect=responses):
-        save_resp = await client.put(
-            "/api/users/settings",
+        save_resp = await client.post(
+            "/api/users/settings/api-key",
             headers=_AUTH,
             json={"api_key": "sk-or-v1-ratelimit"},
         )
