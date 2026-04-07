@@ -513,6 +513,55 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
 
 // ── Sticky pendingModel ──────────────────────────────────────────────────
 
+describe("dialog reset on close+reopen", () => {
+  it("closing and reopening the dialog resets pendingModel and re-derives mode from server state", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({ preferred_model: "meta-llama/llama-4-scout" }),
+    );
+
+    const user = setupUser();
+    // 1. Render open with standard mode + saved Llama
+    const { rerender } = render(
+      <ModelSettingsDialog open onOpenChange={() => {}} />,
+      { wrapper: makeWrapper() },
+    );
+
+    // 2. Wait for dialog to load and verify Standard tab is active
+    await waitFor(() => {
+      expect(getStandardTab().getAttribute("data-state")).toBe("active");
+    });
+
+    // 3. Pick a different standard radio (sets pendingModel)
+    const nemotronRadio = screen.getByRole("radio", { name: /nemotron/i });
+    await user.click(nemotronRadio);
+
+    // 4. Verify Save is enabled (pendingModel is dirty)
+    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+
+    // 5. Close the dialog (open=false)
+    rerender(<ModelSettingsDialog open={false} onOpenChange={() => {}} />);
+
+    // 6. Re-open the dialog (open=true)
+    rerender(<ModelSettingsDialog open onOpenChange={() => {}} />);
+
+    // 7. Save should be disabled (pendingModel reset)
+    await waitFor(() => {
+      const saveBtnAfter = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+      expect(saveBtnAfter.disabled).toBe(true);
+    });
+
+    // 8. Standard tab still active and original Llama radio is checked
+    expect(getStandardTab().getAttribute("data-state")).toBe("active");
+    const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
+    expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
+
+    // 9. The discarded pick (Nemotron) is NOT checked
+    const nemotronRadioAfter = screen.getByRole("radio", { name: /nemotron/i });
+    expect(nemotronRadioAfter.getAttribute("aria-checked")).not.toBe("true");
+  });
+});
+
 describe("ModelSettingsDialog — sticky pendingModel under refetch", () => {
   it("a background settings refetch does not overwrite an in-flight model pick", async () => {
     let getCallCount = 0;

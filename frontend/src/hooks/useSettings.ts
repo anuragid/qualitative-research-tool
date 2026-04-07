@@ -77,6 +77,8 @@ export function useSettings() {
 
     deleteApiKey: deleteKeyMutation.mutateAsync,
     isDeletingKey: deleteKeyMutation.isPending,
+    deleteKeyError: deleteKeyMutation.error,
+    resetDeleteKeyError: deleteKeyMutation.reset,
 
     /** Returns the fresh balance via the mutation's promise. */
     refreshBalance: refreshBalanceMutation.mutateAsync,

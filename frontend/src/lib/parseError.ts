@@ -59,6 +59,33 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
   return { message: raw, errorType: "unknown", retryable: true };
 }
 
+/**
+ * Unwrap an unknown thrown error (typically an Axios rejection) into a
+ * displayable string. Reads `response.data.detail` first (FastAPI shape),
+ * then `message`, then falls back.
+ *
+ * Use this in mutation/query error UI rendering instead of hand-rolling
+ * the type narrowing each time.
+ */
+export function extractErrorDetail(err: unknown, fallback: string): string {
+  if (typeof err === "object" && err !== null) {
+    const e = err as {
+      response?: { data?: { detail?: unknown } };
+      message?: string;
+    };
+    const detail = e.response?.data?.detail;
+    if (typeof detail === "string") return detail;
+    // FastAPI sometimes returns a structured detail object — surface its
+    // `message` field if present.
+    if (typeof detail === "object" && detail !== null && "message" in detail) {
+      const msg = (detail as { message?: unknown }).message;
+      if (typeof msg === "string") return msg;
+    }
+    if (typeof e.message === "string") return e.message;
+  }
+  return fallback;
+}
+
 export function getErrorTypeLabel(errorType?: ParsedError["errorType"]): string {
   switch (errorType) {
     case "rate_limit": return "Rate Limited";

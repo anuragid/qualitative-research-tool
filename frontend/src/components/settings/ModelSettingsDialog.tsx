@@ -25,6 +25,7 @@ import { ModelOption } from "./ModelOption";
 import { BalanceDisplay } from "./BalanceDisplay";
 import { LoaderIcon } from "lucide-react";
 import type { SearchModel, UserSettings } from "../../services/settings";
+import { extractErrorDetail } from "../../lib/parseError";
 
 type Mode = "standard" | "premium";
 
@@ -63,6 +64,8 @@ export function ModelSettingsDialog({
     resetUpdateModelError,
     deleteApiKey,
     isDeletingKey,
+    deleteKeyError,
+    resetDeleteKeyError,
     refreshBalance,
     isRefreshingBalance,
   } = useSettings();
@@ -93,6 +96,7 @@ export function ModelSettingsDialog({
     setQuery("");
     resetAddKeyError();
     resetUpdateModelError();
+    resetDeleteKeyError();
     setMode(deriveInitialMode(settings));
     // We intentionally exclude the reset/setQuery callbacks from deps —
     // they're stable identities from the hook and including them would
@@ -145,7 +149,7 @@ export function ModelSettingsDialog({
       setPendingModel(null);
       setApiKeyDraft("");
     } catch {
-      // surfaced via updateModelError or a future toast
+      // surfaced via deleteKeyError inline error message
     }
   };
 
@@ -164,10 +168,13 @@ export function ModelSettingsDialog({
 
   // ── Render ───────────────────────────────────────────────────────────
   const addKeyErrorMessage = addKeyError
-    ? extractErrorMessage(addKeyError, "Could not save the API key.")
+    ? extractErrorDetail(addKeyError, "Could not save the API key.")
     : null;
   const updateModelErrorMessage = updateModelError
-    ? extractErrorMessage(updateModelError, "Could not update the model.")
+    ? extractErrorDetail(updateModelError, "Could not update the model.")
+    : null;
+  const deleteKeyErrorMessage = deleteKeyError
+    ? extractErrorDetail(deleteKeyError, "Could not remove the API key.")
     : null;
 
   // Controlled value for the premium combobox: prefer the matching item
@@ -237,17 +244,24 @@ export function ModelSettingsDialog({
             )}
 
             {settings.has_api_key && (
-              <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs text-text-tertiary">
-                OpenRouter key on file (ending …{settings.key_hint ?? "****"}).{" "}
-                <button
-                  type="button"
-                  className="underline hover:text-text-secondary"
-                  onClick={handleRemoveKey}
-                  disabled={isDeletingKey}
-                >
-                  Remove key
-                </button>
-              </div>
+              <>
+                {deleteKeyErrorMessage && (
+                  <div className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {deleteKeyErrorMessage}
+                  </div>
+                )}
+                <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs text-text-tertiary">
+                  OpenRouter key on file (ending …{settings.key_hint ?? "****"}).{" "}
+                  <button
+                    type="button"
+                    className="underline hover:text-text-secondary"
+                    onClick={handleRemoveKey}
+                    disabled={isDeletingKey}
+                  >
+                    Remove key
+                  </button>
+                </div>
+              </>
             )}
           </TabsContent>
 
@@ -284,7 +298,12 @@ export function ModelSettingsDialog({
                 {addKeyErrorMessage && (
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {addKeyErrorMessage}
-                    {addKeyErrorMessage.toLowerCase().includes("$0 credits") && (
+                    {/* Heuristic: detect any "credits" wording in the error to surface the
+                        Add Credits CTA. The backend's /api-key route only emits two distinct
+                        400 messages — the unreachable/invalid case and the no-credits case —
+                        so a credits-shaped substring is a reliable proxy until the backend
+                        adopts a structured detail payload. */}
+                    {/(\$0 credits|\bno credits\b|\bzero credits\b|\binsufficient credits\b)/i.test(addKeyErrorMessage) && (
                       <a
                         href="https://openrouter.ai/settings/credits"
                         target="_blank"
@@ -319,6 +338,12 @@ export function ModelSettingsDialog({
                     Remove
                   </Button>
                 </div>
+
+                {deleteKeyErrorMessage && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {deleteKeyErrorMessage}
+                  </div>
+                )}
 
                 <BalanceDisplay
                   balance={settings.balance ?? null}
@@ -409,15 +434,4 @@ export function ModelSettingsDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (typeof err === "object" && err !== null) {
-    const e = err as {
-      response?: { data?: { detail?: string } };
-      message?: string;
-    };
-    return e.response?.data?.detail ?? e.message ?? fallback;
-  }
-  return fallback;
 }
