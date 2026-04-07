@@ -35,10 +35,15 @@ const principleColumns: TableColumn<DesignPrinciple>[] = [
 ];
 
 export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: PrinciplesListProps) {
+  // Defensive: upstream jsonb columns can arrive as `null` and prop
+  // drilling + test fixtures occasionally pass `undefined`. Guard at
+  // the boundary so every `.map`/`.length` below is safe.
+  const safePrinciples = principles ?? [];
+
   if (viewMode === "grid") {
     return (
       <CardView columns={2}>
-        {principles.map((principle, i) => (
+        {safePrinciples.map((principle, i) => (
           <PrincipleCard key={principle.principle_id || i} principle={principle} compact />
         ))}
       </CardView>
@@ -48,7 +53,7 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
   if (viewMode === "table") {
     return (
       <TableView
-        data={principles}
+        data={safePrinciples}
         columns={principleColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
@@ -62,11 +67,11 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-h4 text-foreground">
-          Design Principles ({principles.length})
+          Design Principles ({safePrinciples.length})
         </h3>
         <div className="flex gap-2 text-sm">
           {Object.entries(priorityStyles)
-            .filter(([priority]) => principles.some((p) => p.priority === priority))
+            .filter(([priority]) => safePrinciples.some((p) => p.priority === priority))
             .map(([priority, style]) => (
               <Badge key={priority} className={style.badge}>
                 {priority} priority
@@ -76,7 +81,7 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
       </div>
 
       <Accordion type="multiple" className="space-y-3">
-        {principles.map((principle) => (
+        {safePrinciples.map((principle) => (
           <AccordionItem key={principle.principle_id} value={principle.principle_id}>
             <div className={`bg-card rounded-2xl overflow-hidden border-l-4 ${
               priorityStyles[principle.priority]?.border || "border-l-interactive-focus"

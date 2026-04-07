@@ -60,10 +60,13 @@ const crossInsightColumns: TableColumn<CrossInsight>[] = [
 ];
 
 export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSort }: CrossInsightsListProps) {
+  // Defensive guard — prop may be null/undefined. See PR #21.
+  const safeCrossInsights = crossInsights ?? [];
+
   if (viewMode === "grid") {
     return (
       <CardView columns={2}>
-        {crossInsights.map((insight) => (
+        {safeCrossInsights.map((insight) => (
           <CrossInsightCard key={insight.cross_insight_id} insight={insight} compact />
         ))}
       </CardView>
@@ -73,7 +76,7 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
   if (viewMode === "table") {
     return (
       <TableView
-        data={crossInsights}
+        data={safeCrossInsights}
         columns={crossInsightColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
@@ -87,11 +90,11 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-h4 text-foreground">
-          Cross-Video Insights ({crossInsights.length})
+          Cross-Video Insights ({safeCrossInsights.length})
         </h3>
         <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(scopeStyles)
-            .filter(([type]) => crossInsights.some((ci) => ci.scope === type))
+            .filter(([type]) => safeCrossInsights.some((ci) => ci.scope === type))
             .map(([type, style]) => (
               <Badge key={type} className={style}>
                 {type}
@@ -101,7 +104,10 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
       </div>
 
       <Accordion type="multiple" className="space-y-3">
-        {crossInsights.map((insight) => (
+        {safeCrossInsights.map((insight) => {
+          const evidence = insight.evidence ?? [];
+          const supportingMetaPatterns = insight.supporting_meta_patterns ?? [];
+          return (
           <AccordionItem key={insight.cross_insight_id} value={insight.cross_insight_id}>
             <div className="bg-card rounded-2xl overflow-hidden border-l-4 border-l-interactive-focus">
               <AccordionTrigger className="px-3 sm:px-5 py-4 hover:no-underline hover:bg-interactive-fill">
@@ -154,10 +160,10 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
 
                   <div>
                     <div className="text-label text-text-placeholder uppercase mb-2">
-                      Evidence From Videos ({insight.evidence.length})
+                      Evidence From Videos ({evidence.length})
                     </div>
                     <ul className="space-y-2">
-                      {insight.evidence.map((item, idx) => (
+                      {evidence.map((item, idx) => (
                         <li key={idx} className="flex gap-2 p-3 bg-brand-pale-blue/30 rounded-xl">
                           <span className="text-text-disabled">&#8226;</span>
                           <span className="text-text-tertiary">{item}</span>
@@ -168,10 +174,10 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
 
                   <div>
                     <div className="text-label text-text-placeholder uppercase mb-2">
-                      Supporting Meta-Patterns ({insight.supporting_meta_patterns.length})
+                      Supporting Meta-Patterns ({supportingMetaPatterns.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {insight.supporting_meta_patterns.map((patternId) => (
+                      {supportingMetaPatterns.map((patternId) => (
                         <Badge key={patternId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
                           {patternId}
                         </Badge>
@@ -183,7 +189,8 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
               </AccordionContent>
             </div>
           </AccordionItem>
-        ))}
+          );
+        })}
       </Accordion>
     </div>
   );

@@ -33,15 +33,18 @@ const patternColumns: TableColumn<Pattern>[] = [
     <p className="text-sm text-text-tertiary line-clamp-2">{p.description}</p>
   ) },
   { key: "related_inferences", label: "Inferences", sortable: false, render: (p) => (
-    <span className="text-sm text-text-placeholder">{p.related_inferences.length}</span>
+    <span className="text-sm text-text-placeholder">{(p.related_inferences ?? []).length}</span>
   ), className: "w-24" },
 ];
 
 export function PatternsList({ patterns, viewMode = "list", sort, onSort }: PatternsListProps) {
+  // Defensive guard — prop may be null/undefined. See PR #21.
+  const safePatterns = patterns ?? [];
+
   if (viewMode === "grid") {
     return (
       <CardView columns={2}>
-        {patterns.map((pattern, i) => (
+        {safePatterns.map((pattern, i) => (
           <PatternCard key={pattern.pattern_id || i} pattern={pattern} compact />
         ))}
       </CardView>
@@ -51,7 +54,7 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
   if (viewMode === "table") {
     return (
       <TableView
-        data={patterns}
+        data={safePatterns}
         columns={patternColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
@@ -65,11 +68,11 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-h4 text-foreground">
-          Patterns ({patterns.length})
+          Patterns ({safePatterns.length})
         </h3>
         <div className="flex gap-2 text-sm">
           {Object.entries(relationshipTypeStyles)
-            .filter(([type]) => patterns.some((p) => p.relationship_type === type))
+            .filter(([type]) => safePatterns.some((p) => p.relationship_type === type))
             .map(([type, style]) => (
               <Badge key={type} className={style}>
                 {type}
@@ -79,7 +82,9 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
       </div>
 
       <Accordion type="multiple" className="space-y-2">
-        {patterns.map((pattern) => (
+        {safePatterns.map((pattern) => {
+          const relatedInferences = pattern.related_inferences ?? [];
+          return (
           <AccordionItem key={pattern.pattern_id} value={pattern.pattern_id}>
             <div className="bg-card rounded-2xl overflow-hidden">
               <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-interactive-fill">
@@ -120,10 +125,10 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
 
                   <div>
                     <div className="text-label text-text-placeholder uppercase mb-2">
-                      Related Inferences ({pattern.related_inferences.length})
+                      Related Inferences ({relatedInferences.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {pattern.related_inferences.map((infId) => (
+                      {relatedInferences.map((infId) => (
                         <Badge key={infId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
                           {infId}
                         </Badge>
@@ -135,7 +140,8 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
               </AccordionContent>
             </div>
           </AccordionItem>
-        ))}
+          );
+        })}
       </Accordion>
     </div>
   );

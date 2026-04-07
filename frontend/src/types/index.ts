@@ -1,4 +1,52 @@
-// BYOK balance types
+// Runtime-validated schemas are the source of truth — TypeScript types
+// in this file are derived via `z.infer` in the schema modules and
+// re-exported here for backward-compat with existing imports.
+//
+// See `docs/production-readiness/prs/pr21-frontend-defensive.md` and
+// `frontend/src/schemas/` for the zod schemas that back these types.
+
+// ---------- Schema-backed types (Video, Project, Analysis, Transcript) ----------
+
+export type {
+  Video,
+  VideoStatus,
+} from "../schemas/video";
+
+export type {
+  VideoAnalysis,
+  AnalysisStatus,
+  AnalysisStatusResponse,
+  AnalysisStep,
+  Chunk,
+  Inference,
+  Pattern,
+  Insight,
+  DesignPrinciple,
+} from "../schemas/analysis";
+
+export type {
+  Project,
+  ProjectStatus,
+  ProjectAnalysis,
+  MetaPattern,
+  CrossInsight,
+  SystemPrinciple,
+} from "../schemas/project";
+
+export type {
+  Transcript,
+  TranscriptStatus,
+  ProcessedTranscript,
+  Utterance,
+  SpeakerLabel,
+  WordLevelTranscript,
+  Word,
+  SearchMatch,
+  TranscriptSearchResult,
+} from "../schemas/transcript";
+
+// ---------- BYOK balance types (hand-written, not yet schema-backed) ----------
+
 /**
  * Balance info matching backend `BalanceInfo.as_dict()`.
  *
@@ -31,26 +79,7 @@ export interface BalanceInfo {
   stale: boolean;
 }
 
-// Project types
-export type ProjectStatus =
-  | "planning"    // Project created, no files yet
-  | "ready"       // Has files, ready for analysis
-  | "processing"  // Analysis/transcription running
-  | "completed"   // All processing done
-  | "archived"    // Stored for reference (can be unarchived)
-  | "error";      // Something failed
-
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  status: ProjectStatus;
-  error_message?: string | null;  // For error state details
-  videos?: Video[];
-}
+// ---------- Project DTOs (request bodies, not API responses) ----------
 
 export interface CreateProjectDto {
   name: string;
@@ -61,135 +90,10 @@ export interface CreateProjectDto {
 export interface UpdateProjectDto {
   name?: string;
   description?: string;
-  status?: ProjectStatus;
+  status?: import("../schemas/project").ProjectStatus;
 }
 
-// Video types
-export interface Video {
-  id: string;
-  project_id: string;
-  filename: string;
-  file_size_bytes: number;
-  duration_seconds: number | null;
-  uploaded_at: string;
-  status: VideoStatus;
-  error_message: string | null;
-  transcript?: Transcript;
-  analysis?: VideoAnalysis;
-}
-
-export type VideoStatus =
-  | "uploaded"
-  | "transcribing"
-  | "transcribed"
-  | "analyzing"
-  | "analyzed"
-  | "error";
-
-// Transcript types
-export interface Transcript {
-  id: string;
-  video_id: string;
-  assemblyai_id: string;
-  raw_transcript: Record<string, unknown>;
-  processed_transcript: ProcessedTranscript;
-  status: "pending" | "processing" | "completed" | "error";
-  created_at: string;
-  completed_at: string | null;
-  speaker_labels?: SpeakerLabel[];
-}
-
-export interface ProcessedTranscript {
-  text: string;
-  utterances: Utterance[];
-}
-
-export interface Utterance {
-  speaker: string;
-  text: string;
-  start: number;
-  end: number;
-  confidence: number;
-}
-
-export interface SpeakerLabel {
-  id: string;
-  transcript_id: string;
-  speaker_label: string;
-  assigned_name: string | null;
-  role: string | null;
-  created_at: string;
-}
-
-export interface LabelSpeakerDto {
-  speaker_label: string;
-  assigned_name: string;
-  role?: string;
-}
-
-// Analysis types
-//
-// ``id`` is optional so the shape can also model the "not_started"
-// sentinel returned by GET /api/videos/:id/analysis when the parent
-// video exists but no ``video_analyses`` row has been created yet.  See
-// backend/app/routes/videos.py :: get_video_analysis and Sentry
-// JAVASCRIPT-REACT-6.
-export interface VideoAnalysis {
-  id: string | null;
-  video_id: string;
-  chunks: Chunk[] | null;
-  chunks_completed_at: string | null;
-  inferences: Inference[] | null;
-  inferences_completed_at: string | null;
-  patterns: Pattern[] | null;
-  patterns_completed_at: string | null;
-  insights: Insight[] | null;
-  insights_completed_at: string | null;
-  design_principles: DesignPrinciple[] | null;
-  principles_completed_at: string | null;
-  status: AnalysisStatus;
-  started_at: string | null;
-  completed_at: string | null;
-  error_message: string | null;
-  current_step: string | null;
-  step_status: Record<string, string> | null;
-  chunk_completed_at: string | null;
-  infer_completed_at: string | null;
-  relate_completed_at: string | null;
-  explain_completed_at: string | null;
-  activate_completed_at: string | null;
-}
-
-// "not_started" is emitted by the backend when the parent video/project
-// exists but no analysis row has been created yet -- the frontend must
-// render an empty/CTA state for this status instead of crashing.
-export type AnalysisStatus =
-  | "not_started"
-  | "pending"
-  | "processing"
-  | "completed"
-  | "error";
-
-export interface AnalysisStatusResponse {
-  status: AnalysisStatus;
-  current_step: string | null;
-  step_status: Record<string, string> | null;
-  started_at: string | null;
-  completed_at: string | null;
-}
-
-export interface Chunk {
-  chunk_id: string;
-  speaker: string;
-  timestamp: string;
-  text: string;
-  type: "quote" | "observation" | "context" | "fact";
-}
-
-export interface Inference {
-  chunk_id: string;
-  inferences: InferenceItem[];
-}
+// ---------- Inference inner item (kept as nominal alias for legacy call sites) ----------
 
 export interface InferenceItem {
   inference_id: string;
@@ -198,114 +102,10 @@ export interface InferenceItem {
   context: string;
 }
 
-export interface Pattern {
-  pattern_id: string;
-  pattern_name: string;
-  description: string;
-  related_inferences: string[];
-  relationship_type: "convergent" | "divergent" | "tension" | "causal";
-  frequency: "high" | "medium" | "low";
-  significance: string;
-}
+// ---------- Transcript request DTOs ----------
 
-export interface Insight {
-  insight_id: string;
-  headline: string;
-  explanation: string;
-  supporting_patterns: string[];
-  evidence: string[];
-  type: "non-consensus" | "first-principles" | "surprising" | "revealing";
-  implications: string;
-  confidence: "high" | "medium" | "low";
-}
-
-export interface DesignPrinciple {
-  principle_id: string;
-  insight_id: string;
-  principle: string;
-  rationale: string;
-  how_might_we: string[];
-  priority: "high" | "medium" | "low";
-}
-
-// Project Analysis (Cross-Video) types
-//
-// ``id`` and ``error_message`` may be null when the backend returns
-// the "not_started" sentinel (project exists but no project_analyses
-// row).
-export interface ProjectAnalysis {
-  id: string | null;
-  project_id: string;
-  video_ids: string[];
-  cross_video_patterns: MetaPattern[] | null;
-  patterns_completed_at: string | null;
-  cross_video_insights: CrossInsight[] | null;
-  insights_completed_at: string | null;
-  cross_video_principles: SystemPrinciple[] | null;
-  principles_completed_at: string | null;
-  status: AnalysisStatus;
-  started_at: string | null;
-  completed_at: string | null;
-  error_message: string | null;
-}
-
-export interface MetaPattern {
-  meta_pattern_id: string;
-  pattern_name: string;
-  description: string;
-  appears_in_videos: string[];
-  related_patterns: string[];
-  consistency: "consistent" | "varying" | "contradictory";
-  context_sensitivity: string;
-  significance: string;
-}
-
-export interface CrossInsight {
-  cross_insight_id: string;
-  headline: string;
-  explanation: string;
-  supporting_meta_patterns: string[];
-  consistency_across_videos: "high" | "medium" | "low";
-  contextual_factors: string;
-  evidence: string[];
-  scope: "universal" | "context-dependent";
-  implications: string;
-  confidence: "high" | "medium" | "low";
-}
-
-export interface SystemPrinciple {
-  system_principle_id: string;
-  cross_insight_id: string;
-  principle: string;
-  rationale: string;
-  context_considerations: string;
-  how_might_we: string[];
-  scope: "universal" | "segmented";
-  priority: "critical" | "high" | "medium";
-}
-
-// Video-Transcript Sync types
-export interface Word {
-  text: string;
-  start: number; // milliseconds
-  end: number; // milliseconds
-  speaker: string;
-  confidence: number;
-}
-
-export interface WordLevelTranscript {
-  words: Word[];
-  duration: number; // total video duration in ms
-}
-
-export interface SearchMatch {
-  text: string;
-  count: number;
-  timestamps: [number, number][]; // [start, end] pairs in milliseconds
-  indexes: number[];
-}
-
-export interface TranscriptSearchResult {
-  total_count: number;
-  matches: SearchMatch[];
+export interface LabelSpeakerDto {
+  speaker_label: string;
+  assigned_name: string;
+  role?: string;
 }

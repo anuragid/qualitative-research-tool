@@ -45,7 +45,7 @@ const metaPatternColumns: TableColumn<MetaPattern>[] = [
     sortable: true,
     render: (mp) => (
       <Badge className="bg-interactive-focus-bg text-interactive-focus text-label">
-        {mp.appears_in_videos.length}
+        {(mp.appears_in_videos ?? []).length}
       </Badge>
     ),
     className: "w-24",
@@ -60,10 +60,13 @@ const metaPatternColumns: TableColumn<MetaPattern>[] = [
 ];
 
 export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort, videoNames }: MetaPatternsListProps) {
+  // Defensive guard — jsonb prop may be null/undefined. See PR #21.
+  const safeMetaPatterns = metaPatterns ?? [];
+
   if (viewMode === "grid") {
     return (
       <CardView columns={2}>
-        {metaPatterns.map((metaPattern) => (
+        {safeMetaPatterns.map((metaPattern) => (
           <MetaPatternCard key={metaPattern.meta_pattern_id} metaPattern={metaPattern} compact />
         ))}
       </CardView>
@@ -73,7 +76,7 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
   if (viewMode === "table") {
     return (
       <TableView
-        data={metaPatterns}
+        data={safeMetaPatterns}
         columns={metaPatternColumns}
         sort={sort || null}
         onSort={onSort || (() => {})}
@@ -87,13 +90,13 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-h4 text-foreground">
-          Meta-Patterns ({metaPatterns.length})
+          Meta-Patterns ({safeMetaPatterns.length})
         </h3>
         <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(consistencyStyles)
             .filter(([key]) =>
               ["consistent", "varying", "contradictory"].includes(key) &&
-              metaPatterns.some((mp) => normalizeConsistency(mp.consistency) === key)
+              safeMetaPatterns.some((mp) => normalizeConsistency(mp.consistency) === key)
             )
             .map(([type, style]) => (
               <Badge key={type} className={style}>
@@ -104,7 +107,10 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
       </div>
 
       <Accordion type="multiple" className="space-y-2">
-        {metaPatterns.map((metaPattern) => (
+        {safeMetaPatterns.map((metaPattern) => {
+          const appearsIn = metaPattern.appears_in_videos ?? [];
+          const relatedPatterns = metaPattern.related_patterns ?? [];
+          return (
           <AccordionItem key={metaPattern.meta_pattern_id} value={metaPattern.meta_pattern_id}>
             <div className="bg-card rounded-2xl overflow-hidden">
               <AccordionTrigger className="px-3 sm:px-5 py-4 hover:no-underline hover:bg-interactive-fill">
@@ -117,7 +123,7 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
                         {normalizeConsistency(metaPattern.consistency)}
                       </Badge>
                       <Badge className="bg-interactive-focus-bg text-interactive-focus border-0">
-                        {metaPattern.appears_in_videos.length} videos
+                        {appearsIn.length} videos
                       </Badge>
                     </div>
                     <p className="text-sm text-text-tertiary line-clamp-2">
@@ -152,10 +158,10 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
 
                   <div>
                     <div className="text-label text-text-placeholder uppercase mb-2">
-                      Appears In Videos ({metaPattern.appears_in_videos.length})
+                      Appears In Videos ({appearsIn.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {metaPattern.appears_in_videos.map((videoId, index) => (
+                      {appearsIn.map((videoId, index) => (
                         <Badge key={videoId} variant="outline" className="text-xs text-text-tertiary border-border">
                           {videoNames?.[videoId] || `Video ${index + 1}`}
                         </Badge>
@@ -165,10 +171,10 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
 
                   <div>
                     <div className="text-label text-text-placeholder uppercase mb-2">
-                      Related Patterns ({metaPattern.related_patterns.length})
+                      Related Patterns ({relatedPatterns.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {metaPattern.related_patterns.map((patternId) => (
+                      {relatedPatterns.map((patternId) => (
                         <Badge key={patternId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
                           {patternId}
                         </Badge>
@@ -180,7 +186,8 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
               </AccordionContent>
             </div>
           </AccordionItem>
-        ))}
+          );
+        })}
       </Accordion>
     </div>
   );

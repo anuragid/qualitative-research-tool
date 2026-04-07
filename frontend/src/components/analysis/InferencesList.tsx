@@ -33,17 +33,19 @@ function makeInferenceColumns(chunks?: Chunk[]): TableColumn<Inference>[] {
       );
     }, className: "w-48" },
     { key: "count", label: "Count", sortable: true, render: (inf) => (
-      <span className="text-sm text-text-secondary">{inf.inferences.length}</span>
+      <span className="text-sm text-text-secondary">{(inf.inferences ?? []).length}</span>
     ), className: "w-20" },
     { key: "meaning", label: "First Inference", render: (inf) => (
       <p className="text-sm text-text-primary line-clamp-2">
-        {inf.inferences[0]?.meaning || "\u2014"}
+        {(inf.inferences ?? [])[0]?.meaning || "\u2014"}
       </p>
     ) },
   ];
 }
 
 export function InferencesList({ inferences, chunks, viewMode = "list", sort, onSort }: InferencesListProps) {
+  // Defensive guard — prop may be null/undefined. See PR #21.
+  const safeInferences = inferences ?? [];
   const getChunkById = (chunkId: string) => {
     return chunks?.find((c) => c.chunk_id === chunkId);
   };
@@ -51,7 +53,7 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
   if (viewMode === "grid") {
     return (
       <CardView columns={2}>
-        {inferences.map((inference, i) => (
+        {safeInferences.map((inference, i) => (
           <InferenceCard
             key={inference.chunk_id || i}
             inference={inference}
@@ -67,7 +69,7 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
     const columns = makeInferenceColumns(chunks);
     return (
       <TableView
-        data={inferences}
+        data={safeInferences}
         columns={columns}
         sort={sort || null}
         onSort={onSort || (() => {})}
@@ -77,8 +79,8 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
   }
 
   // Default: list view (accordion)
-  const totalInferences = inferences.reduce(
-    (sum, inf) => sum + inf.inferences.length,
+  const totalInferences = safeInferences.reduce(
+    (sum, inf) => sum + (inf.inferences ?? []).length,
     0
   );
 
@@ -86,13 +88,14 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-h4 text-foreground">
-          Inferences ({totalInferences} from {inferences.length} chunks)
+          Inferences ({totalInferences} from {safeInferences.length} chunks)
         </h3>
       </div>
 
       <Accordion type="multiple" className="space-y-2">
-        {inferences.map((inference) => {
+        {safeInferences.map((inference) => {
           const chunk = getChunkById(inference.chunk_id);
+          const items = inference.inferences ?? [];
           const badgeStyle = chunk ? (chunkTypeStyles[chunk.type]?.badge || "") : "";
           return (
             <AccordionItem key={inference.chunk_id} value={inference.chunk_id}>
@@ -103,8 +106,8 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-text-primary">
-                          {inference.inferences.length} inference
-                          {inference.inferences.length !== 1 ? "s" : ""}
+                          {items.length} inference
+                          {items.length !== 1 ? "s" : ""}
                         </span>
                         <Badge className={badgeStyle || "bg-interactive-fill text-text-tertiary border-0"}>
                           {chunk?.type || "unknown"}
@@ -121,7 +124,7 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
 
                 <AccordionContent className="px-5 pb-5">
                   <div className="space-y-3 pl-8">
-                    {inference.inferences.map((item) => (
+                    {items.map((item) => (
                       <div
                         key={item.inference_id}
                         className="border-l-2 border-brand-mustard/40 pl-4 py-2"

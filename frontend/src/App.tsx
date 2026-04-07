@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SignIn, SignUp } from "@clerk/react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { UploadProvider } from "./contexts/UploadContext";
 import { useAuth } from "./hooks/useAuth";
 import { useUserSync } from "./hooks/useUserSync";
@@ -85,14 +86,18 @@ function App() {
           }
         />
 
-        {/* Protected routes */}
+        {/* Protected routes — each wrapped in RouteErrorBoundary so a
+            render crash on one page doesn't black out the whole app.
+            See docs/production-readiness/prs/pr21-frontend-defensive.md. */}
         <Route
           path="/projects"
           element={
             isAuthenticated ? (
-              <UploadProvider>
-                <ProjectsPage />
-              </UploadProvider>
+              <RouteErrorBoundary routeName="projects">
+                <UploadProvider>
+                  <ProjectsPage />
+                </UploadProvider>
+              </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
             )
@@ -103,9 +108,11 @@ function App() {
           path="/projects/:projectId"
           element={
             isAuthenticated ? (
-              <UploadProvider>
-                <ProjectDetailPage />
-              </UploadProvider>
+              <RouteErrorBoundary routeName="project-detail">
+                <UploadProvider>
+                  <ProjectDetailPage />
+                </UploadProvider>
+              </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
             )
@@ -116,9 +123,11 @@ function App() {
           path="/videos/:videoId"
           element={
             isAuthenticated ? (
-              <UploadProvider>
-                <VideoDetailPage />
-              </UploadProvider>
+              <RouteErrorBoundary routeName="video-detail">
+                <UploadProvider>
+                  <VideoDetailPage />
+                </UploadProvider>
+              </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
             )
