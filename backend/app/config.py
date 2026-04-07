@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 4096
     LLM_TEMPERATURE: float = 0.7
 
+    # BYOK balance — see backend/app/services/openrouter_balance.py
+    LOW_BALANCE_THRESHOLD_USD: float = 0.50  # UI yellow-warning threshold
+    BALANCE_CACHE_TTL_SECONDS: int = 60  # How long persisted balance is "fresh"
+
     # File Upload Settings
     MAX_FILE_SIZE_MB: int = 500
     ALLOWED_VIDEO_EXTENSIONS: List[str] = [".mp4", ".mov", ".webm", ".avi"]

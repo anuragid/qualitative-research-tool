@@ -1,13 +1,71 @@
 """Celery application configuration."""
 
 import logging
+import time
 from datetime import timedelta
 
 from celery import Celery, signals
+from sqlalchemy import inspect
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Required columns the worker depends on at runtime. If a Railway deploy
+# fires the worker before the backend's migration step has finished,
+# the worker would crash on the first task with an UndefinedColumn error
+# from Postgres. The check below loops with backoff so the worker can
+# wait for the backend to apply the migration. After 60s of misses we
+# give up and exit non-zero so Railway restarts us with the latest image.
+_REQUIRED_BALANCE_COLUMNS = (
+    "key_total_credits",
+    "key_total_usage",
+    "key_limit",
+    "key_limit_remaining",
+    "key_is_free_tier",
+    "key_balance_checked_at",
+    "key_balance_error",
+)
+_SCHEMA_CHECK_MAX_ATTEMPTS = 12
+_SCHEMA_CHECK_INTERVAL_SECONDS = 5
+
+
+def _verify_byok_balance_schema() -> None:
+    """Confirm the BYOK balance migration has been applied.
+
+    Loops with a 5-second backoff for up to 60 seconds. Raises
+    RuntimeError if the columns are still missing — Celery will then
+    refuse to start, Railway will restart the worker, and by the time
+    it boots again the backend should have run the migration.
+    """
+    from app.database import engine
+
+    for attempt in range(1, _SCHEMA_CHECK_MAX_ATTEMPTS + 1):
+        try:
+            inspector = inspect(engine)
+            existing_columns = {col["name"] for col in inspector.get_columns("users")}
+            missing = [c for c in _REQUIRED_BALANCE_COLUMNS if c not in existing_columns]
+            if not missing:
+                logger.info(
+                    "BYOK balance schema check passed (all 7 columns present)"
+                )
+                return
+            logger.warning(
+                f"BYOK balance schema check attempt {attempt}/{_SCHEMA_CHECK_MAX_ATTEMPTS}: "
+                f"missing columns {missing}; sleeping {_SCHEMA_CHECK_INTERVAL_SECONDS}s"
+            )
+        except Exception as exc:  # noqa: BLE001 — DB unreachable, keep retrying
+            logger.warning(
+                f"BYOK balance schema check attempt {attempt}/{_SCHEMA_CHECK_MAX_ATTEMPTS}: "
+                f"DB inspect failed ({exc}); sleeping {_SCHEMA_CHECK_INTERVAL_SECONDS}s"
+            )
+        time.sleep(_SCHEMA_CHECK_INTERVAL_SECONDS)
+
+    raise RuntimeError(
+        "BYOK balance migration has not been applied — worker refusing to start. "
+        "The backend service runs migrations on boot; if this persists, manually "
+        "run `alembic upgrade head` or check the backend deploy logs."
+    )
 
 
 @signals.celeryd_init.connect
@@ -21,6 +79,17 @@ def init_sentry_for_worker(**kwargs):
     from app.sentry_setup import init_sentry
     init_sentry()
     logger.info("Sentry initialized for Celery worker")
+
+
+@signals.worker_ready.connect
+def verify_schema_on_worker_start(sender=None, **kwargs):
+    """Block worker readiness until the BYOK balance migration is applied.
+
+    Runs once when the worker process becomes ready to accept tasks.
+    Failing fast here is preferable to crashing on the first task with
+    an opaque UndefinedColumn error halfway through a Celery retry chain.
+    """
+    _verify_byok_balance_schema()
 
 
 # Create Celery app

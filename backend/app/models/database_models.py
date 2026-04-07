@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import ARRAY, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import ARRAY, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -25,6 +25,19 @@ class User(Base):
     encrypted_api_key = Column(Text)  # Fernet-encrypted OpenRouter API key
     key_hint = Column(String(8))  # Last 4 chars of plaintext key
     key_validated_at = Column(DateTime(timezone=True))  # Last successful validation
+
+    # BYOK balance snapshot — refreshed on key save, on /refresh-balance, and on
+    # cache miss (TTL `BALANCE_CACHE_TTL_SECONDS`). All nullable so existing rows
+    # without a refreshed balance keep working — see migration
+    # `add_byok_balance_columns`.
+    key_total_credits = Column(Float)  # /credits.data.total_credits
+    key_total_usage = Column(Float)  # /credits.data.total_usage
+    key_limit = Column(Float)  # /auth/key.data.limit (nullable upstream too)
+    key_limit_remaining = Column(Float)  # /auth/key.data.limit_remaining (nullable upstream too)
+    key_is_free_tier = Column(Boolean)  # /auth/key.data.is_free_tier
+    key_balance_checked_at = Column(DateTime(timezone=True))  # Last successful refresh
+    key_balance_error = Column(String(255))  # Last refresh error, NULL when healthy
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_seen = Column(DateTime(timezone=True))

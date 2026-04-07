@@ -64,6 +64,22 @@ class UserSettingsUpdate(BaseModel):
         return v
 
 
+class BalanceInfoResponse(BaseModel):
+    """Pydantic mirror of BalanceInfo.as_dict() — shape locked by
+    docs/byok-balance-contract.md. Frontend imports the matching TS
+    interface from frontend/src/types/api.ts."""
+    total_credits: float
+    total_usage: float
+    balance_remaining: float
+    is_free_tier: bool
+    key_label: str
+    key_limit: Optional[float] = None
+    key_limit_remaining: Optional[float] = None
+    has_credits: bool
+    checked_at: datetime
+    stale: bool
+
+
 class UserSettingsResponse(BaseModel):
     """Schema for user settings response."""
     preferred_model: Optional[str] = None
@@ -71,6 +87,10 @@ class UserSettingsResponse(BaseModel):
     key_hint: Optional[str] = None
     key_validated_at: Optional[datetime] = None
     available_models: List[Dict[str, str]] = []
+    # BYOK balance snapshot. None when the user has no key or we have
+    # never successfully fetched their balance. Stale=True when the
+    # last refresh failed but we still have a cached value to show.
+    balance: Optional[BalanceInfoResponse] = None
 
 
 # ========== Project Schemas ==========

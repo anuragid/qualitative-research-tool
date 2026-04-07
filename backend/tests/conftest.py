@@ -47,7 +47,18 @@ async def client(tmp_path):
     # Import models to register them with Base
 
     # Create tables using raw SQL to work around type issues
-    from sqlalchemy import Column, DateTime, ForeignKey, Integer, MetaData, String, Table, Text
+    from sqlalchemy import (
+        Boolean,
+        Column,
+        DateTime,
+        Float,
+        ForeignKey,
+        Integer,
+        MetaData,
+        String,
+        Table,
+        Text,
+    )
 
     # Render PostgreSQL types as SQLite-compatible types
     from sqlalchemy.sql import func
@@ -67,6 +78,16 @@ async def client(tmp_path):
         Column("encrypted_api_key", Text),
         Column("key_hint", String(8)),
         Column("key_validated_at", DateTime),
+        # BYOK balance snapshot — mirror of migration `add_byok_balance_columns`.
+        # Tests use this to seed/inspect persisted balance state without spinning
+        # up Alembic against SQLite.
+        Column("key_total_credits", Float),
+        Column("key_total_usage", Float),
+        Column("key_limit", Float),
+        Column("key_limit_remaining", Float),
+        Column("key_is_free_tier", Boolean),
+        Column("key_balance_checked_at", DateTime),
+        Column("key_balance_error", String(255)),
         Column("created_at", DateTime, server_default=func.now()),
         Column("updated_at", DateTime, server_default=func.now()),
         Column("last_seen", DateTime),
