@@ -112,7 +112,7 @@ describe("ModelSettingsDialog — mode initialization", () => {
     expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
   });
 
-  it("opens in Standard mode when key exists but saved model is standard", async () => {
+  it("opens in Premium mode when key exists, even if saved model is standard, and pre-pops the default sonnet pick", async () => {
     vi.spyOn(settingsService, "getSettings").mockResolvedValue(
       makeSettings({
         has_api_key: true,
@@ -123,14 +123,39 @@ describe("ModelSettingsDialog — mode initialization", () => {
     );
     renderDialog();
 
+    // Once a key is on file the user is committed to Premium — Standard is
+    // unreachable until the key is removed.
     await waitFor(() => {
-      expect(getStandardTab().getAttribute("data-state")).toBe("active");
+      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
     });
-    // Llama 4 Scout radio is checked (radix uses aria-checked + data-state="checked")
-    const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
-    expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
-    // The "key on file" affordance is visible
-    expect(screen.getByText(/key on file.*1234/i)).toBeDefined();
+    expect((getStandardTab() as HTMLButtonElement).disabled).toBe(true);
+
+    // The "Selected model" row shows the pending default (latest Sonnet),
+    // not the carried-over standard model id.
+    const selected = screen.getByTestId("selected-model-display");
+    expect(selected.textContent).toMatch(/anthropic\/claude-sonnet-4\.6/i);
+
+    // Save is enabled (pending pick differs from saved standard model).
+    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+  });
+
+  it("Standard tab is disabled while a key is on file", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        has_api_key: true,
+        key_hint: "1234",
+        preferred_model: "anthropic/claude-sonnet-4.6",
+        balance: healthyBalance(),
+      }),
+    );
+    renderDialog();
+
+    await waitFor(() => {
+      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
+    });
+    const standardTab = getStandardTab() as HTMLButtonElement;
+    expect(standardTab.disabled).toBe(true);
   });
 
   it("opens in Premium mode when saved model is premium", async () => {
@@ -358,15 +383,30 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
     );
   });
 
-  it("controlled combobox shows the saved premium id on open", async () => {
+  it("regression: typing in the combobox is not clobbered by re-renders", async () => {
+    // Repro of the controlled-value bug: every keystroke would trigger a
+    // re-render of the parent, which recomputed `comboboxValue` from
+    // `effectiveModel` and reset the input back to the saved label.
+    vi.spyOn(settingsService, "searchModels").mockResolvedValue([]);
+    const user = setupUser();
     renderDialog();
-    await waitFor(() => {
-      const matches = screen.getAllByDisplayValue(/claude/i);
-      expect(matches.length).toBeGreaterThan(0);
-    });
-    // The visible combobox input also reflects the saved value.
+
+    const input = (await screen.findByPlaceholderText(
+      /search models/i,
+    )) as HTMLInputElement;
+    await user.type(input, "claude");
+    expect(input.value).toBe("claude");
+  });
+
+  it("Selected model row shows the saved premium id on open and combobox is empty", async () => {
+    renderDialog();
+    // The "Selected model" row reflects the saved id.
+    const selected = await screen.findByTestId("selected-model-display");
+    expect(selected.textContent).toMatch(/anthropic\/claude-sonnet-4\.6/i);
+
+    // The combobox input is empty (it's a search/pick surface, not a value display).
     const combobox = screen.getByRole("combobox") as HTMLInputElement;
-    expect(combobox.value).toMatch(/claude/i);
+    expect(combobox.value).toBe("");
   });
 
   it("picking a different model enables Save and PUTs preferred-model", async () => {
@@ -419,7 +459,22 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
     });
   });
 
-  it("switching tabs clears pendingModel so Save disables and original model is restored on switch back", async () => {
+  it("Standard tab is disabled while a key is on file (no tab-switch escape hatch)", async () => {
+    const user = setupUser();
+    renderDialog();
+
+    await waitFor(() => {
+      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
+    });
+
+    // The Standard tab is disabled — clicking it does nothing.
+    const standardTab = getStandardTab() as HTMLButtonElement;
+    expect(standardTab.disabled).toBe(true);
+    await user.click(standardTab);
+    expect(getPremiumTab().getAttribute("data-state")).toBe("active");
+  });
+
+  it("picking a model updates the Selected row and enables Save", async () => {
     const searchResults: SearchModel[] = [
       {
         id: "openai/gpt-4o",
@@ -434,16 +489,8 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
     const user = setupUser();
     renderDialog();
 
-    // 1. Start in Premium mode (saved model is claude-sonnet-4.6)
-    await waitFor(() => {
-      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
-    });
-
-    // 2. Pick a different premium model from the combobox (sets pendingModel)
     const input = await screen.findByPlaceholderText(/search models/i);
-    await user.clear(input);
     await user.type(input, "gpt-4o");
-
     await waitFor(
       () => {
         expect(screen.getByRole("option", { name: /gpt-4o/i })).toBeDefined();
@@ -452,29 +499,17 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
     );
     await user.click(screen.getByRole("option", { name: /gpt-4o/i }));
 
-    // 3. Save should be enabled (isDirty=true)
+    // The Selected row reflects the new pick — the source of truth for
+    // "what model will be saved". The combobox input itself may still show
+    // the picked label (normal combobox behavior).
     await waitFor(() => {
-      const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-      expect(saveBtn.disabled).toBe(false);
+      const selected = screen.getByTestId("selected-model-display");
+      expect(selected.textContent).toMatch(/openai\/gpt-4o/i);
     });
-
-    // 4. Switch to Standard tab — handleModeChange clears pendingModel
-    await user.click(getStandardTab());
-
-    // 5. Save should now be disabled (pendingModel cleared)
-    await waitFor(() => {
-      const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-      expect(saveBtn.disabled).toBe(true);
-    });
-
-    // 6. Switch back to Premium tab
-    await user.click(getPremiumTab());
-
-    // 7. Combobox should show the original saved model (claude), not the pending pick (gpt-4o)
-    await waitFor(() => {
-      const combobox = screen.getByRole("combobox") as HTMLInputElement;
-      expect(combobox.value).toMatch(/claude/i);
-    });
+    const saveBtn = screen.getByRole("button", {
+      name: /^save$/i,
+    }) as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
   });
 
   it("clicking Remove key flips mode to Standard and clears the combobox", async () => {
@@ -601,9 +636,10 @@ describe("ModelSettingsDialog — sticky pendingModel under refetch", () => {
     // Force a re-render that mimics a background refetch landing
     rerender(<ModelSettingsDialog open onOpenChange={() => {}} />);
 
-    // pendingModel should still be GPT-4o, NOT reset to claude
-    const combobox = screen.getByRole("combobox") as HTMLInputElement;
-    expect(combobox.value).toMatch(/gpt-4o/i);
+    // pendingModel should still be GPT-4o, NOT reset to claude — verified
+    // via the Selected row and the still-enabled Save button.
+    const selected = screen.getByTestId("selected-model-display");
+    expect(selected.textContent).toMatch(/openai\/gpt-4o/i);
     const saveBtn = screen.getByRole("button", {
       name: /^save$/i,
     }) as HTMLButtonElement;
