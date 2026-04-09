@@ -355,6 +355,8 @@ export default function ProjectDetailPage() {
                 <Button
                   onClick={handleRunProjectAnalysis}
                   disabled={startProjectAnalysis.isPending}
+                  title="Start analyzing patterns, insights, and principles across all analyzed videos in this project"
+                  data-testid="run-project-analysis"
                 >
                   {startProjectAnalysis.isPending ? (
                     <>
