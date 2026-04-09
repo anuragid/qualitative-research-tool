@@ -347,7 +347,11 @@ export default function ProjectDetailPage() {
                 <h2 className="text-h4">Cross-Video Analysis</h2>
               </div>
 
-              {!projectAnalysis || projectAnalysis.status === 'pending' ? (
+              {/* "not_started" is the backend sentinel (PR #18) emitted when no
+                  project_analysis row exists yet — treat it identically to "no
+                  analysis" so the CTA still renders. Mirrors the
+                  `hasStartedAnalysis` pattern in AnalysisSection.tsx. */}
+              {!projectAnalysis || projectAnalysis.status === 'pending' || projectAnalysis.status === 'not_started' ? (
                 <Button
                   onClick={handleRunProjectAnalysis}
                   disabled={startProjectAnalysis.isPending}
@@ -585,8 +589,10 @@ export default function ProjectDetailPage() {
               </Card>
             )}
 
-            {/* Only show initial card if not loading and no analysis exists */}
-            {!projectAnalysis && !startProjectAnalysis.isPending && (
+            {/* Only show initial card if not loading and no analysis exists.
+                "not_started" is treated as "no analysis" — see the comment on
+                the CTA ternary above. */}
+            {(!projectAnalysis || projectAnalysis.status === 'not_started') && !startProjectAnalysis.isPending && (
               <Card className="shadow-card">
                 <CardContent className="py-6">
                   <div className="text-center">
