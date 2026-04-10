@@ -193,7 +193,7 @@ export function ModelSettingsDialog({
   const radioValue = selectedTier === "included" ? (pendingModel ?? savedModel ?? "") : "";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Model Settings</DialogTitle>
