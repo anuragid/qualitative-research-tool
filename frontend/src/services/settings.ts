@@ -1,8 +1,12 @@
 import { api } from "./api";
 import type { BalanceInfo } from "../types";
 
+export type ModelTier = "included" | "byok";
+
 export interface UserSettings {
   preferred_model: string | null;
+  /** Which section the user's model selection belongs to. Defaults to "included". */
+  model_tier?: ModelTier;
   has_api_key: boolean;
   key_hint: string | null;
   key_validated_at: string | null;
@@ -50,10 +54,14 @@ export const settingsService = {
     return response.data;
   },
 
-  /** Set the user's preferred model. Server enforces tier (no key → standard only). */
-  updatePreferredModel: async (modelId: string): Promise<UserSettings> => {
+  /** Set the user's preferred model and tier. Server enforces tier constraints. */
+  updatePreferredModel: async (payload: {
+    modelId: string;
+    modelTier: ModelTier;
+  }): Promise<UserSettings> => {
     const response = await api.put("/api/users/settings/preferred-model", {
-      preferred_model: modelId,
+      preferred_model: payload.modelId,
+      model_tier: payload.modelTier,
     });
     return response.data;
   },

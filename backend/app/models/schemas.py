@@ -58,6 +58,7 @@ class BalanceInfoResponse(BaseModel):
 class UserSettingsResponse(BaseModel):
     """Schema for user settings response."""
     preferred_model: Optional[str] = None
+    model_tier: str = "included"
     has_api_key: bool = False
     key_hint: Optional[str] = None
     key_validated_at: Optional[datetime] = None
@@ -87,10 +88,12 @@ class ApiKeyAddRequest(BaseModel):
 class PreferredModelUpdateRequest(BaseModel):
     """Schema for PUT /api/users/settings/preferred-model.
 
-    Sole purpose: set the active model. Tier enforcement is in the route
-    (no key → must be a standard model id).
+    Sets the active model and tier. Tier enforcement is in the route
+    (included tier → model must be in STANDARD_MODEL_IDS; byok tier →
+    user must have an API key with credits).
     """
     preferred_model: str = Field(..., min_length=1, max_length=255)
+    model_tier: str = Field(..., min_length=1, max_length=10)
 
     @field_validator("preferred_model")
     @classmethod
@@ -103,6 +106,14 @@ class PreferredModelUpdateRequest(BaseModel):
             raise ValueError(
                 "Invalid model ID format. Expected format: provider/model-name"
             )
+        return v
+
+    @field_validator("model_tier")
+    @classmethod
+    def validate_model_tier(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v not in ("included", "byok"):
+            raise ValueError("model_tier must be 'included' or 'byok'")
         return v
 
 

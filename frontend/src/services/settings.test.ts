@@ -128,13 +128,14 @@ describe("settingsService", () => {
       };
       mockedApi.put.mockResolvedValue({ data: updatedSettings });
 
-      const result = await settingsService.updatePreferredModel(
-        "anthropic/claude-sonnet-4.6",
-      );
+      const result = await settingsService.updatePreferredModel({
+        modelId: "anthropic/claude-sonnet-4.6",
+        modelTier: "byok",
+      });
 
       expect(mockedApi.put).toHaveBeenCalledWith(
         "/api/users/settings/preferred-model",
-        { preferred_model: "anthropic/claude-sonnet-4.6" },
+        { preferred_model: "anthropic/claude-sonnet-4.6", model_tier: "byok" },
       );
       expect(result.preferred_model).toBe("anthropic/claude-sonnet-4.6");
     });

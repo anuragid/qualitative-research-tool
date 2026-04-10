@@ -59,6 +59,7 @@ import app.models.database_models as models  # noqa: F401  (registers ORM)
 from app.dependencies.byok_gate import require_byok_credits
 from app.services.byok_service import (
     InsufficientCreditsError,
+    resolve_byok,
     resolve_byok_with_preflight,
 )
 from app.services.openrouter_balance import BalanceInfo, OpenRouterBalanceError
@@ -109,6 +110,7 @@ def _setup_test_db(tmp_path):
         Column("username", String(255)),
         Column("role", String(50), nullable=False, default="user"),
         Column("preferred_model", String(255)),
+        Column("model_tier", String(10), nullable=False, server_default="included"),
         Column("encrypted_api_key", Text),
         Column("key_hint", String(8)),
         Column("key_validated_at", DateTime),
@@ -270,6 +272,7 @@ def _set_byok_user(TestSession, meta, *, with_key: bool = True) -> None:
             encrypted_api_key="dummy-encrypted-blob" if with_key else None,
             key_hint="abcd" if with_key else None,
             preferred_model="meta-llama/llama-4-scout" if with_key else None,
+            model_tier="byok" if with_key else "included",
             key_validated_at=datetime.now(timezone.utc) if with_key else None,
         )
     )
@@ -291,6 +294,7 @@ async def test_require_byok_credits_non_byok_user_returns_none():
     """
     user = MagicMock()
     user.encrypted_api_key = None
+    user.model_tier = "included"
 
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = user
@@ -304,6 +308,85 @@ async def test_require_byok_credits_non_byok_user_returns_none():
 
     assert result is None
     mock_get_balance.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_require_byok_credits_included_tier_with_key_skips_gate():
+    """User has encrypted_api_key AND model_tier='included' -> gate returns
+    None without calling get_cached_balance. The key exists but the user
+    chose the included tier, so no balance check occurs.
+    """
+    user = MagicMock()
+    user.encrypted_api_key = "encrypted-blob"
+    user.model_tier = "included"
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    with patch(
+        "app.dependencies.byok_gate.get_cached_balance",
+    ) as mock_get_balance:
+        result = await require_byok_credits(
+            request=MagicMock(), db=db, current_user_id="user_xyz",
+        )
+
+    assert result is None
+    mock_get_balance.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_require_byok_credits_byok_tier_without_key_passes_through():
+    """User has model_tier='byok' but no encrypted_api_key -> gate returns
+    None. Downstream task surfaces the missing-key error, not the gate.
+    """
+    user = MagicMock()
+    user.encrypted_api_key = None
+    user.model_tier = "byok"
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    with patch(
+        "app.dependencies.byok_gate.get_cached_balance",
+    ) as mock_get_balance:
+        result = await require_byok_credits(
+            request=MagicMock(), db=db, current_user_id="user_xyz",
+        )
+
+    assert result is None
+    mock_get_balance.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_require_byok_credits_byok_tier_with_key_zero_balance_402():
+    """User has model_tier='byok', has encrypted_api_key, $0 balance -> 402
+    with structured error detail including error_type and balance payload.
+    """
+    user = MagicMock()
+    user.encrypted_api_key = "encrypted-blob"
+    user.model_tier = "byok"
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    empty = _make_balance(has_credits=False, balance_remaining=0.0)
+
+    with patch(
+        "app.dependencies.byok_gate.get_cached_balance",
+        return_value=empty,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await require_byok_credits(
+                request=MagicMock(), db=db, current_user_id="user_xyz",
+            )
+
+    err = exc_info.value
+    assert err.status_code == 402
+    detail = err.detail
+    assert isinstance(detail, dict)
+    assert detail["error_type"] == "insufficient_credits"
+    assert detail["balance"]["balance_remaining"] == 0.0
+    assert detail["balance"]["has_credits"] is False
 
 
 @pytest.mark.asyncio
@@ -332,6 +415,7 @@ async def test_require_byok_credits_healthy_balance_returns_balance():
     """
     user = MagicMock()
     user.encrypted_api_key = "encrypted-blob"
+    user.model_tier = "byok"
 
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = user
@@ -360,6 +444,7 @@ async def test_require_byok_credits_zero_balance_raises_402():
     """
     user = MagicMock()
     user.encrypted_api_key = "encrypted-blob"
+    user.model_tier = "byok"
 
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = user
@@ -416,6 +501,7 @@ async def test_require_byok_credits_balance_fetch_error_passes_through():
     """
     user = MagicMock()
     user.encrypted_api_key = "encrypted-blob"
+    user.model_tier = "byok"
 
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = user
@@ -432,8 +518,101 @@ async def test_require_byok_credits_balance_fetch_error_passes_through():
 
 
 # ---------------------------------------------------------------------------
+# Unit tests: resolve_byok (tier-based routing)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_byok_included_tier_returns_none_key_and_preferred_model():
+    """resolve_byok with included tier returns (None, preferred_model) — the
+    server key is used even when the user has an encrypted_api_key on file.
+    """
+    user = MagicMock(spec=models.User)
+    user.model_tier = "included"
+    user.preferred_model = "meta-llama/llama-4-scout"
+    user.encrypted_api_key = "encrypted-blob"  # key exists but ignored
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    api_key, model = resolve_byok(db, "user_xyz")
+
+    assert api_key is None
+    assert model == "meta-llama/llama-4-scout"
+
+
+def test_resolve_byok_included_tier_defaults_model_when_none():
+    """resolve_byok with included tier and no preferred_model returns the
+    default standard model.
+    """
+    from app.constants import DEFAULT_STANDARD_MODEL
+
+    user = MagicMock(spec=models.User)
+    user.model_tier = "included"
+    user.preferred_model = None
+    user.encrypted_api_key = None
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    api_key, model = resolve_byok(db, "user_xyz")
+
+    assert api_key is None
+    assert model == DEFAULT_STANDARD_MODEL
+
+
+# ---------------------------------------------------------------------------
 # Unit tests: resolve_byok_with_preflight service function
 # ---------------------------------------------------------------------------
+
+
+def test_resolve_byok_with_preflight_included_tier_skips_balance_check():
+    """resolve_byok_with_preflight with included tier returns
+    (None, preferred_model, None) and never calls get_cached_balance.
+    """
+    user = MagicMock(spec=models.User)
+    user.model_tier = "included"
+    user.preferred_model = "meta-llama/llama-4-scout"
+    user.encrypted_api_key = "encrypted-blob"  # has key, but included tier
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    with patch(
+        "app.services.byok_service.resolve_byok",
+        return_value=(None, "meta-llama/llama-4-scout"),
+    ), patch(
+        "app.services.byok_service.get_cached_balance",
+    ) as mock_get_balance:
+        api_key, model, balance = resolve_byok_with_preflight(db, "user_xyz")
+
+    assert api_key is None
+    assert model == "meta-llama/llama-4-scout"
+    assert balance is None
+    mock_get_balance.assert_not_called()
+
+
+def test_resolve_byok_with_preflight_byok_tier_zero_balance_raises():
+    """resolve_byok_with_preflight with byok tier and $0 balance raises
+    InsufficientCreditsError carrying the BalanceInfo.
+    """
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = MagicMock(spec=models.User)
+
+    empty = _make_balance(has_credits=False, balance_remaining=0.0)
+
+    with patch(
+        "app.services.byok_service.resolve_byok",
+        return_value=("sk-or-v1-real", "anthropic/claude-sonnet-4.6"),
+    ), patch(
+        "app.services.byok_service.get_cached_balance",
+        return_value=empty,
+    ):
+        with pytest.raises(InsufficientCreditsError) as exc_info:
+            resolve_byok_with_preflight(db, "user_xyz", force_refresh=True)
+
+    assert exc_info.value.balance is empty
+    assert exc_info.value.balance.balance_remaining == 0.0
+    assert exc_info.value.balance.has_credits is False
 
 
 def test_resolve_byok_with_preflight_non_byok_returns_none_triple():

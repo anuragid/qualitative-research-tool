@@ -10,7 +10,6 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import {
   Combobox,
   ComboboxInput,
@@ -27,7 +26,7 @@ import { LoaderIcon } from "lucide-react";
 import type { SearchModel, UserSettings } from "../../services/settings";
 import { extractErrorDetail } from "../../lib/parseError";
 
-type Mode = "standard" | "premium";
+type SelectedTier = "included" | "byok";
 
 interface ModelSettingsDialogProps {
   open: boolean;
@@ -35,10 +34,9 @@ interface ModelSettingsDialogProps {
 }
 
 /**
- * The default premium model selected when a user enters Premium mode without
- * an existing premium pick. Latest Anthropic Sonnet on OpenRouter as of 2026-04.
+ * The default standard model selected when falling back to included tier.
  */
-const DEFAULT_PREMIUM_MODEL = "anthropic/claude-sonnet-4.6";
+const DEFAULT_STANDARD_MODEL = "meta-llama/llama-4-scout";
 
 function isStandardId(id: string | null | undefined, settings: UserSettings | undefined): boolean {
   if (!id || !settings?.available_models) return false;
@@ -68,7 +66,7 @@ export function ModelSettingsDialog({
     isRefreshingBalance,
   } = useSettings();
 
-  const [mode, setMode] = useState<Mode>("standard");
+  const [selectedTier, setSelectedTier] = useState<SelectedTier>("included");
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [pendingModel, setPendingModel] = useState<string | null>(null);
   const { results, isSearching, query, setQuery } = useModelSearch();
@@ -77,15 +75,6 @@ export function ModelSettingsDialog({
     settings?.available_models?.filter((m) => m.tier === "standard") ?? [];
 
   // ── Reset on open ────────────────────────────────────────────────────
-  // Initialize the dialog state ONCE per "open=true session". The ref
-  // guard ensures that background `["user-settings"]` refetches do not
-  // re-derive `mode` or clobber `pendingModel` mid-session — they only
-  // update the cached settings the dialog reads from.
-  //
-  // Mode rule: presence of an API key is the binary toggle.
-  //   has_api_key === true  → Premium (Standard tab disabled)
-  //   has_api_key === false → Standard (Premium tab opens the add-key form)
-  // To go back to Standard once you've added a key you must remove it.
   const initializedRef = useRef(false);
   useEffect(() => {
     if (!open) {
@@ -100,67 +89,48 @@ export function ModelSettingsDialog({
     resetUpdateModelError();
     resetDeleteKeyError();
 
-    const initialMode: Mode = settings.has_api_key ? "premium" : "standard";
-    setMode(initialMode);
-
-    // If we're entering Premium and the saved model is null or a standard
-    // model (i.e. user just validated their key but never picked a premium
-    // model), pre-populate `pendingModel` with the latest Anthropic Sonnet
-    // so the Save button is dirty and a single click commits a sane default.
-    if (initialMode === "premium") {
-      const savedIsPremium =
-        settings.preferred_model != null &&
-        !isStandardId(settings.preferred_model, settings);
-      setPendingModel(savedIsPremium ? null : DEFAULT_PREMIUM_MODEL);
-    } else {
-      setPendingModel(null);
-    }
-    // We intentionally exclude the reset/setQuery callbacks from deps —
-    // they're stable identities from the hook and including them would
-    // not change behavior given the ref guard above.
+    // Derive initial tier from settings.model_tier (falls back to "included")
+    const tier: SelectedTier =
+      (settings as Record<string, unknown>).model_tier === "byok" ? "byok" : "included";
+    setSelectedTier(tier);
+    setPendingModel(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, settings]);
 
-  // If has_api_key flips true mid-session (e.g. via the add-key flow or a
-  // background refetch from another tab) while the dialog is showing the
-  // Standard tab, auto-switch to Premium since Standard is now disabled.
-  useEffect(() => {
-    if (!open || !settings) return;
-    if (settings.has_api_key && mode === "standard") {
-      setMode("premium");
-      // Pre-pop the default if their saved model isn't already premium.
-      if (!settings.preferred_model || isStandardId(settings.preferred_model, settings)) {
-        setPendingModel(DEFAULT_PREMIUM_MODEL);
-      }
-    }
-  }, [open, settings, mode]);
-
   if (isLoading || !settings) return null;
 
-  // ── Derived values (no local mirrors of saved state) ─────────────────
-  const effectiveModel = pendingModel ?? settings.preferred_model;
-  const isDirty =
-    pendingModel != null && pendingModel !== settings.preferred_model;
+  // ── Derived values ──────────────────────────────────────────────────
+  const savedModel = settings.preferred_model;
 
-  // ── Handlers ─────────────────────────────────────────────────────────
-  const handleModeChange = (next: string) => {
-    // Once a key is on file, Standard is unreachable until the user removes
-    // the key. Belt-and-suspenders alongside the disabled tab trigger.
-    if (next === "standard" && settings.has_api_key) return;
-    setMode(next as Mode);
-    setPendingModel(null);
-    setQuery("");
-    resetAddKeyError();
-    resetUpdateModelError();
-  };
+  const byokDisplayModel = selectedTier === "byok"
+    ? (pendingModel ?? (!isStandardId(savedModel, settings) ? savedModel : null))
+    : null;
 
-  const handleStandardPick = (id: string) => {
+  const isDirty = (() => {
+    if (pendingModel != null) return true;
+    const savedTier = (settings as Record<string, unknown>).model_tier ?? "included";
+    return selectedTier !== savedTier;
+  })();
+
+  // Save blocked conditions
+  const byokNoKey = selectedTier === "byok" && !settings.has_api_key;
+  const byokNoCredits =
+    selectedTier === "byok" &&
+    settings.has_api_key &&
+    settings.balance != null &&
+    !settings.balance.has_credits;
+  const saveDisabled = !isDirty || isUpdatingModel || byokNoKey || byokNoCredits;
+
+  // ── Handlers ────────────────────────────────────────────────────────
+  const handleIncludedPick = (id: string) => {
+    setSelectedTier("included");
     setPendingModel(id);
     resetUpdateModelError();
   };
 
-  const handlePremiumPick = (model: SearchModel | null) => {
+  const handleByokPick = (model: SearchModel | null) => {
     if (!model) return;
+    setSelectedTier("byok");
     setPendingModel(model.id);
     resetUpdateModelError();
   };
@@ -168,44 +138,47 @@ export function ModelSettingsDialog({
   const handleAddKey = async () => {
     if (apiKeyDraft.length < 10) return;
     try {
-      const updated = await addApiKey(apiKeyDraft);
+      await addApiKey(apiKeyDraft);
       setApiKeyDraft("");
-      // After validating, default to the latest Anthropic Sonnet if their
-      // saved model is null or still a standard one. The user is committing
-      // to premium by adding a key — a sensible default makes Save one click.
-      if (!updated.preferred_model || isStandardId(updated.preferred_model, updated)) {
-        setPendingModel(DEFAULT_PREMIUM_MODEL);
-      }
     } catch {
-      // addKeyError is set by the mutation; the inline error renders it.
+      // addKeyError is set by the mutation
     }
   };
 
   const handleRemoveKey = async () => {
     try {
       await deleteApiKey();
-      setMode("standard");
-      setPendingModel(null);
+      setSelectedTier("included");
+      setPendingModel(DEFAULT_STANDARD_MODEL);
       setApiKeyDraft("");
     } catch {
-      // surfaced via deleteKeyError inline error message
+      // surfaced via deleteKeyError
     }
   };
 
   const handleSave = async () => {
-    if (!isDirty || pendingModel == null) {
+    if (saveDisabled) {
       onOpenChange(false);
       return;
     }
+
+    const modelToSave =
+      selectedTier === "included"
+        ? pendingModel ?? savedModel ?? DEFAULT_STANDARD_MODEL
+        : pendingModel ?? savedModel ?? "";
+
     try {
-      await updatePreferredModel(pendingModel);
+      await updatePreferredModel({
+        modelId: modelToSave,
+        modelTier: selectedTier,
+      });
       onOpenChange(false);
     } catch {
       // updateModelError is set; user retries
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────
   const addKeyErrorMessage = addKeyError
     ? extractErrorDetail(addKeyError, "Could not save the API key.")
     : null;
@@ -216,45 +189,35 @@ export function ModelSettingsDialog({
     ? extractErrorDetail(deleteKeyError, "Could not remove the API key.")
     : null;
 
+  // Radio group value: only set when tier is "included"
+  const radioValue = selectedTier === "included" ? (pendingModel ?? savedModel ?? "") : "";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Model Settings</DialogTitle>
           <DialogDescription>
-            Choose between the included standard models, or bring your own
-            OpenRouter key to use any premium model.
+            Choose which model to use for analysis.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={mode} onValueChange={handleModeChange} className="py-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger
-              value="standard"
-              disabled={settings.has_api_key}
-              title={
-                settings.has_api_key
-                  ? "Remove your OpenRouter key to use a standard model"
-                  : undefined
-              }
-            >
-              Standard
-            </TabsTrigger>
-            <TabsTrigger value="premium">Premium</TabsTrigger>
-          </TabsList>
-
-          {/* ── STANDARD MODE ───────────────────────────────────────── */}
-          <TabsContent value="standard" className="mt-4">
+        <div className="flex flex-col gap-6 py-4">
+          {/* ── INCLUDED SECTION ──────────────────────────────────── */}
+          <div data-testid="included-section">
+            <h3 className="mb-3 text-sm font-semibold text-text-secondary">
+              Included
+            </h3>
             <RadioGroup
-              value={effectiveModel ?? ""}
-              onValueChange={handleStandardPick}
+              value={radioValue}
+              onValueChange={handleIncludedPick}
               className="flex flex-col gap-2"
             >
               {standardModels.map((model) => (
                 <label
                   key={model.id}
                   className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-[color,background,border-color] duration-[var(--duration-micro)] ease-[var(--ease)] ${
-                    effectiveModel === model.id
+                    radioValue === model.id
                       ? "border-interactive-focus bg-interactive-focus-bg"
                       : "border-border hover:bg-interactive-fill"
                   }`}
@@ -263,46 +226,30 @@ export function ModelSettingsDialog({
                     value={model.id}
                     aria-label={model.name}
                   />
-                  <div>
+                  <div className="flex-1">
                     <div className="font-medium text-sm">{model.name}</div>
                     <div className="text-xs text-text-tertiary">
                       {model.provider ?? "Open source"}
                     </div>
                   </div>
+                  <span className="text-xs text-success font-medium">Free</span>
                 </label>
               ))}
             </RadioGroup>
+          </div>
 
-            {updateModelErrorMessage && (
-              <div className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {updateModelErrorMessage}
-              </div>
-            )}
+          {/* ── BYOK SECTION ─────────────────────────────────────── */}
+          <div
+            data-testid="byok-section"
+            className={`${selectedTier !== "byok" ? "opacity-75" : ""}`}
+          >
+            <h3 className="mb-3 text-sm font-semibold text-text-secondary">
+              Bring Your Own Key
+            </h3>
+            <p className="mb-3 text-xs text-text-tertiary">
+              Use any model from OpenRouter with your own API key.
+            </p>
 
-            {settings.has_api_key && (
-              <>
-                {deleteKeyErrorMessage && (
-                  <div className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    {deleteKeyErrorMessage}
-                  </div>
-                )}
-                <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs text-text-tertiary">
-                  OpenRouter key on file (ending …{settings.key_hint ?? "****"}).{" "}
-                  <button
-                    type="button"
-                    className="underline hover:text-text-secondary"
-                    onClick={handleRemoveKey}
-                    disabled={isDeletingKey}
-                  >
-                    Remove key
-                  </button>
-                </div>
-              </>
-            )}
-          </TabsContent>
-
-          {/* ── PREMIUM MODE ───────────────────────────────────────── */}
-          <TabsContent value="premium" className="mt-4">
             {!settings.has_api_key ? (
               <div className="flex flex-col gap-2">
                 <label
@@ -334,11 +281,6 @@ export function ModelSettingsDialog({
                 {addKeyErrorMessage && (
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {addKeyErrorMessage}
-                    {/* Heuristic: detect any "credits" wording in the error to surface the
-                        Add Credits CTA. The backend's /api-key route only emits two distinct
-                        400 messages — the unreachable/invalid case and the no-credits case —
-                        so a credits-shaped substring is a reliable proxy until the backend
-                        adopts a structured detail payload. */}
                     {/(\$0 credits|\bno credits\b|\bzero credits\b|\binsufficient credits\b)/i.test(addKeyErrorMessage) && (
                       <a
                         href="https://openrouter.ai/settings/credits"
@@ -363,7 +305,7 @@ export function ModelSettingsDialog({
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-                    Key ending in …{settings.key_hint ?? "****"}
+                    Key ending in ...{settings.key_hint ?? "****"}
                   </div>
                   <Button
                     variant="ghost"
@@ -384,9 +326,7 @@ export function ModelSettingsDialog({
                 <BalanceDisplay
                   balance={settings.balance ?? null}
                   onRefresh={() => {
-                    void refreshBalance().catch(() => {
-                      // surfaced by stale flag in the component
-                    });
+                    void refreshBalance().catch(() => {});
                   }}
                   isRefreshing={isRefreshingBalance}
                   lowThresholdUsd={settings.low_balance_threshold_usd ?? 0.5}
@@ -400,7 +340,7 @@ export function ModelSettingsDialog({
                     Selected model
                   </div>
                   <div className="mt-0.5 font-mono text-sm text-foreground break-all">
-                    {effectiveModel ?? "—"}
+                    {byokDisplayModel ?? "\u2014"}
                   </div>
                 </div>
 
@@ -410,16 +350,9 @@ export function ModelSettingsDialog({
                   filter={null}
                   itemToStringLabel={(m) => m?.name ?? ""}
                   itemToStringValue={(m) => m?.id ?? ""}
-                  // The combobox is purely a search-and-pick surface; the
-                  // currently-selected model lives in `pendingModel` /
-                  // `effectiveModel` and is shown in the "Selected model"
-                  // row above. Controlling `value` from `effectiveModel`
-                  // would resync the input on every keystroke and clobber
-                  // typing, so we leave `value` uncontrolled and only
-                  // control `inputValue` (the search query).
                   inputValue={query}
                   onInputValueChange={setQuery}
-                  onValueChange={handlePremiumPick}
+                  onValueChange={handleByokPick}
                 >
                   <ComboboxInput placeholder="Search models..." />
                   <ComboboxContent>
@@ -469,8 +402,15 @@ export function ModelSettingsDialog({
                 </p>
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+
+          {/* Included-tier update error (shown outside the sections) */}
+          {selectedTier === "included" && updateModelErrorMessage && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {updateModelErrorMessage}
+            </div>
+          )}
+        </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -478,7 +418,7 @@ export function ModelSettingsDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!isDirty || isUpdatingModel}
+            disabled={saveDisabled}
           >
             {isUpdatingModel ? "Saving..." : "Save"}
           </Button>

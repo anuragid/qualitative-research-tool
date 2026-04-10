@@ -39,6 +39,7 @@ def _setup_test_db(tmp_path):
         Column("username", String(255)),
         Column("role", String(50), nullable=False, default="user"),
         Column("preferred_model", String(255)),
+        Column("model_tier", String(10), nullable=False, server_default="included"),
         Column("encrypted_api_key", Text),
         Column("key_hint", String(8)),
         Column("key_validated_at", DateTime),

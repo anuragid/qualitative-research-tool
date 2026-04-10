@@ -25,6 +25,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user_id
+from app.constants import MODEL_TIER_INCLUDED
 from app.database import get_db
 from app.models.database_models import User
 from app.services.openrouter_balance import (
@@ -68,10 +69,18 @@ async def require_byok_credits(
         )
         return None
 
-    if user is None or not user.encrypted_api_key:
-        # Non-BYOK user (or unknown user — let downstream auth handle
-        # that case). Skip the gate entirely so non-BYOK users are
-        # never affected by this feature.
+    if user is None:
+        # Unknown user — let downstream auth handle that case.
+        return None
+
+    # Tier-based routing: included tier skips all balance checks
+    if getattr(user, "model_tier", MODEL_TIER_INCLUDED) == MODEL_TIER_INCLUDED:
+        return None
+
+    if not user.encrypted_api_key:
+        # BYOK tier but no key configured — shouldn't normally happen
+        # (the model-selection route prevents this). Skip the gate and
+        # let the downstream task surface the error.
         return None
 
     try:

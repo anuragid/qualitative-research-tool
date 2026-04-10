@@ -44,6 +44,7 @@ class User(Base):
     username = Column(String(255))
     role = Column(String(50), nullable=False, default="user")  # admin, user, viewer
     preferred_model = Column(String(255))  # OpenRouter model ID for BYOK
+    model_tier = Column(String(10), nullable=False, server_default="included")  # "included" or "byok"
     encrypted_api_key = Column(Text)  # Fernet-encrypted OpenRouter API key
     key_hint = Column(String(8))  # Last 4 chars of plaintext key
     key_validated_at = Column(DateTime(timezone=True))  # Last successful validation

@@ -28,9 +28,12 @@ const STANDARD_MODELS = [
   { id: "deepseek/deepseek-chat-v3-0324", name: "DeepSeek V3", tier: "standard", provider: "DeepSeek" },
 ];
 
+const DEFAULT_STANDARD_MODEL = "meta-llama/llama-4-scout";
+
 function makeSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
     preferred_model: null,
+    model_tier: "included",
     has_api_key: false,
     key_hint: null,
     key_validated_at: null,
@@ -55,6 +58,21 @@ function healthyBalance(): BalanceInfo {
   };
 }
 
+function zeroBalance(): BalanceInfo {
+  return {
+    total_credits: 5,
+    total_usage: 5,
+    balance_remaining: 0,
+    is_free_tier: false,
+    key_label: "sk-or-v1-abc...xyz",
+    key_limit: null,
+    key_limit_remaining: null,
+    has_credits: false,
+    checked_at: "2026-04-06T12:00:00Z",
+    stale: false,
+  };
+}
+
 function makeWrapper() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -73,14 +91,6 @@ function renderDialog() {
   return { ...utils, onOpenChange };
 }
 
-function getStandardTab(): HTMLElement {
-  return screen.getByRole("tab", { name: /standard/i });
-}
-
-function getPremiumTab(): HTMLElement {
-  return screen.getByRole("tab", { name: /premium/i });
-}
-
 // ── Default mocks ────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -96,110 +106,242 @@ afterEach(() => {
   cleanup();
 });
 
-// ── Mode initialization ──────────────────────────────────────────────────
+// ── Initialization ──────────────────────────────────────────────────────
 
-describe("ModelSettingsDialog — mode initialization", () => {
-  it("opens in Standard mode when no key and no preferred model", async () => {
-    vi.spyOn(settingsService, "getSettings").mockResolvedValue(makeSettings());
+describe("ModelSettingsDialog — initialization", () => {
+  it("opens with included radio selected when model_tier='included' and preferred_model is a standard model", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+      }),
+    );
     renderDialog();
 
     await waitFor(() => {
       expect(screen.getByText("Model Settings")).toBeDefined();
     });
 
-    expect(getStandardTab().getAttribute("data-state")).toBe("active");
-    // Combobox is not rendered in Standard mode
-    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
+    // The included radio for Llama 4 Scout should be checked
+    const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
+    expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
+
+    // No API key on file, so BYOK section shows add-key form (no model display)
+    expect(screen.queryByTestId("selected-model-display")).toBeNull();
+    // The add-key form should be visible in the BYOK section
+    expect(screen.getByPlaceholderText(/sk-or-v1/i)).toBeDefined();
   });
 
-  it("opens in Premium mode when key exists, even if saved model is standard, and pre-pops the default sonnet pick", async () => {
+  it("opens with BYOK model displayed when model_tier='byok' and preferred_model is a premium model", async () => {
     vi.spyOn(settingsService, "getSettings").mockResolvedValue(
       makeSettings({
-        has_api_key: true,
-        key_hint: "1234",
-        preferred_model: "meta-llama/llama-4-scout",
-        balance: healthyBalance(),
-      }),
-    );
-    renderDialog();
-
-    // Once a key is on file the user is committed to Premium — Standard is
-    // unreachable until the key is removed.
-    await waitFor(() => {
-      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
-    });
-    expect((getStandardTab() as HTMLButtonElement).disabled).toBe(true);
-
-    // The "Selected model" row shows the pending default (latest Sonnet),
-    // not the carried-over standard model id.
-    const selected = screen.getByTestId("selected-model-display");
-    expect(selected.textContent).toMatch(/anthropic\/claude-sonnet-4\.6/i);
-
-    // Save is enabled (pending pick differs from saved standard model).
-    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(false);
-  });
-
-  it("Standard tab is disabled while a key is on file", async () => {
-    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
-      makeSettings({
-        has_api_key: true,
-        key_hint: "1234",
+        model_tier: "byok",
         preferred_model: "anthropic/claude-sonnet-4.6",
-        balance: healthyBalance(),
-      }),
-    );
-    renderDialog();
-
-    await waitFor(() => {
-      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
-    });
-    const standardTab = getStandardTab() as HTMLButtonElement;
-    expect(standardTab.disabled).toBe(true);
-  });
-
-  it("opens in Premium mode when saved model is premium", async () => {
-    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
-      makeSettings({
         has_api_key: true,
         key_hint: "1234",
-        preferred_model: "anthropic/claude-sonnet-4.6",
         balance: healthyBalance(),
       }),
     );
     renderDialog();
 
     await waitFor(() => {
-      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
+      expect(screen.getByText("Model Settings")).toBeDefined();
     });
-    expect(screen.getByText(/key ending in.*1234/i)).toBeDefined();
-    expect(screen.getByText(/8\.52.*of.*\$10/i)).toBeDefined();
+
+    // BYOK section shows the premium model
+    const selectedDisplay = screen.getByTestId("selected-model-display");
+    expect(selectedDisplay.textContent).toMatch(/anthropic\/claude-sonnet-4\.6/i);
+
+    // Included radios should NOT have any checked
+    const radios = screen.getAllByRole("radio");
+    for (const radio of radios) {
+      expect(radio.getAttribute("aria-checked")).not.toBe("true");
+    }
+  });
+
+  it("falls back to 'included' when model_tier is missing from settings", async () => {
+    // Simulate a settings response where model_tier is absent (old backend)
+    const settingsWithoutTier = makeSettings({
+      preferred_model: "meta-llama/llama-4-scout",
+    });
+    // Remove model_tier to simulate missing field
+    delete (settingsWithoutTier as Record<string, unknown>).model_tier;
+
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(settingsWithoutTier);
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("Model Settings")).toBeDefined();
+    });
+
+    // Should default to included — Llama radio selected
+    const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
+    expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
   });
 });
 
-// ── Standard mode ────────────────────────────────────────────────────────
+// ── Mutual exclusion ────────────────────────────────────────────────────
 
-describe("ModelSettingsDialog — Standard mode", () => {
-  beforeEach(() => {
+describe("ModelSettingsDialog — mutual exclusion", () => {
+  it("clicking an included radio deselects BYOK (model display shows dash)", async () => {
     vi.spyOn(settingsService, "getSettings").mockResolvedValue(
-      makeSettings({ preferred_model: "meta-llama/llama-4-scout" }),
+      makeSettings({
+        model_tier: "byok",
+        preferred_model: "anthropic/claude-sonnet-4.6",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: healthyBalance(),
+      }),
     );
-  });
 
-  it("Save is disabled with no pending change", async () => {
+    const user = setupUser();
     renderDialog();
+
+    // Wait for BYOK model to be shown
     await waitFor(() => {
-      const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-      expect(saveBtn.disabled).toBe(true);
+      const selected = screen.getByTestId("selected-model-display");
+      expect(selected.textContent).toMatch(/anthropic\/claude-sonnet-4\.6/i);
     });
+
+    // Click an included radio
+    await user.click(screen.getByRole("radio", { name: /deepseek/i }));
+
+    // BYOK model display should now show "—"
+    const selected = screen.getByTestId("selected-model-display");
+    expect(selected.textContent).toContain("\u2014");
+
+    // The included radio should be checked
+    expect(
+      screen.getByRole("radio", { name: /deepseek/i }).getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
-  it("picking a different standard radio enables Save and PUTs preferred-model", async () => {
+  it("selecting from BYOK combobox deselects included radios", async () => {
+    const searchResults: SearchModel[] = [
+      {
+        id: "openai/gpt-4o",
+        name: "GPT-4o",
+        provider: "OpenAI",
+        context_length: 128000,
+        is_free: false,
+      },
+    ];
+    vi.spyOn(settingsService, "searchModels").mockResolvedValue(searchResults);
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: healthyBalance(),
+      }),
+    );
+
+    const user = setupUser();
+    renderDialog();
+
+    // Wait for included radio to be checked
+    await waitFor(() => {
+      expect(
+        screen.getByRole("radio", { name: /llama 4 scout/i }).getAttribute("aria-checked"),
+      ).toBe("true");
+    });
+
+    // Search and pick from BYOK combobox
+    const input = screen.getByPlaceholderText(/search models/i);
+    await user.type(input, "gpt-4o");
+    await waitFor(
+      () => {
+        expect(screen.getByRole("option", { name: /gpt-4o/i })).toBeDefined();
+      },
+      { timeout: 2000 },
+    );
+    await user.click(screen.getByRole("option", { name: /gpt-4o/i }));
+
+    // Included radios should all be unchecked
+    await waitFor(() => {
+      const radios = screen.getAllByRole("radio");
+      for (const radio of radios) {
+        expect(radio.getAttribute("aria-checked")).not.toBe("true");
+      }
+    });
+
+    // BYOK display should show the picked model
+    const selected = screen.getByTestId("selected-model-display");
+    expect(selected.textContent).toMatch(/openai\/gpt-4o/i);
+  });
+
+  it("rapid switching: included -> BYOK -> included -> final state is included with correct model", async () => {
+    const searchResults: SearchModel[] = [
+      {
+        id: "openai/gpt-4o",
+        name: "GPT-4o",
+        provider: "OpenAI",
+        context_length: 128000,
+        is_free: false,
+      },
+    ];
+    vi.spyOn(settingsService, "searchModels").mockResolvedValue(searchResults);
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: healthyBalance(),
+      }),
+    );
+
+    const user = setupUser();
+    renderDialog();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("radio", { name: /llama 4 scout/i }).getAttribute("aria-checked"),
+      ).toBe("true");
+    });
+
+    // Step 1: Pick from BYOK
+    const input = screen.getByPlaceholderText(/search models/i);
+    await user.type(input, "gpt-4o");
+    await waitFor(
+      () => {
+        expect(screen.getByRole("option", { name: /gpt-4o/i })).toBeDefined();
+      },
+      { timeout: 2000 },
+    );
+    await user.click(screen.getByRole("option", { name: /gpt-4o/i }));
+
+    // Step 2: Switch back to included by clicking DeepSeek radio
+    await user.click(screen.getByRole("radio", { name: /deepseek/i }));
+
+    // Final: DeepSeek should be selected, BYOK cleared
+    expect(
+      screen.getByRole("radio", { name: /deepseek/i }).getAttribute("aria-checked"),
+    ).toBe("true");
+    const selected = screen.getByTestId("selected-model-display");
+    expect(selected.textContent).toContain("\u2014");
+  });
+});
+
+// ── Save behavior ───────────────────────────────────────────────────────
+
+describe("ModelSettingsDialog — save behavior", () => {
+  it("save sends { modelId, modelTier: 'included' } when included model selected", async () => {
     const updateSpy = vi
       .spyOn(settingsService, "updatePreferredModel")
       .mockResolvedValue(
-        makeSettings({ preferred_model: "deepseek/deepseek-chat-v3-0324" }),
+        makeSettings({
+          model_tier: "included",
+          preferred_model: "deepseek/deepseek-chat-v3-0324",
+        }),
       );
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+      }),
+    );
 
     const user = setupUser();
     renderDialog();
@@ -208,208 +350,20 @@ describe("ModelSettingsDialog — Standard mode", () => {
       expect(screen.getByRole("radio", { name: /deepseek/i })).toBeDefined();
     });
     await user.click(screen.getByRole("radio", { name: /deepseek/i }));
-    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(false);
 
+    const saveBtn = screen.getByRole("button", { name: /^save$/i });
+    expect((saveBtn as HTMLButtonElement).disabled).toBe(false);
     await user.click(saveBtn);
-    await waitFor(() => {
-      expect(updateSpy).toHaveBeenCalledWith("deepseek/deepseek-chat-v3-0324");
-    });
-  });
-
-  it("clicking the already-selected radio leaves Save disabled", async () => {
-    const user = setupUser();
-    renderDialog();
-    await waitFor(() => {
-      expect(screen.getByRole("radio", { name: /llama 4 scout/i })).toBeDefined();
-    });
-
-    await user.click(screen.getByRole("radio", { name: /llama 4 scout/i }));
-    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(true);
-  });
-});
-
-// ── Premium mode, no key ─────────────────────────────────────────────────
-
-describe("ModelSettingsDialog — Premium mode, no key", () => {
-  let settingsState: UserSettings;
-
-  beforeEach(() => {
-    settingsState = makeSettings();
-    vi.spyOn(settingsService, "getSettings").mockImplementation(async () => settingsState);
-  });
-
-  it("switching to Premium reveals the key input, no combobox", async () => {
-    const user = setupUser();
-    renderDialog();
 
     await waitFor(() => {
-      expect(getPremiumTab()).toBeDefined();
-    });
-    await user.click(getPremiumTab());
-    expect(screen.getByPlaceholderText(/sk-or-v1/i)).toBeDefined();
-    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
-  });
-
-  it("Validate button is disabled until the key is at least 10 chars", async () => {
-    const user = setupUser();
-    renderDialog();
-    await waitFor(() => {
-      expect(getPremiumTab()).toBeDefined();
-    });
-    await user.click(getPremiumTab());
-
-    const input = screen.getByPlaceholderText(/sk-or-v1/i);
-    const validateBtn = screen.getByRole("button", {
-      name: /validate/i,
-    }) as HTMLButtonElement;
-
-    expect(validateBtn.disabled).toBe(true);
-    await user.type(input, "short");
-    expect(validateBtn.disabled).toBe(true);
-    await user.type(input, "1234567890");
-    expect(validateBtn.disabled).toBe(false);
-  });
-
-  it("on validate success, combobox mounts and balance shows", async () => {
-    const validatedSettings = makeSettings({
-      has_api_key: true,
-      key_hint: "1234",
-      balance: healthyBalance(),
-    });
-    const addKeySpy = vi
-      .spyOn(settingsService, "addApiKey")
-      .mockImplementation(async () => {
-        // Server-side state is now updated; subsequent getSettings reflects it.
-        settingsState = validatedSettings;
-        return validatedSettings;
+      expect(updateSpy).toHaveBeenCalledWith({
+        modelId: "deepseek/deepseek-chat-v3-0324",
+        modelTier: "included",
       });
-
-    const user = setupUser();
-    renderDialog();
-
-    await waitFor(() => {
-      expect(getPremiumTab()).toBeDefined();
     });
-    await user.click(getPremiumTab());
-    await user.type(
-      screen.getByPlaceholderText(/sk-or-v1/i),
-      "sk-or-v1-test1234",
-    );
-    await user.click(screen.getByRole("button", { name: /validate/i }));
-
-    await waitFor(() => {
-      expect(addKeySpy).toHaveBeenCalledWith("sk-or-v1-test1234");
-    });
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText(/search models/i)).toBeDefined();
-    });
-    expect(screen.getByText(/8\.52.*of.*\$10/i)).toBeDefined();
   });
 
-  it("on validate failure, error surfaces inline and combobox stays absent", async () => {
-    vi.spyOn(settingsService, "addApiKey").mockRejectedValue({
-      response: {
-        status: 400,
-        data: { detail: "Your OpenRouter key has $0 credits..." },
-      },
-      message: "Request failed",
-    });
-
-    const user = setupUser();
-    renderDialog();
-
-    await waitFor(() => {
-      expect(getPremiumTab()).toBeDefined();
-    });
-    await user.click(getPremiumTab());
-    await user.type(
-      screen.getByPlaceholderText(/sk-or-v1/i),
-      "sk-or-v1-empty1234",
-    );
-    await user.click(screen.getByRole("button", { name: /validate/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/\$0 credits|invalid api key/i)).toBeDefined();
-    });
-    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
-  });
-
-  it("on no-credits 400, renders inline error and shows a 'Add credits' link to openrouter.ai/settings/credits", async () => {
-    vi.spyOn(settingsService, "addApiKey").mockRejectedValue({
-      response: {
-        status: 400,
-        data: { detail: "Your OpenRouter key has $0 credits. Please add credits to continue." },
-      },
-      message: "Request failed",
-    });
-
-    const user = setupUser();
-    renderDialog();
-
-    await waitFor(() => {
-      expect(getPremiumTab()).toBeDefined();
-    });
-    await user.click(getPremiumTab());
-    await user.type(
-      screen.getByPlaceholderText(/sk-or-v1/i),
-      "sk-or-v1-nocredits1234",
-    );
-    await user.click(screen.getByRole("button", { name: /validate/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/\$0 credits/i)).toBeDefined();
-    });
-
-    const link = screen.getByRole("link", { name: /add credits/i }) as HTMLAnchorElement;
-    expect(link).toBeDefined();
-    expect(link.href).toContain("openrouter.ai/settings/credits");
-    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
-  });
-});
-
-// ── Premium mode, validated key ──────────────────────────────────────────
-
-describe("ModelSettingsDialog — Premium mode, validated key", () => {
-  beforeEach(() => {
-    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
-      makeSettings({
-        has_api_key: true,
-        key_hint: "1234",
-        preferred_model: "anthropic/claude-sonnet-4.6",
-        balance: healthyBalance(),
-      }),
-    );
-  });
-
-  it("regression: typing in the combobox is not clobbered by re-renders", async () => {
-    // Repro of the controlled-value bug: every keystroke would trigger a
-    // re-render of the parent, which recomputed `comboboxValue` from
-    // `effectiveModel` and reset the input back to the saved label.
-    vi.spyOn(settingsService, "searchModels").mockResolvedValue([]);
-    const user = setupUser();
-    renderDialog();
-
-    const input = (await screen.findByPlaceholderText(
-      /search models/i,
-    )) as HTMLInputElement;
-    await user.type(input, "claude");
-    expect(input.value).toBe("claude");
-  });
-
-  it("Selected model row shows the saved premium id on open and combobox is empty", async () => {
-    renderDialog();
-    // The "Selected model" row reflects the saved id.
-    const selected = await screen.findByTestId("selected-model-display");
-    expect(selected.textContent).toMatch(/anthropic\/claude-sonnet-4\.6/i);
-
-    // The combobox input is empty (it's a search/pick surface, not a value display).
-    const combobox = screen.getByRole("combobox") as HTMLInputElement;
-    expect(combobox.value).toBe("");
-  });
-
-  it("picking a different model enables Save and PUTs preferred-model", async () => {
+  it("save sends { modelId, modelTier: 'byok' } when BYOK model selected", async () => {
     const searchResults: SearchModel[] = [
       {
         id: "openai/gpt-4o",
@@ -424,20 +378,29 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
       .spyOn(settingsService, "updatePreferredModel")
       .mockResolvedValue(
         makeSettings({
+          model_tier: "byok",
+          preferred_model: "openai/gpt-4o",
           has_api_key: true,
           key_hint: "1234",
-          preferred_model: "openai/gpt-4o",
           balance: healthyBalance(),
         }),
       );
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: healthyBalance(),
+      }),
+    );
 
     const user = setupUser();
     renderDialog();
 
+    // Pick a BYOK model
     const input = await screen.findByPlaceholderText(/search models/i);
-    await user.clear(input);
     await user.type(input, "gpt-4o");
-
     await waitFor(
       () => {
         expect(screen.getByRole("option", { name: /gpt-4o/i })).toBeDefined();
@@ -446,35 +409,33 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
     );
     await user.click(screen.getByRole("option", { name: /gpt-4o/i }));
 
-    await waitFor(() => {
-      const saveBtn = screen.getByRole("button", {
-        name: /^save$/i,
-      }) as HTMLButtonElement;
-      expect(saveBtn.disabled).toBe(false);
-    });
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    const saveBtn = screen.getByRole("button", { name: /^save$/i });
+    await user.click(saveBtn);
 
     await waitFor(() => {
-      expect(updateSpy).toHaveBeenCalledWith("openai/gpt-4o");
+      expect(updateSpy).toHaveBeenCalledWith({
+        modelId: "openai/gpt-4o",
+        modelTier: "byok",
+      });
     });
   });
 
-  it("Standard tab is disabled while a key is on file (no tab-switch escape hatch)", async () => {
-    const user = setupUser();
+  it("save disabled when nothing changed (not dirty)", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+      }),
+    );
     renderDialog();
 
     await waitFor(() => {
-      expect(getPremiumTab().getAttribute("data-state")).toBe("active");
+      const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+      expect(saveBtn.disabled).toBe(true);
     });
-
-    // The Standard tab is disabled — clicking it does nothing.
-    const standardTab = getStandardTab() as HTMLButtonElement;
-    expect(standardTab.disabled).toBe(true);
-    await user.click(standardTab);
-    expect(getPremiumTab().getAttribute("data-state")).toBe("active");
   });
 
-  it("picking a model updates the Selected row and enables Save", async () => {
+  it("save disabled when BYOK selected but no API key on file", async () => {
     const searchResults: SearchModel[] = [
       {
         id: "openai/gpt-4o",
@@ -485,49 +446,114 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
       },
     ];
     vi.spyOn(settingsService, "searchModels").mockResolvedValue(searchResults);
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: false, // no key
+      }),
+    );
 
-    const user = setupUser();
     renderDialog();
 
-    const input = await screen.findByPlaceholderText(/search models/i);
-    await user.type(input, "gpt-4o");
-    await waitFor(
-      () => {
-        expect(screen.getByRole("option", { name: /gpt-4o/i })).toBeDefined();
-      },
-      { timeout: 2000 },
-    );
-    await user.click(screen.getByRole("option", { name: /gpt-4o/i }));
-
-    // The Selected row reflects the new pick — the source of truth for
-    // "what model will be saved". The combobox input itself may still show
-    // the picked label (normal combobox behavior).
+    // Since there's no API key, BYOK section shows the add-key form.
+    // The user can't select a BYOK model without a key, so Save should
+    // remain disabled — the combobox isn't mounted without a key.
     await waitFor(() => {
-      const selected = screen.getByTestId("selected-model-display");
-      expect(selected.textContent).toMatch(/openai\/gpt-4o/i);
+      expect(screen.getByText("Model Settings")).toBeDefined();
     });
-    const saveBtn = screen.getByRole("button", {
-      name: /^save$/i,
-    }) as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(false);
+
+    // Save should still be disabled (no change from initial state)
+    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(true);
   });
 
-  it("clicking Remove key flips mode to Standard and clears the combobox", async () => {
+  it("save disabled when BYOK selected and balance is $0", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "byok",
+        preferred_model: "anthropic/claude-sonnet-4.6",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: zeroBalance(),
+      }),
+    );
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("Model Settings")).toBeDefined();
+    });
+
+    // Save should be disabled when BYOK tier is active with $0 balance
+    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(true);
+  });
+});
+
+// ── BYOK section ────────────────────────────────────────────────────────
+
+describe("ModelSettingsDialog — BYOK section", () => {
+  it("shows add-key form when no API key", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: false,
+      }),
+    );
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("Model Settings")).toBeDefined();
+    });
+
+    // BYOK section should show the add-key input
+    expect(screen.getByPlaceholderText(/sk-or-v1/i)).toBeDefined();
+    // No combobox search input when key is absent
+    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
+  });
+
+  it("shows key hint + balance + combobox when API key exists", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: healthyBalance(),
+      }),
+    );
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("Model Settings")).toBeDefined();
+    });
+
+    // Key hint is visible
+    expect(screen.getByText(/1234/)).toBeDefined();
+    // Balance is visible
+    expect(screen.getByText(/8\.52/)).toBeDefined();
+    // Combobox is mounted
+    expect(screen.getByPlaceholderText(/search models/i)).toBeDefined();
+  });
+
+  it("remove key switches to included tier with default model", async () => {
     vi.spyOn(settingsService, "deleteApiKey").mockResolvedValue();
-    // After delete, settings refetch returns the default standard
     vi.spyOn(settingsService, "getSettings")
       .mockResolvedValueOnce(
         makeSettings({
+          model_tier: "byok",
+          preferred_model: "anthropic/claude-sonnet-4.6",
           has_api_key: true,
           key_hint: "1234",
-          preferred_model: "anthropic/claude-sonnet-4.6",
           balance: healthyBalance(),
         }),
       )
       .mockResolvedValue(
         makeSettings({
+          model_tier: "included",
+          preferred_model: DEFAULT_STANDARD_MODEL,
           has_api_key: false,
-          preferred_model: "meta-llama/llama-4-scout",
         }),
       );
 
@@ -535,114 +561,182 @@ describe("ModelSettingsDialog — Premium mode, validated key", () => {
     renderDialog();
 
     await waitFor(() => {
-      expect(screen.getByText(/key ending in.*1234/i)).toBeDefined();
+      expect(screen.getByText(/1234/)).toBeDefined();
     });
-    await user.click(screen.getByRole("button", { name: /^remove$/i }));
+
+    // Click remove key
+    await user.click(screen.getByRole("button", { name: /remove/i }));
+
+    // After removal, included radios should be visible and selected
+    await waitFor(() => {
+      const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
+      expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
+    });
+
+    // Combobox should be gone (replaced by add-key form)
+    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
+  });
+
+  it("$0 balance shows inline error with 'Add credits' link", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "byok",
+        preferred_model: "anthropic/claude-sonnet-4.6",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: zeroBalance(),
+      }),
+    );
+    renderDialog();
 
     await waitFor(() => {
-      expect(getStandardTab().getAttribute("data-state")).toBe("active");
+      expect(screen.getByText("Model Settings")).toBeDefined();
     });
-    expect(screen.queryByPlaceholderText(/search models/i)).toBeNull();
+
+    // BalanceDisplay shows "No credits remaining" in the error state
+    expect(screen.getByText(/no credits remaining/i)).toBeDefined();
+
+    // "Add credits" link should be present
+    const link = screen.getByRole("link", { name: /add credits/i }) as HTMLAnchorElement;
+    expect(link).toBeDefined();
+    expect(link.href).toContain("openrouter.ai/settings/credits");
   });
 });
 
-// ── Sticky pendingModel ──────────────────────────────────────────────────
+// ── Error handling ──────────────────────────────────────────────────────
 
-describe("dialog reset on close+reopen", () => {
-  it("closing and reopening the dialog resets pendingModel and re-derives mode from server state", async () => {
+describe("ModelSettingsDialog — error handling", () => {
+  it("add key error renders inline", async () => {
     vi.spyOn(settingsService, "getSettings").mockResolvedValue(
-      makeSettings({ preferred_model: "meta-llama/llama-4-scout" }),
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: false,
+      }),
+    );
+    vi.spyOn(settingsService, "addApiKey").mockRejectedValue({
+      response: {
+        status: 400,
+        data: { detail: "Invalid API key format" },
+      },
+      message: "Request failed",
+    });
+
+    const user = setupUser();
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/sk-or-v1/i)).toBeDefined();
+    });
+
+    await user.type(
+      screen.getByPlaceholderText(/sk-or-v1/i),
+      "sk-or-v1-badkey1234",
+    );
+    await user.click(screen.getByRole("button", { name: /validate/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid api key/i)).toBeDefined();
+    });
+  });
+
+  it("update model error renders inline", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+      }),
+    );
+    vi.spyOn(settingsService, "updatePreferredModel").mockRejectedValue({
+      response: {
+        status: 500,
+        data: { detail: "Internal server error" },
+      },
+      message: "Request failed",
+    });
+
+    const user = setupUser();
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: /deepseek/i })).toBeDefined();
+    });
+    await user.click(screen.getByRole("radio", { name: /deepseek/i }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/internal server error/i)).toBeDefined();
+    });
+  });
+});
+
+// ── Key management ──────────────────────────────────────────────────────
+
+describe("ModelSettingsDialog — key management", () => {
+  it("BYOK section is dimmed (opacity) when included tier is active", async () => {
+    vi.spyOn(settingsService, "getSettings").mockResolvedValue(
+      makeSettings({
+        model_tier: "included",
+        preferred_model: "meta-llama/llama-4-scout",
+        has_api_key: true,
+        key_hint: "1234",
+        balance: healthyBalance(),
+      }),
+    );
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("Model Settings")).toBeDefined();
+    });
+
+    // The BYOK section should have opacity-75 when included is the active tier
+    const byokSection = screen.getByTestId("byok-section");
+    expect(byokSection.className).toMatch(/opacity-75/);
+  });
+
+  it("key can still be managed (added/removed) even when included tier is active", async () => {
+    vi.spyOn(settingsService, "deleteApiKey").mockResolvedValue();
+    let currentSettings = makeSettings({
+      model_tier: "included",
+      preferred_model: "meta-llama/llama-4-scout",
+      has_api_key: true,
+      key_hint: "1234",
+      balance: healthyBalance(),
+    });
+    vi.spyOn(settingsService, "getSettings").mockImplementation(
+      async () => currentSettings,
     );
 
     const user = setupUser();
-    // 1. Render open with standard mode + saved Llama
-    const { rerender } = render(
-      <ModelSettingsDialog open onOpenChange={() => {}} />,
-      { wrapper: makeWrapper() },
-    );
+    renderDialog();
 
-    // 2. Wait for dialog to load and verify Standard tab is active
     await waitFor(() => {
-      expect(getStandardTab().getAttribute("data-state")).toBe("active");
+      expect(screen.getByText(/1234/)).toBeDefined();
     });
 
-    // 3. Pick a different standard radio (sets pendingModel)
-    const nemotronRadio = screen.getByRole("radio", { name: /nemotron/i });
-    await user.click(nemotronRadio);
-
-    // 4. Verify Save is enabled (pendingModel is dirty)
-    const saveBtn = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(false);
-
-    // 5. Close the dialog (open=false)
-    rerender(<ModelSettingsDialog open={false} onOpenChange={() => {}} />);
-
-    // 6. Re-open the dialog (open=true)
-    rerender(<ModelSettingsDialog open onOpenChange={() => {}} />);
-
-    // 7. Save should be disabled (pendingModel reset)
-    await waitFor(() => {
-      const saveBtnAfter = screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement;
-      expect(saveBtnAfter.disabled).toBe(true);
-    });
-
-    // 8. Standard tab still active and original Llama radio is checked
-    expect(getStandardTab().getAttribute("data-state")).toBe("active");
+    // Included radio should be checked (included tier is active)
     const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
     expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
 
-    // 9. The discarded pick (Nemotron) is NOT checked
-    const nemotronRadioAfter = screen.getByRole("radio", { name: /nemotron/i });
-    expect(nemotronRadioAfter.getAttribute("aria-checked")).not.toBe("true");
-  });
-});
+    // But the "Remove" button in BYOK section should still be clickable
+    const removeBtn = screen.getByRole("button", { name: /remove/i });
+    expect((removeBtn as HTMLButtonElement).disabled).toBe(false);
 
-describe("ModelSettingsDialog — sticky pendingModel under refetch", () => {
-  it("a background settings refetch does not overwrite an in-flight model pick", async () => {
-    let getCallCount = 0;
-    vi.spyOn(settingsService, "getSettings").mockImplementation(async () => {
-      getCallCount += 1;
-      return makeSettings({
-        has_api_key: true,
-        key_hint: "1234",
-        preferred_model: "anthropic/claude-sonnet-4.6",
-        balance: { ...healthyBalance(), balance_remaining: 8.52 - getCallCount * 0.1 },
-      });
+    // After removal, the add-key form should appear
+    currentSettings = makeSettings({
+      model_tier: "included",
+      preferred_model: "meta-llama/llama-4-scout",
+      has_api_key: false,
     });
-    const searchResults: SearchModel[] = [
-      {
-        id: "openai/gpt-4o",
-        name: "GPT-4o",
-        provider: "OpenAI",
-        context_length: 128000,
-        is_free: false,
-      },
-    ];
-    vi.spyOn(settingsService, "searchModels").mockResolvedValue(searchResults);
+    await user.click(removeBtn);
 
-    const user = setupUser();
-    const { rerender } = renderDialog();
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/sk-or-v1/i)).toBeDefined();
+    });
 
-    const input = await screen.findByPlaceholderText(/search models/i);
-    await user.type(input, "gpt-4o");
-    await waitFor(
-      () => {
-        expect(screen.getByRole("option", { name: /gpt-4o/i })).toBeDefined();
-      },
-      { timeout: 2000 },
-    );
-    await user.click(screen.getByRole("option", { name: /gpt-4o/i }));
-
-    // Force a re-render that mimics a background refetch landing
-    rerender(<ModelSettingsDialog open onOpenChange={() => {}} />);
-
-    // pendingModel should still be GPT-4o, NOT reset to claude — verified
-    // via the Selected row and the still-enabled Save button.
-    const selected = screen.getByTestId("selected-model-display");
-    expect(selected.textContent).toMatch(/openai\/gpt-4o/i);
-    const saveBtn = screen.getByRole("button", {
-      name: /^save$/i,
-    }) as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(false);
+    // Included radios should still be selected — removing key doesn't change tier
+    expect(
+      screen.getByRole("radio", { name: /llama 4 scout/i }).getAttribute("aria-checked"),
+    ).toBe("true");
   });
 });

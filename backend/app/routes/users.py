@@ -8,7 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
-from app.constants import DEFAULT_STANDARD_MODEL, STANDARD_MODEL_IDS, STANDARD_MODELS
+from app.constants import (
+    DEFAULT_STANDARD_MODEL,
+    MODEL_TIER_BYOK,
+    MODEL_TIER_INCLUDED,
+    STANDARD_MODEL_IDS,
+    STANDARD_MODELS,
+)
 from app.database import get_db
 from app.models import database_models
 from app.models.schemas import (
@@ -206,6 +212,7 @@ async def get_user_settings(
 
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
+        model_tier=db_user.model_tier or MODEL_TIER_INCLUDED,
         has_api_key=bool(db_user.encrypted_api_key),
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
@@ -286,6 +293,7 @@ async def add_api_key(
 
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
+        model_tier=db_user.model_tier or MODEL_TIER_INCLUDED,
         has_api_key=True,
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
@@ -305,10 +313,11 @@ async def update_preferred_model(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Set the user's preferred model.
+    """Set the user's preferred model and tier.
 
-    Tier enforcement: a user without a BYOK key can only pick a model
-    from STANDARD_MODEL_IDS. With a key on file, any model id is allowed.
+    Tier enforcement:
+    - ``included`` tier: model must be in STANDARD_MODEL_IDS.
+    - ``byok`` tier: user must have an API key with credits.
     Does NOT touch the API key.
     """
     user_id = current_user["id"]
@@ -319,17 +328,45 @@ async def update_preferred_model(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    tier = payload.model_tier
     has_key = bool(db_user.encrypted_api_key)
-    if not has_key and payload.preferred_model not in STANDARD_MODEL_IDS:
+
+    if tier == MODEL_TIER_INCLUDED and payload.preferred_model not in STANDARD_MODEL_IDS:
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail=(
-                "Add your OpenRouter API key in Settings to unlock "
-                "premium models."
+                "The selected model is not available on the included tier. "
+                "Switch to BYOK tier or choose a standard model."
             ),
         )
 
+    if tier == MODEL_TIER_BYOK:
+        if not has_key:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Add your OpenRouter API key in Settings to unlock "
+                    "premium models."
+                ),
+            )
+        # Fresh balance check for BYOK tier selection
+        try:
+            balance_check = get_cached_balance(db, db_user, max_age_seconds=0)
+        except Exception:  # noqa: BLE001 — degraded pass
+            balance_check = None
+
+        if balance_check is not None and not balance_check.has_credits:
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    "Your OpenRouter key has no remaining credits. "
+                    "Add credits at https://openrouter.ai/settings/credits "
+                    "and try again."
+                ),
+            )
+
     db_user.preferred_model = payload.preferred_model
+    db_user.model_tier = tier
     db.commit()
 
     fresh_balance: Optional[BalanceInfo] = None
@@ -344,6 +381,7 @@ async def update_preferred_model(
 
     return UserSettingsResponse(
         preferred_model=db_user.preferred_model,
+        model_tier=db_user.model_tier or MODEL_TIER_INCLUDED,
         has_api_key=has_key,
         key_hint=db_user.key_hint,
         key_validated_at=db_user.key_validated_at,
@@ -434,6 +472,7 @@ async def delete_api_key(
     db_user.key_hint = None
     db_user.key_validated_at = None
     db_user.preferred_model = DEFAULT_STANDARD_MODEL
+    db_user.model_tier = MODEL_TIER_INCLUDED
     # Also clear balance snapshot fields — they reference a key that no
     # longer exists, and leaving them set would let the next GET /settings
     # render stale BYOK balance data for a non-BYOK user.

@@ -71,28 +71,36 @@ class TestPreferredModelValidation:
     """Preferred model IDs must follow provider/model-name format."""
 
     def test_valid_model_id(self):
-        req = PreferredModelUpdateRequest(preferred_model="anthropic/claude-sonnet-4.6")
+        req = PreferredModelUpdateRequest(preferred_model="anthropic/claude-sonnet-4.6", model_tier="byok")
         assert req.preferred_model == "anthropic/claude-sonnet-4.6"
 
     def test_valid_model_id_with_colons(self):
-        req = PreferredModelUpdateRequest(preferred_model="meta-llama/llama-4-scout:free")
+        req = PreferredModelUpdateRequest(preferred_model="meta-llama/llama-4-scout:free", model_tier="included")
         assert req.preferred_model == "meta-llama/llama-4-scout:free"
 
     def test_blank_model_rejected(self):
         with pytest.raises(ValidationError, match="blank"):
-            PreferredModelUpdateRequest(preferred_model="   ")
+            PreferredModelUpdateRequest(preferred_model="   ", model_tier="included")
 
     def test_no_slash_rejected(self):
         with pytest.raises(ValidationError, match="Invalid model ID format"):
-            PreferredModelUpdateRequest(preferred_model="just-a-model-name")
+            PreferredModelUpdateRequest(preferred_model="just-a-model-name", model_tier="included")
 
     def test_script_injection_rejected(self):
         with pytest.raises(ValidationError, match="Invalid model ID format"):
-            PreferredModelUpdateRequest(preferred_model="<script>alert(1)</script>")
+            PreferredModelUpdateRequest(preferred_model="<script>alert(1)</script>", model_tier="included")
 
     def test_model_with_dots(self):
-        req = PreferredModelUpdateRequest(preferred_model="deepseek/deepseek-chat-v3-0324")
+        req = PreferredModelUpdateRequest(preferred_model="deepseek/deepseek-chat-v3-0324", model_tier="included")
         assert req.preferred_model == "deepseek/deepseek-chat-v3-0324"
+
+    def test_invalid_tier_rejected(self):
+        with pytest.raises(ValidationError, match="model_tier must be"):
+            PreferredModelUpdateRequest(preferred_model="meta-llama/llama-4-scout", model_tier="premium")
+
+    def test_missing_tier_rejected(self):
+        with pytest.raises(ValidationError):
+            PreferredModelUpdateRequest(preferred_model="meta-llama/llama-4-scout")
 
 
 class TestApiKeySanitization:

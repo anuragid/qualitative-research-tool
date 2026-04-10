@@ -18,6 +18,10 @@ DEFAULT_STANDARD_MODEL = STANDARD_MODELS[0]["id"]  # Llama 4 Scout
 # If the primary model is rate-limited/unavailable, try the next.
 STANDARD_MODEL_FALLBACKS = [m["id"] for m in STANDARD_MODELS]
 
+# ── Model tier constants ────────────────────────────────────────────────
+MODEL_TIER_INCLUDED = "included"
+MODEL_TIER_BYOK = "byok"
+
 # ── Recommended model per tier (shown in the settings dialog) ────────────
 RECOMMENDED_MODELS = {
     "standard": {

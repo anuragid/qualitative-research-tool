@@ -26,10 +26,13 @@ export function useSettings() {
     },
   });
 
-  /** Set the preferred model. On success, writes the fresh settings into the cache. */
-  const updatePreferredModelMutation = useMutation<UserSettings, Error, string>({
-    mutationFn: (modelId: string) =>
-      settingsService.updatePreferredModel(modelId),
+  /** Set the preferred model and tier. On success, writes the fresh settings into the cache. */
+  const updatePreferredModelMutation = useMutation<
+    UserSettings,
+    Error,
+    { modelId: string; modelTier: import("../services/settings").ModelTier }
+  >({
+    mutationFn: (payload) => settingsService.updatePreferredModel(payload),
     onSuccess: (data) => {
       queryClient.setQueryData<UserSettings>(["user-settings"], data);
       queryClient.invalidateQueries({ queryKey: ["user-settings"] });

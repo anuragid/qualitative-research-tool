@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.constants import DEFAULT_STANDARD_MODEL, MODEL_TIER_INCLUDED
 from app.models.database_models import User
 from app.services.encryption_service import encryption_service
 from app.services.openrouter_balance import (
@@ -43,7 +44,11 @@ class InsufficientCreditsError(Exception):
 def resolve_byok(db: Session, user_id: str | None) -> tuple[str | None, str | None]:
     """Look up and decrypt a user's BYOK API key and preferred model.
 
-    Returns (api_key, model) -- both None when no BYOK is configured.
+    Uses ``user.model_tier`` to decide routing:
+    - ``"included"`` → return (None, preferred_model) so the server key is used.
+    - ``"byok"`` → decrypt the user's key, re-validate if stale, return it.
+
+    Returns (api_key, model) -- api_key is None when using the included tier.
     Raises Exception if a BYOK key exists but cannot be decrypted or
     fails re-validation, so we never silently fall back to the Methodex key.
     """
@@ -53,6 +58,11 @@ def resolve_byok(db: Session, user_id: str | None) -> tuple[str | None, str | No
     if not user:
         return None, None
 
+    # Tier-based routing: included tier always uses the server key
+    if getattr(user, "model_tier", MODEL_TIER_INCLUDED) == MODEL_TIER_INCLUDED:
+        return None, user.preferred_model or DEFAULT_STANDARD_MODEL
+
+    # BYOK tier — need a key
     if not user.encrypted_api_key:
         return None, user.preferred_model
 
@@ -131,7 +141,7 @@ def resolve_byok_with_preflight(
     """
     api_key, model = resolve_byok(db, user_id)
     if api_key is None:
-        return None, None, None
+        return None, model, None
 
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:

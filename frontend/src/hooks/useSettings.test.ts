@@ -149,8 +149,9 @@ describe("useSettings", () => {
     });
     await waitFor(() => expect(result.current.settings).toBeDefined());
 
+    const payload = { modelId: "meta-llama/llama-4-scout", modelTier: "included" as const };
     await act(async () => {
-      await result.current.updatePreferredModel("meta-llama/llama-4-scout");
+      await result.current.updatePreferredModel(payload);
     });
 
     await waitFor(() => {
@@ -158,7 +159,7 @@ describe("useSettings", () => {
         "meta-llama/llama-4-scout",
       );
     });
-    expect(mockedService.updatePreferredModel).toHaveBeenCalledWith("meta-llama/llama-4-scout");
+    expect(mockedService.updatePreferredModel).toHaveBeenCalledWith(payload);
   });
 
   it("addApiKey error surfaces via addKeyError and does not update cache", async () => {

@@ -91,6 +91,7 @@ def db_user_factory(client):
         encrypted_api_key=None,
         key_hint=None,
         preferred_model=None,
+        model_tier=None,
         key_total_credits=None,
         key_total_usage=None,
         key_is_free_tier=None,
@@ -111,6 +112,8 @@ def db_user_factory(client):
                 user.key_hint = key_hint
             if preferred_model is not None:
                 user.preferred_model = preferred_model
+            if model_tier is not None:
+                user.model_tier = model_tier
             if key_total_credits is not None:
                 user.key_total_credits = key_total_credits
             if key_total_usage is not None:
@@ -125,6 +128,54 @@ def db_user_factory(client):
             db.close()
 
     return _factory
+
+
+# ── GET /settings ─────────────────────────────────────────────────────────────
+
+
+class TestGetSettings:
+    async def test_returns_model_tier_field(self, client, db_user_factory):
+        """GET /settings response includes the model_tier field."""
+        db_user_factory(model_tier="included")
+        response = await client.get(
+            "/api/users/settings",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert "model_tier" in body
+        assert body["model_tier"] == "included"
+
+    async def test_returns_byok_model_tier(self, client, db_user_factory):
+        """GET /settings for a BYOK user returns model_tier='byok'."""
+        db_user_factory(
+            encrypted_api_key=b"some-key",
+            key_hint="abcd",
+            model_tier="byok",
+            preferred_model="anthropic/claude-sonnet-4.6",
+        )
+        with patch(
+            "app.routes.users.get_cached_balance",
+            return_value=_healthy_balance(),
+        ):
+            response = await client.get(
+                "/api/users/settings",
+                headers=_AUTH,
+            )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["model_tier"] == "byok"
+        assert body["preferred_model"] == "anthropic/claude-sonnet-4.6"
+
+    async def test_defaults_to_included_when_tier_unset(self, client, db_user_factory):
+        """GET /settings defaults model_tier to 'included' when not explicitly set."""
+        db_user_factory()  # model_tier not set
+        response = await client.get(
+            "/api/users/settings",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["model_tier"] == "included"
 
 
 # ── POST /settings/api-key ────────────────────────────────────────────────────
@@ -251,23 +302,36 @@ class TestPutPreferredModel:
         db_user_factory()  # no key
         response = await client.put(
             "/api/users/settings/preferred-model",
-            json={"preferred_model": "meta-llama/llama-4-scout"},
+            json={"preferred_model": "meta-llama/llama-4-scout", "model_tier": "included"},
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["preferred_model"] == "meta-llama/llama-4-scout"
+        assert response.json()["model_tier"] == "included"
 
-    async def test_no_key_premium_model_returns_403(self, client, db_user_factory):
+    async def test_included_tier_premium_model_returns_400(self, client, db_user_factory):
+        """Included tier + non-standard model = 400."""
         db_user_factory()
         response = await client.put(
             "/api/users/settings/preferred-model",
-            json={"preferred_model": "anthropic/claude-sonnet-4.6"},
+            json={"preferred_model": "anthropic/claude-sonnet-4.6", "model_tier": "included"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "not available on the included tier" in response.json()["detail"].lower()
+
+    async def test_byok_tier_no_key_returns_403(self, client, db_user_factory):
+        """BYOK tier but no key on file = 403."""
+        db_user_factory()
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "anthropic/claude-sonnet-4.6", "model_tier": "byok"},
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "openrouter api key" in response.json()["detail"].lower()
 
-    async def test_with_key_premium_model_returns_200(
+    async def test_with_key_byok_tier_premium_model_returns_200(
         self, client, db_user_factory
     ):
         db_user_factory(
@@ -276,36 +340,122 @@ class TestPutPreferredModel:
         )
         response = await client.put(
             "/api/users/settings/preferred-model",
-            json={"preferred_model": "anthropic/claude-sonnet-4.6"},
+            json={"preferred_model": "anthropic/claude-sonnet-4.6", "model_tier": "byok"},
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["preferred_model"] == "anthropic/claude-sonnet-4.6"
+        assert response.json()["model_tier"] == "byok"
 
-    async def test_with_key_standard_model_returns_200(
+    async def test_with_key_included_tier_standard_model_returns_200(
         self, client, db_user_factory
     ):
-        """A BYOK user can fall back to a standard model."""
+        """A BYOK user can fall back to the included tier with a standard model."""
         db_user_factory(
             encrypted_api_key=b"some-encrypted",
             key_hint="abcd",
         )
         response = await client.put(
             "/api/users/settings/preferred-model",
-            json={"preferred_model": "deepseek/deepseek-chat-v3-0324"},
+            json={"preferred_model": "deepseek/deepseek-chat-v3-0324", "model_tier": "included"},
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["preferred_model"] == "deepseek/deepseek-chat-v3-0324"
+        assert response.json()["model_tier"] == "included"
 
     async def test_invalid_format_returns_422(self, client, db_user_factory):
         db_user_factory()
         response = await client.put(
             "/api/users/settings/preferred-model",
-            json={"preferred_model": "no-slash-here"},
+            json={"preferred_model": "no-slash-here", "model_tier": "included"},
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    async def test_invalid_tier_returns_422(self, client, db_user_factory):
+        """Invalid model_tier value is rejected by schema validation."""
+        db_user_factory()
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "meta-llama/llama-4-scout", "model_tier": "premium"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    async def test_missing_tier_returns_422(self, client, db_user_factory):
+        """model_tier is required in the request payload."""
+        db_user_factory()
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "meta-llama/llama-4-scout"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    async def test_byok_tier_zero_balance_returns_402(self, client, db_user_factory):
+        """BYOK tier with key but $0 balance -> 402 with structured error detail."""
+        db_user_factory(
+            encrypted_api_key=b"some-encrypted",
+            key_hint="abcd",
+        )
+        with patch(
+            "app.routes.users.get_cached_balance",
+            return_value=_empty_balance("sk-or-v1-empty0"),
+        ):
+            response = await client.put(
+                "/api/users/settings/preferred-model",
+                json={"preferred_model": "anthropic/claude-sonnet-4.6", "model_tier": "byok"},
+                headers=_AUTH,
+            )
+        assert response.status_code == status.HTTP_402_PAYMENT_REQUIRED
+        assert "no remaining credits" in response.json()["detail"].lower()
+
+    async def test_byok_tier_with_credits_returns_200(self, client, db_user_factory):
+        """BYOK tier with key and credits -> 200, both model_tier and preferred_model saved."""
+        db_user_factory(
+            encrypted_api_key=b"some-encrypted",
+            key_hint="abcd",
+        )
+        with patch(
+            "app.routes.users.get_cached_balance",
+            return_value=_healthy_balance("sk-or-v1-test1234"),
+        ):
+            response = await client.put(
+                "/api/users/settings/preferred-model",
+                json={"preferred_model": "anthropic/claude-sonnet-4.6", "model_tier": "byok"},
+                headers=_AUTH,
+            )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["preferred_model"] == "anthropic/claude-sonnet-4.6"
+        assert body["model_tier"] == "byok"
+
+    async def test_included_tier_with_byok_key_on_file_stays_included(
+        self, client, db_user_factory
+    ):
+        """User has a BYOK key on file but selects included tier with a standard model.
+
+        The PUT succeeds, tier stays included, and the BYOK key is untouched.
+        """
+        db_user_factory(
+            encrypted_api_key=b"byok-key-present",
+            key_hint="xyzw",
+            model_tier="byok",
+            preferred_model="anthropic/claude-sonnet-4.6",
+        )
+        response = await client.put(
+            "/api/users/settings/preferred-model",
+            json={"preferred_model": "meta-llama/llama-4-scout", "model_tier": "included"},
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["model_tier"] == "included"
+        assert body["preferred_model"] == "meta-llama/llama-4-scout"
+        # Key is still present
+        assert body["has_api_key"] is True
+        assert body["key_hint"] == "xyzw"
 
     async def test_does_not_touch_api_key(self, client, db_user_factory):
         db_user_factory(
@@ -314,7 +464,7 @@ class TestPutPreferredModel:
         )
         response = await client.put(
             "/api/users/settings/preferred-model",
-            json={"preferred_model": "meta-llama/llama-4-scout"},
+            json={"preferred_model": "meta-llama/llama-4-scout", "model_tier": "included"},
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_200_OK
@@ -333,6 +483,7 @@ class TestDeleteApiKey:
             encrypted_api_key=b"will-be-cleared",
             key_hint="abcd",
             preferred_model="anthropic/claude-sonnet-4.6",
+            model_tier="byok",
         )
         response = await client.delete(
             "/api/users/settings/api-key",
@@ -351,6 +502,7 @@ class TestDeleteApiKey:
             assert refreshed.encrypted_api_key is None
             assert refreshed.key_hint is None
             assert refreshed.preferred_model == DEFAULT_STANDARD_MODEL
+            assert refreshed.model_tier == "included"
         finally:
             db.close()
 
@@ -388,6 +540,40 @@ class TestDeleteApiKey:
             headers=_AUTH,
         )
         assert response.status_code == status.HTTP_200_OK
+
+    async def test_delete_resets_tier_to_included_and_model_to_default(
+        self, client, db_user_factory
+    ):
+        """After DELETE, model_tier is reset to 'included' and preferred_model
+        to the default standard model — even if the user was on BYOK with a
+        premium model.
+        """
+        db_user_factory(
+            encrypted_api_key=b"will-be-cleared",
+            key_hint="abcd",
+            preferred_model="anthropic/claude-sonnet-4.6",
+            model_tier="byok",
+        )
+        response = await client.delete(
+            "/api/users/settings/api-key",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        from app.database import get_db
+        from app.main import app
+        from app.models.database_models import User
+
+        override = app.dependency_overrides.get(get_db, get_db)
+        db = next(override())
+        try:
+            refreshed = db.query(User).filter(User.id == _DEV_USER_ID).first()
+            assert refreshed.model_tier == "included"
+            assert refreshed.preferred_model == DEFAULT_STANDARD_MODEL
+            assert refreshed.encrypted_api_key is None
+            assert refreshed.key_hint is None
+        finally:
+            db.close()
 
     async def test_balance_columns_cleared(self, client, db_user_factory):
         db_user_factory(
