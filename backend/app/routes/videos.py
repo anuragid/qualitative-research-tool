@@ -963,11 +963,21 @@ async def search_transcript_words(
                 detail=f"No transcript found for video {video_id}"
             )
 
+        # Split query into individual words for the AssemblyAI API.
+        # The API restricts phrases to 5 words max, so we tokenize the
+        # input (splitting on whitespace and commas) and send each word
+        # as a separate search term.
+        import re
+        tokens = [t for t in re.split(r'[\s,]+', query.strip()) if t]
+        if not tokens:
+            raise HTTPException(status_code=400, detail="Search query cannot be empty")
+        search_words = ",".join(tokens)
+
         # Call AssemblyAI Word Search API
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"https://api.assemblyai.com/v2/transcript/{transcript.assemblyai_id}/word-search",
-                params={"words": query},
+                params={"words": search_words},
                 headers={"authorization": settings.ASSEMBLYAI_API_KEY}
             )
 

@@ -144,3 +144,49 @@ class TestSearchQueryValidation:
         )
         # Should fail (422 for Pydantic validation or 404 for missing video)
         assert response.status_code in (400, 404, 422)
+
+    def test_long_phrase_split_into_words(self):
+        """Phrases > 5 words must be split into individual comma-separated
+        words before calling AssemblyAI (PYTHON-FASTAPI-Y fix).
+
+        Tests the tokenization logic directly — the same regex split used
+        in search_transcript_words to avoid the AssemblyAI 5-word limit.
+        """
+        import re
+
+        query = "how did the participant feel about the overall experience"
+        tokens = [t for t in re.split(r'[\s,]+', query.strip()) if t]
+        search_words = ",".join(tokens)
+
+        assert len(tokens) == 9, f"Expected 9 tokens, got {len(tokens)}: {tokens}"
+        assert "," in search_words
+        # Each token is a single word (no spaces)
+        for token in tokens:
+            assert " " not in token, f"Token should be a single word: {token}"
+        # No token exceeds 5 words (each is 1 word)
+        assert all(len(t.split()) <= 5 for t in tokens)
+
+    def test_comma_separated_query_preserved(self):
+        """Comma-separated input should split into individual words too."""
+        import re
+
+        query = "design,prototype,user"
+        tokens = [t for t in re.split(r'[\s,]+', query.strip()) if t]
+        assert tokens == ["design", "prototype", "user"]
+
+    def test_mixed_whitespace_and_commas(self):
+        """Mixed delimiters should all be handled."""
+        import re
+
+        query = "design thinking,  user experience , prototype"
+        tokens = [t for t in re.split(r'[\s,]+', query.strip()) if t]
+        assert tokens == ["design", "thinking", "user", "experience", "prototype"]
+
+    def test_single_word_query_unchanged(self):
+        """Single word queries should pass through unchanged."""
+        import re
+
+        query = "participant"
+        tokens = [t for t in re.split(r'[\s,]+', query.strip()) if t]
+        assert tokens == ["participant"]
+        assert ",".join(tokens) == "participant"
