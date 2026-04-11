@@ -91,7 +91,7 @@ export function ModelSettingsDialog({
 
     // Derive initial tier from settings.model_tier (falls back to "included")
     const tier: SelectedTier =
-      (settings as Record<string, unknown>).model_tier === "byok" ? "byok" : "included";
+      settings.model_tier === "byok" ? "byok" : "included";
     setSelectedTier(tier);
     setPendingModel(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,7 +108,7 @@ export function ModelSettingsDialog({
 
   const isDirty = (() => {
     if (pendingModel != null) return true;
-    const savedTier = (settings as Record<string, unknown>).model_tier ?? "included";
+    const savedTier = settings.model_tier ?? "included";
     return selectedTier !== savedTier;
   })();
 
