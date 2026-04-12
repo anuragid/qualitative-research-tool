@@ -11,6 +11,8 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.exc import OperationalError
+
 from app.models.database_models import (
     ProjectAnalysis,
     Transcript,
@@ -55,7 +57,16 @@ def _watchdog_error_json(details: str) -> str:
     })
 
 
-@celery_app.task(base=DatabaseTask, bind=True, name="reset_stuck_analyses")
+@celery_app.task(
+    base=DatabaseTask,
+    bind=True,
+    name="reset_stuck_analyses",
+    autoretry_for=(OperationalError,),
+    retry_backoff=True,
+    retry_backoff_max=30,
+    retry_jitter=True,
+    max_retries=3,
+)
 def reset_stuck_analyses(self):
     """Find and reset any analyses stuck in a processing state."""
 
@@ -264,6 +275,15 @@ def reset_stuck_analyses(self):
                 total, videos_reset, projects_reset, transcripts_reset,
             )
 
+    except OperationalError:
+        db.rollback()
+        retries = getattr(self.request, "retries", 0)
+        logger.warning(
+            "Watchdog task hit transient DB error (attempt %d/%d), will retry",
+            retries + 1,
+            (self.max_retries or 0) + 1,
+        )
+        raise
     except Exception:
         db.rollback()
         logger.exception("Watchdog task failed")
