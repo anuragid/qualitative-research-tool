@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, load_only, selectinload
 
 from app.auth_bridge import Permission, require_permissions
 from app.config import settings
@@ -17,9 +17,10 @@ from app.models.database_models import Project, ProjectAnalysis, Video, VideoAna
 from app.models.schemas import (
     ProjectAnalysisResponse,
     ProjectCreate,
+    ProjectListResponse,
     ProjectResponse,
     ProjectUpdate,
-    VideoResponse,
+    VideoListItemResponse,
 )
 from app.rate_limit import limiter
 from app.services.openrouter_balance import BalanceInfo
@@ -32,6 +33,25 @@ from app.state import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Columns to load for lightweight list/poll payloads. Excludes the 5 JSONB
+# blobs (chunks, inferences, patterns, insights, design_principles) that can
+# be 50–500 KB per video. The full blobs are only needed on the detail/analysis
+# endpoint which is NOT polled.
+_ANALYSIS_STATUS_COLS = [
+    VideoAnalysis.id,
+    VideoAnalysis.video_id,
+    VideoAnalysis.status,
+    VideoAnalysis.started_at,
+    VideoAnalysis.completed_at,
+    VideoAnalysis.current_step,
+    VideoAnalysis.step_status,
+    VideoAnalysis.chunk_completed_at,
+    VideoAnalysis.infer_completed_at,
+    VideoAnalysis.relate_completed_at,
+    VideoAnalysis.explain_completed_at,
+    VideoAnalysis.activate_completed_at,
+]
 
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -83,7 +103,7 @@ async def create_project(
         )
 
 
-@router.get("/", response_model=List[ProjectResponse])
+@router.get("/", response_model=List[ProjectListResponse])
 async def list_projects(
     skip: int = 0,
     limit: int = 50,
@@ -111,14 +131,18 @@ async def list_projects(
 
         projects = db.query(Project)\
             .filter(Project.user_id == current_user_id)\
-            .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
+            .options(
+                selectinload(Project.videos).selectinload(Video.video_analysis).load_only(
+                    *_ANALYSIS_STATUS_COLS
+                )
+            )\
             .order_by(Project.created_at.desc())\
             .offset(skip)\
             .limit(limit)\
             .all()
 
         logger.info(f"Retrieved {len(projects)} projects")
-        return projects
+        return [ProjectListResponse.model_validate(p) for p in projects]
 
     except Exception as e:
         logger.error(f"Error listing projects: {e}")
@@ -128,7 +152,7 @@ async def list_projects(
         )
 
 
-@router.get("/{project_id}", response_model=ProjectResponse)
+@router.get("/{project_id}", response_model=ProjectListResponse)
 async def get_project(
     project_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
@@ -148,7 +172,11 @@ async def get_project(
     current_user_id = current_user["id"]
     try:
         project = db.query(Project)\
-            .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
+            .options(
+                selectinload(Project.videos).selectinload(Video.video_analysis).load_only(
+                    *_ANALYSIS_STATUS_COLS
+                )
+            )\
             .filter(Project.id == project_id)\
             .filter(Project.user_id == current_user_id)\
             .first()
@@ -160,7 +188,7 @@ async def get_project(
             )
 
         logger.info(f"Retrieved project: {project_id}")
-        return project
+        return ProjectListResponse.model_validate(project)
 
     except HTTPException:
         raise
@@ -290,7 +318,7 @@ async def delete_project(
         )
 
 
-@router.get("/{project_id}/videos", response_model=List[VideoResponse])
+@router.get("/{project_id}/videos", response_model=List[VideoListItemResponse])
 async def list_project_videos(
     project_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
@@ -319,15 +347,18 @@ async def list_project_videos(
                 detail=f"Project {project_id} not found"
             )
 
-        # Get all videos for this project
+        # Get all videos for this project — load only analysis status fields,
+        # not the JSONB blobs, since this endpoint is polled every 4-20s.
         videos = db.query(Video)\
-            .options(selectinload(Video.video_analysis))\
+            .options(
+                selectinload(Video.video_analysis).load_only(*_ANALYSIS_STATUS_COLS)
+            )\
             .filter(Video.project_id == project_id)\
             .order_by(Video.uploaded_at.desc())\
             .all()
 
         logger.info(f"Retrieved {len(videos)} videos for project {project_id}")
-        return videos
+        return [VideoListItemResponse.model_validate(v) for v in videos]
 
     except HTTPException:
         raise
