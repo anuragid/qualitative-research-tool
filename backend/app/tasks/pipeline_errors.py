@@ -145,6 +145,11 @@ def handle_project_pipeline_error(self, request, exc, traceback, project_id: str
                     pa, ProjectAnalysisEvent.CHAIN_FAILED, db=self.db
                 )
                 pa.completed_at = datetime.now(timezone.utc)
+                pa.error_message = build_error_json(
+                    step=failed_step,
+                    exc=exc if isinstance(exc, Exception) else Exception(str(exc)),
+                    message=str(exc),
+                )
                 logger.info(
                     f"handle_project_pipeline_error: marked ProjectAnalysis "
                     f"{project_id} as error (step={failed_step})"

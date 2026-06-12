@@ -260,6 +260,7 @@ class ProjectAnalysis(Base):
     )
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
+    error_message = Column(Text(), nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="project_analyses")

@@ -643,3 +643,115 @@ class TestCrossStepFailurePolicy:
         db_session.expire_all()
         row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
         assert row.status == "error"  # stamped immediately
+
+
+class TestErrorMessagePersistence:
+    """_update_project_analysis_error and handle_project_pipeline_error must
+    write a structured error_message to the PA row."""
+
+    def test_update_project_analysis_error_writes_error_message(self, db_session):
+        """_update_project_analysis_error should set error_message with step + exc info."""
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        exc = ValueError("rate limit exceeded")
+        project_analysis_steps._update_project_analysis_error(
+            db_session, str(project.id), "cross_relate", exc=exc
+        )
+
+        db_session.refresh(pa)
+        assert pa.error_message is not None
+        parsed = json.loads(pa.error_message)
+        assert parsed["step"] == "cross_relate"
+        assert "rate limit exceeded" in parsed["message"]
+
+    def test_update_project_analysis_error_writes_fallback_when_no_exc(self, db_session):
+        """Without an exc argument, error_message should fall back to a generic string."""
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        project_analysis_steps._update_project_analysis_error(
+            db_session, str(project.id), "cross_explain"
+        )
+
+        db_session.refresh(pa)
+        assert pa.error_message is not None
+        parsed = json.loads(pa.error_message)
+        assert parsed["step"] == "cross_explain"
+
+    def test_handle_project_pipeline_error_writes_error_message(self, db_session):
+        """handle_project_pipeline_error should set error_message on the PA row."""
+        from app.tasks import pipeline_errors
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        # Inject the test session directly into the task's thread-local store
+        pipeline_errors.handle_project_pipeline_error._thread_local.db = db_session
+
+        exc = RuntimeError("OpenRouter credits exhausted")
+        fake_request = MagicMock()
+        fake_request.task = "analyze_cross_relate_step"
+
+        pipeline_errors.handle_project_pipeline_error.run(
+            fake_request, exc, "fake-traceback", str(project.id)
+        )
+
+        db_session.refresh(pa)
+        assert pa.error_message is not None
+        parsed = json.loads(pa.error_message)
+        assert parsed["step"] == "cross_relate"
+        assert "OpenRouter credits exhausted" in parsed["message"]
+
+    def test_project_analysis_response_schema_includes_error_message(self):
+        """ProjectAnalysisResponse.model_validate should include error_message."""
+        from uuid import uuid4
+
+        from app.models.database_models import ProjectAnalysis
+        from app.models.schemas import ProjectAnalysisResponse
+
+        error_json = '{"step": "cross_relate", "error_type": "ValueError", "retryable": false, "message": "bad input"}'
+        pa = ProjectAnalysis(
+            id=uuid4(),
+            project_id=uuid4(),
+            status="error",
+            video_ids=[],
+            error_message=error_json,
+        )
+
+        response = ProjectAnalysisResponse.model_validate(pa)
+        assert response.error_message is not None
+        assert "cross_relate" in response.error_message
+
+    def test_project_analysis_response_error_message_nullable(self):
+        """ProjectAnalysisResponse.error_message should be None when not set."""
+        from uuid import uuid4
+
+        from app.models.database_models import ProjectAnalysis
+        from app.models.schemas import ProjectAnalysisResponse
+
+        pa = ProjectAnalysis(
+            id=uuid4(),
+            project_id=uuid4(),
+            status="completed",
+            video_ids=[],
+        )
+
+        response = ProjectAnalysisResponse.model_validate(pa)
+        assert response.error_message is None
