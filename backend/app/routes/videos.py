@@ -1161,7 +1161,15 @@ async def trigger_chunk_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_chunk_step
-        task = analyze_chunk_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_chunk_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="chunk"
+            ),
+        )
         logger.info(f"CHUNK step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1231,7 +1239,15 @@ async def trigger_infer_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_infer_step
-        task = analyze_infer_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_infer_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="infer"
+            ),
+        )
         logger.info(f"INFER step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1301,7 +1317,15 @@ async def trigger_relate_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_relate_step
-        task = analyze_relate_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_relate_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="relate"
+            ),
+        )
         logger.info(f"RELATE step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1371,7 +1395,15 @@ async def trigger_explain_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_explain_step
-        task = analyze_explain_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_explain_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="explain"
+            ),
+        )
         logger.info(f"EXPLAIN step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1441,7 +1473,15 @@ async def trigger_activate_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_activate_step
-        task = analyze_activate_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_activate_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="activate"
+            ),
+        )
         logger.info(f"ACTIVATE step started for video {video_id}, task_id: {task.id}")
 
         return {
