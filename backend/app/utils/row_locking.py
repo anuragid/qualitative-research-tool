@@ -26,13 +26,25 @@ PostgreSQL ``DATABASE_URL`` is present.
 
 Lock-ordering / deadlock policy
 -------------------------------
-Every call site here locks exactly **one** row (the contended
-status-bearing row) and never holds it while acquiring a second row
-lock, so there is no lock-ordering cycle and therefore no deadlock
-possible between these sites. The watchdog additionally uses
-``SKIP LOCKED`` so its sweep never *blocks* behind a live task's
-transaction — it just skips any row another transaction is currently
-mutating and revisits it on the next 5-minute pass.
+GLOBAL LOCK ORDER for every *blocking* (non-SKIP-LOCKED) acquirer:
+
+    Video  →  child status row (VideoAnalysis / Transcript)
+
+i.e. parent before child. This covers explicit ``FOR UPDATE`` locks AND
+the implicit row locks taken by ``UPDATE`` statements at flush/commit —
+a transaction that has locked a child and then flushes an ``UPDATE
+videos`` is acquiring the Video lock *second*, which inverts the order.
+(That exact inversion — step routes / auto-dispatch locking VideoAnalysis
+first while ``/analyze`` held Video and waited on VideoAnalysis — was a
+reproducible Postgres deadlock caught in the PR #48 review; the fix is
+that every route/task that will touch ``video.status`` locks the Video
+row explicitly FIRST. Locked in by
+``tests/test_row_locking_postgres.py::test_global_lock_order_*``.)
+
+The watchdog is exempt from the ordering rule because it acquires every
+lock with ``SKIP LOCKED`` and therefore never *waits* — it can never be
+the blocked side of a cycle. It also processes one candidate per
+transaction so no lock is held across its sweep.
 """
 
 from __future__ import annotations

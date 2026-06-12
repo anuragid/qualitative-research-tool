@@ -1118,7 +1118,15 @@ async def trigger_chunk_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Block only if a step is currently mid-execution.  Coarser checks on
         # video.status would deadlock the step-by-step pipeline (see _is_any_step_processing).
@@ -1187,7 +1195,15 @@ async def trigger_infer_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Lock the VideoAnalysis row so the _is_any_step_processing guard +
         # ANALYZE_DISPATCHED transition serialize against a concurrent step
@@ -1249,7 +1265,15 @@ async def trigger_relate_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Lock the VideoAnalysis row so the _is_any_step_processing guard +
         # ANALYZE_DISPATCHED transition serialize against a concurrent step
@@ -1311,7 +1335,15 @@ async def trigger_explain_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Lock the VideoAnalysis row so the _is_any_step_processing guard +
         # ANALYZE_DISPATCHED transition serialize against a concurrent step
@@ -1373,7 +1405,15 @@ async def trigger_activate_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Lock the VideoAnalysis row so the _is_any_step_processing guard +
         # ANALYZE_DISPATCHED transition serialize against a concurrent step

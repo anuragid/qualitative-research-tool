@@ -166,6 +166,148 @@ def test_skip_locked_does_not_block(pg_engine):
         sb.close()
 
 
+# ---------------------------------------------------------------------------
+# Global lock-order regression tests (PR #48 review finding)
+# ---------------------------------------------------------------------------
+#
+# The review reproduced a real deadlock: /analyze locked Video -> VideoAnalysis
+# while the step routes / auto-dispatch locked VideoAnalysis first and then
+# implicitly locked Video via the UPDATE at commit — opposite orders, plain
+# FOR UPDATE on both sides, textbook cycle. The fix establishes a GLOBAL
+# order (Video first, then the child status row) for every blocking acquirer.
+#
+# These tests encode the two lock-acquisition sequences on a parent/child
+# scratch-table pair and prove, against real Postgres:
+#   - the canonical V->child order run concurrently from both sides
+#     serializes cleanly (no deadlock), and
+#   - the inverted order (child first, then UPDATE parent — the pre-fix step
+#     route / auto-dispatch shape) deterministically deadlocks, so this
+#     harness genuinely detects ordering inversions (not theater).
+#
+# HONEST LIMIT: these mirror the routes' lock sequences; they do not execute
+# the route handlers themselves (driving two real HTTP requests against a
+# Postgres-backed app with forced mid-transaction overlap is not supported by
+# the current test infra). The code-side guarantee is the explicit
+# for_update=True Video lock at the TOP of every route/task that later
+# mutates video.status — grep `GLOBAL LOCK ORDER` in app/.
+
+
+@pytest.fixture
+def pg_parent_child(pg_engine):
+    """Parent/child scratch tables + one row each, mirroring videos /
+    video_analyses."""
+    parent_id = uuid.uuid4().hex
+    child_id = uuid.uuid4().hex
+    with pg_engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS _lock_child"))
+        conn.execute(text("DROP TABLE IF EXISTS _lock_parent"))
+        conn.execute(text(
+            "CREATE TABLE _lock_parent (id varchar(36) PRIMARY KEY, status varchar(50))"
+        ))
+        conn.execute(text(
+            "CREATE TABLE _lock_child (id varchar(36) PRIMARY KEY, "
+            "parent_id varchar(36) REFERENCES _lock_parent(id), status varchar(50))"
+        ))
+        conn.execute(
+            text("INSERT INTO _lock_parent (id, status) VALUES (:id, 'transcribed')"),
+            {"id": parent_id},
+        )
+        conn.execute(
+            text("INSERT INTO _lock_child (id, parent_id, status) "
+                 "VALUES (:id, :pid, 'error')"),
+            {"id": child_id, "pid": parent_id},
+        )
+    yield {"engine": pg_engine, "parent_id": parent_id, "child_id": child_id}
+    with pg_engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS _lock_child"))
+        conn.execute(text("DROP TABLE IF EXISTS _lock_parent"))
+
+
+def _run_sequence(Session, steps, errors, hold_seconds=0.5):
+    """Run a list of SQL steps in one transaction, sleeping after the first
+    statement so the two actors genuinely overlap mid-transaction."""
+    s = Session()
+    try:
+        first = True
+        for stmt, params in steps:
+            s.execute(text(stmt), params)
+            if first:
+                time.sleep(hold_seconds)
+                first = False
+        s.commit()
+    except Exception as exc:  # noqa: BLE001 - collected for assertions
+        errors.append(exc)
+        s.rollback()
+    finally:
+        s.close()
+
+
+def test_global_lock_order_video_first_does_not_deadlock(pg_parent_child):
+    """Both actors use the canonical order (parent FOR UPDATE, then child
+    FOR UPDATE, then UPDATE both) — mirroring /analyze AND the fixed step
+    routes / auto-dispatch. Run concurrently with forced overlap, they must
+    serialize cleanly: zero errors."""
+    eng = pg_parent_child["engine"]
+    pid, cid = pg_parent_child["parent_id"], pg_parent_child["child_id"]
+    Session = sessionmaker(bind=eng)
+
+    canonical = [
+        ("SELECT id FROM _lock_parent WHERE id = :pid FOR UPDATE", {"pid": pid}),
+        ("SELECT id FROM _lock_child WHERE id = :cid FOR UPDATE", {"cid": cid}),
+        ("UPDATE _lock_parent SET status = 'analyzing' WHERE id = :pid", {"pid": pid}),
+        ("UPDATE _lock_child SET status = 'pending' WHERE id = :cid", {"cid": cid}),
+    ]
+
+    errors: list[Exception] = []
+    threads = [
+        threading.Thread(target=_run_sequence, args=(Session, canonical, errors))
+        for _ in range(2)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=15)
+
+    assert not errors, (
+        f"canonical V->child order must not deadlock, got: {errors!r}"
+    )
+
+
+def test_inverted_lock_order_deadlocks_proving_detection(pg_parent_child):
+    """The PRE-FIX shape: actor A = /analyze (parent FOR UPDATE, then child
+    FOR UPDATE); actor B = old step route / auto-dispatch (child FOR UPDATE
+    first, then UPDATE parent at flush). With forced overlap Postgres's
+    deadlock detector must abort one of them — proving this harness would
+    catch a regression that reintroduces the inversion."""
+    eng = pg_parent_child["engine"]
+    pid, cid = pg_parent_child["parent_id"], pg_parent_child["child_id"]
+    Session = sessionmaker(bind=eng)
+
+    analyze_route = [  # V -> child (correct, unchanged)
+        ("SELECT id FROM _lock_parent WHERE id = :pid FOR UPDATE", {"pid": pid}),
+        ("SELECT id FROM _lock_child WHERE id = :cid FOR UPDATE", {"cid": cid}),
+    ]
+    old_step_route = [  # child -> V (the pre-fix inversion)
+        ("SELECT id FROM _lock_child WHERE id = :cid FOR UPDATE", {"cid": cid}),
+        ("UPDATE _lock_parent SET status = 'analyzing' WHERE id = :pid", {"pid": pid}),
+    ]
+
+    errors: list[Exception] = []
+    ta = threading.Thread(target=_run_sequence, args=(Session, analyze_route, errors))
+    tb = threading.Thread(target=_run_sequence, args=(Session, old_step_route, errors))
+    ta.start()
+    tb.start()
+    ta.join(timeout=15)
+    tb.join(timeout=15)
+
+    assert len(errors) == 1, (
+        f"inverted lock order should deadlock exactly one actor, got {errors!r}"
+    )
+    assert "deadlock detected" in str(errors[0]).lower(), (
+        f"expected a Postgres deadlock abort, got: {errors[0]!r}"
+    )
+
+
 def test_lock_rows_helper_compiles_for_update_on_pg(pg_engine):
     """End-to-end: the actual ``lock_rows`` helper emits a real FOR UPDATE
     against live Postgres (not just a compiled-string check)."""
