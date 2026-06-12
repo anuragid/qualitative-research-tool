@@ -12,7 +12,6 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
@@ -37,7 +36,6 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID  # noqa: E402
 from sqlalchemy.exc import OperationalError, ProgrammingError  # noqa: E402
 from sqlalchemy.ext.compiler import compiles  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # SQLite compatibility shims (same as test_project_analysis_chain.py)

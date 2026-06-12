@@ -24,13 +24,13 @@ from app.state import (
     ProjectAnalysisEvent,
     ProjectAnalysisStateMachine,
 )
+from app.tasks._pipeline_utils import build_error_json
 from app.tasks.analysis_steps import (
     NonRetryableAnalysisError,
     _is_retryable_step_exc,
     _raise_for_node_error,
     _resolve_byok_or_raise_credits_error,
 )
-from app.tasks._pipeline_utils import build_error_json
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
