@@ -42,6 +42,12 @@ export default defineConfig({
     projects: [
       {
         extends: true,
+        // Inject dev-bypass env flag so unit tests match the local-dev contract
+        // (VITE_DEV_AUTH_BYPASS=true is always set locally; without it the auth
+        // hook resolves to the Clerk wrapper and api.ts never sets a Bearer token).
+        define: {
+          'import.meta.env.VITE_DEV_AUTH_BYPASS': '"true"',
+        },
         test: {
           name: 'unit',
           include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

@@ -15,7 +15,7 @@ export function useProjects() {
     refetchInterval: (query) => {
       const projects = query.state.data;
       // Poll if any project or its videos are actively processing
-      const hasActiveWork = !!projects?.some(
+      const hasActiveWork = Array.isArray(projects) && !!projects.some(
         (p) =>
           p.status === "processing" ||
           p.videos?.some(
