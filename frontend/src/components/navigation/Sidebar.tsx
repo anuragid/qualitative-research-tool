@@ -133,7 +133,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: Side
           </NavLink>
 
           {/* Project list */}
-          {projects && projects.length > 0 && (
+          {Array.isArray(projects) && projects.length > 0 && (
             <div className="pt-1 space-y-0.5">
               {projects.map((project) => (
                 <NavLink
