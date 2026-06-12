@@ -6,8 +6,9 @@ each service via the Railway GraphQL API. Safe to re-run — Railway's
 serviceInstanceUpdate mutation is idempotent and no-ops on unchanged
 fields.
 
-Also creates the new 'beat' service if it doesn't yet exist, and removes
-the worker's unused public domain.
+Also creates the new 'beat' service if it doesn't yet exist, removes
+the worker's unused public domain, and gates Railway auto-deploy on
+GitHub check suites passing (the "Wait for CI" setting).
 
 SAFETY: the default behaviour is dry-run. You must pass ``--apply`` to
 actually mutate Railway. An accidental ``python3 railway-service-config.py``
@@ -252,6 +253,131 @@ def ensure_beat_service_exists(
     return beat_id
 
 
+def list_deployment_triggers(
+    token: str,
+    env_id: str,
+    service_id: str,
+) -> list[dict]:
+    """Return all deployment triggers for a service in the given environment.
+
+    Each node has at minimum: id, serviceId, branch, checkSuites, provider, repository.
+    The ``checkSuites`` field controls Railway's "Wait for CI" gate — when True,
+    Railway will not auto-deploy a push until all GitHub check suites on that commit
+    have a successful conclusion (i.e., GitHub Actions CI must pass first).
+    """
+    query = """
+    query DeploymentTriggers(
+        $projectId: String!
+        $environmentId: String!
+        $serviceId: String!
+    ) {
+        deploymentTriggers(
+            projectId: $projectId
+            environmentId: $environmentId
+            serviceId: $serviceId
+        ) {
+            edges {
+                node {
+                    id
+                    serviceId
+                    branch
+                    checkSuites
+                    provider
+                    repository
+                    environmentId
+                }
+            }
+        }
+    }
+    """
+    data = gql(
+        query,
+        {
+            "projectId": PROJECT_ID,
+            "environmentId": env_id,
+            "serviceId": service_id,
+        },
+        token,
+    )
+    return [e["node"] for e in data["deploymentTriggers"]["edges"]]
+
+
+def enable_check_suites_gate(
+    token: str,
+    env_id: str,
+    service_ids: list[str],
+    service_names: list[str],
+    apply: bool,
+) -> None:
+    """Set checkSuites=True on every deployment trigger for the given services.
+
+    ``checkSuites=True`` is Railway's "Wait for CI" setting: the auto-deploy
+    is held until all GitHub check suites on the pushed commit reach a
+    successful conclusion. This prevents a commit with failing GitHub Actions
+    CI from being deployed automatically.
+
+    The mutation used is ``deploymentTriggerUpdate`` which accepts:
+        id        – trigger id (required)
+        input     – DeploymentTriggerUpdateInput { branch, checkSuites, repository, rootDirectory }
+
+    When ``apply`` is False, only the current state is printed (read-only).
+    """
+    any_trigger_found = False
+    for service_id, service_name in zip(service_ids, service_names):
+        triggers = list_deployment_triggers(token, env_id, service_id)
+        if not triggers:
+            print(
+                f"  {service_name} ({service_id}): no deployment triggers found "
+                "(service may not be connected to a GitHub repo yet)"
+            )
+            continue
+
+        for trigger in triggers:
+            any_trigger_found = True
+            trigger_id = trigger["id"]
+            current = trigger.get("checkSuites")
+            branch = trigger.get("branch", "?")
+            repo = trigger.get("repository", "?")
+            print(
+                f"  {service_name}: trigger {trigger_id} "
+                f"branch={branch} repo={repo} checkSuites={current}"
+            )
+
+            if current is True:
+                print(f"    already gated — no change needed")
+                continue
+
+            if not apply:
+                print(f"    [DRY] would set checkSuites=True on trigger {trigger_id}")
+                continue
+
+            mutation = """
+            mutation GateOnCI($id: String!, $input: DeploymentTriggerUpdateInput!) {
+                deploymentTriggerUpdate(id: $id, input: $input)
+            }
+            """
+            gql(
+                mutation,
+                {
+                    "id": trigger_id,
+                    "input": {
+                        "branch": branch,
+                        "checkSuites": True,
+                    },
+                },
+                token,
+            )
+            print(f"    set checkSuites=True on trigger {trigger_id}")
+
+    if not any_trigger_found:
+        print(
+            "  WARNING: No deployment triggers found for any target service.\n"
+            "  This is expected if the services have not yet been connected to a\n"
+            "  GitHub repo in the Railway dashboard. Connect them first, then\n"
+            "  re-run this script with --apply to activate the CI gate."
+        )
+
+
 def remove_worker_public_domain(token: str, apply: bool) -> None:
     """Delete the worker's pointless public domain (workers do no HTTP)."""
     query = """
@@ -304,7 +430,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description=(
             "Apply the methodex Railway service topology (replicas, "
             "healthchecks, drain settings, beat service creation, worker "
-            "domain cleanup). Defaults to dry-run; pass --apply to mutate."
+            "domain cleanup, CI-gate via checkSuites). "
+            "Defaults to dry-run; pass --apply to mutate."
         ),
     )
     group = parser.add_mutually_exclusive_group()
@@ -383,6 +510,28 @@ def main(argv: list[str] | None = None) -> int:
         # 3. Remove worker's public domain
         print("\n==> Step 3: remove worker public domain")
         remove_worker_public_domain(token, apply)
+
+        # 4. Gate auto-deploy on GitHub check suites (CI must pass before Railway deploys)
+        #
+        # Railway's DeploymentTrigger.checkSuites=True is the "Wait for CI" toggle.
+        # When enabled, Railway holds the auto-deploy until every GitHub check suite
+        # on the pushed commit reaches a successful conclusion — which means
+        # GitHub Actions (backend-ci, frontend-ci) must pass first.
+        #
+        # This is the correct gating mechanism (Option A from the deploy-gating plan):
+        # - No CI changes required (Railway handles the gate natively)
+        # - Works for both backend and worker services
+        # - The wait-backend-deploy job in ci.yml still runs after backend-ci and
+        #   provides observability + post-deploy verification in GitHub Actions
+        print("\n==> Step 4: gate auto-deploy on GitHub check suites (Wait for CI)")
+        gated_service_ids = [
+            TARGET["backend"]["id"],
+            TARGET["worker"]["id"],
+        ]
+        gated_service_names = ["backend", "worker"]
+        enable_check_suites_gate(
+            token, env_id, gated_service_ids, gated_service_names, apply
+        )
 
         if apply:
             print("\nDone — Railway has been updated.")

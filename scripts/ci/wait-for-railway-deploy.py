@@ -4,11 +4,17 @@
 Used in GitHub Actions to block CI from reporting green until the backend is
 actually live. Polls the Railway GraphQL API every 15 seconds for up to 10 minutes.
 
+SHA matching uses the full 40-character SHA (or whichever prefix Railway stores).
+We first try an exact match, then fall back to checking whether the stored commit
+starts with the provided SHA. Using ``sha[:7]`` as the match key is fragile —
+two different commits in quick succession can share the same 7-char prefix, leading
+the script to latch onto the wrong deployment. Always pass the full GITHUB_SHA.
+
 Environment variables:
 - RAILWAY_API_TOKEN: workspace-scoped Railway API token (GitHub secret)
 - RAILWAY_PROJECT_ID: Railway project id (default: methodex project id)
 - RAILWAY_BACKEND_SERVICE_ID: backend service id
-- COMMIT_SHA: the commit sha we're waiting for (usually $GITHUB_SHA)
+- COMMIT_SHA: the commit sha we're waiting for (usually $GITHUB_SHA; pass full SHA)
 """
 
 import os
@@ -91,7 +97,7 @@ def find_deployment_for_sha(token: str, project_id: str, service_id: str, sha: s
         commit = None
         if isinstance(meta, dict):
             commit = meta.get("commitHash") or meta.get("commit") or meta.get("sha")
-        if commit and commit.startswith(sha[:7]):
+        if commit and (commit == sha or commit.startswith(sha)):
             return node.get("id"), node.get("status")
     return None, None
 
@@ -109,13 +115,13 @@ def main():
         print("COMMIT_SHA (or GITHUB_SHA) env var is required", file=sys.stderr)
         return 2
 
-    print(f"Waiting for Railway backend deployment of {sha[:7]} to reach SUCCESS...")
+    print(f"Waiting for Railway backend deployment of {sha} to reach SUCCESS...")
 
     start = time.monotonic()
     while time.monotonic() - start < MAX_WAIT_SECONDS:
         dep_id, status = find_deployment_for_sha(token, project_id, service_id, sha)
         if status is None:
-            print(f"  [{int(time.monotonic() - start)}s] No deployment found yet for {sha[:7]}")
+            print(f"  [{int(time.monotonic() - start)}s] No deployment found yet for {sha}")
         elif status == "SUCCESS":
             print(f"  [{int(time.monotonic() - start)}s] Deployment {dep_id} SUCCESS")
             return 0
