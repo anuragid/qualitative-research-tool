@@ -1,0 +1,39 @@
+# Known schema drift — items here are TOLERATED by check_migration_drift.py.
+#
+# IMPORTANT: This file must be emptied (or deleted) by Wave-2 PR W2-A which
+# adds the missing index migration.  Once W2-A merges, any entry remaining
+# here is a NEW bug — delete it from this file only when the matching
+# migration has been written and merged.
+#
+# Format: one canonical drift key per line.  Lines starting with '#' and
+# blank lines are ignored.  The canonical key is derived by check_migration_drift.py
+# from the alembic autogenerate diff tuple; see that script for derivation logic.
+#
+# --- Wave-2 A backlog items (missing indexes + minor schema mismatches) ---
+#
+# Missing indexes (6 columns declared index=True in database_models.py but no
+# migration ever created them — verified 2026-06-12 against production chain
+# head f5a6b7c8d9e0):
+add_index:ix_project_analyses_project_id
+add_index:ix_projects_status
+add_index:ix_speaker_labels_transcript_id
+add_index:ix_transcripts_video_id
+add_index:ix_video_analyses_video_id
+add_index:ix_videos_project_id
+add_index:ix_videos_status
+#
+# projects.status: model declares nullable=False but migration left it nullable.
+# Fix in W2-A alongside the index migration.
+modify_nullable:projects:status
+#
+# users.email: model declares index=True (which implies nullable) but the
+# add_user_authentication migration created it with a unique constraint
+# (users_email_key) instead of a plain index.  Alembic sees: nullable mismatch
+# + removed unique constraints.  Fix in W2-A.
+modify_nullable:users:email
+remove_constraint:users:users_email_key
+remove_constraint:users:users_username_key
+#
+# video_analyses.step_status: migration used JSON, model uses JSONB.
+# Fix in W2-A.
+modify_type:video_analyses:step_status
