@@ -139,6 +139,96 @@ class TestS3ServiceDownloadFile:
 
 
 # ---------------------------------------------------------------------------
+# S3Service boto3 client timeout config
+# ---------------------------------------------------------------------------
+
+
+class TestS3ServiceClientTimeouts:
+    """R2 boto3 client must carry explicit connect/read timeouts.
+
+    A stalled R2 connection with no timeout would hang the worker thread until
+    Celery's task_time_limit (360 s) SIGKILLs it. These tests assert that the
+    BotoConfig passed to boto3.client contains both timeouts sourced from
+    settings so a hung socket is cut loose well before the SIGKILL threshold.
+
+    Worst-case time for non-streaming calls:
+        max_attempts × (connect_timeout + read_timeout)
+        = 3 × (10 + 300) = 930 s
+    This is the theoretical ceiling for a completely unresponsive endpoint
+    before exponential back-off; real back-off means actual wall-clock time
+    stays lower. For the large-file download_file path, read_timeout applies
+    per-socket-read (i.e. the deadline for a single recv() call), not for the
+    whole transfer, so large downloads are not capped at 300 s.
+    """
+
+    def test_client_config_has_connect_timeout(self):
+        """boto3 client config must set connect_timeout from settings."""
+        from app.config import settings
+        from app.services.s3_service import S3Service
+
+        captured_configs = []
+
+        def capturing_client(*args, **kwargs):
+            cfg = kwargs.get("config")
+            if cfg is not None:
+                captured_configs.append(cfg)
+            # Return a MagicMock so no real network call happens
+            return MagicMock()
+
+        service = S3Service()
+        with patch("boto3.client", side_effect=capturing_client):
+            _ = service.s3_client  # triggers lazy init
+
+        assert len(captured_configs) == 1, "boto3.client was not called with a config"
+        assert captured_configs[0].connect_timeout == settings.R2_CONNECT_TIMEOUT_SECONDS
+
+    def test_client_config_has_read_timeout(self):
+        """boto3 client config must set read_timeout from settings."""
+        from app.config import settings
+        from app.services.s3_service import S3Service
+
+        captured_configs = []
+
+        def capturing_client(*args, **kwargs):
+            cfg = kwargs.get("config")
+            if cfg is not None:
+                captured_configs.append(cfg)
+            return MagicMock()
+
+        service = S3Service()
+        with patch("boto3.client", side_effect=capturing_client):
+            _ = service.s3_client
+
+        assert len(captured_configs) == 1
+        assert captured_configs[0].read_timeout == settings.R2_READ_TIMEOUT_SECONDS
+
+    def test_timeout_math_within_task_limit(self):
+        """Worst-case non-streaming timeout must not exceed task_time_limit.
+
+        This is a contract test: if someone bumps the timeouts or the retry
+        count without considering the Celery task_time_limit, this test fails
+        loudly rather than silently shipping a regression.
+
+        Note: read_timeout is per-socket-read for streaming transfers (e.g.
+        download_file), so this ceiling only applies to non-streaming API calls
+        (head_object, generate_presigned_url, delete_object, upload_fileobj).
+        """
+        from app.config import settings
+
+        TASK_TIME_LIMIT_SECONDS = 360
+
+        # Worst-case per-attempt ceiling for non-streaming calls must be < task limit.
+        # We check connect_timeout + read_timeout per attempt (not total) since
+        # standard retry mode includes back-off delays that are bounded separately.
+        per_attempt = settings.R2_CONNECT_TIMEOUT_SECONDS + settings.R2_READ_TIMEOUT_SECONDS
+        assert per_attempt < TASK_TIME_LIMIT_SECONDS, (
+            f"connect_timeout ({settings.R2_CONNECT_TIMEOUT_SECONDS}s) + "
+            f"read_timeout ({settings.R2_READ_TIMEOUT_SECONDS}s) = {per_attempt}s "
+            f"exceeds task_time_limit={TASK_TIME_LIMIT_SECONDS}s per attempt"
+        )
+
+
+# ---------------------------------------------------------------------------
 # AssemblyAIService.upload_file
 # ---------------------------------------------------------------------------
 

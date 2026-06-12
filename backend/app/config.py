@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str
     R2_ENDPOINT_URL: str  # e.g. https://<account_id>.r2.cloudflarestorage.com
     R2_BUCKET_NAME: str
+    R2_CONNECT_TIMEOUT_SECONDS: int = 10
+    R2_READ_TIMEOUT_SECONDS: int = 300
 
     # AI APIs - OpenRouter (OpenAI-compatible)
     OPENROUTER_API_KEY: str

@@ -38,6 +38,8 @@ class S3Service:
                 config=BotoConfig(
                     signature_version="s3v4",
                     retries={"max_attempts": 3, "mode": "standard"},
+                    connect_timeout=settings.R2_CONNECT_TIMEOUT_SECONDS,
+                    read_timeout=settings.R2_READ_TIMEOUT_SECONDS,
                 ),
             )
         return self._s3_client
