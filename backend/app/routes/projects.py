@@ -29,6 +29,7 @@ from app.state import (
     ProjectAnalysisEvent,
     ProjectAnalysisStateMachine,
 )
+from app.utils.row_locking import lock_rows
 
 logger = logging.getLogger(__name__)
 
@@ -450,9 +451,15 @@ async def trigger_project_analysis(
 
         # Look up any existing ProjectAnalysis row so we can guard against a
         # double-dispatch and reset a stale errored row before redispatching.
-        existing_analysis = db.query(ProjectAnalysis)\
-            .filter(ProjectAnalysis.project_id == project_id)\
-            .first()
+        # Lock it FOR UPDATE so two simultaneous retry clicks serialize: the
+        # second blocks until the first commits its reset-to-processing, then
+        # re-reads status == "processing" and 409s below — the chain is
+        # dispatched exactly once (the duplicate-chain race confirmed in
+        # PR #40 review). When no row exists yet there is nothing to lock; the
+        # first chain link creates it.
+        existing_analysis = lock_rows(
+            db.query(ProjectAnalysis).filter(ProjectAnalysis.project_id == project_id)
+        ).first()
 
         # Race condition / double-click guard: reject if a cross-video
         # analysis is already in flight. Mirrors the video route's

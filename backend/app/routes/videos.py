@@ -30,6 +30,7 @@ from app.state import (
     VideoEvent,
     VideoStateMachine,
 )
+from app.utils.row_locking import lock_rows
 
 logger = logging.getLogger(__name__)
 
@@ -48,18 +49,31 @@ def _get_video_with_ownership(
     video_id: UUID,
     current_user_id: str,
     db: Session,
+    *,
+    for_update: bool = False,
 ) -> Video:
     """
     Fetch a video and verify ownership through the project relationship.
 
     Raises HTTPException 404 if the video doesn't exist or the user doesn't own it.
+
+    ``for_update``: when True, the Video row is selected ``FOR UPDATE`` so the
+    mutating status-transition routes (transcribe / analyze) serialize against
+    concurrent requests on the SAME video — the second request blocks until the
+    first commits, then re-reads the post-commit state and hits its 409 guard
+    instead of racing through it (audit R-H2 compare-and-swap). No-op on SQLite.
+    The join filters on Project but only the Video row is locked (single-row
+    lock — see deadlock note in app/utils/row_locking.py).
     """
-    video = (
+    query = (
         db.query(Video)
         .join(Project, Video.project_id == Project.id)
         .filter(Video.id == video_id, Project.user_id == current_user_id)
-        .first()
     )
+    if for_update:
+        # Lock only the Video row, not the joined Project (of=Video).
+        query = lock_rows(query, of=Video)
+    video = query.first()
     if not video:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -615,7 +629,12 @@ async def start_transcription(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # Lock the video row for the guard+transition+commit so two concurrent
+        # /transcribe POSTs serialize: the second blocks until the first
+        # commits, re-reads status='transcribing', and 409s (no double submit).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Reject if the upload hasn't been confirmed yet. Previously this was silently
         # accepted, which produced a confusing UX where the upload widget showed a
@@ -712,7 +731,14 @@ async def trigger_video_analysis(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # Lock the video row so two concurrent /analyze (retry) clicks
+        # serialize: the second blocks until the first commits its
+        # ANALYZE_DISPATCHED transition, re-reads status='analyzing', and 409s
+        # — closing the duplicate-chain dispatch race (audit R-H2; the same
+        # race was confirmed for project retry in PR #40 review).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Race condition: reject if already analyzing
         if video.status in ("analyzing",):
@@ -741,11 +767,10 @@ async def trigger_video_analysis(
             )
 
         # Set video status to "analyzing" inside the request transaction to close
-        # the concurrent-double-click race. Two requests hitting this endpoint
-        # back-to-back will both reach this point, but only one will win the
-        # commit — the other will see status == "analyzing" on its next read
-        # and reject via the status check above. The chunk step's matching
-        # reassignment later is idempotent (ANALYZING -> ANALYZING self-loop).
+        # the concurrent-double-click race. The FOR UPDATE on the video row
+        # above already serializes the two requests, so only one wins the
+        # commit and the other 409s on the status check. The chunk step's
+        # matching reassignment later is idempotent (ANALYZING -> ANALYZING).
         VideoStateMachine.transition(
             video, VideoEvent.ANALYZE_DISPATCHED, db=db
         )
@@ -756,8 +781,13 @@ async def trigger_video_analysis(
         # every step and the retry is a no-op. See
         # docs/production-readiness/prs/pr19-5-retry-swallow.md and PR #19.5
         # for the full root-cause story (Kathleen video 4b1f4b25, 2026-04-07).
-        analysis = db.query(VideoAnalysis).filter(
-            VideoAnalysis.video_id == video_id
+        # Lock the VideoAnalysis row too: although the video-row lock already
+        # serializes manual double-clicks, this also serializes a manual retry
+        # against the worker's auto-dispatch path (transcription_tasks), so the
+        # error->pending reset and the chunk step's pending->processing can't
+        # interleave.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
         ).first()
         if analysis and analysis.status == "error":
             # RETRY_RESET: error -> pending. The companion JSONB clears
@@ -1088,11 +1118,26 @@ async def trigger_chunk_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Block only if a step is currently mid-execution.  Coarser checks on
         # video.status would deadlock the step-by-step pipeline (see _is_any_step_processing).
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1150,9 +1195,24 @@ async def trigger_infer_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1205,9 +1265,24 @@ async def trigger_relate_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1260,9 +1335,24 @@ async def trigger_explain_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1315,9 +1405,24 @@ async def trigger_activate_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

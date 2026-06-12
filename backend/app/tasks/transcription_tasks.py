@@ -33,6 +33,7 @@ from app.state import (
 )
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
+from app.utils.row_locking import lock_rows
 
 logger = logging.getLogger(__name__)
 
@@ -62,23 +63,49 @@ def _maybe_auto_dispatch_analyze_chain(db: Session, video: Video) -> None:
     in the analysis row. No additional preflight here is needed; this matches
     the existing chain pattern intentionally.
     """
+    # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — the same order as
+    # the /analyze and step routes. This function later mutates video.status
+    # (ANALYZE_DISPATCHED) so its commit takes the Video row lock anyway;
+    # acquiring it explicitly BEFORE the VideoAnalysis lock (instead of
+    # implicitly at flush, after it) prevents a lock-order inversion against
+    # a concurrent /analyze request holding Video and waiting on
+    # VideoAnalysis — a reproducible Postgres deadlock (PR #48 review
+    # finding). Re-reading under the lock also makes the status guard a true
+    # CAS: we decide on the freshly committed state, not the caller's
+    # possibly stale snapshot.
+    locked_video = lock_rows(
+        db.query(Video).filter(Video.id == video.id)
+    ).first()
+    if locked_video is None:
+        logger.warning(
+            f"[auto-dispatch] Video {video.id} disappeared before dispatch"
+        )
+        db.rollback()
+        return
+    video = locked_video
+
     if video.status != "transcribed":
         logger.info(
             f"[auto-dispatch] Skipping analyze for video {video.id}: "
             f"video.status={video.status!r} (expected 'transcribed')"
         )
+        db.rollback()  # release the Video row lock
         return
 
-    existing = (
-        db.query(VideoAnalysis)
-        .filter(VideoAnalysis.video_id == video.id)
-        .first()
-    )
+    # Lock the VideoAnalysis row so this check-then-dispatch guard serializes
+    # against a concurrent manual /analyze retry click on the same video
+    # (audit R-H2). Without the lock both paths could read status not-in
+    # (processing, completed), both pass the guard, and both dispatch a chain.
+    # The lock makes the second actor read the post-commit state and bail.
+    existing = lock_rows(
+        db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video.id)
+    ).first()
     if existing and existing.status in ("processing", "completed"):
         logger.info(
             f"[auto-dispatch] Skipping analyze for video {video.id}: "
             f"VideoAnalysis.status={existing.status!r} (chain in flight or done)"
         )
+        db.rollback()  # release both row locks
         return
 
     # Resolve the user_id. Transcription tasks don't receive user_id directly;
@@ -90,6 +117,7 @@ def _maybe_auto_dispatch_analyze_chain(db: Session, video: Video) -> None:
             f"[auto-dispatch] Cannot dispatch analyze for video {video.id}: "
             f"project {video.project_id} not found"
         )
+        db.rollback()  # release both row locks
         return
     current_user_id = project.user_id
 
