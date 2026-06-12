@@ -125,6 +125,20 @@ PROJECT_ANALYSIS_TRANSITIONS: dict[
     # processing — there is no separate pending step.
     (None, ProjectAnalysisEvent.ROW_CREATED): VideoAnalysisStatus.PROCESSING,
 
+    # Retry reset: /analyze handler flips an ERROR row back to a runnable
+    # state before redispatching the chain. ProjectAnalysis has no PENDING
+    # state (it is born PROCESSING), so the runnable state it returns to is
+    # PROCESSING — the mirror of VideoAnalysis's error -> pending reset
+    # (PR #21). Without this, the cross_relate precheck (status == "error"
+    # -> "skipped") swallows every retry and the row stays error forever.
+    # Idempotent PROCESSING self-loop so a second racing retry click does
+    # not raise InvalidTransitionError. RETRY_RESET is deliberately NOT
+    # allowed from COMPLETED (mirror of the video policy): the route's reset
+    # block only fires for error rows, so a deliberate re-trigger of a
+    # completed analysis is never clobbered here.
+    (VideoAnalysisStatus.ERROR, ProjectAnalysisEvent.RETRY_RESET): VideoAnalysisStatus.PROCESSING,
+    (VideoAnalysisStatus.PROCESSING, ProjectAnalysisEvent.RETRY_RESET): VideoAnalysisStatus.PROCESSING,
+
     # Idempotent progress writes inside the chain steps.
     (VideoAnalysisStatus.PROCESSING, ProjectAnalysisEvent.CHAIN_STEP_PROGRESS): VideoAnalysisStatus.PROCESSING,
 
