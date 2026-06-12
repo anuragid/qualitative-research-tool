@@ -37,7 +37,15 @@ class S3Service:
                 region_name="auto",
                 config=BotoConfig(
                     signature_version="s3v4",
-                    retries={"max_attempts": 3, "mode": "standard"},
+                    # Standard retry mode retries on connect/read timeouts too,
+                    # so worst case against a fully stalled endpoint is
+                    # max_attempts × (connect_timeout + read_timeout)
+                    # = 2 × (10 + 160) = 340 s < Celery task_time_limit=360 s.
+                    # max_attempts=2 trades some transient-5xx resilience; the
+                    # bounded Celery task-level retry covers that class.
+                    retries={"max_attempts": 2, "mode": "standard"},
+                    connect_timeout=settings.R2_CONNECT_TIMEOUT_SECONDS,
+                    read_timeout=settings.R2_READ_TIMEOUT_SECONDS,
                 ),
             )
         return self._s3_client
