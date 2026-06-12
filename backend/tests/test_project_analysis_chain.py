@@ -404,3 +404,242 @@ class TestProjectErrorWriterSurfacesCommitFailure:
             project_analysis_steps._update_project_analysis_error = orig
 
         assert call_count["n"] == 1  # surfaced once, no recursion
+
+
+# ---------------------------------------------------------------------------
+# Crash-injection: result+status atomicity for the cross-video chain
+# ---------------------------------------------------------------------------
+
+
+class _SimulatedWorkerKill(BaseException):
+    """BaseException so it escapes the step's ``except Exception`` block —
+    simulates a SIGKILL/OOM where the process dies mid-function and no
+    error-writer runs."""
+
+
+class _CountingKillSession:
+    """Proxies a real Session but raises ``_SimulatedWorkerKill`` on the Nth
+    ``commit()``, rolling back first so the killed transaction's lock is
+    released and its pending writes are discarded (the net effect of a
+    dropped connection)."""
+
+    def __init__(self, real_session, kill_on_commit: int):
+        self._real = real_session
+        self._kill_on = kill_on_commit
+        self.commit_count = 0
+
+    def commit(self):
+        self.commit_count += 1
+        if self.commit_count == self._kill_on:
+            try:
+                self._real.rollback()
+            except Exception:
+                pass
+            raise _SimulatedWorkerKill(
+                f"worker killed at commit #{self.commit_count}"
+            )
+        return self._real.commit()
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+class TestCrossStepCommitAtomicity:
+    """Each cross-video step persists its result and its state transition in
+    a SINGLE commit. A kill before that commit lands must leave the PA row in
+    its pre-step state (no torn partial), and re-delivery must complete it."""
+
+    def test_cross_explain_crash_then_redelivery_is_atomic(
+        self, db_session, monkeypatch
+    ):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        calls = {"node": 0}
+
+        def _node(state):
+            calls["node"] += 1
+            return {"cross_video_insights": [{"id": "CI1", "text": "ins"}]}
+
+        monkeypatch.setattr(project_analysis_steps, "cross_explain_node", _node)
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+
+        # cross_explain makes exactly ONE commit (results). Kill it.
+        kill = _CountingKillSession(db_session, kill_on_commit=1)
+        s1 = MagicMock()
+        s1.db = kill
+        with pytest.raises(_SimulatedWorkerKill):
+            unbound(s1, str(project.id), "dev_user_local")
+
+        # Durable state: insights never persisted (atomic single commit),
+        # status still 'processing' (recoverable).
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.cross_video_insights is None
+        assert row.status == "processing"
+
+        # Re-delivery completes it.
+        s2 = MagicMock()
+        s2.db = db_session
+        result = unbound(s2, str(project.id), "dev_user_local")
+        assert result["status"] == "success"
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.cross_video_insights == [{"id": "CI1", "text": "ins"}]
+        assert calls["node"] == 2  # re-ran once per delivery
+
+    def test_cross_activate_crash_leaves_no_partial_completion(
+        self, db_session, monkeypatch
+    ):
+        """The terminal step writes results + CHAIN_SUCCEEDED in one commit.
+        A kill before it must NOT leave status=completed without principles,
+        nor principles without completed status."""
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+            cross_video_insights=[{"id": "CI1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        def _node(state):
+            return {"cross_video_principles": [{"id": "CDP1"}]}
+
+        monkeypatch.setattr(project_analysis_steps, "cross_activate_node", _node)
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_activate_step._orig_run.__func__
+        kill = _CountingKillSession(db_session, kill_on_commit=1)
+        s1 = MagicMock()
+        s1.db = kill
+        with pytest.raises(_SimulatedWorkerKill):
+            unbound(s1, str(project.id), "dev_user_local")
+
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        principles = row.cross_video_principles
+        is_completed = row.status == "completed"
+        assert not (is_completed and principles is None), (
+            "cross_activate: status=completed WITHOUT principles — torn write."
+        )
+        assert not (principles is not None and not is_completed), (
+            "cross_activate: principles WITHOUT completed status — torn write."
+        )
+        # Surviving state is the recoverable pre-completion one.
+        assert principles is None
+        assert row.status == "processing"
+
+        # Re-delivery finishes it atomically.
+        s2 = MagicMock()
+        s2.db = db_session
+        unbound(s2, str(project.id), "dev_user_local")
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.status == "completed"
+        assert row.cross_video_principles == [{"id": "CDP1"}]
+        assert row.completed_at is not None
+
+
+class TestCrossStepFailurePolicy:
+    """Cross-video failure policy mirrors the per-video one: retryable
+    failures keep the PA row 'processing' for Celery's autoretry; only
+    non-retryable failures stamp 'error' immediately."""
+
+    def test_cross_explain_retryable_node_error_leaves_processing(
+        self, db_session, monkeypatch
+    ):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        # Retryable node error.
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "cross_explain_node",
+            lambda state: {"error": "rate limited", "error_type": "rate_limit"},
+        )
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+        s = MagicMock()
+        s.db = db_session
+        with pytest.raises(Exception):
+            unbound(s, str(project.id), "dev_user_local")
+
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.status == "processing"  # runnable for autoretry, not error
+
+    def test_cross_explain_nonretryable_node_error_stamps_error(
+        self, db_session, monkeypatch
+    ):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        from app.tasks.analysis_steps import NonRetryableAnalysisError
+
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "cross_explain_node",
+            lambda state: {"error": "bad schema", "error_type": "validation_error"},
+        )
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+        s = MagicMock()
+        s.db = db_session
+        with pytest.raises(NonRetryableAnalysisError):
+            unbound(s, str(project.id), "dev_user_local")
+
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.status == "error"  # stamped immediately

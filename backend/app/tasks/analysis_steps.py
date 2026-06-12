@@ -243,6 +243,64 @@ def _build_insufficient_credits_error_json(step_name: str, exc: "InsufficientCre
     return json.dumps(payload)
 
 
+def _is_retryable_step_exc(exc: Exception | None) -> bool:
+    """Decide whether the exception that ended a step will be *autoretried*
+    by Celery (``autoretry_for=(Exception,)``) rather than failing the chain.
+
+    Non-retryable failures (``NonRetryableAnalysisError`` and its
+    ``InsufficientCreditsNonRetryable`` subclass) are excluded from autoretry
+    via ``dont_autoretry_for`` — for those the row should be stamped ``error``
+    immediately so the user sees the failure without waiting for the watchdog.
+
+    Every *other* exception that reaches a step's ``except`` block (a retryable
+    node error, a transient ``OperationalError``, an unexpected bug) WILL be
+    re-run by Celery on the same task. For those we must NOT stamp ``error``:
+    the in-progress row has to stay ``processing`` so the retried attempt's
+    cancellation precheck (which short-circuits on ``status == "error"``) does
+    not swallow it. The chain's terminal ``.on_error`` handler stamps ``error``
+    once retries are truly exhausted, and the watchdog is the final backstop.
+    """
+    return not isinstance(exc, NonRetryableAnalysisError)
+
+
+def _handle_step_failure(
+    db: Session,
+    video_id: str,
+    step_name: str,
+    exc: Exception | None = None,
+):
+    """Single failure-policy entry point for the 5 per-video step ``except``
+    blocks.
+
+    - Retryable failure -> discard the dirty partial transaction (rollback)
+      and leave the row ``processing`` so Celery's autoretry can re-run the
+      step's node and finish. Stamping ``error`` here would make the retry's
+      cancellation precheck skip the step, turning a transient hiccup into a
+      permanent error (the bug this PR fixes).
+    - Non-retryable failure -> stamp the row ``error`` immediately via
+      :func:`_update_analysis_error` (unchanged behaviour, incl. the BYOK
+      0-balance structured payload).
+
+    Centralised so the retryable/non-retryable policy lives in ONE place
+    instead of being duplicated across the five step bodies.
+    """
+    if _is_retryable_step_exc(exc):
+        # Retryable: just clean the session so the connection is returned to
+        # the pool uncorrupted. The row stays ``processing`` for the retry.
+        try:
+            db.rollback()
+        except Exception:
+            logger.warning(
+                "Rollback after retryable %s failure for %s failed; "
+                "session will be reset by the task lifecycle",
+                step_name,
+                video_id,
+                exc_info=True,
+            )
+        return
+    _update_analysis_error(db, video_id, step_name, exc=exc)
+
+
 def _update_analysis_error(
     db: Session,
     video_id: str,
@@ -445,7 +503,7 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"CHUNK step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "chunk", exc=e)
+        _handle_step_failure(self.db, video_id, "chunk", exc=e)
         raise
 
 
@@ -520,7 +578,7 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"INFER step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "infer", exc=e)
+        _handle_step_failure(self.db, video_id, "infer", exc=e)
         raise
 
 
@@ -592,7 +650,7 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"RELATE step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "relate", exc=e)
+        _handle_step_failure(self.db, video_id, "relate", exc=e)
         raise
 
 
@@ -665,7 +723,7 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"EXPLAIN step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "explain", exc=e)
+        _handle_step_failure(self.db, video_id, "explain", exc=e)
         raise
 
 
@@ -758,5 +816,5 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"ACTIVATE step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "activate", exc=e)
+        _handle_step_failure(self.db, video_id, "activate", exc=e)
         raise
