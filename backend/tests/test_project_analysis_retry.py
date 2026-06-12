@@ -164,6 +164,9 @@ def _setup_test_db(tmp_path, *, pa_status: str):
         cross_video_patterns=[{"id": "STALE_CP"}],
         cross_video_insights=[{"id": "STALE_CI"}],
         cross_video_principles=[{"id": "STALE_CDP"}],
+        # Stale structured error payload from the prior failed run.
+        error_message='{"step": "cross_relate", "error_type": "llm_error", '
+                      '"retryable": true, "message": "STALE ERROR"}',
     ))
     db.commit()
     db.close()
@@ -249,6 +252,13 @@ async def test_retry_resets_errored_row_and_dispatches(tmp_path):
         )
         assert row["cross_video_insights"] in (None, [])
         assert row["cross_video_principles"] in (None, [])
+        # The stale error payload must be cleared on retry, mirroring the
+        # video path where RETRY_RESET clears error_message as a state
+        # machine side effect. Otherwise a retried row carries the old
+        # failure reason forever.
+        assert row["error_message"] is None, (
+            f"Stale error_message not cleared on retry: {row['error_message']!r}"
+        )
     finally:
         app.dependency_overrides.clear()
 

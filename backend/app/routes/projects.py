@@ -460,6 +460,10 @@ async def trigger_project_analysis(
             )
             existing_analysis.started_at = datetime.now(timezone.utc)
             existing_analysis.completed_at = None
+            # Clear the stale error payload from the failed run — mirrors
+            # VideoStateMachine, which clears error_message as a RETRY_RESET
+            # side effect (state/video_state.py). A fresh failure rewrites it.
+            existing_analysis.error_message = None
             # Clear stale partial cross-video results so the new run doesn't
             # mix old blobs in. The chain steps repopulate these.
             existing_analysis.cross_video_patterns = None
