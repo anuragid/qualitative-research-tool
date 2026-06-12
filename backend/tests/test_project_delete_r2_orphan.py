@@ -11,8 +11,7 @@ error), so any videos already deleted on the partial attempt can be re-deleted
 without consequence.
 """
 
-import uuid as uuid_module
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
