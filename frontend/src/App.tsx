@@ -1,9 +1,13 @@
 import { lazy, Suspense } from "react";
+import type { ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SignIn, SignUp } from "@clerk/react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
+import {
+  RouteErrorBoundary,
+  ChunkLoadRecoveryReset,
+} from "./components/RouteErrorBoundary";
 import { UploadProvider } from "./contexts/UploadContext";
 import { useAuth } from "./hooks/useAuth";
 import { useUserSync } from "./hooks/useUserSync";
@@ -29,6 +33,19 @@ function PageLoader() {
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       <span className="sr-only">Loading…</span>
     </div>
+  );
+}
+
+/** Suspense wrapper for lazy route pages. ChunkLoadRecoveryReset sits
+ *  inside the Suspense boundary so it commits only once the lazy chunk
+ *  has resolved — proof of a successful route render, which resets the
+ *  chunk-reload loop guard (see RouteErrorBoundary). */
+function SuspensePage({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ChunkLoadRecoveryReset />
+      {children}
+    </Suspense>
   );
 }
 
@@ -83,9 +100,9 @@ function App() {
               // hash after deploy) is caught and shown as "Update available"
               // rather than a white screen or unhandled rejection.
               <RouteErrorBoundary routeName="landing">
-                <Suspense fallback={<PageLoader />}>
+                <SuspensePage>
                   <LandingPage />
-                </Suspense>
+                </SuspensePage>
               </RouteErrorBoundary>
             )
           }
@@ -124,11 +141,11 @@ function App() {
           element={
             isAuthenticated ? (
               <RouteErrorBoundary routeName="projects">
-                <Suspense fallback={<PageLoader />}>
+                <SuspensePage>
                   <UploadProvider>
                     <ProjectsPage />
                   </UploadProvider>
-                </Suspense>
+                </SuspensePage>
               </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
@@ -141,11 +158,11 @@ function App() {
           element={
             isAuthenticated ? (
               <RouteErrorBoundary routeName="project-detail">
-                <Suspense fallback={<PageLoader />}>
+                <SuspensePage>
                   <UploadProvider>
                     <ProjectDetailPage />
                   </UploadProvider>
-                </Suspense>
+                </SuspensePage>
               </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
@@ -158,11 +175,11 @@ function App() {
           element={
             isAuthenticated ? (
               <RouteErrorBoundary routeName="video-detail">
-                <Suspense fallback={<PageLoader />}>
+                <SuspensePage>
                   <UploadProvider>
                     <VideoDetailPage />
                   </UploadProvider>
-                </Suspense>
+                </SuspensePage>
               </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
@@ -175,9 +192,9 @@ function App() {
           path="*"
           element={
             <RouteErrorBoundary routeName="not-found">
-              <Suspense fallback={<PageLoader />}>
+              <SuspensePage>
                 <NotFoundPage />
-              </Suspense>
+              </SuspensePage>
             </RouteErrorBoundary>
           }
         />
