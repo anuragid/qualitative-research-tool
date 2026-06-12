@@ -190,6 +190,30 @@ def test_watchdog_timeout_sets_error_message() -> None:
     assert video.error_message == "timeout json"
 
 
+def test_upload_rejected_drives_to_error_with_message() -> None:
+    """confirm-upload server-side validation failure: drive the row to ERROR
+    and stamp the rejection reason so the UI can show why the upload failed."""
+    video = _make_video(status=VideoStatus.UPLOADING.value, error_message=None)
+    VideoStateMachine.transition(
+        video,
+        VideoEvent.UPLOAD_REJECTED,
+        error_message="Uploaded file is too large",
+    )
+    assert video.status == VideoStatus.ERROR.value
+    assert video.error_message == "Uploaded file is too large"
+
+
+def test_upload_rejected_from_error_is_idempotent() -> None:
+    """A re-confirm probe on an already-rejected (ERROR) row re-rejects as a
+    no-op self-loop rather than raising."""
+    video = _make_video(status=VideoStatus.ERROR.value, error_message="prev reject")
+    VideoStateMachine.transition(
+        video, VideoEvent.UPLOAD_REJECTED, error_message="still too large"
+    )
+    assert video.status == VideoStatus.ERROR.value
+    assert video.error_message == "still too large"
+
+
 # ---------------------------------------------------------------------------
 # Retry and idempotency
 # ---------------------------------------------------------------------------
