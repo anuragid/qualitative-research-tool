@@ -294,3 +294,113 @@ class TestCrossProjectCancellationPrecheck:
 
         assert result == {"project_id": str(project.id), "status": "skipped"}
         assert called["hit"] is False
+
+
+class TestCrossProjectCancellationTransientDB:
+    """A transient DB outage inside the project cancellation precheck must
+    RAISE (Celery autoretry path), not silently proceed to a cross-video
+    LLM call on possibly-cancelled work."""
+
+    def test_check_project_cancellation_reraises_on_operational_error(self, db_session):
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.query.side_effect = OperationalError(
+            "SELECT ...", {}, Exception("connection reset by peer")
+        )
+
+        with pytest.raises(OperationalError):
+            project_analysis_steps._check_project_cancellation(
+                broken_db, str(project.id)
+            )
+
+    def test_cross_explain_raises_for_autoretry_when_precheck_db_fails(
+        self, db_session, monkeypatch
+    ):
+        """cross_explain must surface the OperationalError instead of
+        proceeding to the BYOK/LLM resolution."""
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        byok_calls: list = []
+
+        def _spy_byok(db, user_id, step, *, force_refresh=False):
+            byok_calls.append(step)
+            return (None, None)
+
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            _spy_byok,
+        )
+
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.query.side_effect = OperationalError(
+            "SELECT ...", {}, Exception("server closed connection")
+        )
+
+        mock_self = MagicMock()
+        mock_self.db = broken_db
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+        with pytest.raises(OperationalError):
+            unbound(mock_self, str(project.id), "dev_user_local")
+
+        assert byok_calls == [], (
+            "cross_explain proceeded to BYOK/LLM resolution despite unknown "
+            "cancellation state."
+        )
+
+
+class TestProjectErrorWriterSurfacesCommitFailure:
+    """_update_project_analysis_error must re-raise if writing the error
+    state itself fails, surfacing exactly once without recursing."""
+
+    def test_update_project_analysis_error_reraises_when_commit_fails(self, db_session):
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.commit.side_effect = OperationalError(
+            "COMMIT", {}, Exception("WAL write failed")
+        )
+
+        call_count = {"n": 0}
+        orig = project_analysis_steps._update_project_analysis_error
+
+        def _counting(*args, **kwargs):
+            call_count["n"] += 1
+            return orig(*args, **kwargs)
+
+        project_analysis_steps._update_project_analysis_error = _counting
+        try:
+            with pytest.raises(OperationalError):
+                project_analysis_steps._update_project_analysis_error(
+                    broken_db, str(project.id), "cross_explain"
+                )
+        finally:
+            project_analysis_steps._update_project_analysis_error = orig
+
+        assert call_count["n"] == 1  # surfaced once, no recursion

@@ -1173,6 +1173,14 @@ def test_update_analysis_error_other_exceptions_leave_error_message_unchanged():
 
     fake_analysis = MagicMock()
     fake_analysis.step_status = {}
+    # Real-string status so VideoAnalysisStateMachine.transition(CHAIN_FAILED)
+    # can coerce it into the enum. Previously this was a bare MagicMock, which
+    # made the transition raise ValueError — masked by the old swallow-and-
+    # pass behaviour. Now that the writer re-raises on failure, the mock must
+    # represent a legal source state so the test exercises the *success* path
+    # it actually intends to (error_message left untouched for non-credit
+    # exceptions).
+    fake_analysis.status = "processing"
 
     db.query.return_value.filter.return_value.first.side_effect = [
         fake_analysis,

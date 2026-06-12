@@ -143,6 +143,169 @@ class TestCancellationPrecheck:
         assert _check_cancellation(db_session, str(video.id)) is True
 
 
+class TestCancellationPrecheckTransientDB:
+    """A transient DB outage inside the cancellation precheck must RAISE,
+    not silently return False ("not cancelled"). Returning False would let
+    the step proceed and burn an LLM call (and BYOK credits) on work that
+    may already be cancelled. Raising lets Celery's autoretry decorator
+    (autoretry_for=(Exception,), max_retries=3) retry the precheck."""
+
+    def test_check_cancellation_reraises_on_operational_error(self, db_session):
+        """Mock the query to raise OperationalError → precheck must re-raise,
+        not return False."""
+        from unittest.mock import MagicMock
+
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import analysis_steps
+
+        _, video = _seed_project_video_transcript(db_session)
+
+        # Wrap the real session so .query() raises a transient DB error but
+        # .rollback()/.expire_all() stay functional (mirrors a mid-request
+        # connection drop).
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.query.side_effect = OperationalError(
+            "SELECT ...", {}, Exception("server closed the connection unexpectedly")
+        )
+
+        with pytest.raises(OperationalError):
+            analysis_steps._check_cancellation(broken_db, str(video.id))
+
+    def test_step_task_raises_for_autoretry_when_precheck_db_fails(self, db_session):
+        """The full step body must surface the OperationalError (Celery
+        autoretry path) instead of proceeding to the BYOK/LLM call.
+
+        We assert the step never reaches resolve_byok_with_preflight — i.e.
+        no LLM credits are burned when the cancellation state is unknown."""
+        from unittest.mock import MagicMock
+
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import analysis_steps
+
+        _, video = _seed_project_video_transcript(db_session)
+        analysis = VideoAnalysis(
+            video_id=video.id,
+            status="processing",
+            inferences=[{"id": "i1"}],  # so relate would otherwise proceed
+            step_status={"chunk": "completed", "infer": "completed"},
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        # First .query() call (the precheck) raises; sentinel proves the
+        # step body never advanced to BYOK resolution.
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.query.side_effect = OperationalError(
+            "SELECT ...", {}, Exception("connection refused")
+        )
+
+        byok_calls: list = []
+
+        def _spy_byok(*args, **kwargs):
+            byok_calls.append(args)
+            return (None, None, None)
+
+        import app.tasks.analysis_steps as _mod
+        orig_byok = _mod.resolve_byok_with_preflight
+        _mod.resolve_byok_with_preflight = _spy_byok
+        try:
+            mock_self = MagicMock()
+            mock_self.db = broken_db
+            unbound = analysis_steps.analyze_relate_step._orig_run.__func__
+            with pytest.raises(OperationalError):
+                unbound(mock_self, str(video.id), None)
+        finally:
+            _mod.resolve_byok_with_preflight = orig_byok
+
+        assert byok_calls == [], (
+            "Step proceeded to BYOK/LLM resolution despite an unknown "
+            "cancellation state — credits could be burned on cancelled work."
+        )
+
+
+class TestErrorWriterSurfacesCommitFailure:
+    """If writing the ERROR STATE itself fails, _update_analysis_error must
+    re-raise (surface to Celery / the chain's on_error) instead of leaving
+    the row 'processing' silently. It must surface exactly once and must not
+    recurse into itself."""
+
+    def test_update_analysis_error_reraises_when_commit_fails(self, db_session):
+        from unittest.mock import MagicMock
+
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import analysis_steps
+
+        _, video = _seed_project_video_transcript(db_session)
+        analysis = VideoAnalysis(
+            video_id=video.id,
+            status="processing",
+            step_status={"infer": "processing"},
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        # Real reads succeed, but commit raises (write path is what's down).
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.commit.side_effect = OperationalError(
+            "COMMIT", {}, Exception("could not write to WAL")
+        )
+
+        call_count = {"n": 0}
+        orig = analysis_steps._update_analysis_error
+
+        def _counting(*args, **kwargs):
+            call_count["n"] += 1
+            return orig(*args, **kwargs)
+
+        analysis_steps._update_analysis_error = _counting
+        try:
+            with pytest.raises(OperationalError):
+                analysis_steps._update_analysis_error(
+                    broken_db, str(video.id), "infer", exc=RuntimeError("boom")
+                )
+        finally:
+            analysis_steps._update_analysis_error = orig
+
+        # Surfaced exactly once — no recursive re-entry into the writer.
+        assert call_count["n"] == 1
+
+    def test_step_except_block_surfaces_writer_failure_once(self, db_session):
+        """End-to-end: a step whose body fails AND whose error-write fails
+        must propagate one exception out of the task (Celery autoretry),
+        not swallow both."""
+        from unittest.mock import MagicMock
+
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import analysis_steps
+
+        _, video = _seed_project_video_transcript(db_session)
+        analysis = VideoAnalysis(
+            video_id=video.id,
+            status="processing",
+            inferences=None,  # forces "No inferences available" raise in relate
+            step_status={"chunk": "completed"},
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        # Precheck read works; later commit (in the error writer) fails.
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.commit.side_effect = OperationalError(
+            "COMMIT", {}, Exception("disk full")
+        )
+
+        mock_self = MagicMock()
+        mock_self.db = broken_db
+        unbound = analysis_steps.analyze_relate_step._orig_run.__func__
+        # Exactly one exception propagates; it is the surfaced failure.
+        with pytest.raises(Exception):
+            unbound(mock_self, str(video.id), None)
+
+
 class TestStepTasksShortCircuitWhenCancelled:
     """Every step task body must exit early and return {status: skipped}
     when the cancellation precheck fires. This lets subsequent chain
