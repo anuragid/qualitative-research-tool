@@ -95,13 +95,13 @@ jobs:
           echo "OK: single head confirmed"
 
       - name: Check model-vs-migration drift
-        # Runs alembic autogenerate check and fails on any NEW drift not listed
-        # in scripts/ci/known_schema_drift.txt.
+        # Runs alembic autogenerate check and fails on any drift not listed in
+        # scripts/ci/known_schema_drift.txt.
         #
-        # KNOWN DRIFT: scripts/ci/known_schema_drift.txt currently lists the 7
-        # missing indexes plus 5 minor schema mismatches (nullable/type/constraint).
-        # These are tolerated here and must be resolved by Wave-2 PR W2-A which
-        # adds the index migration.  Once W2-A merges, that file must be emptied.
+        # The original 12 known-drift items (7 missing indexes + 5 schema
+        # mismatches) were resolved by the "add missing indexes + reconcile
+        # model/schema drift" PR. known_schema_drift.txt is now EMPTY and must
+        # stay that way — any new entry is a regression.
         run: python3 ../scripts/ci/check_migration_drift.py
 
   frontend-ci:

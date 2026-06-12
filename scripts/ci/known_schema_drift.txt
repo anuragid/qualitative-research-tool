@@ -1,70 +1,25 @@
 # Known schema drift — items here are TOLERATED by check_migration_drift.py.
 #
-# IMPORTANT: Wave-2 PR W2-A must resolve every entry below and EMPTY this
-# file.  Once W2-A merges, any entry remaining here is a regression.
+# THIS FILE MUST STAY EMPTY (no drift keys below this header).
 #
-# READ THE PER-ENTRY COMMENTS BEFORE FIXING.  Not every entry is fixed by
-# writing a migration: for several entries below the DATABASE is RIGHT and
-# the MODEL is wrong — blindly running autogenerate and applying its output
-# would DROP real integrity guarantees (unique constraints, NOT NULL).
+# As of PR "fix(db): add missing indexes + reconcile model/schema drift" the
+# original 12 tolerated items were ALL resolved:
+#   - 7 missing indexes were created (CONCURRENTLY) by migration b8c4d2e3f5a6.
+#   - video_analyses.step_status JSON->JSONB by migration a7b3c9d1e2f4.
+#   - projects.status NOT NULL, users.email NOT NULL, and the
+#     users_email_key / users_username_key UNIQUE constraints were reconciled
+#     by tightening the MODEL (app/models/database_models.py) to match the DB —
+#     no DDL, because the database was already correct.
 #
-# Format: one canonical drift key per line.  Lines starting with '#' and
-# blank lines are ignored.  Keys are derived from alembic autogenerate diff
-# tuples by check_migration_drift.py:
+# The drift gate (check_migration_drift.py) now requires the autogenerate diff
+# to be EMPTY. Any NEW entry added here is a regression: fix the migration or
+# the model instead of re-tolerating drift.
+#
+# Format (for reference only — there should be NO active entries): one
+# canonical drift key per line. Lines starting with '#' and blank lines are
+# ignored. Keys are derived from alembic autogenerate diff tuples by
+# check_migration_drift.py:
 #   add_index:<index_name>
 #   modify_nullable:<table>:<column>      (direction-agnostic)
 #   modify_type:<table>:<column>          (direction-agnostic)
 #   remove_constraint:<table>:<constraint_name>
-#
-# ---------------------------------------------------------------------------
-# MISSING INDEXES (7) — fix: WRITE A MIGRATION (op.create_index)
-# Models declare index=True but no migration ever created these indexes, so
-# production lacks them all.  Verified 2026-06-12 against chain head
-# f5a6b7c8d9e0.
-# ---------------------------------------------------------------------------
-add_index:ix_project_analyses_project_id
-add_index:ix_projects_status
-add_index:ix_speaker_labels_transcript_id
-add_index:ix_transcripts_video_id
-add_index:ix_video_analyses_video_id
-add_index:ix_videos_project_id
-add_index:ix_videos_status
-#
-# ---------------------------------------------------------------------------
-# projects.status nullable — fix: CHANGE THE MODEL, NOT the database.
-# Migration d484f4320746 created the column and altered it to NOT NULL with a
-# server default.  The MODEL omits nullable= (defaults to nullable=True), so
-# autogenerate wants to drop NOT NULL.  The DATABASE IS RIGHT — status must
-# stay NOT NULL.  Fix: add nullable=False (and matching server_default) to
-# Project.status in database_models.py.  Do NOT generate a migration dropping
-# NOT NULL.
-# ---------------------------------------------------------------------------
-modify_nullable:projects:status
-#
-# ---------------------------------------------------------------------------
-# users.email nullable — fix: CHANGE THE MODEL, NOT the database.
-# add_user_authentication created users.email as NOT NULL; the MODEL omits
-# nullable= (defaults to True).  The DATABASE IS RIGHT.  Fix: add
-# nullable=False to User.email in database_models.py.
-# ---------------------------------------------------------------------------
-modify_nullable:users:email
-#
-# ---------------------------------------------------------------------------
-# users unique constraints — REAL DRIFT WHERE THE DATABASE IS RIGHT.
-# add_user_authentication created UNIQUE constraints users_email_key and
-# users_username_key.  The MODEL lacks unique=True on email/username, so
-# autogenerate wants to DROP BOTH UNIQUE CONSTRAINTS.  Uniqueness of
-# email/username is a real integrity guarantee and MUST STAY.  Fix: add
-# unique=True to User.email and User.username in database_models.py.  Do NOT
-# let autogenerate emit the drop.
-# ---------------------------------------------------------------------------
-remove_constraint:users:users_email_key
-remove_constraint:users:users_username_key
-#
-# ---------------------------------------------------------------------------
-# video_analyses.step_status type — REAL drift, deferred to W2-A.
-# Migration 32f29ff0b70c created the column as JSON; the model declares JSONB.
-# JSONB is the intended type (indexable, deduplicated keys).  Fix in W2-A:
-# migration ALTER COLUMN step_status TYPE JSONB (safe, lossless cast).
-# ---------------------------------------------------------------------------
-modify_type:video_analyses:step_status
