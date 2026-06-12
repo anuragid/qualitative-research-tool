@@ -5,9 +5,16 @@ list_project_videos) return ``VideoListItemResponse`` / ``ProjectListResponse``
 shapes which deliberately omit the 5 heavy JSONB columns
 (chunks, inferences, patterns, insights, design_principles).
 
-These tests assert at the *HTTP response* level that none of those keys
-appear in the JSON, and at the *schema* level that the new lightweight
-schemas validate correctly.
+These tests assert at three levels:
+
+1. *HTTP response* — none of the blob keys appear in the JSON.
+2. *Schema* — the new lightweight schemas validate correctly.
+3. *SQL* — the ``load_only()`` loader option keeps the blob columns out of
+   the SELECT statements actually sent to the database
+   (``test_blob_columns_not_selected_from_db``).  Without this, dropping
+   ``load_only`` would still pass the JSON tests (Pydantic strips the
+   fields at serialization) but silently reintroduce the heavy DB reads
+   this PR exists to remove.
 """
 
 import uuid as uuid_module
@@ -317,4 +324,71 @@ async def test_list_project_videos_no_analysis_row(tmp_path):
         data = resp.json()
         assert data[0]["analysis"] is None
     finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_blob_columns_not_selected_from_db(tmp_path):
+    """SQL-level regression lock for the load_only() optimization.
+
+    The JSON-shape tests above would still pass if ``load_only`` were
+    removed from the routes — Pydantic strips the blob fields at
+    serialization time regardless.  This test captures every statement
+    sent to the database while exercising all three list endpoints and
+    asserts that no SELECT against ``video_analyses`` includes any of the
+    5 blob columns.  This is the assertion that actually locks in the
+    "don't even FETCH the JSONB from Postgres" behavior.
+    """
+    Session, project_uuid, _ = _setup_db(tmp_path)
+    engine = Session.kw["bind"]
+
+    captured: list[str] = []
+
+    from sqlalchemy import event
+
+    def _capture(conn, cursor, statement, parameters, context, executemany):
+        captured.append(statement)
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(Session)
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            headers = {"Authorization": "Bearer dev-bypass"}
+            assert (await client.get("/api/projects/", headers=headers)).status_code == 200
+            assert (
+                await client.get(f"/api/projects/{project_uuid}", headers=headers)
+            ).status_code == 200
+            assert (
+                await client.get(f"/api/projects/{project_uuid}/videos", headers=headers)
+            ).status_code == 200
+
+        analysis_selects = [
+            s for s in captured
+            if "video_analyses" in s and s.lstrip().upper().startswith("SELECT")
+        ]
+        # Each endpoint loads the analysis relationship, so we must have seen
+        # at least one SELECT per endpoint (selectinload's second query).
+        assert len(analysis_selects) >= 3, (
+            f"Expected >=3 SELECTs against video_analyses (one per endpoint), "
+            f"got {len(analysis_selects)}. All captured: {captured}"
+        )
+        # Use the table-qualified column form so e.g. a bind-param value or
+        # the word 'patterns' elsewhere can't false-positive.
+        for stmt in analysis_selects:
+            for col in _BLOB_KEYS:
+                assert f"video_analyses.{col}" not in stmt, (
+                    f"Blob column 'video_analyses.{col}' was SELECTed — the "
+                    f"load_only() optimization has been dropped or broken.\n"
+                    f"Statement: {stmt}"
+                )
+            # Sanity: status IS selected (proves we're looking at the real
+            # relationship-load query, not some unrelated statement).
+            assert "video_analyses.status" in stmt
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
         app.dependency_overrides.clear()
