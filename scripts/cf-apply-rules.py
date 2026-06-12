@@ -232,7 +232,7 @@ def _print_token_help() -> None:
     print(f"Restrict to zone: {ZONE_NAME}", file=sys.stderr)
     print("", file=sys.stderr)
     print("Then run:", file=sys.stderr)
-    print("  CF_API_TOKEN=... python3 scripts/cf-apply-rules.py [--dry-run]", file=sys.stderr)
+    print("  CF_API_TOKEN=... python3 scripts/cf-apply-rules.py [--dry-run | --apply]", file=sys.stderr)
 
 
 def verify_token(token: str, report: Report) -> bool:
