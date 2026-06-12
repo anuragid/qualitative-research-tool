@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session, contains_eager, selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth_bridge import Permission, require_permissions
 from app.config import settings
@@ -129,36 +129,35 @@ async def list_projects(
         skip = max(skip, 0)
         skip = min(skip, 10000)
 
-        # Single LEFT OUTER JOIN: projects + videos (id/status/uploaded_at only).
-        # No join to video_analyses — the projects-list UI only needs:
+        # selectinload pages the PROJECTS first (LIMIT/OFFSET apply to project
+        # rows), then issues one IN-list SELECT for the videos of exactly
+        # those projects.  load_only() restricts that second SELECT to the
+        # three columns the projects-list UI needs:
         #   - video.id          (React key + thumbnail slot)
         #   - video.status      (FolderStatusIcon + polling gate)
         #   - video.uploaded_at (sort key for "3 most-recent" thumbnails)
         #
-        # contains_eager(Project.videos) tells SQLAlchemy to populate the
-        # Project.videos relationship from the outerjoin columns instead of
-        # issuing a second SELECT.  load_only() restricts the Video columns
-        # fetched to the three we need, so the query never touches the
-        # video_analyses table at all.
+        # The video_analyses table is never touched — that was the heavy
+        # second level of the old two-level selectinload chain.
         #
-        # Query count: 1 (vs. 2 with the previous selectinload approach, and
-        # vs. N+1 without eager-loading at all).
-        projects = (
-            db.query(Project)
-            .outerjoin(Project.videos)
+        # NOTE: do NOT replace this with outerjoin + contains_eager + LIMIT.
+        # SQL LIMIT applies to JOIN ROWS, so a user with a few multi-video
+        # projects silently loses projects off the end of the list (e.g.
+        # 3 projects x 20 videos = 60 rows > limit 50).  Locked by
+        # test_list_projects_pagination_counts_projects_not_join_rows.
+        projects = db.query(Project)\
+            .filter(Project.user_id == current_user_id)\
             .options(
-                contains_eager(Project.videos).load_only(
+                selectinload(Project.videos).load_only(
                     Video.id,
                     Video.status,
                     Video.uploaded_at,
                 )
-            )
-            .filter(Project.user_id == current_user_id)
-            .order_by(Project.created_at.desc())
-            .offset(skip)
-            .limit(limit)
+            )\
+            .order_by(Project.created_at.desc())\
+            .offset(skip)\
+            .limit(limit)\
             .all()
-        )
 
         logger.info(f"Retrieved {len(projects)} projects")
         return [ProjectListResponse.model_validate(p) for p in projects]
@@ -190,22 +189,23 @@ async def get_project(
     """
     current_user_id = current_user["id"]
     try:
-        # Same optimised pattern as list_projects: single outerjoin to videos
-        # (id/status/uploaded_at only), no touch of video_analyses.
-        project = (
-            db.query(Project)
-            .outerjoin(Project.videos)
+        # Same optimised pattern as list_projects: selectinload restricted to
+        # (id/status/uploaded_at), no touch of video_analyses.
+        #
+        # NOTE: do NOT use outerjoin + contains_eager here either — .first()
+        # emits LIMIT 1 which would truncate the joined rows to a single
+        # video.  Locked by test_get_project_returns_all_videos.
+        project = db.query(Project)\
             .options(
-                contains_eager(Project.videos).load_only(
+                selectinload(Project.videos).load_only(
                     Video.id,
                     Video.status,
                     Video.uploaded_at,
                 )
-            )
-            .filter(Project.id == project_id)
-            .filter(Project.user_id == current_user_id)
+            )\
+            .filter(Project.id == project_id)\
+            .filter(Project.user_id == current_user_id)\
             .first()
-        )
 
         if not project:
             raise HTTPException(

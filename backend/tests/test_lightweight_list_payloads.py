@@ -394,10 +394,10 @@ async def test_blob_columns_not_selected_from_db(tmp_path):
 async def test_list_projects_no_video_analyses_table_access(tmp_path):
     """SQL-level regression lock: list_projects must NOT touch video_analyses.
 
-    The aggregate rollup (outerjoin on videos only) should resolve
-    FolderCard's needs (count, status-per-video, sort) without ever hitting
-    the video_analyses table.  If this test fails it means the route has
-    regressed to the old two-level selectinload.
+    The video-stub projection (selectinload restricted to id/status/
+    uploaded_at) resolves FolderCard's needs (count, status-per-video, sort)
+    without ever hitting the video_analyses table.  If this test fails it
+    means the route has regressed to the old two-level selectinload.
     """
     Session, project_uuid, _ = _setup_db(tmp_path)
     engine = Session.kw["bind"]
@@ -432,27 +432,32 @@ async def test_list_projects_no_video_analyses_table_access(tmp_path):
         ]
         assert len(analysis_selects) == 0, (
             f"list_projects issued {len(analysis_selects)} SELECT(s) against "
-            f"video_analyses — the outerjoin optimisation has been reverted.\n"
+            f"video_analyses — the stub optimisation has been reverted.\n"
             f"Offending statements: {analysis_selects}"
         )
 
-        # Total SELECT count: exactly 1 (the projects+videos outerjoin).
+        # Total SELECT count: exactly 2 (projects page + videos IN-list from
+        # selectinload).  NOT one-per-project (N+1) and NOT a third SELECT
+        # against video_analyses.
         selects = [s for s in captured if s.lstrip().upper().startswith("SELECT")]
-        assert len(selects) == 1, (
-            f"Expected exactly 1 SELECT for list_projects (projects+videos outerjoin), "
-            f"got {len(selects)}.\nAll SELECTs: {selects}"
+        assert len(selects) == 2, (
+            f"Expected exactly 2 SELECTs for list_projects (projects + videos "
+            f"selectinload), got {len(selects)}.\nAll SELECTs: {selects}"
         )
 
-        # The single query must touch the videos table (proves the outerjoin
-        # is there) but must NOT select any of the blob columns.
-        assert "videos" in selects[0], (
-            "The projects-list SELECT must join videos. Got: " + selects[0]
-        )
-        for col in _BLOB_KEYS:
-            assert col not in selects[0], (
-                f"Blob column '{col}' appeared in list_projects SELECT.\n"
-                f"Statement: {selects[0]}"
+        # The videos SELECT must be column-restricted: id/status/uploaded_at
+        # plus the FK, and nothing heavy.
+        videos_select = next(s for s in selects if "FROM videos" in s)
+        for col in ("videos.filename", "videos.s3_key", "videos.s3_url",
+                    "videos.file_size_bytes", "videos.duration_seconds",
+                    "videos.error_message"):
+            assert col not in videos_select, (
+                f"Column '{col}' appeared in the list_projects videos SELECT — "
+                f"the load_only() projection has been widened.\n"
+                f"Statement: {videos_select}"
             )
+        assert "videos.status" in videos_select
+        assert "videos.uploaded_at" in videos_select
     finally:
         event.remove(engine, "before_cursor_execute", _capture)
         app.dependency_overrides.clear()
@@ -463,7 +468,7 @@ async def test_get_project_no_video_analyses_table_access(tmp_path):
     """SQL-level regression lock: get_project must NOT touch video_analyses.
 
     Same guarantee as list_projects — both endpoints now use the
-    outerjoin-on-videos-only pattern.
+    column-restricted selectinload (video stub) pattern.
     """
     Session, project_uuid, _ = _setup_db(tmp_path)
     engine = Session.kw["bind"]
@@ -499,14 +504,14 @@ async def test_get_project_no_video_analyses_table_access(tmp_path):
             f"video_analyses — regression detected.\nOffending statements: {analysis_selects}"
         )
 
-        # The single query must touch videos.
+        # Exactly 2 SELECTs: project row + videos selectinload.
         selects = [s for s in captured if s.lstrip().upper().startswith("SELECT")]
-        assert len(selects) == 1, (
-            f"Expected exactly 1 SELECT for get_project, got {len(selects)}.\n"
-            f"All SELECTs: {selects}"
+        assert len(selects) == 2, (
+            f"Expected exactly 2 SELECTs for get_project (project + videos "
+            f"selectinload), got {len(selects)}.\nAll SELECTs: {selects}"
         )
-        assert "videos" in selects[0], (
-            "get_project SELECT must join videos. Got: " + selects[0]
+        assert any("FROM videos" in s for s in selects), (
+            f"get_project must load videos. All SELECTs: {selects}"
         )
     finally:
         event.remove(engine, "before_cursor_execute", _capture)
@@ -556,5 +561,180 @@ async def test_list_projects_video_stub_shape(tmp_path):
                 f"list_projects video stub unexpectedly contains '{field}' — "
                 "the VideoStatusStub projection has been widened."
             )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def _seed_extra_projects(Session, n_projects: int, videos_per_project: int) -> list[str]:
+    """Insert additional projects (each with N videos) for the dev user.
+
+    Returns the list of project ids (hex format, matching _setup_db).
+    """
+    from sqlalchemy import text
+
+    db = Session()
+    project_ids = []
+    try:
+        for p in range(n_projects):
+            pid = uuid_module.uuid4().hex
+            project_ids.append(pid)
+            db.execute(
+                text(
+                    "INSERT INTO projects (id, user_id, name, status) "
+                    "VALUES (:id, 'dev_user_local', :name, 'ready')"
+                ),
+                {"id": pid, "name": f"Seeded Project {p}"},
+            )
+            for v in range(videos_per_project):
+                db.execute(
+                    text(
+                        "INSERT INTO videos (id, project_id, filename, s3_key, "
+                        "s3_url, file_size_bytes, status) VALUES "
+                        "(:id, :pid, :fn, 'k', 'https://u', 1000, 'analyzed')"
+                    ),
+                    {
+                        "id": uuid_module.uuid4().hex,
+                        "pid": pid,
+                        "fn": f"video_{p}_{v}.mp4",
+                    },
+                )
+        db.commit()
+    finally:
+        db.close()
+    return project_ids
+
+
+@pytest.mark.asyncio
+async def test_list_projects_pagination_counts_projects_not_join_rows(tmp_path):
+    """Pagination lock: ``limit`` must apply to PROJECTS, not joined video rows.
+
+    Regression guard for the outerjoin + contains_eager + LIMIT anti-pattern:
+    SQL LIMIT applies to join ROWS, so 4 projects x 5 videos = 20+ rows would
+    be truncated by limit=5 to ~1 project.  With selectinload, limit=5 must
+    return min(5, n_projects) full projects each carrying ALL of its videos.
+    """
+    Session, project_uuid, _ = _setup_db(tmp_path)  # 1 project, 1 video
+    _seed_extra_projects(Session, n_projects=4, videos_per_project=5)
+    # Total: 5 projects, 21 video rows.
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(Session)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            headers = {"Authorization": "Bearer dev-bypass"}
+
+            # Default limit: all 5 projects come back, every video attached.
+            resp = await client.get("/api/projects/", headers=headers)
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) == 5, (
+                f"Expected all 5 projects, got {len(data)} — LIMIT is being "
+                "applied to join rows instead of projects."
+            )
+            total_videos = sum(len(p.get("videos", [])) for p in data)
+            assert total_videos == 21, (
+                f"Expected 21 total video stubs across projects, got {total_videos}"
+            )
+            # Each seeded project must carry ALL 5 of its videos.
+            seeded = [p for p in data if p["name"].startswith("Seeded Project")]
+            assert len(seeded) == 4
+            for p in seeded:
+                assert len(p["videos"]) == 5, (
+                    f"Project {p['name']} returned {len(p['videos'])} videos, "
+                    "expected 5 — video collection truncated."
+                )
+
+            # Explicit limit smaller than the join-row count but >= project
+            # count boundary: limit=3 must return exactly 3 PROJECTS (15+
+            # join rows would have busted a row-level limit).
+            resp = await client.get("/api/projects/?limit=3", headers=headers)
+            assert resp.status_code == 200
+            page = resp.json()
+            assert len(page) == 3, (
+                f"limit=3 returned {len(page)} projects — pagination is "
+                "counting join rows, not projects."
+            )
+            for p in page:
+                if p["name"].startswith("Seeded Project"):
+                    assert len(p["videos"]) == 5, (
+                        "Paged project lost videos — collection truncated by "
+                        "row-level LIMIT."
+                    )
+
+            # skip/limit paging must partition the project set, not rows.
+            resp_rest = await client.get("/api/projects/?skip=3&limit=3", headers=headers)
+            assert resp_rest.status_code == 200
+            rest = resp_rest.json()
+            assert len(rest) == 2
+            page_ids = {p["id"] for p in page}
+            rest_ids = {p["id"] for p in rest}
+            assert page_ids.isdisjoint(rest_ids), "skip/limit pages overlap"
+            assert len(page_ids | rest_ids) == 5, "skip/limit pages lose projects"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_get_project_returns_all_videos(tmp_path):
+    """get_project must return EVERY video of a multi-video project.
+
+    Regression guard for outerjoin + contains_eager + .first(): .first()
+    emits LIMIT 1 which truncates the joined rows to a single video.
+    """
+    Session, _, _ = _setup_db(tmp_path)
+    pid = _seed_extra_projects(Session, n_projects=1, videos_per_project=5)[0]
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(Session)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(
+                f"/api/projects/{uuid_module.UUID(pid)}",
+                headers={"Authorization": "Bearer dev-bypass"},
+            )
+        assert resp.status_code == 200, resp.json()
+        videos = resp.json().get("videos", [])
+        assert len(videos) == 5, (
+            f"get_project returned {len(videos)} of 5 videos — the video "
+            "collection was truncated (LIMIT 1 applied to join rows?)."
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_list_projects_zero_video_project(tmp_path):
+    """A project with no videos must come back with videos == [] (not missing,
+    not null, not crashing)."""
+    Session, _, _ = _setup_db(tmp_path)
+    pid = _seed_extra_projects(Session, n_projects=1, videos_per_project=0)[0]
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(Session)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(
+                "/api/projects/",
+                headers={"Authorization": "Bearer dev-bypass"},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2  # _setup_db project + the empty one
+        empty = next(p for p in data if p["id"] == str(uuid_module.UUID(pid)))
+        assert empty["videos"] == [], (
+            f"Zero-video project should serialize videos=[], got {empty.get('videos')!r}"
+        )
     finally:
         app.dependency_overrides.clear()
