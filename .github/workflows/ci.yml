@@ -135,6 +135,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The vitest storybook project runs in real Chromium via
+      # @vitest/browser-playwright (see frontend/vite.config.ts).
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Test (vitest)
         run: npm test -- --run
 
