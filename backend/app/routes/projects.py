@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session, contains_eager, load_only, selectinload
+from sqlalchemy.orm import Session, contains_eager, selectinload
 
 from app.auth_bridge import Permission, require_permissions
 from app.config import settings
