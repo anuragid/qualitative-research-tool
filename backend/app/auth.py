@@ -246,13 +246,23 @@ class ClerkAuth:
                         detail="Invalid token: signature verification failed",
                     )
 
-            # Verify the token with Clerk's public key
+            # Verify the token with Clerk's public key.
+            # Pin the issuer when CLERK_ISSUER is configured: this rejects a
+            # token minted by the same JWKS for a different Clerk context.
+            # When unset (local dev), the issuer is not enforced so local runs
+            # keep working; production requires it (see config validation).
+            decode_kwargs: Dict[str, Any] = {
+                "algorithms": ["RS256"],
+                "options": {"verify_aud": False},  # Clerk doesn't use standard aud claim
+                "leeway": leeway,
+            }
+            if settings.CLERK_ISSUER:
+                decode_kwargs["issuer"] = settings.CLERK_ISSUER
+
             payload = jwt.decode(
                 token,
                 public_keys[kid],
-                algorithms=["RS256"],
-                options={"verify_aud": False},  # Clerk doesn't use standard aud claim
-                leeway=leeway,
+                **decode_kwargs,
             )
 
             # Extract role from metadata or default to 'user'

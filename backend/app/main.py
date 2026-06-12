@@ -35,7 +35,15 @@ _DEFAULT_LOCALHOST_ORIGINS = "http://localhost:5173,http://localhost:3000"
 
 
 def _validate_production_config() -> None:
-    """Validate critical env vars for production. Raises on fatal misconfig."""
+    """Validate critical env vars for production. Raises on fatal misconfig.
+
+    NOTE: Hard requirements for production (ENCRYPTION_KEY, CLERK_ISSUER) are
+    enforced on the Settings model itself via a model_validator in config.py,
+    so they fail fast at settings construction (import time) for every
+    entrypoint — API, worker, and scripts — and cannot be skipped by an
+    APP_ENV typo. This function keeps the softer, runtime-only warnings plus
+    the dev-bypass guard.
+    """
     if settings.APP_ENV != "production":
         return
 
@@ -43,16 +51,6 @@ def _validate_production_config() -> None:
         logger.warning(
             "SECURITY: CLERK_SECRET_KEY does not start with 'sk_live_' — "
             "Clerk auth may not work correctly in production."
-        )
-
-    # ENCRYPTION_KEY is required in production — without it BYOK keys
-    # would be stored unprotected. This is a hard failure, not a warning.
-    if not settings.ENCRYPTION_KEY:
-        raise RuntimeError(
-            "FATAL: ENCRYPTION_KEY is not set in production. "
-            "BYOK API keys cannot be encrypted without it. "
-            "Generate one with: python -c "
-            "'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
         )
 
     # Dev auth bypass must never be reachable in production.

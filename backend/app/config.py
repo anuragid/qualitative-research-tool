@@ -1,7 +1,8 @@
 """Application configuration using Pydantic Settings."""
 
-from typing import List
+from typing import List, Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,8 +16,11 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    # Application — defaults are safe for production; override in .env for local dev
-    APP_ENV: str = "production"
+    # Application — defaults are safe for production; override in .env for local dev.
+    # Constrained Literal so a typo (e.g. "Development") fails loudly at settings
+    # construction instead of silently disabling the dev bypass AND skipping the
+    # production-config validation below. "test" is used by the test suite.
+    APP_ENV: Literal["development", "test", "production"] = "production"
     DEBUG: bool = False
     PROJECT_NAME: str = "Qualitative Research Tool"
     API_V1_PREFIX: str = "/api"
@@ -51,6 +55,13 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: str = ""
     CLERK_PUBLISHABLE_KEY: str = ""
     CLERK_JWKS_URL: str = ""  # Override JWKS URL; defaults to Clerk Backend API
+    # Expected JWT `iss` claim. When set, JWT verification pins the issuer so a
+    # token minted by the same JWKS for a different Clerk context is rejected.
+    # REQUIRED in production (see model_validator). For Clerk this is the
+    # Frontend API URL, e.g. https://clerk.<your-domain> (custom domain) or
+    # https://<slug>.clerk.accounts.dev (development instances). Leave empty in
+    # local dev to skip the check.
+    CLERK_ISSUER: str = ""
 
     # Encryption for BYOK API keys (required in production)
     ENCRYPTION_KEY: str = ""
@@ -87,6 +98,41 @@ class Settings(BaseSettings):
             self.CELERY_BROKER_URL = self.REDIS_URL
         if not self.CELERY_RESULT_BACKEND:
             self.CELERY_RESULT_BACKEND = self.REDIS_URL
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """Fail fast if production is missing critical security config.
+
+        Lives on the settings model (not just main.py) so it cannot be skipped
+        by an APP_ENV typo and so it fires for every entrypoint that imports
+        settings — API, worker, and CLI scripts alike. main.py keeps its own
+        broader startup check (origins, key prefixes) for warnings; the hard
+        failures live here.
+        """
+        if self.APP_ENV != "production":
+            return self
+
+        missing: List[str] = []
+        # Without ENCRYPTION_KEY, BYOK API keys would be stored unprotected.
+        if not self.ENCRYPTION_KEY:
+            missing.append("ENCRYPTION_KEY")
+        # Without CLERK_ISSUER, the JWT issuer pin is a no-op — a token minted
+        # by the same JWKS for a different context would be accepted.
+        if not self.CLERK_ISSUER:
+            missing.append("CLERK_ISSUER")
+
+        if missing:
+            raise ValueError(
+                "FATAL: the following settings are required when APP_ENV="
+                f"'production' but are empty: {', '.join(missing)}. "
+                "Set them in the deployment environment (e.g. Railway). "
+                "Generate ENCRYPTION_KEY with: python -c "
+                "\"from cryptography.fernet import Fernet; "
+                "print(Fernet.generate_key().decode())\". "
+                "CLERK_ISSUER is your Clerk Frontend API URL "
+                "(e.g. https://clerk.<your-domain>)."
+            )
+        return self
 
 
 # Global settings instance
