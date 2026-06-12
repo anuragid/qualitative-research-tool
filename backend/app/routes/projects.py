@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 from uuid import UUID
 
@@ -23,6 +24,10 @@ from app.models.schemas import (
 from app.rate_limit import limiter
 from app.services.openrouter_balance import BalanceInfo
 from app.services.s3_service import s3_service
+from app.state import (
+    ProjectAnalysisEvent,
+    ProjectAnalysisStateMachine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -386,10 +391,54 @@ async def trigger_project_analysis(
 
         video_ids = [video.id for video in analyzed_videos]
 
-        # Dispatch the cross-video analysis chain. The first chain link
-        # (analyze_cross_relate_step) is responsible for creating or
-        # resetting the ProjectAnalysis row — this route is now a pure
-        # dispatcher.
+        # Look up any existing ProjectAnalysis row so we can guard against a
+        # double-dispatch and reset a stale errored row before redispatching.
+        existing_analysis = db.query(ProjectAnalysis)\
+            .filter(ProjectAnalysis.project_id == project_id)\
+            .first()
+
+        # Race condition / double-click guard: reject if a cross-video
+        # analysis is already in flight. Mirrors the video route's
+        # `video.status in ("analyzing",)` 409 (videos.py ~647-651). Two
+        # back-to-back retry clicks both reach here, but the first one's
+        # reset-to-processing commit makes the second see status ==
+        # "processing" and bail, so the chain is dispatched exactly once.
+        if existing_analysis is not None and existing_analysis.status == "processing":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Project analysis is already in progress",
+            )
+
+        # Retry path: if the ProjectAnalysis row is in "error" state, reset
+        # it BEFORE dispatching the chain. Otherwise the first chain link
+        # (analyze_cross_relate_step) sees status == "error" in its precheck,
+        # returns {"status": "skipped"}, the later steps skip via
+        # _check_project_cancellation, the chain "succeeds", and the row
+        # stays error forever — the retry is a silent no-op and the user
+        # can't recover without a DB edit. Mirrors the video retry path
+        # (videos.py ~691-712 + PR #19.5).
+        #
+        # RETRY_RESET (error -> processing) goes through the state machine so
+        # we never write status directly (project invariant #3). Like the
+        # video route, this block only fires for error rows: a deliberate
+        # re-trigger of a COMPLETED analysis is left untouched here and the
+        # idempotent chain simply recomputes it.
+        if existing_analysis is not None and existing_analysis.status == "error":
+            ProjectAnalysisStateMachine.transition(
+                existing_analysis, ProjectAnalysisEvent.RETRY_RESET, db=db
+            )
+            existing_analysis.started_at = datetime.now(timezone.utc)
+            existing_analysis.completed_at = None
+            # Clear stale partial cross-video results so the new run doesn't
+            # mix old blobs in. The chain steps repopulate these.
+            existing_analysis.cross_video_patterns = None
+            existing_analysis.cross_video_insights = None
+            existing_analysis.cross_video_principles = None
+            db.commit()
+
+        # Dispatch the cross-video analysis chain. When no row exists yet the
+        # first chain link (analyze_cross_relate_step) creates it; on retry
+        # the reset above has already flipped it to a runnable state.
         from celery import chain
 
         from app.tasks.pipeline_errors import handle_project_pipeline_error
