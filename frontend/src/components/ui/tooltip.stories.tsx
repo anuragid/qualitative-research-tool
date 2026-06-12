@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./Tooltip";
-import { SimpleTooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
+import { SimpleTooltip } from "./tooltip";
 import { Button } from "./button";
 import { Plus, Info } from "lucide-react";
 
