@@ -124,6 +124,7 @@ Group related inferences into patterns and explain what each pattern represents.
                     "patterns": None,
                     "current_step": "relate",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         logger.info(f"[RELATE] Identified {len(patterns)} patterns")

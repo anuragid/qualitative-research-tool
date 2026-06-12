@@ -112,6 +112,7 @@ For each insight, create one or more design principles that provide strategic di
                     "design_principles": None,
                     "current_step": "activate",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         logger.info(f"[ACTIVATE] Generated {len(design_principles)} design principles")

@@ -114,6 +114,7 @@ Create design principles that provide strategic direction for the entire system.
                     "cross_video_principles": None,
                     "current_step": "cross_activate",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         logger.info(f"[CROSS_ACTIVATE] Generated {len(system_principles)} system-level design principles")
