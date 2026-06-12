@@ -216,6 +216,35 @@ class TestHandlePipelineError:
         db_session.refresh(analysis)
         assert video.status == "analyzed"
 
+    def test_reraises_when_error_handler_itself_fails(self, db_session):
+        """If the terminal error handler can't write the error state (e.g.
+        the commit raises because the DB is still down), it must NOT swallow.
+
+        Previously a bare ``pass`` meant the row stayed 'processing' with no
+        trace beyond a worker log line. The handler now re-raises so Celery's
+        Sentry integration sees the failed-error-handler. Loop-safe: this
+        task has no autoretry decorator and isn't called recursively, so the
+        re-raise surfaces exactly once."""
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video, _ = _seed_video_in_processing(db_session)
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.commit.side_effect = OperationalError(
+            "COMMIT", {}, Exception("connection lost")
+        )
+
+        fake_exc = RuntimeError("original step failure")
+        fake_request = MagicMock()
+        fake_request.task = "analyze_infer_step"
+        mock_self = MagicMock()
+        mock_self.db = broken_db
+
+        unbound = handle_pipeline_error.run.__func__
+        with pytest.raises(OperationalError):
+            unbound(mock_self, fake_request, fake_exc, "tb", str(video.id))
+
 
 def _seed_project_analysis_in_processing(db_session, user_id="dev_user_local"):
     project = Project(name="test-proj", user_id=user_id)
@@ -272,3 +301,29 @@ def test_handle_project_pipeline_error_is_idempotent(db_session):
     db_session.refresh(pa)
     assert pa.status == "error"
     assert pa.completed_at == first_completed_at  # unchanged on second call
+
+
+def test_handle_project_pipeline_error_reraises_when_handler_fails(db_session):
+    """The project chain's terminal handler must re-raise (not swallow) if
+    writing the error state itself fails."""
+    from unittest.mock import MagicMock
+
+    from sqlalchemy.exc import OperationalError
+
+    from app.tasks.pipeline_errors import handle_project_pipeline_error
+
+    project, _ = _seed_project_analysis_in_processing(db_session)
+    broken_db = MagicMock(wraps=db_session)
+    broken_db.commit.side_effect = OperationalError(
+        "COMMIT", {}, Exception("DB unreachable")
+    )
+
+    fake_exc = RuntimeError("cross_relate failure")
+    fake_request = MagicMock()
+    fake_request.task = "analyze_cross_relate_step"
+    task_self = type("T", (), {"db": broken_db})()
+
+    with pytest.raises(OperationalError):
+        handle_project_pipeline_error.run.__func__(
+            task_self, fake_request, fake_exc, "tb", str(project.id)
+        )

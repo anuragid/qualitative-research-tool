@@ -13,6 +13,8 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+import sentry_sdk
+
 from app.models.database_models import Video, VideoAnalysis
 from app.state import (
     InvalidTransitionError,
@@ -97,14 +99,23 @@ def handle_pipeline_error(self, request, exc, traceback, video_id: str):
         self.db.commit()
 
     except Exception as e:
+        # This is the chain's terminal .on_error callback. If marking the
+        # error state fails here, the row stays "processing" with no reason
+        # until the watchdog reset (~17 min). Previously this was swallowed
+        # (logger + pass), so the only trace was a worker log line. Capture
+        # to Sentry and re-raise so the failed-error-handler is observable.
+        # Safe from loops: this task has no autoretry decorator and is never
+        # called recursively, so the re-raise surfaces exactly once.
         logger.error(
             f"handle_pipeline_error itself failed: {sanitize_error(str(e))}",
             exc_info=True,
         )
+        sentry_sdk.capture_exception(e)
         try:
             self.db.rollback()
         except Exception:
             pass
+        raise
 
 
 @celery_app.task(base=DatabaseTask, bind=True, name="handle_project_pipeline_error")
@@ -151,12 +162,17 @@ def handle_project_pipeline_error(self, request, exc, traceback, project_id: str
         self.db.commit()
 
     except Exception as e:
+        # Terminal .on_error callback for the project chain. Same rationale
+        # as handle_pipeline_error: surface a failed error-write to Sentry
+        # and re-raise instead of leaving the PA row stuck silently.
         from app.tasks._pipeline_utils import sanitize_error
         logger.error(
             f"handle_project_pipeline_error itself failed: {sanitize_error(str(e))}",
             exc_info=True,
         )
+        sentry_sdk.capture_exception(e)
         try:
             self.db.rollback()
         except Exception:
             pass
+        raise

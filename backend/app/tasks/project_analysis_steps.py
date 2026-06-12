@@ -10,6 +10,8 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+import sentry_sdk
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.agents.nodes.cross_activate import cross_activate_node
@@ -39,6 +41,14 @@ def _check_project_cancellation(db: Session, project_id: str) -> bool:
     ProjectAnalysis rows. A missing row is treated as cancelled for
     steps 2 and 3; step 1 (cross_relate) passes require_existing=False
     since it's responsible for creating the row.
+
+    Raises:
+        OperationalError: A transient DB outage is re-raised (not swallowed
+            as "not cancelled") so the task's ``autoretry_for=(Exception,)``
+            decorator retries the precheck instead of proceeding to burn a
+            cross-video LLM call on possibly-cancelled work. A missing row
+            stays a clean "cancelled" signal — only genuine query failures
+            propagate.
     """
     try:
         db.expire_all()
@@ -48,9 +58,17 @@ def _check_project_cancellation(db: Session, project_id: str) -> bool:
         if pa is None or pa.status == "error":
             return True
         return False
-    except Exception:
-        logger.exception("_check_project_cancellation failed, proceeding")
-        return False
+    except OperationalError:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(
+            "_check_project_cancellation: transient DB error for %s — "
+            "re-raising for autoretry",
+            project_id,
+        )
+        raise
 
 
 def _get_or_create_project_analysis(db: Session, project_id: UUID) -> ProjectAnalysis:
@@ -87,7 +105,16 @@ def _get_or_create_project_analysis(db: Session, project_id: UUID) -> ProjectAna
 
 
 def _update_project_analysis_error(db: Session, project_id: str, step_name: str):
-    """Mark ProjectAnalysis as error, safe to call on dirty session."""
+    """Mark ProjectAnalysis as error, safe to call on dirty session.
+
+    Raises:
+        Exception: If writing the error state itself fails, the failure is
+            re-raised (not swallowed) so it surfaces to Celery's autoretry /
+            the chain's ``.on_error`` handler instead of leaving the PA row
+            ``processing`` until the watchdog reset. Loop-safe: called only
+            from a cross-video step's ``except Exception as e`` block, never
+            recursively, so the re-raise surfaces exactly once.
+    """
     try:
         db.rollback()
         pa = db.query(ProjectAnalysis).filter(
@@ -107,12 +134,15 @@ def _update_project_analysis_error(db: Session, project_id: str, step_name: str)
         db.commit()
     except Exception as commit_error:
         logger.error(
-            f"Failed to update project error status for {step_name}: {commit_error}"
+            f"Failed to update project error status for {step_name}: {commit_error}",
+            exc_info=True,
         )
+        sentry_sdk.capture_exception(commit_error)
         try:
             db.rollback()
         except Exception:
             pass
+        raise
 
 
 @celery_app.task(
@@ -132,19 +162,20 @@ def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None)
         logger.info(f"Starting CROSS_RELATE step for project {project_id}")
 
         # First chain link: skip only on explicit error state (not on
-        # missing PA row — we create it below).
-        try:
-            self.db.expire_all()
-            existing = self.db.query(ProjectAnalysis).filter(
-                ProjectAnalysis.project_id == UUID(project_id)
-            ).first()
-            if existing is not None and existing.status == "error":
-                logger.info(
-                    f"Skipping cross_relate for {project_id} — already in error state"
-                )
-                return {"project_id": project_id, "status": "skipped"}
-        except Exception:
-            logger.exception("cross_relate precheck failed, proceeding")
+        # missing PA row — we create it below). A transient DB outage is
+        # re-raised (not swallowed as "proceed") so Celery autoretries
+        # instead of burning a cross-video LLM call on possibly-cancelled
+        # work. The outer ``except Exception`` routes it through
+        # _update_project_analysis_error + re-raise -> autoretry.
+        self.db.expire_all()
+        existing = self.db.query(ProjectAnalysis).filter(
+            ProjectAnalysis.project_id == UUID(project_id)
+        ).first()
+        if existing is not None and existing.status == "error":
+            logger.info(
+                f"Skipping cross_relate for {project_id} — already in error state"
+            )
+            return {"project_id": project_id, "status": "skipped"}
 
         pa = _get_or_create_project_analysis(self.db, UUID(project_id))
 
