@@ -234,13 +234,22 @@ class TestWatchdogSucceedsAfterTransientFailure:
     but a direct re-invocation succeeds — proving the retry path works."""
 
     def test_succeeds_when_db_is_healthy(self):
-        """With no stuck records and a healthy DB, task returns zeros."""
+        """With no stuck records and a healthy DB, task returns zeros.
+
+        Post fix/select-for-update-cas the watchdog commits PER stuck row (in
+        its own short transaction) rather than once at the end of a single
+        big transaction. So with no stuck records there is nothing to commit —
+        ``commit`` is NOT called. This is the intended new behaviour: empty
+        sweeps no longer issue a pointless commit, and the per-row scope bounds
+        how long any single row lock is held (deadlock-avoidance).
+        """
         from app.tasks.watchdog_tasks import reset_stuck_analyses
 
         mock_db = MagicMock()
-        # All queries return empty lists (no stuck records)
+        # All candidate queries return empty lists (no stuck records). The
+        # candidate SELECTs now project a single column (e.g. VideoAnalysis.id)
+        # then .filter(...).all(); the orphaned-video sweep uses outerjoin.
         mock_db.query.return_value.filter.return_value.all.return_value = []
-        mock_db.query.return_value.filter.return_value.join.return_value.filter.return_value.all.return_value = []
         mock_db.query.return_value.filter.return_value.outerjoin.return_value.filter.return_value.all.return_value = []
 
         reset_stuck_analyses._thread_local.db = mock_db
@@ -252,7 +261,8 @@ class TestWatchdogSucceedsAfterTransientFailure:
             "projects_reset": 0,
             "transcripts_reset": 0,
         }
-        mock_db.commit.assert_called_once()
+        # No stuck rows -> no per-row transaction -> no commit.
+        mock_db.commit.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

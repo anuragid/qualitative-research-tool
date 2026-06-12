@@ -33,6 +33,7 @@ from app.state import (
 )
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
+from app.utils.row_locking import lock_rows
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +70,14 @@ def _maybe_auto_dispatch_analyze_chain(db: Session, video: Video) -> None:
         )
         return
 
-    existing = (
-        db.query(VideoAnalysis)
-        .filter(VideoAnalysis.video_id == video.id)
-        .first()
-    )
+    # Lock the VideoAnalysis row so this check-then-dispatch guard serializes
+    # against a concurrent manual /analyze retry click on the same video
+    # (audit R-H2). Without the lock both paths could read status not-in
+    # (processing, completed), both pass the guard, and both dispatch a chain.
+    # The lock makes the second actor read the post-commit state and bail.
+    existing = lock_rows(
+        db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video.id)
+    ).first()
     if existing and existing.status in ("processing", "completed"):
         logger.info(
             f"[auto-dispatch] Skipping analyze for video {video.id}: "
