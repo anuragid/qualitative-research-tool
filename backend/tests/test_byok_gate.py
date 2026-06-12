@@ -431,10 +431,108 @@ async def test_require_byok_credits_healthy_balance_returns_balance():
         )
 
     assert result is healthy
-    # Always-fresh check at the route layer
+    # Gate must pass the configured TTL, not 0 (fixes the 20 s stall bug).
     mock_get_balance.assert_called_once()
     _, kwargs = mock_get_balance.call_args
-    assert kwargs.get("max_age_seconds") == 0
+    from app.config import settings as _settings
+    assert kwargs.get("max_age_seconds") == _settings.BALANCE_CACHE_TTL_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_require_byok_credits_fresh_cache_zero_network_calls():
+    """When a fresh cached balance exists, the gate must use it and perform
+    ZERO calls to ``get_cached_balance`` with a force-refresh (max_age_seconds=0).
+
+    This is the key regression test for the 20 s stall bug.  The buggy
+    code passed ``max_age_seconds=0``, which always bypasses the cache and
+    makes two synchronous httpx GETs to OpenRouter on every Analyze click,
+    stalling the event loop for up to ~20 s.
+
+    The fixed gate passes ``max_age_seconds=BALANCE_CACHE_TTL_SECONDS`` so
+    a fresh cached row (age < TTL) is returned with zero network calls.
+
+    Strategy: patch ``get_cached_balance`` at the import site in the gate
+    module, then assert it was called with the TTL (not 0).  A separate
+    sub-patch on ``fetch_balance_sync`` lets us assert no HTTP call left
+    the process.
+    """
+    from unittest.mock import patch as _patch
+
+    from app.config import settings as _settings
+
+    user = MagicMock()
+    user.encrypted_api_key = "encrypted-blob"
+    user.model_tier = "byok"
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    healthy = _make_balance(has_credits=True, balance_remaining=7.25)
+
+    with _patch(
+        "app.dependencies.byok_gate.get_cached_balance",
+        return_value=healthy,
+    ) as mock_get_balance, _patch(
+        "app.services.openrouter_balance.fetch_balance_sync",
+    ) as mock_fetch:
+        result = await require_byok_credits(
+            request=MagicMock(), db=db, current_user_id="user_xyz",
+        )
+
+    # Gate must use the TTL — not 0 — so the cache branch is honoured.
+    mock_get_balance.assert_called_once()
+    _, kwargs = mock_get_balance.call_args
+    assert kwargs.get("max_age_seconds") == _settings.BALANCE_CACHE_TTL_SECONDS, (
+        f"Gate passed max_age_seconds={kwargs.get('max_age_seconds')!r} but "
+        f"expected {_settings.BALANCE_CACHE_TTL_SECONDS} (BALANCE_CACHE_TTL_SECONDS). "
+        "A value of 0 bypasses the cache and makes two synchronous httpx GETs "
+        "on every Analyze click — this is the 20 s stall bug."
+    )
+    # Network layer was never touched (get_cached_balance was mocked above)
+    mock_fetch.assert_not_called()
+    # Balance was returned so the credit check ran
+    assert result is healthy
+    assert result.has_credits is True
+
+
+@pytest.mark.asyncio
+async def test_require_byok_credits_stale_cache_triggers_exactly_one_refresh():
+    """When the cached balance is stale (older than TTL), the gate must
+    trigger exactly ONE ``get_cached_balance`` call which internally does
+    a live fetch — it must NOT call the balance function twice.
+
+    We assert via ``get_cached_balance`` mock call_count == 1.
+    """
+    from unittest.mock import patch as _patch
+
+    from app.config import settings as _settings
+
+    user = MagicMock()
+    user.encrypted_api_key = "encrypted-blob"
+    user.model_tier = "byok"
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = user
+
+    fresh_balance = _make_balance(has_credits=True, balance_remaining=7.0)
+
+    with _patch(
+        "app.dependencies.byok_gate.get_cached_balance",
+        return_value=fresh_balance,
+    ) as mock_get_balance:
+        result = await require_byok_credits(
+            request=MagicMock(), db=db, current_user_id="user_xyz",
+        )
+
+    # Gate must call get_cached_balance exactly once regardless of staleness.
+    assert mock_get_balance.call_count == 1, (
+        f"Gate called get_cached_balance {mock_get_balance.call_count} times; expected 1."
+    )
+    # The TTL kwarg must be present (not 0 which forces bypass)
+    _, kwargs = mock_get_balance.call_args
+    assert kwargs.get("max_age_seconds") == _settings.BALANCE_CACHE_TTL_SECONDS
+    assert result is not None
+    assert result.has_credits is True
 
 
 @pytest.mark.asyncio

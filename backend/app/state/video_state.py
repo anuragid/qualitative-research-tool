@@ -37,6 +37,13 @@ TRANSITIONS: dict[tuple[Optional[VideoStatus], VideoEvent], VideoStatus] = {
     # Recovery: a previous false-negative stamped the row as ERROR; if R2
     # actually has the bytes, confirm-upload can recover it (PR #20).
     (VideoStatus.ERROR, VideoEvent.UPLOAD_CONFIRMED): VideoStatus.UPLOADED,
+    # Server-side enforcement at confirm-upload: the R2 object failed the
+    # size or magic-byte check, so the row is driven to ERROR with a clear
+    # message and the offending object is deleted by the route. Legal from
+    # every confirm-eligible source state plus an idempotent ERROR self-loop.
+    (VideoStatus.UPLOADING, VideoEvent.UPLOAD_REJECTED): VideoStatus.ERROR,
+    (VideoStatus.UPLOADED, VideoEvent.UPLOAD_REJECTED): VideoStatus.ERROR,
+    (VideoStatus.ERROR, VideoEvent.UPLOAD_REJECTED): VideoStatus.ERROR,
 
     # ---- Transcription flow ----
     (VideoStatus.UPLOADED, VideoEvent.TRANSCRIBE_REQUESTED): VideoStatus.TRANSCRIBING,
@@ -165,6 +172,7 @@ class VideoStateMachine:
             VideoEvent.TRANSCRIBE_FAILED,
             VideoEvent.CHAIN_FAILED,
             VideoEvent.WATCHDOG_TIMEOUT,
+            VideoEvent.UPLOAD_REJECTED,
         ):
             if error_message is not None:
                 video.error_message = error_message

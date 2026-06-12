@@ -156,3 +156,41 @@ def test_project_analysis_illegal_completed_to_running_raises() -> None:
         ProjectAnalysisStateMachine.transition(
             pa, ProjectAnalysisEvent.CHAIN_STEP_PROGRESS
         )
+
+
+def test_project_analysis_retry_reset_clears_error() -> None:
+    """RETRY_RESET on an errored ProjectAnalysis must flip it back to a
+    runnable state. ProjectAnalysis has no PENDING state (it is born
+    PROCESSING), so the runnable state it returns to is PROCESSING — the
+    mirror of VideoAnalysis's error -> pending reset (PR #21). Without
+    this edge, the cross_relate precheck (status == "error" -> skipped)
+    swallows every retry and the row stays error forever."""
+    pa = _make_pa(status=VideoAnalysisStatus.ERROR.value)
+    ProjectAnalysisStateMachine.transition(
+        pa, ProjectAnalysisEvent.RETRY_RESET
+    )
+    assert pa.status == VideoAnalysisStatus.PROCESSING.value
+
+
+def test_project_analysis_retry_reset_idempotent_on_processing() -> None:
+    """RETRY_RESET on a row already in PROCESSING is an idempotent
+    self-loop (mirrors the PENDING -> PENDING video self-loop), so a
+    second racing retry click doesn't raise InvalidTransitionError."""
+    pa = _make_pa(status=VideoAnalysisStatus.PROCESSING.value)
+    ProjectAnalysisStateMachine.transition(
+        pa, ProjectAnalysisEvent.RETRY_RESET
+    )
+    assert pa.status == VideoAnalysisStatus.PROCESSING.value
+
+
+def test_project_analysis_retry_reset_from_completed_raises() -> None:
+    """Mirror of the video policy: RETRY_RESET is NOT allowed from
+    COMPLETED. A deliberate re-trigger of a completed cross-video
+    analysis must not be silently clobbered by the reset block — the
+    route's reset block only fires for error rows, exactly like the
+    video route. This pins the intended semantics."""
+    pa = _make_pa(status=VideoAnalysisStatus.COMPLETED.value)
+    with pytest.raises(InvalidTransitionError):
+        ProjectAnalysisStateMachine.transition(
+            pa, ProjectAnalysisEvent.RETRY_RESET
+        )

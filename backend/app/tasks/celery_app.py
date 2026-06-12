@@ -186,8 +186,13 @@ celery_app.conf.update(
     # Celery Beat schedule for periodic tasks
     beat_schedule={
         "watchdog-reset-stuck-analyses": {
+            # Every 10 min. The watchdog only resets records older than
+            # _ANALYSIS_TIMEOUT (17 min), so a 10-min cadence still detects a
+            # stuck record within ~10 min of it crossing the threshold while
+            # halving the per-day Celery log volume this task generates (it is
+            # by far the most frequent thing in the worker logs).
             "task": "reset_stuck_analyses",
-            "schedule": timedelta(minutes=5),
+            "schedule": timedelta(minutes=10),
         },
         "validate-openrouter-models": {
             "task": "validate_openrouter_models",

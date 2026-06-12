@@ -14,7 +14,14 @@ Restrict the token to zone: methodex.ai (and the methodex account for the
 account-level scopes).
 
 Run:
-    CF_API_TOKEN=... python3 scripts/cf-apply-rules.py [--dry-run] [--r2-bucket methodex-logs]
+    # Default: dry-run only (safe, read-only)
+    CF_API_TOKEN=... python3 scripts/cf-apply-rules.py [--r2-bucket methodex-logs]
+
+    # Explicit dry-run (same as default)
+    CF_API_TOKEN=... python3 scripts/cf-apply-rules.py --dry-run [--r2-bucket methodex-logs]
+
+    # Actually apply changes to the live zone
+    CF_API_TOKEN=... python3 scripts/cf-apply-rules.py --apply [--r2-bucket methodex-logs]
 
 This script is idempotent: it checks whether each rule/record exists before
 creating it, and skips existing ones. Safe to run multiple times.
@@ -23,7 +30,7 @@ Design notes:
 - Uses curl for HTTPS because system Python 3.13 on macOS has intermittent
   SSL cert verification issues with urllib.
 - Uses only the Python stdlib. No pip installs.
-- All writes are gated behind --dry-run; GET reads still run in dry-run mode
+- All writes require --apply flag; GET reads still run in both modes
   so the user can see current state before committing.
 - The script continues past partial failures, accumulates them, and exits
   non-zero at the end if any step failed. No single failure crashes the run.
@@ -225,7 +232,7 @@ def _print_token_help() -> None:
     print(f"Restrict to zone: {ZONE_NAME}", file=sys.stderr)
     print("", file=sys.stderr)
     print("Then run:", file=sys.stderr)
-    print("  CF_API_TOKEN=... python3 scripts/cf-apply-rules.py [--dry-run]", file=sys.stderr)
+    print("  CF_API_TOKEN=... python3 scripts/cf-apply-rules.py [--dry-run | --apply]", file=sys.stderr)
 
 
 def verify_token(token: str, report: Report) -> bool:
@@ -648,10 +655,17 @@ def step_logpush(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
+    group = p.add_mutually_exclusive_group()
+    group.add_argument(
         "--dry-run",
         action="store_true",
-        help="Do not perform any writes. Still issues GETs to show state.",
+        help="Print the plan without mutating Cloudflare. This is the default.",
+    )
+    group.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually apply changes to the live Cloudflare zone. Without this flag, "
+             "the script is read-only.",
     )
     p.add_argument(
         "--r2-bucket",
@@ -670,9 +684,13 @@ def main() -> int:
     args = parse_args()
     report = Report()
 
+    # Default to dry-run unless --apply is passed.
+    apply = args.apply
+    dry_run = args.dry_run or (not args.apply and not args.dry_run)
+
     print(f"cf-apply-rules.py — zone={ZONE_NAME} ({ZONE_ID})")
     print(f"account={ACCOUNT_ID}")
-    print(f"mode={'DRY-RUN' if args.dry_run else 'APPLY'}")
+    print(f"mode={'APPLY' if apply else 'DRY-RUN'}")
     print(f"r2-bucket={args.r2_bucket}")
     print("-" * 72)
     sys.stdout.flush()
@@ -694,7 +712,7 @@ def main() -> int:
         report.fail("token verification", f"unexpected: {e}")
         ok = False
     if not ok:
-        if args.dry_run:
+        if dry_run:
             print("    token verification failed; continuing in dry-run mode")
             print("    (no writes will be issued; GETs will likely also fail)")
         else:
@@ -705,9 +723,9 @@ def main() -> int:
 
     # Wrap each step individually so one failure doesn't abort the rest.
     for step_fn, name in [
-        (lambda: step_custom_rules(token, args.dry_run, report), "custom rules"),
-        (lambda: step_rate_limit_rule(token, args.dry_run, report), "rate limit"),
-        (lambda: step_dns_records(token, args.dry_run, report), "dns records"),
+        (lambda: step_custom_rules(token, dry_run, report), "custom rules"),
+        (lambda: step_rate_limit_rule(token, dry_run, report), "rate limit"),
+        (lambda: step_dns_records(token, dry_run, report), "dns records"),
     ]:
         try:
             step_fn()
@@ -716,7 +734,7 @@ def main() -> int:
 
     if not args.skip_logpush:
         try:
-            step_logpush(token, args.dry_run, args.r2_bucket, report)
+            step_logpush(token, dry_run, args.r2_bucket, report)
         except Exception as e:
             report.fail("logpush", f"unexpected exception: {e}")
     else:

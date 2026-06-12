@@ -1,5 +1,6 @@
 # FastAPI & ASGI Server
-fastapi==0.115.8
+fastapi==0.133.0
+starlette==1.0.1
 uvicorn==0.34.0
 python-multipart>=0.0.7
 
@@ -34,11 +35,11 @@ httpx==0.28.1
 tenacity==9.0.0
 
 # Environment Variables
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 
 # Authentication (Clerk JWT verification)
-PyJWT[crypto]==2.9.0
-cryptography==45.0.0
+PyJWT[crypto]==2.13.0
+cryptography==46.0.7
 
 # Rate Limiting
 slowapi==0.1.9
