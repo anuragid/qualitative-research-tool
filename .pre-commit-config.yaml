@@ -1,0 +1,10 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks
+        description: Detect secrets in commit history
+        entry: gitleaks detect
+        language: system
+        stages: [commit]
