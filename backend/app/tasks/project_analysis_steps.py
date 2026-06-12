@@ -8,6 +8,7 @@ and writes results back.
 
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID
 
 import sentry_sdk
@@ -29,6 +30,7 @@ from app.tasks.analysis_steps import (
     _raise_for_node_error,
     _resolve_byok_or_raise_credits_error,
 )
+from app.tasks._pipeline_utils import build_error_json
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
 
@@ -135,10 +137,10 @@ def _handle_project_step_failure(
                 exc_info=True,
             )
         return
-    _update_project_analysis_error(db, project_id, step_name)
+    _update_project_analysis_error(db, project_id, step_name, exc=exc)
 
 
-def _update_project_analysis_error(db: Session, project_id: str, step_name: str):
+def _update_project_analysis_error(db: Session, project_id: str, step_name: str, exc: Optional[Exception] = None):
     """Mark ProjectAnalysis as error, safe to call on dirty session.
 
     Raises:
@@ -159,12 +161,17 @@ def _update_project_analysis_error(db: Session, project_id: str, step_name: str)
                 ProjectAnalysisStateMachine.transition(
                     pa, ProjectAnalysisEvent.CHAIN_FAILED, db=db
                 )
-            except InvalidTransitionError as exc:
+            except InvalidTransitionError as transition_exc:
                 logger.warning(
                     f"_update_project_analysis_error: invalid transition "
-                    f"for {project_id} ({step_name}): {exc}"
+                    f"for {project_id} ({step_name}): {transition_exc}"
                 )
             pa.completed_at = datetime.now(timezone.utc)
+            pa.error_message = build_error_json(
+                step=step_name,
+                exc=exc if exc is not None else Exception(f"Analysis failed at {step_name}"),
+                message=str(exc) if exc is not None else f"Analysis failed at step '{step_name}'",
+            )
         db.commit()
     except Exception as commit_error:
         logger.error(

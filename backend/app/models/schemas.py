@@ -438,6 +438,7 @@ class ProjectAnalysisResponse(BaseModel):
     status: str
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
 
 
 

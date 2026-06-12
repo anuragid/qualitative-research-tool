@@ -215,13 +215,15 @@ def reset_stuck_analyses(self):
         )
 
         for pa in stuck_project_analyses:
-            # ProjectAnalysis has no error_message column, so unlike the
-            # Video path we don't pass a payload — the status change is
-            # the only observable side effect.
+            timeout_mins = int(_ANALYSIS_TIMEOUT.total_seconds() // 60)
+            error_msg = _watchdog_error_json(
+                f"Stuck in processing state for over {timeout_mins} minutes"
+            )
             ProjectAnalysisStateMachine.transition(
                 pa, ProjectAnalysisEvent.WATCHDOG_TIMEOUT, db=db
             )
             pa.completed_at = now
+            pa.error_message = error_msg
             projects_reset += 1
             logger.warning(
                 "Watchdog reset stuck ProjectAnalysis %s (project %s) — started_at %s",
