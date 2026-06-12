@@ -25,6 +25,7 @@ from app.state import (
 )
 from app.tasks.analysis_steps import (
     NonRetryableAnalysisError,
+    _is_retryable_step_exc,
     _raise_for_node_error,
     _resolve_byok_or_raise_credits_error,
 )
@@ -102,6 +103,39 @@ def _get_or_create_project_analysis(db: Session, project_id: UUID) -> ProjectAna
         db.commit()
         db.refresh(pa)
     return pa
+
+
+def _handle_project_step_failure(
+    db: Session,
+    project_id: str,
+    step_name: str,
+    exc: Exception | None = None,
+):
+    """Failure policy for the 3 cross-video step ``except`` blocks.
+
+    Mirrors :func:`app.tasks.analysis_steps._handle_step_failure`:
+
+    - Retryable failure -> roll back the dirty partial transaction and leave
+      the ProjectAnalysis row ``processing`` so Celery's autoretry can re-run
+      the node and finish. Stamping ``error`` here would make the retry's
+      ``_check_project_cancellation`` precheck skip the step, turning a
+      transient hiccup into a permanent error.
+    - Non-retryable failure -> stamp the row ``error`` immediately via
+      :func:`_update_project_analysis_error` (unchanged behaviour).
+    """
+    if _is_retryable_step_exc(exc):
+        try:
+            db.rollback()
+        except Exception:
+            logger.warning(
+                "Rollback after retryable %s failure for project %s failed; "
+                "session will be reset by the task lifecycle",
+                step_name,
+                project_id,
+                exc_info=True,
+            )
+        return
+    _update_project_analysis_error(db, project_id, step_name)
 
 
 def _update_project_analysis_error(db: Session, project_id: str, step_name: str):
@@ -231,7 +265,7 @@ def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None)
 
     except Exception as e:
         logger.error(f"CROSS_RELATE step failed for project {project_id}: {e}")
-        _update_project_analysis_error(self.db, project_id, "cross_relate")
+        _handle_project_step_failure(self.db, project_id, "cross_relate", exc=e)
         raise
 
 
@@ -286,7 +320,7 @@ def analyze_cross_explain_step(self, project_id: str, user_id: str | None = None
 
     except Exception as e:
         logger.error(f"CROSS_EXPLAIN step failed for project {project_id}: {e}")
-        _update_project_analysis_error(self.db, project_id, "cross_explain")
+        _handle_project_step_failure(self.db, project_id, "cross_explain", exc=e)
         raise
 
 
@@ -346,5 +380,5 @@ def analyze_cross_activate_step(self, project_id: str, user_id: str | None = Non
 
     except Exception as e:
         logger.error(f"CROSS_ACTIVATE step failed for project {project_id}: {e}")
-        _update_project_analysis_error(self.db, project_id, "cross_activate")
+        _handle_project_step_failure(self.db, project_id, "cross_activate", exc=e)
         raise
