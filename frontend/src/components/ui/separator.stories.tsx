@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Separator } from "./Separator";
+import { Separator } from "./separator";
 
 const meta = {
   title: "Primitives/Separator",
