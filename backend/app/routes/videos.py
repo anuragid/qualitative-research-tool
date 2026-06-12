@@ -1166,7 +1166,9 @@ async def trigger_chunk_step(
         video_id_str = str(video_id)
         task = analyze_chunk_step.apply_async(
             args=[video_id_str, current_user_id],
-            link_error=handle_pipeline_error.s(video_id=video_id_str),
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="chunk"
+            ),
         )
         logger.info(f"CHUNK step started for video {video_id}, task_id: {task.id}")
 
@@ -1242,7 +1244,9 @@ async def trigger_infer_step(
         video_id_str = str(video_id)
         task = analyze_infer_step.apply_async(
             args=[video_id_str, current_user_id],
-            link_error=handle_pipeline_error.s(video_id=video_id_str),
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="infer"
+            ),
         )
         logger.info(f"INFER step started for video {video_id}, task_id: {task.id}")
 
@@ -1318,7 +1322,9 @@ async def trigger_relate_step(
         video_id_str = str(video_id)
         task = analyze_relate_step.apply_async(
             args=[video_id_str, current_user_id],
-            link_error=handle_pipeline_error.s(video_id=video_id_str),
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="relate"
+            ),
         )
         logger.info(f"RELATE step started for video {video_id}, task_id: {task.id}")
 
@@ -1394,7 +1400,9 @@ async def trigger_explain_step(
         video_id_str = str(video_id)
         task = analyze_explain_step.apply_async(
             args=[video_id_str, current_user_id],
-            link_error=handle_pipeline_error.s(video_id=video_id_str),
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="explain"
+            ),
         )
         logger.info(f"EXPLAIN step started for video {video_id}, task_id: {task.id}")
 
@@ -1470,7 +1478,9 @@ async def trigger_activate_step(
         video_id_str = str(video_id)
         task = analyze_activate_step.apply_async(
             args=[video_id_str, current_user_id],
-            link_error=handle_pipeline_error.s(video_id=video_id_str),
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="activate"
+            ),
         )
         logger.info(f"ACTIVATE step started for video {video_id}, task_id: {task.id}")
 

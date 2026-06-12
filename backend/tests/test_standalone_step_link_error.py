@@ -14,19 +14,39 @@ Background (follow-up flagged in PR #44 review):
     'processing' until the ~17-min watchdog.
 
     The fix: dispatch via
-    ``task.apply_async(args=[...], link_error=handle_pipeline_error.s(video_id=...))``.
+    ``task.apply_async(args=[...],
+    link_error=handle_pipeline_error.s(video_id=..., step_name=...))``.
+
+Celery errback semantics (verified against the pinned Celery 5.3.4,
+``celery/backends/base.py::_call_task_errbacks``): because
+``handle_pipeline_error`` is ``bind=True``, its ``__header__`` is a
+``functools.partial``, which forces Celery onto the OLD-STYLE errback
+protocol — the errback is enqueued as a normal task with the FAILED
+TASK'S ID STRING as the only prepended positional argument plus the
+kwargs bound in the signature; ``exc`` and ``traceback`` are NOT
+delivered. The new-style protocol (non-bind errbacks) would call
+``errback(request_context, exc, traceback)`` with a Context carrying
+``.task``. Both ``chain.on_error`` and single-task ``link_error`` go
+through the same ``request.errbacks`` delivery.
+
+Because the old-style protocol carries no task name, the step routes
+bind ``step_name`` explicitly in the errback signature — that gives
+exact step attribution where the chain path can only say "unknown".
 
 These tests lock that contract in:
 
     * Each of the 5 step routes dispatches with a ``link_error`` signature
-      bound to ``handle_pipeline_error`` with the correct ``video_id``.
-    * ``video_id`` must be bound as a KWARG, not a positional arg — the
-      worker invokes a single-task errback with ``(request, exc, traceback)``
-      prepended as positionals, so a positionally-bound video_id would land
-      in the ``request`` slot and corrupt the call.
-    * Invoking the exact signature the route builds, using the worker's
-      errback calling convention for a single (non-chain) task, stamps both
-      the Video and VideoAnalysis rows as 'error'.
+      bound to ``handle_pipeline_error`` with the correct ``video_id`` AND
+      an explicit ``step_name`` — kwarg-bound, never positional, so they
+      can't collide with the prepended positional(s) of either protocol.
+    * Protocol-shape invariant: driving Celery's real
+      ``_call_task_errbacks`` with a bind=True errback delivers exactly
+      ``(failed_task_id,)`` positionally + the signature kwargs.
+    * Invoking the exact signature the routes build, using the REAL
+      old-style convention, stamps Video + VideoAnalysis 'error' with the
+      step name recorded from the explicit kwarg.
+    * The chain (new-style Context) convention still works — the chain
+      dispatches share this handler.
 """
 
 import os
@@ -266,32 +286,96 @@ async def test_standalone_step_dispatch_attaches_error_link(db_setup, step):
         assert isinstance(link_error, Signature)
         assert link_error.task == "handle_pipeline_error"
 
-        # video_id must be kwarg-bound: the worker prepends
-        # (request, exc, traceback) as POSITIONAL args when invoking a
-        # single-task errback, so a positionally-bound video_id would land
-        # in the wrong parameter slot.
+        # Everything must be kwarg-bound: Celery prepends positional
+        # context when invoking errbacks — (failed_task_id,) on the
+        # old-style protocol our bind=True handler gets, or
+        # (request, exc, traceback) on the new-style one. Positionally
+        # bound values would land in the wrong parameter slots.
         assert link_error.args == (), (
             "link_error signature must not bind positional args — they "
-            "would collide with the (request, exc, traceback) positionals "
-            "the worker prepends for errbacks."
+            "would collide with the positionals Celery prepends when "
+            "invoking errbacks."
         )
-        assert link_error.kwargs == {"video_id": str(video_id)}
+        # step_name is bound explicitly because the old-style protocol
+        # delivers only the failed task's id string — there is no task
+        # name to derive the step from. The route KNOWS the step.
+        assert link_error.kwargs == {
+            "video_id": str(video_id),
+            "step_name": step,
+        }
     finally:
         app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
-# Errback-protocol test: the signature the route builds must work when
-# invoked as a single task's link_error (not just a chain's on_error).
+# Protocol-shape invariant: what does Celery ACTUALLY deliver to a
+# bind=True errback? Drive the real backend._call_task_errbacks.
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_error_link_signature_stamps_error_when_invoked_as_errback(db_setup):
-    """Simulate the worker invoking the route-built link_error signature
-    after a standalone step task fails terminally: the errback receives
-    (request, exc, traceback) as positionals plus the signature's own
-    kwargs, and must stamp both Video and VideoAnalysis to 'error'."""
+def test_celery_delivers_old_style_errback_args_for_bind_true_handler():
+    """Celery 5.3.4 ``_call_task_errbacks`` routes bind=True errbacks
+    (``__header__`` is a functools.partial) onto the OLD-STYLE protocol:
+    the errback task is invoked with exactly ``(failed_task_id,)``
+    positionally plus the signature's kwargs — NO Context, NO exc, NO
+    traceback. This is the invariant the handler's parameter defaults and
+    the routes' explicit ``step_name`` kwarg are built on; if a Celery
+    upgrade changes it, this test fails loudly."""
+    from functools import partial as _partial
+
+    from app.tasks.celery_app import celery_app
+    from app.tasks.pipeline_errors import handle_pipeline_error
+
+    # The premise: our handler is bind=True so its __header__ is a partial,
+    # which is exactly what forces the old-style branch in
+    # celery/backends/base.py::_call_task_errbacks.
+    assert isinstance(handle_pipeline_error.__header__, _partial)
+
+    received = {}
+
+    @celery_app.task(bind=True, name="_test_recording_errback")
+    def recording_errback(self, *args, **kwargs):
+        received["args"] = args
+        received["kwargs"] = kwargs
+
+    class _FakeFailedRequest:
+        id = "failed-task-id-123"
+        root_id = None
+        group = None
+        errbacks = [recording_errback.s(video_id="vid-42", step_name="infer")]
+        delivery_info = {"is_eager": True}
+        task = "analyze_infer_step"
+        chord = None
+
+    old_eager = celery_app.conf.task_always_eager
+    celery_app.conf.task_always_eager = True
+    try:
+        celery_app.backend._call_task_errbacks(
+            _FakeFailedRequest(), RuntimeError("boom"), "tb-string"
+        )
+    finally:
+        celery_app.conf.task_always_eager = old_eager
+
+    assert received["args"] == ("failed-task-id-123",), (
+        f"Celery delivered {received.get('args')!r} — expected the failed "
+        f"task's id string as the ONLY positional. If this changed, "
+        f"handle_pipeline_error's parameter handling must be revisited."
+    )
+    assert received["kwargs"] == {"video_id": "vid-42", "step_name": "infer"}
+
+
+# ---------------------------------------------------------------------------
+# Errback behavior tests: the signature the routes build must stamp the
+# error state under BOTH calling conventions.
+# ---------------------------------------------------------------------------
+
+
+def test_error_link_stamps_error_via_real_link_error_convention(db_setup):
+    """Invoke the exact signature the step routes build using the REAL
+    old-style convention Celery uses for our bind=True handler: the failed
+    task's id STRING as the only prepended positional — no exc, no
+    traceback. Must stamp Video + VideoAnalysis 'error' and record the
+    step from the explicit step_name kwarg."""
     TestSession = db_setup
     video_id = _seed_video(
         TestSession,
@@ -302,15 +386,62 @@ async def test_error_link_signature_stamps_error_when_invoked_as_errback(db_setu
 
     from app.tasks.pipeline_errors import handle_pipeline_error
 
-    # Build the exact signature shape the step routes build.
+    # The exact signature shape the infer step route builds.
+    sig = handle_pipeline_error.s(video_id=str(video_id), step_name="infer")
+
+    session = TestSession()
+    try:
+        mock_self = MagicMock()
+        mock_self.db = session
+
+        # Old-style protocol: (failed_task_id,) + sig.args positionally,
+        # sig.kwargs as kwargs. Nothing else is delivered.
+        unbound = handle_pipeline_error.run.__func__
+        unbound(mock_self, "failed-task-id-123", *sig.args, **sig.kwargs)
+
+        video = session.query(Video).filter(Video.id == video_id).first()
+        analysis = (
+            session.query(VideoAnalysis)
+            .filter(VideoAnalysis.video_id == video_id)
+            .first()
+        )
+        session.refresh(video)
+        session.refresh(analysis)
+
+        assert video.status == "error", (
+            "Errback must stamp video.status='error' after a terminal "
+            "standalone-step failure"
+        )
+        assert video.error_message
+        # Step attribution must come from the explicit step_name kwarg —
+        # the task-id string carries no task name to derive it from.
+        assert '"step": "infer"' in video.error_message
+        assert analysis.status == "error"
+        assert analysis.completed_at is not None
+    finally:
+        session.close()
+
+
+def test_error_link_stamps_error_via_chain_context_convention(db_setup):
+    """The chain dispatches share this handler and the new-style protocol
+    (non-bind errbacks / future Celery changes) delivers a Context plus
+    exception info. Without an explicit step_name, the step must be
+    derived from request.task."""
+    TestSession = db_setup
+    video_id = _seed_video(
+        TestSession,
+        video_status="analyzing",
+        with_analysis=True,
+        analysis_status="processing",
+    )
+
+    from app.tasks.pipeline_errors import handle_pipeline_error
+
+    # The exact signature shape the chain dispatches build (no step_name).
     sig = handle_pipeline_error.s(video_id=str(video_id))
 
-    # Worker errback protocol for a single failed task: positional
-    # (request, exc, traceback) prepended before the signature's own
-    # args/kwargs. request is the failed task's context (a Context object,
-    # NOT a chain) — handle_pipeline_error reads request.task off it.
     failed_request = MagicMock()
-    failed_request.task = "analyze_infer_step"
+    failed_request.task = "analyze_relate_step"
     exc = RuntimeError("LLM timeout — autoretries exhausted")
 
     session = TestSession()
@@ -330,13 +461,11 @@ async def test_error_link_signature_stamps_error_when_invoked_as_errback(db_setu
         session.refresh(video)
         session.refresh(analysis)
 
-        assert video.status == "error", (
-            "Errback must stamp video.status='error' after a terminal "
-            "standalone-step failure"
-        )
+        assert video.status == "error"
         assert video.error_message
-        assert '"step": "infer"' in video.error_message
+        # Step derived from the Context's .task attribute.
+        assert '"step": "relate"' in video.error_message
+        assert "autoretries exhausted" in video.error_message
         assert analysis.status == "error"
-        assert analysis.completed_at is not None
     finally:
         session.close()
