@@ -443,7 +443,7 @@ async def test_infer_step_unblocked_after_chunk_completes(tmp_path):
 
     class _StubDispatch:
         @staticmethod
-        def delay(*args, **kwargs):
+        def apply_async(*args, **kwargs):
             return _StubTask()
 
     analysis_steps.analyze_infer_step = _StubDispatch  # type: ignore[assignment]
