@@ -168,6 +168,21 @@ class S3Service:
         """Check if an object exists in R2 and return its metadata."""
         return self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_key)
 
+    def get_object_range(self, s3_key: str, length: int) -> bytes:
+        """Fetch the first ``length`` bytes of an object via a ranged GET.
+
+        Used by the presigned-upload confirmation path to sniff an object's
+        magic bytes without downloading the whole (potentially large) file.
+        The HTTP ``Range`` header is inclusive, so byte 0..length-1 is
+        requested. ``length`` is expected to be small (a few bytes).
+        """
+        response = self.s3_client.get_object(
+            Bucket=self.bucket_name,
+            Key=s3_key,
+            Range=f"bytes=0-{length - 1}",
+        )
+        return response["Body"].read()
+
     def delete_video(self, s3_key: str) -> bool:
         """
         Delete video from R2.

@@ -19,6 +19,7 @@ from app.dependencies.byok_gate import require_byok_credits
 from app.models.database_models import Project, Transcript, Video, VideoAnalysis
 from app.models.schemas import TranscriptResponse, VideoAnalysisResponse, VideoResponse, VideoUploadResponse
 from app.rate_limit import limiter
+from app.services.media_validation import MAGIC_BYTE_PROBE_LEN, is_valid_media_header
 from app.services.openrouter_balance import BalanceInfo
 from app.services.s3_service import s3_service
 from app.state import (
@@ -33,6 +34,14 @@ from app.state import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# confirm-upload size envelope: the actual R2 object may be at most this
+# multiple of the size the client claimed at /upload-url. Absorbs container
+# muxing/metadata overhead and JS ``File.size`` rounding (a few percent)
+# while still rejecting an object smuggled in far larger than its claim.
+# A 1 MB absolute floor (applied at the call site) keeps tiny uploads from
+# being rejected over rounding noise.
+UPLOAD_SIZE_TOLERANCE = 1.10
 
 
 def _get_video_with_ownership(
@@ -200,6 +209,20 @@ async def confirm_upload(
       uploaded  -> verify bytes still exist (defensive) -> uploaded (no-op)
       error     -> verify bytes -> uploaded (recovery from a previous false-negative)
       anything else -> 400
+
+    Server-side enforcement (security findings H1/H2/H3). The presigned PUT
+    URL only pins Bucket/Key/ContentType, so R2 will accept an object of any
+    size and any bytes at the agreed key — the size check at /upload-url only
+    saw the *client-claimed* size. confirm-upload is the single
+    server-controlled checkpoint after the client PUT, so it re-validates:
+      1. ContentLength <= MAX_FILE_SIZE_MB (absolute ceiling).
+      2. ContentLength within a tolerance envelope of the size the client
+         claimed when it requested the URL (catches "claimed 10MB, PUT 5GB").
+      3. The first bytes pass the same magic-byte validator the legacy
+         /upload path uses (catches non-media content under a video MIME).
+    On any of these, the row is driven to ERROR via the state machine and
+    the offending object is deleted from R2 so the upload can be retried
+    cleanly without leaving an orphaned object or a stuck row.
     """
     current_user_id = current_user["id"]
     video = _get_video_with_ownership(video_id, current_user_id, db)
@@ -209,6 +232,27 @@ async def confirm_upload(
             status_code=400,
             detail=f"Video is in '{video.status}' state, cannot confirm upload",
         )
+
+    async def _reject(status_code: int, detail: str) -> None:
+        """Drive the row to ERROR, delete the offending R2 object, and raise.
+
+        Cleanup is best-effort: a failed delete must not mask the original
+        validation rejection (the user still needs the 4xx). The row is
+        always transitioned + committed so it never stays stuck in
+        'uploading'.
+        """
+        VideoStateMachine.transition(
+            video, VideoEvent.UPLOAD_REJECTED, db=db, error_message=detail
+        )
+        db.commit()
+        try:
+            await asyncio.to_thread(s3_service.delete_video, video.s3_key)
+        except Exception as cleanup_err:  # noqa: BLE001 - cleanup is best-effort
+            logger.error(
+                f"Failed to delete rejected upload object for video {video.id}: {cleanup_err}"
+            )
+        logger.warning(f"Rejected upload for video {video.id}: {detail}")
+        raise HTTPException(status_code=status_code, detail=detail)
 
     # Verify the object actually exists in R2 and is not empty
     try:
@@ -220,6 +264,55 @@ async def confirm_upload(
         raise
     except Exception:
         raise HTTPException(status_code=400, detail="File not found in storage. Upload may not have completed.")
+
+    # H1: absolute size ceiling. The presigned URL did not constrain object
+    # size, so an attacker can PUT an arbitrarily large object regardless of
+    # the size they claimed at /upload-url. Reject + clean up.
+    max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    if content_length > max_bytes:
+        await _reject(
+            413,
+            f"Uploaded file is too large ({content_length} bytes). "
+            f"Maximum: {settings.MAX_FILE_SIZE_MB}MB.",
+        )
+
+    # H2: claimed-size envelope. The /upload-url size check only saw the
+    # client-claimed file_size; enforce that the actual object is within a
+    # tolerance of it. A small slack (UPLOAD_SIZE_TOLERANCE) absorbs
+    # container/metadata overhead and JS File.size rounding without letting a
+    # caller smuggle a vastly larger object under a small claimed size.
+    claimed = video.file_size_bytes or 0
+    if claimed > 0:
+        envelope = max(int(claimed * UPLOAD_SIZE_TOLERANCE), claimed + 1024 * 1024)
+        if content_length > envelope:
+            await _reject(
+                400,
+                f"Uploaded file size ({content_length} bytes) exceeds the "
+                f"declared size ({claimed} bytes) by more than the allowed "
+                f"tolerance.",
+            )
+
+    # H3: content sniffing. The presigned URL pinned only the Content-Type
+    # header, which the client controls and R2 does not verify against the
+    # bytes. Fetch the first bytes via a ranged GET and run them through the
+    # shared magic-byte validator. Reject non-media content + clean up.
+    try:
+        header = await asyncio.to_thread(
+            s3_service.get_object_range, video.s3_key, MAGIC_BYTE_PROBE_LEN
+        )
+    except Exception:
+        # If we cannot read the bytes back, treat it like a missing object
+        # rather than silently accepting unvalidated content.
+        raise HTTPException(
+            status_code=400,
+            detail="File not found in storage. Upload may not have completed.",
+        )
+    if not is_valid_media_header(header):
+        await _reject(
+            400,
+            "Uploaded file does not appear to be a valid media file. "
+            "Content does not match an allowed video/audio format.",
+        )
 
     # Flip to "uploaded". The state machine handles all three legal
     # source states in its transition table (UPLOADING, UPLOADED,
@@ -306,36 +399,14 @@ async def upload_video(
                 detail=f"File too large. Maximum size: {settings.MAX_FILE_SIZE_MB}MB"
             )
 
-        # Validate file content by magic bytes
-        header = await file.read(12)
+        # Validate file content by magic bytes (shared with the presigned
+        # confirm-upload path via app.services.media_validation so the two
+        # upload routes can never disagree on what counts as valid media).
+        header = await file.read(MAGIC_BYTE_PROBE_LEN)
         await file.seek(0)  # Reset file position
         if len(header) < 2:
             raise HTTPException(status_code=400, detail="File too small to be a valid media file")
-
-        # Check for known video/audio file signatures
-        is_valid_magic = False
-        # Video: MP4/MOV/M4A (ftyp box)
-        if len(header) >= 8 and header[4:8] == b'ftyp':
-            is_valid_magic = True
-        # Video: WebM/MKV (EBML)
-        elif header[:4] == b'\x1a\x45\xdf\xa3':
-            is_valid_magic = True
-        # Video: AVI / Audio: WAV (both RIFF-based)
-        elif header[:4] == b'RIFF':
-            is_valid_magic = True
-        # Audio: MP3 with ID3v2 tag
-        elif header[:3] == b'ID3':
-            is_valid_magic = True
-        # Audio: MP3 frame sync / AAC ADTS (0xFFE0+)
-        elif len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
-            is_valid_magic = True
-        # Audio: OGG Vorbis/Opus
-        elif header[:4] == b'OggS':
-            is_valid_magic = True
-        # Audio: FLAC
-        elif header[:4] == b'fLaC':
-            is_valid_magic = True
-        if not is_valid_magic:
+        if not is_valid_media_header(header):
             raise HTTPException(status_code=400, detail="File does not appear to be a valid media file")
 
         # Get file size
