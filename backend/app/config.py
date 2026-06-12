@@ -40,8 +40,13 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str
     R2_ENDPOINT_URL: str  # e.g. https://<account_id>.r2.cloudflarestorage.com
     R2_BUCKET_NAME: str
+    # Timeout budget: botocore standard retry mode ALSO retries on
+    # connect/read timeouts, so the worst case for a fully stalled endpoint is
+    # max_attempts × (connect + read) = 2 × (10 + 160) = 340 s, which must stay
+    # below Celery task_time_limit=360 s. See s3_service.py and the contract
+    # test in tests/test_transcription_tasks.py before changing these.
     R2_CONNECT_TIMEOUT_SECONDS: int = 10
-    R2_READ_TIMEOUT_SECONDS: int = 300
+    R2_READ_TIMEOUT_SECONDS: int = 160
 
     # AI APIs - OpenRouter (OpenAI-compatible)
     OPENROUTER_API_KEY: str
