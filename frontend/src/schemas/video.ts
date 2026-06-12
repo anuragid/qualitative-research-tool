@@ -19,6 +19,32 @@ export const VideoStatusSchema = z.enum([
 export type VideoStatus = z.infer<typeof VideoStatusSchema>;
 
 /**
+ * Absolute-minimum video stub returned in the projects *list* response.
+ *
+ * Matches backend ``VideoStatusStub`` — only the three fields the
+ * projects-list UI actually reads:
+ *   - id          — React key + thumbnail slot identity
+ *   - status      — FolderStatusIcon state machine + polling gate
+ *   - uploaded_at — sort key for "3 most-recent" thumbnail ordering
+ *
+ * No ``analysis`` embed, no file metadata.  This keeps ``GET /api/projects/``
+ * free of any ``video_analyses`` DB reads.
+ *
+ * Deploy-window tolerance: ``.passthrough()`` so an old backend that still
+ * sends extra fields (``filename``, ``analysis``, etc.) passes validation
+ * without a SchemaValidationError during the rollout window.
+ */
+export const VideoStubSchema = z
+  .object({
+    id: z.string().uuid(),
+    status: VideoStatusSchema,
+    uploaded_at: z.string(),
+  })
+  .passthrough();
+
+export type VideoStub = z.infer<typeof VideoStubSchema>;
+
+/**
  * Video schema for list/polled contexts — matches backend `VideoListItemResponse`.
  *
  * The `analysis` field is a lightweight status embed (`VideoAnalysisStatusEmbedSchema`)

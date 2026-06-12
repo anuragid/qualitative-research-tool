@@ -1,17 +1,17 @@
 import { Plus, Play, Check, Archive, AlertCircle } from "lucide-react";
-import type { ProjectStatus, Video } from "../../types";
+import type { ProjectStatus, VideoStub } from "../../types";
 
 interface FolderStatusIconProps {
   status: ProjectStatus;
   videoCount: number;
-  videos?: Video[];
+  videos?: VideoStub[];
 }
 
 /**
  * Derives the active processing phase from video statuses.
  * Returns the most advanced phase currently in progress.
  */
-function getProcessingPhase(videos?: Video[]): "transcribing" | "analyzing" | "synthesizing" | "generic" {
+function getProcessingPhase(videos?: VideoStub[]): "transcribing" | "analyzing" | "synthesizing" | "generic" {
   if (!videos || videos.length === 0) return "generic";
 
   const hasTranscribing = videos.some((v) => v.status === "transcribing");
@@ -94,7 +94,7 @@ function SpinnerIcon() {
  * Checks whether any video in the project is actively being processed,
  * even if the project-level status hasn't been updated to "processing".
  */
-function isAnyVideoProcessing(videos?: Video[]): boolean {
+function isAnyVideoProcessing(videos?: VideoStub[]): boolean {
   if (!videos || videos.length === 0) return false;
   return videos.some((v) => v.status === "transcribing" || v.status === "analyzing");
 }

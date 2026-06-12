@@ -232,10 +232,12 @@ async def test_list_projects_no_blobs(tmp_path):
         assert len(data) == 1
         project = data[0]
         _assert_no_blobs(project)
-        # Sanity: analysis status IS present
-        analysis_objs = [v.get("analysis") for v in project.get("videos", []) if v.get("analysis")]
-        assert len(analysis_objs) == 1
-        assert analysis_objs[0]["status"] == "completed"
+        # The new VideoStatusStub projection omits the analysis embed entirely
+        # (no video_analyses join). The videos array still exists with stubs.
+        videos = project.get("videos", [])
+        assert len(videos) == 1
+        stub = videos[0]
+        assert stub["status"] == "analyzed"  # video.status, not analysis.status
     finally:
         app.dependency_overrides.clear()
 
@@ -259,10 +261,10 @@ async def test_get_project_no_blobs(tmp_path):
             )
         assert resp.status_code == 200, resp.json()
         _assert_no_blobs(resp.json())
-        # Analysis status present
+        # VideoStatusStub omits analysis embed; video.status is present
         videos = resp.json().get("videos", [])
         assert len(videos) == 1
-        assert videos[0]["analysis"]["status"] == "completed"
+        assert videos[0]["status"] == "analyzed"  # video.status, not analysis.status
     finally:
         app.dependency_overrides.clear()
 
@@ -329,15 +331,14 @@ async def test_list_project_videos_no_analysis_row(tmp_path):
 
 @pytest.mark.asyncio
 async def test_blob_columns_not_selected_from_db(tmp_path):
-    """SQL-level regression lock for the load_only() optimization.
+    """SQL-level regression lock: list_project_videos must NOT SELECT blob columns.
 
-    The JSON-shape tests above would still pass if ``load_only`` were
-    removed from the routes — Pydantic strips the blob fields at
-    serialization time regardless.  This test captures every statement
-    sent to the database while exercising all three list endpoints and
-    asserts that no SELECT against ``video_analyses`` includes any of the
-    5 blob columns.  This is the assertion that actually locks in the
-    "don't even FETCH the JSONB from Postgres" behavior.
+    ``list_projects`` and ``get_project`` no longer touch ``video_analyses``
+    at all (tested separately below).  ``list_project_videos`` still joins it
+    but only the status-tracking columns, not the 5 JSONB blobs.
+
+    This test verifies that the one remaining ``video_analyses`` consumer
+    (list_project_videos) stays clean.
     """
     Session, project_uuid, _ = _setup_db(tmp_path)
     engine = Session.kw["bind"]
@@ -359,10 +360,6 @@ async def test_blob_columns_not_selected_from_db(tmp_path):
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             headers = {"Authorization": "Bearer dev-bypass"}
-            assert (await client.get("/api/projects/", headers=headers)).status_code == 200
-            assert (
-                await client.get(f"/api/projects/{project_uuid}", headers=headers)
-            ).status_code == 200
             assert (
                 await client.get(f"/api/projects/{project_uuid}/videos", headers=headers)
             ).status_code == 200
@@ -371,14 +368,13 @@ async def test_blob_columns_not_selected_from_db(tmp_path):
             s for s in captured
             if "video_analyses" in s and s.lstrip().upper().startswith("SELECT")
         ]
-        # Each endpoint loads the analysis relationship, so we must have seen
-        # at least one SELECT per endpoint (selectinload's second query).
-        assert len(analysis_selects) >= 3, (
-            f"Expected >=3 SELECTs against video_analyses (one per endpoint), "
+        # list_project_videos should still emit a SELECT against video_analyses
+        # (via selectinload's second query).
+        assert len(analysis_selects) >= 1, (
+            f"Expected >=1 SELECTs against video_analyses from list_project_videos, "
             f"got {len(analysis_selects)}. All captured: {captured}"
         )
-        # Use the table-qualified column form so e.g. a bind-param value or
-        # the word 'patterns' elsewhere can't false-positive.
+        # Use the table-qualified column form to avoid false positives.
         for stmt in analysis_selects:
             for col in _BLOB_KEYS:
                 assert f"video_analyses.{col}" not in stmt, (
@@ -391,4 +387,174 @@ async def test_blob_columns_not_selected_from_db(tmp_path):
             assert "video_analyses.status" in stmt
     finally:
         event.remove(engine, "before_cursor_execute", _capture)
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_list_projects_no_video_analyses_table_access(tmp_path):
+    """SQL-level regression lock: list_projects must NOT touch video_analyses.
+
+    The aggregate rollup (outerjoin on videos only) should resolve
+    FolderCard's needs (count, status-per-video, sort) without ever hitting
+    the video_analyses table.  If this test fails it means the route has
+    regressed to the old two-level selectinload.
+    """
+    Session, project_uuid, _ = _setup_db(tmp_path)
+    engine = Session.kw["bind"]
+
+    captured: list[str] = []
+
+    from sqlalchemy import event
+
+    def _capture(conn, cursor, statement, parameters, context, executemany):
+        captured.append(statement)
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(Session)
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(
+                "/api/projects/",
+                headers={"Authorization": "Bearer dev-bypass"},
+            )
+        assert resp.status_code == 200
+
+        # Zero SELECTs against video_analyses — the list endpoint no longer
+        # touches that table.
+        analysis_selects = [
+            s for s in captured
+            if "video_analyses" in s and s.lstrip().upper().startswith("SELECT")
+        ]
+        assert len(analysis_selects) == 0, (
+            f"list_projects issued {len(analysis_selects)} SELECT(s) against "
+            f"video_analyses — the outerjoin optimisation has been reverted.\n"
+            f"Offending statements: {analysis_selects}"
+        )
+
+        # Total SELECT count: exactly 1 (the projects+videos outerjoin).
+        selects = [s for s in captured if s.lstrip().upper().startswith("SELECT")]
+        assert len(selects) == 1, (
+            f"Expected exactly 1 SELECT for list_projects (projects+videos outerjoin), "
+            f"got {len(selects)}.\nAll SELECTs: {selects}"
+        )
+
+        # The single query must touch the videos table (proves the outerjoin
+        # is there) but must NOT select any of the blob columns.
+        assert "videos" in selects[0], (
+            "The projects-list SELECT must join videos. Got: " + selects[0]
+        )
+        for col in _BLOB_KEYS:
+            assert col not in selects[0], (
+                f"Blob column '{col}' appeared in list_projects SELECT.\n"
+                f"Statement: {selects[0]}"
+            )
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_get_project_no_video_analyses_table_access(tmp_path):
+    """SQL-level regression lock: get_project must NOT touch video_analyses.
+
+    Same guarantee as list_projects — both endpoints now use the
+    outerjoin-on-videos-only pattern.
+    """
+    Session, project_uuid, _ = _setup_db(tmp_path)
+    engine = Session.kw["bind"]
+
+    captured: list[str] = []
+
+    from sqlalchemy import event
+
+    def _capture(conn, cursor, statement, parameters, context, executemany):
+        captured.append(statement)
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(Session)
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(
+                f"/api/projects/{project_uuid}",
+                headers={"Authorization": "Bearer dev-bypass"},
+            )
+        assert resp.status_code == 200
+
+        analysis_selects = [
+            s for s in captured
+            if "video_analyses" in s and s.lstrip().upper().startswith("SELECT")
+        ]
+        assert len(analysis_selects) == 0, (
+            f"get_project issued {len(analysis_selects)} SELECT(s) against "
+            f"video_analyses — regression detected.\nOffending statements: {analysis_selects}"
+        )
+
+        # The single query must touch videos.
+        selects = [s for s in captured if s.lstrip().upper().startswith("SELECT")]
+        assert len(selects) == 1, (
+            f"Expected exactly 1 SELECT for get_project, got {len(selects)}.\n"
+            f"All SELECTs: {selects}"
+        )
+        assert "videos" in selects[0], (
+            "get_project SELECT must join videos. Got: " + selects[0]
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_list_projects_video_stub_shape(tmp_path):
+    """JSON shape test: list_projects videos array must contain only id/status/uploaded_at.
+
+    Old backends may send extra fields (VideoListItemResponse with filename,
+    analysis, etc.) — the passthrough schema absorbs them. New backends send
+    only the stub. This test validates the new shape explicitly.
+    """
+    Session, project_uuid, _ = _setup_db(tmp_path)
+
+    from app.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(Session)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(
+                "/api/projects/",
+                headers={"Authorization": "Bearer dev-bypass"},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list) and len(data) == 1
+        project = data[0]
+        videos = project.get("videos", [])
+        assert len(videos) == 1, f"Expected 1 video stub, got {len(videos)}"
+        stub = videos[0]
+
+        # Required fields present
+        assert "id" in stub, "video stub must have id"
+        assert "status" in stub, "video stub must have status"
+        assert "uploaded_at" in stub, "video stub must have uploaded_at"
+        assert stub["status"] == "analyzed"
+
+        # Heavy fields absent — the route no longer sends them
+        heavy_fields = {"filename", "file_size_bytes", "duration_seconds", "error_message", "analysis"}
+        for field in heavy_fields:
+            assert field not in stub, (
+                f"list_projects video stub unexpectedly contains '{field}' — "
+                "the VideoStatusStub projection has been widened."
+            )
+    finally:
         app.dependency_overrides.clear()

@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, contains_eager, load_only, selectinload
 
 from app.auth_bridge import Permission, require_permissions
 from app.config import settings
@@ -129,17 +129,36 @@ async def list_projects(
         skip = max(skip, 0)
         skip = min(skip, 10000)
 
-        projects = db.query(Project)\
-            .filter(Project.user_id == current_user_id)\
+        # Single LEFT OUTER JOIN: projects + videos (id/status/uploaded_at only).
+        # No join to video_analyses — the projects-list UI only needs:
+        #   - video.id          (React key + thumbnail slot)
+        #   - video.status      (FolderStatusIcon + polling gate)
+        #   - video.uploaded_at (sort key for "3 most-recent" thumbnails)
+        #
+        # contains_eager(Project.videos) tells SQLAlchemy to populate the
+        # Project.videos relationship from the outerjoin columns instead of
+        # issuing a second SELECT.  load_only() restricts the Video columns
+        # fetched to the three we need, so the query never touches the
+        # video_analyses table at all.
+        #
+        # Query count: 1 (vs. 2 with the previous selectinload approach, and
+        # vs. N+1 without eager-loading at all).
+        projects = (
+            db.query(Project)
+            .outerjoin(Project.videos)
             .options(
-                selectinload(Project.videos).selectinload(Video.video_analysis).load_only(
-                    *_ANALYSIS_STATUS_COLS
+                contains_eager(Project.videos).load_only(
+                    Video.id,
+                    Video.status,
+                    Video.uploaded_at,
                 )
-            )\
-            .order_by(Project.created_at.desc())\
-            .offset(skip)\
-            .limit(limit)\
+            )
+            .filter(Project.user_id == current_user_id)
+            .order_by(Project.created_at.desc())
+            .offset(skip)
+            .limit(limit)
             .all()
+        )
 
         logger.info(f"Retrieved {len(projects)} projects")
         return [ProjectListResponse.model_validate(p) for p in projects]
@@ -171,15 +190,22 @@ async def get_project(
     """
     current_user_id = current_user["id"]
     try:
-        project = db.query(Project)\
+        # Same optimised pattern as list_projects: single outerjoin to videos
+        # (id/status/uploaded_at only), no touch of video_analyses.
+        project = (
+            db.query(Project)
+            .outerjoin(Project.videos)
             .options(
-                selectinload(Project.videos).selectinload(Video.video_analysis).load_only(
-                    *_ANALYSIS_STATUS_COLS
+                contains_eager(Project.videos).load_only(
+                    Video.id,
+                    Video.status,
+                    Video.uploaded_at,
                 )
-            )\
-            .filter(Project.id == project_id)\
-            .filter(Project.user_id == current_user_id)\
+            )
+            .filter(Project.id == project_id)
+            .filter(Project.user_id == current_user_id)
             .first()
+        )
 
         if not project:
             raise HTTPException(
