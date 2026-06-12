@@ -309,12 +309,19 @@ def enable_check_suites_gate(
     service_names: list[str],
     apply: bool,
 ) -> None:
-    """Set checkSuites=True on every deployment trigger for the given services.
+    """Set checkSuites=True on the *main-branch* deployment triggers only.
 
     ``checkSuites=True`` is Railway's "Wait for CI" setting: the auto-deploy
     is held until all GitHub check suites on the pushed commit reach a
     successful conclusion. This prevents a commit with failing GitHub Actions
     CI from being deployed automatically.
+
+    Branch filter: only triggers whose ``branch`` is ``main`` are gated.
+    Preview/PR-environment triggers stay ungated so that experimental branches
+    (which may not run the full check suite, or whose suites may include
+    third-party apps that never conclude) deploy without waiting. Railway
+    watches ALL check suites on a commit, not just our workflows, so gating
+    non-main triggers is both unnecessary and a stall risk.
 
     The mutation used is ``deploymentTriggerUpdate`` which accepts:
         id        – trigger id (required)
@@ -322,6 +329,7 @@ def enable_check_suites_gate(
 
     When ``apply`` is False, only the current state is printed (read-only).
     """
+    GATED_BRANCH = "main"
     any_trigger_found = False
     for service_id, service_name in zip(service_ids, service_names):
         triggers = list_deployment_triggers(token, env_id, service_id)
@@ -342,6 +350,13 @@ def enable_check_suites_gate(
                 f"  {service_name}: trigger {trigger_id} "
                 f"branch={branch} repo={repo} checkSuites={current}"
             )
+
+            if branch != GATED_BRANCH:
+                print(
+                    f"    skipping — branch {branch!r} != {GATED_BRANCH!r} "
+                    "(only main deploys are gated on CI)"
+                )
+                continue
 
             if current is True:
                 print(f"    already gated — no change needed")
@@ -514,15 +529,18 @@ def main(argv: list[str] | None = None) -> int:
         # 4. Gate auto-deploy on GitHub check suites (CI must pass before Railway deploys)
         #
         # Railway's DeploymentTrigger.checkSuites=True is the "Wait for CI" toggle.
-        # When enabled, Railway holds the auto-deploy until every GitHub check suite
-        # on the pushed commit reaches a successful conclusion — which means
-        # GitHub Actions (backend-ci, frontend-ci) must pass first.
+        # When enabled, Railway holds the auto-deploy in WAITING until every GitHub
+        # check suite on the pushed commit concludes successfully — which means
+        # GitHub Actions (backend-ci, frontend-ci) must pass first. If any suite
+        # fails, the deployment is SKIPPED.
         #
-        # This is the correct gating mechanism (Option A from the deploy-gating plan):
-        # - No CI changes required (Railway handles the gate natively)
-        # - Works for both backend and worker services
-        # - The wait-backend-deploy job in ci.yml still runs after backend-ci and
-        #   provides observability + post-deploy verification in GitHub Actions
+        # IMPORTANT: ci.yml must NEVER contain a job that waits for the Railway
+        # deployment — that would deadlock (the deployment can't start until the
+        # check suite completes, and the suite can't complete while a job waits
+        # for the deployment). Post-deploy failure handling is Railway-side:
+        # healthcheck + ON_FAILURE restart policy. Only main-branch triggers are
+        # gated; see enable_check_suites_gate and
+        # docs/production-readiness/runbooks/deploy-gating.md.
         print("\n==> Step 4: gate auto-deploy on GitHub check suites (Wait for CI)")
         gated_service_ids = [
             TARGET["backend"]["id"],

@@ -3,89 +3,94 @@
 ## Problem
 
 Railway auto-deploys backend and worker on every push to `main` via its GitHub
-integration. This deployment races GitHub Actions CI — a commit with failing
-backend tests can be live before CI finishes.
+integration. Historically this deployment raced GitHub Actions CI — a commit
+with failing backend tests could be live before CI finished.
 
-The `wait-backend-deploy` / `wait-worker-deploy` jobs in `ci.yml` only
-*observe* Railway reaching `SUCCESS`; they do not prevent the deployment from
-starting. They are post-deploy verification, not a gate.
+## Architecture (final)
 
-## Solution: Railway "Wait for CI" (checkSuites gate)
+**The gate lives entirely on the Railway side.** Railway's `DeploymentTrigger`
+has a `checkSuites: Boolean` field ("Wait for CI" in the dashboard). When
+`true`:
 
-Railway's `DeploymentTrigger` has a `checkSuites: Boolean` field. When set to
-`true`, Railway holds the auto-deploy until **all GitHub check suites on the
-pushed commit have a successful conclusion**. This means `backend-ci` and
-`frontend-ci` must pass before Railway fires the deployment.
+- On push, Railway creates the deployment in a **WAITING** state.
+- It stays WAITING until **every GitHub check suite on the pushed commit**
+  concludes. Note: this is *all* suites — GitHub Actions plus any other
+  installed GitHub Apps (Codecov, Pages, etc.) that create suites on the commit.
+- All suites succeed → deployment proceeds (BUILDING → DEPLOYING → SUCCESS).
+- Any suite fails → deployment is **SKIPPED**. The red commit never goes live.
 
-This is the correct layer for the gate: it is enforced by Railway itself, with
-no extra CI job required. The `wait-backend-deploy` / `wait-worker-deploy` jobs
-continue to run as post-deploy observability (confirming Railway reached
-`SUCCESS` after the gate passed).
+**There is deliberately NO "wait for Railway deploy" job in `ci.yml`.**
+The original design had `wait-backend-deploy`/`wait-worker-deploy` jobs that
+polled the Railway API for the deployment to reach SUCCESS. Combined with
+`checkSuites=true` that is a deterministic deadlock:
+
+```
+Railway waits for the check suite to conclude
+  → the check suite contains a job waiting for the Railway deployment
+    → the deployment never starts
+      → the suite never concludes (job times out at 10 min, goes red)
+        → deployment is SKIPPED. Every main push hangs and never deploys.
+```
+
+We evaluated moving those jobs to a separate `workflow_run`-triggered workflow,
+but `workflow_run` workflows create a **new check suite on the same commit**,
+and Railway watches all suites on the commit (confirmed by Railway community
+reports of deploys stuck in "waiting for CI" due to third-party check suites).
+Railway's documentation does not state that only push-time suites are
+considered, so the `workflow_run` variant could not be confirmed deadlock-free.
+We chose deletion: a wrong gate halts production; simplicity wins.
+
+**Post-deploy failure handling is Railway-side instead:**
+
+| Mechanism | Where | What it covers |
+|-----------|-------|----------------|
+| `checkSuites=true` on main triggers | Railway deployment trigger | Failing tests/lint never deploy |
+| Healthcheck `/health/ready` (timeout 10s) | backend service instance | A deploy that builds but can't serve never receives traffic |
+| `restartPolicyType = ON_FAILURE` (max 10) | `railway.toml` | Crash-looping containers restart |
+| `scripts/ci/wait-for-railway-deploy.py` | manual, run locally | Operator confirmation that a specific SHA reached SUCCESS |
+
+Only **main-branch** triggers are gated. PR/preview-environment triggers stay
+ungated so experimental branches deploy without waiting on (possibly absent or
+never-concluding) check suites.
 
 ## Activating the Gate
 
 ### Pre-requisites
 
-1. You must have a Railway **workspace-scoped** API token (not a project token).
-   The GitHub Actions secret `RAILWAY_API_TOKEN` is workspace-scoped and works.
-   A personal token from `~/.railway/config.json` also works if it has write
-   access to the project.
-
-2. The backend and worker services must already be connected to the GitHub repo
-   in the Railway dashboard (Settings → Source → GitHub). The script can only
-   update existing deployment triggers; it cannot create them.
+1. A Railway **workspace-scoped** API token (the GitHub Actions secret
+   `RAILWAY_API_TOKEN` qualifies; a personal token from
+   `~/.railway/config.json` works if it has write access to the project).
+2. Backend and worker services connected to the GitHub repo in the Railway
+   dashboard. The script updates existing triggers; it cannot create them.
 
 ### Command
 
 ```bash
-export RAILWAY_API_TOKEN=<your-workspace-token>
+export RAILWAY_API_TOKEN=<workspace-token>
 
-# Dry-run (read-only) — shows current checkSuites state for each trigger:
+# Dry-run (read-only) — shows current checkSuites state per trigger:
 python3 scripts/railway-service-config.py
 
-# Apply — sets checkSuites=True on every trigger for backend + worker:
+# Apply — sets checkSuites=True on main-branch triggers for backend + worker:
 python3 scripts/railway-service-config.py --apply
 ```
 
-The script is idempotent. Re-running `--apply` on an already-gated trigger
-prints "already gated — no change needed" and exits zero.
+Idempotent: re-running prints "already gated — no change needed".
+Non-main triggers print "skipping — branch ... (only main deploys are gated on CI)".
 
-### What the script does (Step 4)
+## Verifying the Gate Works (and is not deadlocked)
 
-- Queries `deploymentTriggers` for the backend service
-  (`2b70a900-042c-4083-b00b-0d01f3ece5dc`) and worker service
-  (`08097b12-1501-4dff-a990-edcd95c73ed4`) in the production environment.
-- For each trigger where `checkSuites != true`, calls
-  `deploymentTriggerUpdate(id, input: { branch, checkSuites: true })`.
-- Steps 1–3 (topology, beat service, worker domain) are unchanged.
+The failure mode to rule out is not just "gate off" — it is **gate-deadlocked**:
+a check suite on the commit that never concludes leaves the deployment in
+WAITING forever. The verification below distinguishes all three states.
 
-## Verifying the Gate Works
-
-### Option A — Check Railway dashboard
-
-1. Open the Railway project → backend service → Settings → Deploy.
-2. Confirm "Wait for CI checks to pass before deploying" is toggled **on**.
-3. Repeat for the worker service.
-
-### Option B — Push a deliberately failing commit to a test branch
-
-1. Create a branch off `main`.
-2. Add a trivially failing test (e.g., `assert False` in any test file).
-3. Open a draft PR or push directly if the branch is wired to a Railway
-   preview environment.
-4. Observe that Railway shows the deployment in a **pending** or **waiting**
-   state (not `BUILDING`) until CI reaches a conclusion.
-5. After CI fails, Railway should **not** deploy.
-6. Revert the failing test, push again — CI passes, Railway deploys.
-
-### Option C — Inspect the trigger via GraphQL (read-only)
+### Step 1 — Confirm the setting
 
 ```bash
-export RAILWAY_API_TOKEN=<token>
-python3 scripts/railway-service-config.py   # dry-run prints current checkSuites value
+python3 scripts/railway-service-config.py   # dry-run
 ```
 
-A correct output for Step 4 looks like:
+Expected Step 4 output for a correctly gated project:
 
 ```
 ==> Step 4: gate auto-deploy on GitHub check suites (Wait for CI)
@@ -95,25 +100,65 @@ A correct output for Step 4 looks like:
     already gated — no change needed
 ```
 
-## Relationship to ci.yml jobs
+Dashboard equivalent: service → Settings → Deploy → "Wait for CI" toggled on.
 
-| Job | Purpose | Blocks deploy? |
-|-----|---------|---------------|
-| `backend-ci` | Run tests + lint | Not directly — Railway's checkSuites gate uses this as the signal |
-| `frontend-ci` | Lint, typecheck, build | Same |
-| `wait-backend-deploy` | Confirm backend reached SUCCESS after CI | No — observability only |
-| `wait-worker-deploy` | Confirm worker reached SUCCESS after CI | No — observability only |
+### Step 2 — Green-path timing test (proves gate works AND completes)
 
-The `wait-*` jobs have `needs: backend-ci` so they only run after CI passes.
-But the real enforcement is at the Railway layer via `checkSuites=True`.
+1. Push a harmless commit to `main` (e.g., a comment change).
+2. Open the Railway dashboard immediately. The new deployment must appear as
+   **WAITING** (not BUILDING) while GitHub Actions runs. If it goes straight
+   to BUILDING, the gate is not active.
+3. Watch the GitHub Actions run finish green.
+4. Within ~1 minute of the last check suite concluding, the Railway deployment
+   must leave WAITING and proceed to BUILDING → SUCCESS.
+5. Confirm the exact SHA deployed, from your machine:
 
-## Rollback
+   ```bash
+   export RAILWAY_API_TOKEN=<token>
+   COMMIT_SHA=$(git rev-parse origin/main) python3 scripts/ci/wait-for-railway-deploy.py
+   ```
 
-To disable the gate (e.g., emergency hotfix that must bypass CI):
+**Deadlock signature:** all checks on the commit show green/complete in the
+GitHub UI, but the Railway deployment is still WAITING after several minutes.
+Diagnose which suite never concluded:
 
-1. Railway dashboard → backend service → Settings → Deploy → toggle "Wait for CI" **off**.
-2. Repeat for worker.
-3. Deploy the hotfix.
-4. Re-enable the gate: `python3 scripts/railway-service-config.py --apply`.
+```bash
+gh api repos/<owner>/<repo>/commits/$(git rev-parse origin/main)/check-suites \
+  --jq '.check_suites[] | {app: .app.name, status, conclusion}'
+```
+
+Any suite with `status != "completed"` is the blocker. Common culprits:
+a GitHub App that registers suites but never runs them, or a workflow that
+itself waits on the deployment (which is why `ci.yml` must never re-grow a
+wait-for-Railway job). Fix the offending suite or, as a stopgap, disable the
+gate (see Rollback) to unblock the deploy.
+
+### Step 3 — Red-path test (proves failing CI blocks the deploy)
+
+Do this once after activation, at a low-traffic time:
+
+1. Push a commit to `main` with a deliberately failing backend test
+   (e.g., `assert False` in any test file) — or, if pushing red to `main` is
+   unacceptable, temporarily point a scratch Railway service's trigger at a
+   test branch with `checkSuites=true` and push the red commit there.
+2. CI goes red.
+3. The Railway deployment must transition WAITING → **SKIPPED**. The previous
+   deployment keeps serving traffic.
+4. Revert the commit; CI goes green; the revert deploys normally.
+
+## Monitoring deploys (now that CI has no wait job)
+
+- Railway dashboard → service → Deployments: status history per commit.
+- `railway logs --service backend` (or `--service worker`) for live logs.
+- `COMMIT_SHA=<sha> python3 scripts/ci/wait-for-railway-deploy.py` to block
+  until a specific commit reaches SUCCESS (manual use only — never in CI).
+- Sentry will surface runtime regressions that pass tests but fail in prod.
+
+## Rollback (emergency hotfix that must bypass CI)
+
+1. Railway dashboard → backend service → Settings → Deploy → toggle
+   "Wait for CI" **off**. Repeat for worker.
+2. Push/deploy the hotfix.
+3. Re-enable: `python3 scripts/railway-service-config.py --apply`.
 
 Do not leave the gate disabled after the hotfix.

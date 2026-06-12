@@ -127,50 +127,18 @@ jobs:
           command: pages deploy dist/ --project-name=methodex-frontend --branch=main --commit-dirty=true
           workingDirectory: frontend
 
-  # wait-backend-deploy and wait-worker-deploy are observability jobs that confirm
-  # Railway reached SUCCESS for the deployed commit. They are NOT what prevents a
-  # bad commit from going live — that gate is Railway's "Wait for CI" (checkSuites)
-  # setting on the deployment trigger, configured via:
-  #   python3 scripts/railway-service-config.py --apply
-  # See docs/production-readiness/runbooks/deploy-gating.md for details.
-  wait-backend-deploy:
-    name: Wait for Railway Backend Deploy
-    needs: backend-ci
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Wait for Railway deployment to reach SUCCESS
-        env:
-          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-          RAILWAY_PROJECT_ID: "154d302f-8609-4897-a10c-1f0d5bfc4f06"
-          RAILWAY_BACKEND_SERVICE_ID: "2b70a900-042c-4083-b00b-0d01f3ece5dc"
-          COMMIT_SHA: ${{ github.sha }}
-        run: python3 scripts/ci/wait-for-railway-deploy.py
-
-  wait-worker-deploy:
-    name: Wait for Railway Worker Deploy
-    needs: backend-ci
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Wait for Railway deployment to reach SUCCESS
-        env:
-          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-          RAILWAY_PROJECT_ID: "154d302f-8609-4897-a10c-1f0d5bfc4f06"
-          RAILWAY_BACKEND_SERVICE_ID: "08097b12-1501-4dff-a990-edcd95c73ed4"
-          COMMIT_SHA: ${{ github.sha }}
-        run: python3 scripts/ci/wait-for-railway-deploy.py
+  # NOTE: There is deliberately NO "wait for Railway deploy" job in this workflow.
+  #
+  # Railway's "Wait for CI" gate (checkSuites=true on the deployment trigger,
+  # set via `python3 scripts/railway-service-config.py --apply`) holds the
+  # Railway deployment in WAITING until every check suite on the pushed commit
+  # concludes. A job in THIS workflow that polls for the Railway deployment
+  # would deadlock: the deployment cannot start until this check suite
+  # completes, and the suite cannot complete while a job is waiting for the
+  # deployment. Every main push would hang ~10 minutes and go red.
+  #
+  # Post-deploy failure handling lives on the Railway side instead:
+  # healthcheck on /health/ready + ON_FAILURE restart policy (railway.toml).
+  # Manual verification tool: scripts/ci/wait-for-railway-deploy.py (run
+  # locally, never from this workflow).
+  # See docs/production-readiness/runbooks/deploy-gating.md.
