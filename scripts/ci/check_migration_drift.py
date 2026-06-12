@@ -3,27 +3,41 @@
 
 Runs two checks:
   1. Single-head assertion  — the migration chain must have exactly one head.
-  2. Drift-is-empty check   — ``alembic check`` must report no upgrade operations
-     *beyond* the items listed in known_schema_drift.txt.
+  2. Drift-is-empty check   — alembic autogenerate comparison must report no
+     operations *beyond* the items listed in known_schema_drift.txt.
 
-Usage (run from the backend/ directory with DATABASE_URL set):
+Usage (run from the backend/ directory, AFTER ``alembic upgrade head``, with
+DATABASE_URL set):
     python3 ../scripts/ci/check_migration_drift.py
 
 Exit codes:
-    0 — no unexpected drift, single head confirmed.
-    1 — unexpected drift found OR multiple heads detected.
+    0 — no unexpected drift, single head confirmed, DB at head.
+    1 — unexpected drift, multiple heads, DB not at head, or ANY error
+        (connection failure, import failure, etc. — the gate fails CLOSED).
+
+Implementation notes:
+- We call ``alembic.autogenerate.compare_metadata()`` programmatically and
+  classify the RAW diff tuples, instead of shelling out to ``alembic check``
+  and regex-parsing its prose log lines.  The tuple structure is a stable,
+  documented API and is direction-symmetric (e.g. ``modify_nullable`` covers
+  both NULL→NOT NULL and NOT NULL→NULL drift with the same canonical key).
+- Any exception (bad DATABASE_URL, DB not reachable, model import error)
+  propagates to a non-zero exit with the raw traceback printed: fail CLOSED,
+  never silently pass.
 
 IMPORTANT: known_schema_drift.txt lists items that are currently tolerated
-because the corresponding migration has not been written yet.  Each entry
-must be removed from that file when the fixing migration is merged.  The
-Wave-2 PR W2-A must clear this file entirely.
+because the corresponding fix has not been made yet.  Each entry must be
+removed when its fix is merged.  The Wave-2 PR W2-A must clear this file
+entirely.  NOTE: not every entry is fixed by writing a migration — for some,
+the DATABASE is right and the MODEL must change (see the per-entry comments
+in known_schema_drift.txt before touching anything).
 """
 
 from __future__ import annotations
 
-import re
-import subprocess
+import os
 import sys
+import traceback
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -51,126 +65,100 @@ def load_allowlist(path: Path) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# Drift key normalisation
+# Canonical keys from raw autogenerate diff tuples
 # ---------------------------------------------------------------------------
 
-def _normalise_drift_lines(check_stderr: str) -> list[str]:
-    """Extract canonical drift keys from ``alembic check`` stderr.
+def canonical_key(diff: tuple) -> str:
+    """Map one alembic autogenerate diff tuple to a stable canonical key.
 
-    alembic check writes one INFO line per detected change, e.g.:
-      INFO  [alembic.autogenerate.compare] Detected added index 'ix_foo' on ...
-      INFO  [alembic.autogenerate.compare] Detected NULL on column 'table.col'
-      INFO  [alembic.autogenerate.compare] Detected type change from ... on 'table.col'
-      INFO  [alembic.autogenerate.compare] Detected removed unique constraint 'name' on ...
+    Tuple shapes (see alembic.autogenerate.compare_metadata docs):
+      ('add_table', Table) / ('remove_table', Table)
+      ('add_column', schema, table_name, Column) / ('remove_column', ...)
+      ('add_index', Index) / ('remove_index', Index)
+      ('add_constraint', Constraint) / ('remove_constraint', Constraint)
+      ('add_fk', ForeignKeyConstraint) / ('remove_fk', ...)
+      ('modify_nullable', schema, table, column, kwargs, old, new)
+      ('modify_type',     schema, table, column, kwargs, old, new)
+      ('modify_default',  schema, table, column, kwargs, old, new)
 
-    We map each INFO line to a stable canonical key used in known_schema_drift.txt.
+    Note: modify_* keys are intentionally direction-agnostic — the same key
+    matches NULL→NOT NULL and NOT NULL→NULL drift.
     """
-    keys: list[str] = []
+    op = diff[0]
 
-    for line in check_stderr.splitlines():
-        # Only look at autogenerate.compare INFO lines
-        if "[alembic.autogenerate.compare]" not in line:
-            continue
-        msg = line.split("] ", 1)[-1].strip()
+    if op in ("add_index", "remove_index"):
+        return f"{op}:{diff[1].name}"
 
-        # --- added index ---
-        # alembic renders index names with double single-quotes: ''ix_name''
-        m = re.search(r"Detected added index ''([^']+)''", msg)
-        if m:
-            keys.append(f"add_index:{m.group(1)}")
-            continue
+    if op in ("add_table", "remove_table"):
+        return f"{op}:{diff[1].name}"
 
-        # --- nullable mismatch ("Detected NULL on column 'table.col'") ---
-        m = re.search(r"Detected NULL on column '([^.]+)\.([^']+)'", msg)
-        if m:
-            keys.append(f"modify_nullable:{m.group(1)}:{m.group(2)}")
-            continue
+    if op in ("add_column", "remove_column"):
+        # (op, schema, table_name, Column)
+        return f"{op}:{diff[2]}:{diff[3].name}"
 
-        # --- removed unique constraint ---
-        m = re.search(r"Detected removed unique constraint '([^']+)' on '([^']+)'", msg)
-        if m:
-            keys.append(f"remove_constraint:{m.group(2)}:{m.group(1)}")
-            continue
+    if op in ("add_constraint", "remove_constraint", "add_fk", "remove_fk"):
+        constraint = diff[1]
+        table = getattr(constraint, "table", None)
+        table_name = table.name if table is not None else "?"
+        return f"{op}:{table_name}:{constraint.name}"
 
-        # --- type change ---
-        m = re.search(r"Detected type change from .+ on '([^.]+)\.([^']+)'", msg)
-        if m:
-            keys.append(f"modify_type:{m.group(1)}:{m.group(2)}")
-            continue
+    if op.startswith("modify_"):
+        # (op, schema, table_name, column_name, kwargs, old, new)
+        return f"{op}:{diff[2]}:{diff[3]}"
 
-        # --- catch-all: any other autogenerate compare line is unknown drift ---
-        # Strip the common prefix verbiage to produce a short key.
-        short = re.sub(r"^Detected\s+", "", msg)
-        keys.append(f"unknown:{short[:120]}")
-
-    return keys
+    # Unknown op type — emit a repr-based key.  This will never match an
+    # allowlist entry, so unknown ops always fail the gate (fail closed).
+    return f"unknown:{repr(diff)[:160]}"
 
 
-# ---------------------------------------------------------------------------
-# Subprocess helpers
-# ---------------------------------------------------------------------------
-
-def _run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-    )
+def flatten_diffs(diffs: list) -> list[tuple]:
+    """compare_metadata() groups modify_* ops in nested lists — flatten them."""
+    flat: list[tuple] = []
+    for entry in diffs:
+        if isinstance(entry, list):
+            flat.extend(entry)
+        else:
+            flat.append(entry)
+    return flat
 
 
 # ---------------------------------------------------------------------------
 # Check 1: single-head assertion
 # ---------------------------------------------------------------------------
 
-def check_single_head() -> bool:
-    """Return True iff the migration chain has exactly one head."""
-    result = _run(["alembic", "heads"])
-    heads_output = result.stdout + result.stderr
-    # Each head is reported on its own line; non-empty lines ending with (head)
-    head_lines = [
-        ln for ln in heads_output.splitlines()
-        if ln.strip() and not ln.strip().startswith("INFO")
-    ]
-    # alembic heads prints one line per head like:
-    #   f5a6b7c8d9e0 (head)
-    head_revisions = [ln for ln in head_lines if "(head)" in ln]
-
-    if len(head_revisions) == 1:
-        print(f"[PASS] Single migration head: {head_revisions[0].strip()}")
-        return True
-    else:
-        print(
-            f"[FAIL] Expected exactly 1 migration head, found {len(head_revisions)}:",
-            file=sys.stderr,
-        )
-        for h in head_revisions:
-            print(f"  {h.strip()}", file=sys.stderr)
-        return False
+def check_single_head(script_directory) -> tuple[bool, list[str]]:
+    """Return (ok, heads). Fails unless the chain has exactly one head."""
+    heads = list(script_directory.get_heads())
+    if len(heads) == 1:
+        print(f"[PASS] Single migration head: {heads[0]}")
+        return True, heads
+    print(
+        f"[FAIL] Expected exactly 1 alembic head, found {len(heads)}: {heads}",
+        file=sys.stderr,
+    )
+    return False, heads
 
 
 # ---------------------------------------------------------------------------
 # Check 2: drift-is-empty (minus allowlist)
 # ---------------------------------------------------------------------------
 
-def check_no_new_drift(allowlist: set[str]) -> bool:
-    """Run ``alembic check`` and fail on any drift NOT in the allowlist."""
-    result = _run(["alembic", "check"])
-    combined = result.stdout + result.stderr
+def check_no_new_drift(diffs: list, allowlist: set[str]) -> bool:
+    """Classify raw diff tuples; fail on any key NOT in the allowlist."""
+    flat = flatten_diffs(diffs)
 
-    if result.returncode == 0:
-        print("[PASS] alembic check: no schema drift detected.")
+    if not flat:
+        print("[PASS] No schema drift detected (autogenerate diff is empty).")
         return True
 
-    # Parse drift items from stderr INFO lines
-    detected = _normalise_drift_lines(combined)
-
+    detected = [canonical_key(d) for d in flat]
     new_drift = [k for k in detected if k not in allowlist]
     tolerated = [k for k in detected if k in allowlist]
 
     if tolerated:
         print(
             f"[INFO] {len(tolerated)} known-drift item(s) tolerated "
-            f"(listed in known_schema_drift.txt — clear when W2-A merges):"
+            f"(listed in known_schema_drift.txt — must be cleared by W2-A):"
         )
         for k in sorted(tolerated):
             print(f"  (known)  {k}")
@@ -178,12 +166,17 @@ def check_no_new_drift(allowlist: set[str]) -> bool:
     if new_drift:
         print(
             f"\n[FAIL] {len(new_drift)} NEW schema drift item(s) detected "
-            f"— add a migration or update known_schema_drift.txt with a "
-            f"justification comment:",
+            f"— write the missing migration (or fix the model) rather than "
+            f"extending known_schema_drift.txt:",
             file=sys.stderr,
         )
         for k in sorted(new_drift):
             print(f"  (NEW)    {k}", file=sys.stderr)
+        # Also dump the raw tuples for the new items to aid debugging.
+        print("\nRaw diff tuples for NEW items:", file=sys.stderr)
+        for d in flat:
+            if canonical_key(d) in new_drift:
+                print(f"  {d!r}", file=sys.stderr)
         return False
 
     print(
@@ -198,17 +191,79 @@ def check_no_new_drift(allowlist: set[str]) -> bool:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
+    try:
+        # Import alembic/sqlalchemy BEFORE adding cwd to sys.path: the
+        # backend/ working directory contains an `alembic/` migrations folder
+        # that would shadow the installed alembic package otherwise.
+        from alembic.autogenerate import compare_metadata
+        from alembic.config import Config
+        from alembic.runtime.migration import MigrationContext
+        from alembic.script import ScriptDirectory
+        from sqlalchemy import create_engine
+
+        # The script is invoked from backend/ — make `app` importable.
+        sys.path.insert(0, os.getcwd())
+        from app.config import settings
+        from app.database import Base
+        from app.models import database_models  # noqa: F401 — registers models on Base
+    except Exception:
+        print(
+            "[FAIL] Could not import alembic/app modules — gate fails CLOSED.\n"
+            "Run this script from the backend/ directory with dependencies "
+            "installed and required env vars set.",
+            file=sys.stderr,
+        )
+        traceback.print_exc()
+        return 1
+
     allowlist = load_allowlist(ALLOWLIST_FILE)
 
-    head_ok = check_single_head()
-    drift_ok = check_no_new_drift(allowlist)
+    try:
+        cfg = Config("alembic.ini")
+        script_directory = ScriptDirectory.from_config(cfg)
+        head_ok, heads = check_single_head(script_directory)
+
+        engine = create_engine(settings.DATABASE_URL)
+        with engine.connect() as connection:
+            # Match env.py's effective autogenerate comparison options.
+            migration_ctx = MigrationContext.configure(
+                connection,
+                opts={"compare_type": True, "compare_server_default": False},
+            )
+
+            # Sanity: the DB must already be migrated to head, otherwise the
+            # comparison below would report the entire schema as drift.
+            current = migration_ctx.get_current_revision()
+            if current is None or current not in heads:
+                print(
+                    f"[FAIL] Database revision is {current!r}, expected head(s) "
+                    f"{heads} — run `alembic upgrade head` before this gate.",
+                    file=sys.stderr,
+                )
+                return 1
+
+            diffs = compare_metadata(migration_ctx, Base.metadata)
+    except SystemExit:
+        raise
+    except Exception:
+        # Fail CLOSED: any error (bad DATABASE_URL, connection refused,
+        # reflection error, alembic API change) must fail the gate loudly,
+        # never silently pass.
+        print(
+            "[FAIL] Error while running the drift comparison — gate fails "
+            "CLOSED. Raw error follows:",
+            file=sys.stderr,
+        )
+        traceback.print_exc()
+        return 1
+
+    drift_ok = check_no_new_drift(diffs, allowlist)
 
     if head_ok and drift_ok:
         print("\n[PASS] Migration drift gate: all checks passed.")
         return 0
-    else:
-        print("\n[FAIL] Migration drift gate: one or more checks failed.", file=sys.stderr)
-        return 1
+    print("\n[FAIL] Migration drift gate: one or more checks failed.", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
