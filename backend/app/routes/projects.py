@@ -129,11 +129,29 @@ async def list_projects(
         skip = max(skip, 0)
         skip = min(skip, 10000)
 
+        # selectinload pages the PROJECTS first (LIMIT/OFFSET apply to project
+        # rows), then issues one IN-list SELECT for the videos of exactly
+        # those projects.  load_only() restricts that second SELECT to the
+        # three columns the projects-list UI needs:
+        #   - video.id          (React key + thumbnail slot)
+        #   - video.status      (FolderStatusIcon + polling gate)
+        #   - video.uploaded_at (sort key for "3 most-recent" thumbnails)
+        #
+        # The video_analyses table is never touched — that was the heavy
+        # second level of the old two-level selectinload chain.
+        #
+        # NOTE: do NOT replace this with outerjoin + contains_eager + LIMIT.
+        # SQL LIMIT applies to JOIN ROWS, so a user with a few multi-video
+        # projects silently loses projects off the end of the list (e.g.
+        # 3 projects x 20 videos = 60 rows > limit 50).  Locked by
+        # test_list_projects_pagination_counts_projects_not_join_rows.
         projects = db.query(Project)\
             .filter(Project.user_id == current_user_id)\
             .options(
-                selectinload(Project.videos).selectinload(Video.video_analysis).load_only(
-                    *_ANALYSIS_STATUS_COLS
+                selectinload(Project.videos).load_only(
+                    Video.id,
+                    Video.status,
+                    Video.uploaded_at,
                 )
             )\
             .order_by(Project.created_at.desc())\
@@ -171,10 +189,18 @@ async def get_project(
     """
     current_user_id = current_user["id"]
     try:
+        # Same optimised pattern as list_projects: selectinload restricted to
+        # (id/status/uploaded_at), no touch of video_analyses.
+        #
+        # NOTE: do NOT use outerjoin + contains_eager here either — .first()
+        # emits LIMIT 1 which would truncate the joined rows to a single
+        # video.  Locked by test_get_project_returns_all_videos.
         project = db.query(Project)\
             .options(
-                selectinload(Project.videos).selectinload(Video.video_analysis).load_only(
-                    *_ANALYSIS_STATUS_COLS
+                selectinload(Project.videos).load_only(
+                    Video.id,
+                    Video.status,
+                    Video.uploaded_at,
                 )
             )\
             .filter(Project.id == project_id)\

@@ -10,6 +10,7 @@
 export type {
   Video,
   VideoStatus,
+  VideoStub,
 } from "../schemas/video";
 
 export type {
