@@ -1,16 +1,53 @@
+import { lazy, Suspense } from "react";
+import type { ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SignIn, SignUp } from "@clerk/react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
+import {
+  RouteErrorBoundary,
+  ChunkLoadRecoveryReset,
+} from "./components/RouteErrorBoundary";
 import { UploadProvider } from "./contexts/UploadContext";
 import { useAuth } from "./hooks/useAuth";
 import { useUserSync } from "./hooks/useUserSync";
-import ProjectsPage from "./pages/ProjectsPage";
-import ProjectDetailPage from "./pages/ProjectDetailPage";
-import VideoDetailPage from "./pages/VideoDetailPage";
-import LandingPage from "./pages/LandingPage";
-import NotFoundPage from "./pages/NotFoundPage";
+
+// Route-level code splitting — each page is a separate async chunk.
+// LandingPage is the priority split: it pulls in ~40 KB of TSX + ~63 KB
+// landing-page.css that authenticated users never need.
+const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
+const ProjectDetailPage = lazy(() => import("./pages/ProjectDetailPage"));
+const VideoDetailPage = lazy(() => import("./pages/VideoDetailPage"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+
+/** Reusable spinner — matches the auth-loading indicator in App so the
+ *  visual language is consistent across all loading states. */
+function PageLoader() {
+  return (
+    <div
+      className="flex items-center justify-center min-h-screen"
+      role="status"
+      aria-label="Loading page"
+    >
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <span className="sr-only">Loading…</span>
+    </div>
+  );
+}
+
+/** Suspense wrapper for lazy route pages. ChunkLoadRecoveryReset sits
+ *  inside the Suspense boundary so it commits only once the lazy chunk
+ *  has resolved — proof of a successful route render, which resets the
+ *  chunk-reload loop guard (see RouteErrorBoundary). */
+function SuspensePage({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ChunkLoadRecoveryReset />
+      {children}
+    </Suspense>
+  );
+}
 
 function SignInPage() {
   return (
@@ -59,7 +96,14 @@ function App() {
             isAuthenticated ? (
               <Navigate to="/projects" replace />
             ) : (
-              <LandingPage />
+              // RouteErrorBoundary wraps Suspense so a ChunkLoadError (stale
+              // hash after deploy) is caught and shown as "Update available"
+              // rather than a white screen or unhandled rejection.
+              <RouteErrorBoundary routeName="landing">
+                <SuspensePage>
+                  <LandingPage />
+                </SuspensePage>
+              </RouteErrorBoundary>
             )
           }
         />
@@ -88,15 +132,20 @@ function App() {
 
         {/* Protected routes — each wrapped in RouteErrorBoundary so a
             render crash on one page doesn't black out the whole app.
+            Suspense sits inside the error boundary: a ChunkLoadError
+            thrown during lazy import is caught by the boundary and shown
+            as the "Update available / Reload to update" fallback.
             See docs/production-readiness/prs/pr21-frontend-defensive.md. */}
         <Route
           path="/projects"
           element={
             isAuthenticated ? (
               <RouteErrorBoundary routeName="projects">
-                <UploadProvider>
-                  <ProjectsPage />
-                </UploadProvider>
+                <SuspensePage>
+                  <UploadProvider>
+                    <ProjectsPage />
+                  </UploadProvider>
+                </SuspensePage>
               </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
@@ -109,9 +158,11 @@ function App() {
           element={
             isAuthenticated ? (
               <RouteErrorBoundary routeName="project-detail">
-                <UploadProvider>
-                  <ProjectDetailPage />
-                </UploadProvider>
+                <SuspensePage>
+                  <UploadProvider>
+                    <ProjectDetailPage />
+                  </UploadProvider>
+                </SuspensePage>
               </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
@@ -124,9 +175,11 @@ function App() {
           element={
             isAuthenticated ? (
               <RouteErrorBoundary routeName="video-detail">
-                <UploadProvider>
-                  <VideoDetailPage />
-                </UploadProvider>
+                <SuspensePage>
+                  <UploadProvider>
+                    <VideoDetailPage />
+                  </UploadProvider>
+                </SuspensePage>
               </RouteErrorBoundary>
             ) : (
               <Navigate to="/sign-in" replace />
@@ -135,7 +188,16 @@ function App() {
         />
 
         {/* Catch-all 404 route */}
-        <Route path="*" element={<NotFoundPage />} />
+        <Route
+          path="*"
+          element={
+            <RouteErrorBoundary routeName="not-found">
+              <SuspensePage>
+                <NotFoundPage />
+              </SuspensePage>
+            </RouteErrorBoundary>
+          }
+        />
       </Routes>
     </BrowserRouter>
     </TooltipProvider>
