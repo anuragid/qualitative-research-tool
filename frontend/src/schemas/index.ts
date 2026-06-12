@@ -10,14 +10,17 @@
 
 export {
   VideoSchema,
+  VideoDetailSchema,
   VideoListSchema,
   VideoStatusSchema,
   type Video,
+  type VideoDetail,
   type VideoStatus,
 } from "./video";
 
 export {
   VideoAnalysisSchema,
+  VideoAnalysisStatusEmbedSchema,
   AnalysisStatusResponseSchema,
   AnalysisStatusSchema,
   AnalysisStepSchema,
@@ -27,6 +30,7 @@ export {
   InsightSchema,
   DesignPrincipleSchema,
   type VideoAnalysis,
+  type VideoAnalysisStatusEmbed,
   type AnalysisStatus,
   type AnalysisStatusResponse,
   type AnalysisStep,

@@ -317,6 +317,73 @@ class SpeakerLabelResponse(BaseModel):
 
 # ========== Video Analysis Schemas ==========
 
+class VideoAnalysisStatusEmbed(BaseModel):
+    """Lightweight analysis status for embedding in list responses.
+
+    Contains only the status/step tracking fields — NOT the 5 JSONB blobs
+    (chunks, inferences, patterns, insights, design_principles).  Used
+    wherever the list endpoints embed analysis info so polled responses stay
+    small (~200 bytes per video instead of 50–500 KB).
+
+    Full blob payload is available via ``GET /api/videos/{id}/analysis``.
+    See ``VideoAnalysisResponse`` for the full schema.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    # Optional when status == "not_started" -- no row exists yet.
+    id: Optional[UUID] = None
+    video_id: UUID
+    status: str
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    # Step-by-step tracking fields
+    current_step: Optional[str] = None
+    step_status: Optional[Dict[str, str]] = None
+    chunk_completed_at: Optional[datetime] = None
+    infer_completed_at: Optional[datetime] = None
+    relate_completed_at: Optional[datetime] = None
+    explain_completed_at: Optional[datetime] = None
+    activate_completed_at: Optional[datetime] = None
+
+
+class VideoListItemResponse(VideoBase):
+    """Lightweight video shape for list endpoints (no analysis JSONB blobs).
+
+    Use this instead of ``VideoResponse`` in list/polling endpoints
+    (list_projects, get_project, list_project_videos).  Full analysis
+    payload is only fetched via ``GET /api/videos/{id}/analysis``.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    project_id: UUID
+    file_size_bytes: Optional[int] = None
+    duration_seconds: Optional[int] = None
+    uploaded_at: datetime
+    status: str
+    error_message: Optional[str] = None
+    analysis: Optional[VideoAnalysisStatusEmbed] = Field(
+        default=None, validation_alias="video_analysis"
+    )
+
+
+class ProjectListResponse(ProjectBase):
+    """Lightweight project shape for list endpoints.
+
+    Uses ``VideoListItemResponse`` instead of ``VideoResponse`` so
+    analysis JSONB blobs are never serialized in polled list payloads.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    videos: Optional[List["VideoListItemResponse"]] = []
+
+
 class VideoAnalysisResponse(BaseModel):
     """Schema for video analysis response.
 
@@ -376,3 +443,4 @@ class ProjectAnalysisResponse(BaseModel):
 
 # Rebuild models to resolve forward references
 ProjectResponse.model_rebuild()
+ProjectListResponse.model_rebuild()
