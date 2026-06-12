@@ -10,6 +10,11 @@ Behavior summary:
 - Non-BYOK users (no ``encrypted_api_key`` row): instant pass, no
   network call. Returns ``None`` so handlers can branch on it.
 - BYOK users with healthy balance: returns the ``BalanceInfo``.
+  Uses the persisted cache (``settings.BALANCE_CACHE_TTL_SECONDS``)
+  to avoid hitting OpenRouter on every request.  The authoritative
+  fresh check happens in the Celery task pre-flight
+  (``resolve_byok_with_preflight(force_refresh=True)`` in
+  ``analysis_steps.analyze_chunk_step``) before any LLM spend.
 - BYOK users with known-zero balance: raises ``HTTPException(402)``
   with a structured ``detail`` body the frontend renders as the
   "Add credits" alert.
@@ -25,6 +30,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user_id
+from app.config import settings
 from app.constants import MODEL_TIER_INCLUDED
 from app.database import get_db
 from app.models.database_models import User
@@ -84,7 +90,9 @@ async def require_byok_credits(
         return None
 
     try:
-        balance = get_cached_balance(db, user, max_age_seconds=0)
+        balance = get_cached_balance(
+            db, user, max_age_seconds=settings.BALANCE_CACHE_TTL_SECONDS
+        )
     except OpenRouterBalanceError as exc:
         logger.warning(
             "Balance fetch failed for user %s at route gate (degraded "
