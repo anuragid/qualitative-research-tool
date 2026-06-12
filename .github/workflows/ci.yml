@@ -6,11 +6,40 @@ on:
   pull_request:
     branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
+  gitleaks:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # We run the pinned gitleaks CLI directly instead of
+      # gitleaks/gitleaks-action@v2 because the action does not support
+      # baselines (its args are hardcoded in src/gitleaks.js) and it only
+      # scans the push/PR commit range, not full history.
+      #
+      # Config: .gitleaks.toml allowlists test-fixture paths (backend/tests/,
+      # *.test.*, *.stories.*) and shared fake fixture values, so new tests
+      # using those fixtures never trip the scan. .gitleaks-baseline.json
+      # covers the remaining true historical one-offs (incl. an
+      # already-leaked Clerk sk_test key slated for rotation — see
+      # docs/production-readiness/runbooks/secret-rotation.md).
+      # Any NEW finding fails this job.
+      # Checksum verified against gitleaks_8.30.0_checksums.txt on the release.
+      - name: Install gitleaks v8.30.0
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz
+          echo "79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Gitleaks scan (full history, baseline-filtered)
+        run: gitleaks detect --redact -v --baseline-path .gitleaks-baseline.json --exit-code 1
+
   backend-ci:
     name: Backend CI
     runs-on: ubuntu-latest
@@ -32,6 +61,12 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt -r requirements-dev.txt
+
+      # pip-audit is installed via requirements-dev.txt above.
+      # BLOCKING: the dependency-upgrade PR (#38) cleared all known vulns,
+      # so any new finding here must fail CI.
+      - name: Dependency audit (pip-audit)
+        run: pip-audit -r requirements.txt
 
       - name: Lint with ruff
         run: ruff check .
@@ -152,7 +187,7 @@ jobs:
 
   deploy-frontend:
     name: Deploy Frontend
-    needs: frontend-ci
+    needs: [frontend-ci, gitleaks]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:

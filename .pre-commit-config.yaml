@@ -1,0 +1,11 @@
+# Secret scanning on every commit.
+# Install: pip install pre-commit && pre-commit install
+#
+# Uses the official gitleaks hook (entry: `gitleaks git --pre-commit
+# --redact --staged --verbose`, language: golang) so the rev pin below
+# determines the gitleaks version — no system-installed binary required.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks

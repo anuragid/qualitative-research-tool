@@ -1,0 +1,36 @@
+# Gitleaks configuration — extends the default rules.
+#
+# Purpose: structurally allowlist test-fixture locations and shared fake
+# fixture values so that NEW tests using the standard fake keys never trip
+# the secret scan (in CI or the pre-commit hook). Without this, every new
+# test file re-breaks the scan and trains developers to use --no-verify.
+#
+# .gitleaks-baseline.json then only needs to cover true historical
+# one-offs (e.g. the real Clerk sk_test key leaked in backend/.env.example
+# at commit 340d8a1 — see docs/production-readiness/runbooks/secret-rotation.md).
+#
+# IMPORTANT: never put REAL credentials in any allowlisted path or pattern.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test and story files — fake fixture keys are not secrets"
+paths = [
+  '''backend/tests/.*''',
+  '''.*\.test\.(ts|tsx|js|jsx)$''',
+  '''.*\.stories\.(ts|tsx|js|jsx)$''',
+  '''\.gitleaks-baseline\.json$''',
+]
+
+[[allowlists]]
+description = "Shared fake fixture values (used in conftest/env setup across the suite)"
+regexTarget = "secret"
+regexes = [
+  # Fake Fernet ENCRYPTION_KEY fixture used by backend test env setup
+  '''9px3YGa-Z2bljdtUKpLhqzl9IaGdf2RgrCI-zOTrUug=''',
+  # Fake Clerk publishable keys (base64 of test*.clerk.accounts.dev$)
+  '''pk_test_dGVzdC[0-9A-Za-z+/=]*''',
+  # Fake Clerk secret key placeholder
+  '''sk_test_fake''',
+]
