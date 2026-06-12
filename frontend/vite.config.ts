@@ -29,6 +29,21 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: "hidden", // Generate source maps for Sentry but don't expose to browser
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // Split stable vendor packages into a long-lived cached chunk.
+        // React + DOM + Router change infrequently; keeping them out of
+        // the app entry means a code-only deploy doesn't bust the vendor cache.
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/react-router') ||
+              id.includes('node_modules/scheduler/')) {
+            return 'vendor-react';
+          }
+        },
+      },
+    },
   },
   test: {
     coverage: {
