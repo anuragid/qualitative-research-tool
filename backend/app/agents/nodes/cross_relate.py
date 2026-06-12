@@ -116,6 +116,7 @@ Find patterns that transcend individual videos and reveal system-level themes.""
                     "cross_video_patterns": None,
                     "current_step": "cross_relate",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         logger.info(f"[CROSS_RELATE] Identified {len(cross_patterns)} meta-patterns across videos")

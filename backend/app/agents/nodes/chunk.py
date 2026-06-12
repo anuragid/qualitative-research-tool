@@ -196,6 +196,7 @@ Remember:
                     "chunks": None,
                     "current_step": "chunk",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         # Debug: Log chunk types

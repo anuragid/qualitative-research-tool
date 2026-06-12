@@ -120,6 +120,7 @@ Generate insights that reveal truths about the system as a whole, not just indiv
                     "cross_video_insights": None,
                     "current_step": "cross_explain",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         logger.info(f"[CROSS_EXPLAIN] Generated {len(cross_insights)} cross-video insights")
