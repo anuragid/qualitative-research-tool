@@ -180,7 +180,7 @@ async def sync_user(
 
 
 @router.get("/settings", response_model=UserSettingsResponse)
-async def get_user_settings(
+def get_user_settings(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -223,7 +223,7 @@ async def get_user_settings(
 
 @router.post("/settings/api-key", response_model=UserSettingsResponse)
 @limiter.limit("5/minute")
-async def add_api_key(
+def add_api_key(
     request: Request,
     payload: ApiKeyAddRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -307,7 +307,7 @@ async def add_api_key(
     response_model=UserSettingsResponse,
 )
 @limiter.limit("20/minute")
-async def update_preferred_model(
+def update_preferred_model(
     request: Request,
     payload: PreferredModelUpdateRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -392,7 +392,7 @@ async def update_preferred_model(
 
 @router.post("/settings/refresh-balance", response_model=BalanceInfoResponse)
 @limiter.limit("10/minute")
-async def refresh_balance(
+def refresh_balance(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -455,7 +455,7 @@ async def refresh_balance(
 
 
 @router.delete("/settings/api-key")
-async def delete_api_key(
+def delete_api_key(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

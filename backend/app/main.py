@@ -218,13 +218,13 @@ def _probe_redis() -> None:
 
 
 @app.get("/")
-async def root():
+def root():
     """Root endpoint."""
     return {"status": "ok"}
 
 
 @app.get("/health")
-async def health_check():
+def health_check():
     """Backwards-compatible liveness alias for the old single /health probe.
 
     Existing monitoring (UptimeRobot, etc.) is still pointed at this URL,
@@ -235,7 +235,7 @@ async def health_check():
 
 
 @app.get("/health/live")
-async def health_live():
+def health_live():
     """Liveness — is the process running and able to answer HTTP?
 
     Always returns 200 as long as the FastAPI event loop is alive. Used
@@ -246,7 +246,7 @@ async def health_live():
 
 
 @app.get("/health/ready")
-async def health_ready():
+def health_ready():
     """Readiness — can this replica actually serve traffic?
 
     Verifies the things a request handler needs in order to do useful
