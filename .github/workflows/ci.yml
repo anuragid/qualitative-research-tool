@@ -96,6 +96,15 @@ jobs:
       run:
         working-directory: backend
     env:
+      # This job runs alembic/check_migration_drift directly (NOT via pytest),
+      # so tests/conftest.py's APP_ENV=development setdefault never executes.
+      # Without this, APP_ENV defaults to "production" and the Settings
+      # model_validator (config.py) hard-fails on missing ENCRYPTION_KEY /
+      # CLERK_ISSUER at `from app.config import settings` (alembic/env.py),
+      # before any migration can run. "test" is a valid APP_ENV (Literal) and
+      # the prod-secrets validator only fires for "production", so the schema
+      # check imports cleanly without needing real prod secrets.
+      APP_ENV: test
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       # Stub values — only DATABASE_URL is exercised by this job.
       REDIS_URL: redis://localhost:6379/0
