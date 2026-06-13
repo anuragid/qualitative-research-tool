@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/recommended")
-async def get_recommended_models(
+def get_recommended_models(
     _current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
 ):
     """Return the currently recommended standard and advanced models.

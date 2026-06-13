@@ -43,7 +43,7 @@ def _get_transcript_with_ownership(
 
 
 @router.get("/{transcript_id}", response_model=TranscriptResponse)
-async def get_transcript(
+def get_transcript(
     transcript_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
@@ -68,7 +68,7 @@ async def get_transcript(
 
 
 @router.get("/{transcript_id}/speakers", response_model=List[SpeakerLabelResponse])
-async def get_speaker_labels(
+def get_speaker_labels(
     transcript_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
@@ -100,7 +100,7 @@ async def get_speaker_labels(
 
 
 @router.post("/{transcript_id}/speakers", response_model=List[SpeakerLabelResponse], status_code=status.HTTP_201_CREATED)
-async def save_speaker_labels(
+def save_speaker_labels(
     transcript_id: UUID,
     speaker_labels: List[SpeakerLabelCreate],
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_UPDATE)),
@@ -201,7 +201,7 @@ async def save_speaker_labels(
 
 
 @router.patch("/{transcript_id}/speakers/{speaker_label_id}", response_model=SpeakerLabelResponse)
-async def update_speaker_label(
+def update_speaker_label(
     transcript_id: UUID,
     speaker_label_id: UUID,
     update_data: SpeakerLabelUpdate,
@@ -251,7 +251,7 @@ async def update_speaker_label(
 
 
 @router.delete("/{transcript_id}/speakers/{speaker_label_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_speaker_label(
+def delete_speaker_label(
     transcript_id: UUID,
     speaker_label_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_UPDATE)),

@@ -56,7 +56,7 @@ _ANALYSIS_STATUS_COLS = [
 
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
-async def create_project(
+def create_project(
     project_data: ProjectCreate,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_CREATE)),
     db: Session = Depends(get_db)
@@ -105,7 +105,7 @@ async def create_project(
 
 
 @router.get("/", response_model=List[ProjectListResponse])
-async def list_projects(
+def list_projects(
     skip: int = 0,
     limit: int = 50,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
@@ -172,7 +172,7 @@ async def list_projects(
 
 
 @router.get("/{project_id}", response_model=ProjectListResponse)
-async def get_project(
+def get_project(
     project_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
     db: Session = Depends(get_db)
@@ -228,7 +228,7 @@ async def get_project(
 
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
-async def update_project(
+def update_project(
     project_id: UUID,
     project_data: ProjectUpdate,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_UPDATE)),
@@ -346,7 +346,7 @@ async def delete_project(
 
 
 @router.get("/{project_id}/videos", response_model=List[VideoListItemResponse])
-async def list_project_videos(
+def list_project_videos(
     project_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
     db: Session = Depends(get_db)
@@ -399,7 +399,7 @@ async def list_project_videos(
 
 @router.post("/{project_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_ANALYZE)
-async def trigger_project_analysis(
+def trigger_project_analysis(
     project_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
@@ -553,7 +553,7 @@ async def trigger_project_analysis(
 
 
 @router.get("/{project_id}/analysis", response_model=ProjectAnalysisResponse)
-async def get_project_analysis(
+def get_project_analysis(
     project_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)

@@ -475,7 +475,7 @@ async def upload_video(
 
 
 @router.get("/{video_id}", response_model=VideoResponse)
-async def get_video(
+def get_video(
     video_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
     db: Session = Depends(get_db)
@@ -581,7 +581,7 @@ async def get_video_playback_url(
 
 
 @router.get("/{video_id}/transcript", response_model=TranscriptResponse)
-async def get_video_transcript(
+def get_video_transcript(
     video_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
@@ -618,7 +618,7 @@ async def get_video_transcript(
 
 @router.post("/{video_id}/transcribe", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
-async def start_transcription(
+def start_transcription(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
@@ -719,7 +719,7 @@ async def start_transcription(
 
 @router.post("/{video_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_ANALYZE)
-async def trigger_video_analysis(
+def trigger_video_analysis(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
@@ -865,7 +865,7 @@ async def trigger_video_analysis(
 
 
 @router.get("/{video_id}/analysis/status")
-async def get_video_analysis_status(
+def get_video_analysis_status(
     video_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db),
@@ -905,7 +905,7 @@ async def get_video_analysis_status(
 
 
 @router.get("/{video_id}/analysis", response_model=VideoAnalysisResponse)
-async def get_video_analysis(
+def get_video_analysis(
     video_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
@@ -966,7 +966,7 @@ async def get_video_analysis(
 
 
 @router.get("/{video_id}/transcript/words")
-async def get_word_level_transcript(
+def get_word_level_transcript(
     video_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_READ)),
     db: Session = Depends(get_db)
@@ -1106,7 +1106,7 @@ async def search_transcript_words(
 # Step-by-step analysis endpoints
 @router.post("/{video_id}/analyze/chunk", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
-async def trigger_chunk_step(
+def trigger_chunk_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
@@ -1191,7 +1191,7 @@ async def trigger_chunk_step(
 
 @router.post("/{video_id}/analyze/infer", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
-async def trigger_infer_step(
+def trigger_infer_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
@@ -1269,7 +1269,7 @@ async def trigger_infer_step(
 
 @router.post("/{video_id}/analyze/relate", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
-async def trigger_relate_step(
+def trigger_relate_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
@@ -1347,7 +1347,7 @@ async def trigger_relate_step(
 
 @router.post("/{video_id}/analyze/explain", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
-async def trigger_explain_step(
+def trigger_explain_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
@@ -1425,7 +1425,7 @@ async def trigger_explain_step(
 
 @router.post("/{video_id}/analyze/activate", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
-async def trigger_activate_step(
+def trigger_activate_step(
     video_id: UUID,
     request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.ANALYSIS_RUN)),
