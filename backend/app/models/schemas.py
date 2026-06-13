@@ -317,6 +317,102 @@ class SpeakerLabelResponse(BaseModel):
 
 # ========== Video Analysis Schemas ==========
 
+class VideoAnalysisStatusEmbed(BaseModel):
+    """Lightweight analysis status for embedding in list responses.
+
+    Contains only the status/step tracking fields — NOT the 5 JSONB blobs
+    (chunks, inferences, patterns, insights, design_principles).  Used
+    wherever the list endpoints embed analysis info so polled responses stay
+    small (~200 bytes per video instead of 50–500 KB).
+
+    Full blob payload is available via ``GET /api/videos/{id}/analysis``.
+    See ``VideoAnalysisResponse`` for the full schema.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    # Optional when status == "not_started" -- no row exists yet.
+    id: Optional[UUID] = None
+    video_id: UUID
+    status: str
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    # Step-by-step tracking fields
+    current_step: Optional[str] = None
+    step_status: Optional[Dict[str, str]] = None
+    chunk_completed_at: Optional[datetime] = None
+    infer_completed_at: Optional[datetime] = None
+    relate_completed_at: Optional[datetime] = None
+    explain_completed_at: Optional[datetime] = None
+    activate_completed_at: Optional[datetime] = None
+
+
+class VideoListItemResponse(VideoBase):
+    """Lightweight video shape for list endpoints (no analysis JSONB blobs).
+
+    Use this instead of ``VideoResponse`` in list/polling endpoints
+    (list_projects, get_project, list_project_videos).  Full analysis
+    payload is only fetched via ``GET /api/videos/{id}/analysis``.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    project_id: UUID
+    file_size_bytes: Optional[int] = None
+    duration_seconds: Optional[int] = None
+    uploaded_at: datetime
+    status: str
+    error_message: Optional[str] = None
+    analysis: Optional[VideoAnalysisStatusEmbed] = Field(
+        default=None, validation_alias="video_analysis"
+    )
+
+
+class VideoStatusStub(BaseModel):
+    """Absolute minimum video shape for the projects *list* endpoint.
+
+    Only the three fields the projects-list UI actually reads:
+    * ``id``         — React key + thumbnail slot identity
+    * ``status``     — FolderStatusIcon state machine + polling gate
+    * ``uploaded_at`` — sort key for "3 most-recent" thumbnail ordering
+
+    No ``analysis`` embed, no file metadata.  This lets ``list_projects``
+    skip the JOIN to ``video_analyses`` entirely (zero JSONB reads vs. the
+    status-cols-only embed that still required joining that table).
+
+    Deploy-window tolerance: ``.passthrough()`` so an old backend that sends
+    extra fields (e.g. ``filename``, ``analysis``) doesn't fail schema
+    validation on the frontend during the rollout window.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    uploaded_at: datetime
+
+
+class ProjectListResponse(ProjectBase):
+    """Lightweight project shape for list endpoints.
+
+    ``videos`` is now a ``List[VideoStatusStub]`` — the three columns the
+    projects-list UI actually needs (id, status, uploaded_at).  The
+    ``list_projects`` route uses a single outerjoin against the ``videos``
+    table only; ``video_analyses`` is not touched at all.
+
+    Deploy-window tolerance: ``VideoStatusStub`` uses ``.passthrough()``
+    and ``videos`` is optional, so an old backend response carrying full
+    ``VideoListItemResponse`` objects continues to validate without error.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    videos: Optional[List["VideoStatusStub"]] = []
+
+
 class VideoAnalysisResponse(BaseModel):
     """Schema for video analysis response.
 
@@ -371,8 +467,13 @@ class ProjectAnalysisResponse(BaseModel):
     status: str
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
 
 
 
 # Rebuild models to resolve forward references
 ProjectResponse.model_rebuild()
+ProjectListResponse.model_rebuild()
+
+# VideoStatusStub has no forward references, but keep symmetry
+VideoStatusStub.model_rebuild()

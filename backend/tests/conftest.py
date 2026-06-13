@@ -199,12 +199,20 @@ def mock_s3():
     Patches in both the service module and the routes module (which holds
     a local reference from `from ... import s3_service`).
     """
+    # A minimal valid MP4 header (ftyp box at offset 4) so the confirm-upload
+    # content sniff passes by default. Tests that exercise the size/content
+    # rejection paths override head_object / get_object_range explicitly.
+    valid_media_header = b"\x00\x00\x00\x1cftypisom\x00\x00\x02\x00mp41"
     with patch("app.services.s3_service.s3_service") as svc_mock, \
          patch("app.routes.videos.s3_service") as route_mock:
         for mock in (svc_mock, route_mock):
             mock.upload_video.return_value = ("test-key", "https://test-url")
             mock.delete_video.return_value = None
             mock.get_presigned_url.return_value = "https://test-presigned-url"
+            # confirm-upload defaults: object exists, is small, and looks like
+            # real media so the happy path succeeds without per-test setup.
+            mock.head_object.return_value = {"ContentLength": 1000}
+            mock.get_object_range.return_value = valid_media_header
         yield route_mock
 
 

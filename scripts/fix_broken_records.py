@@ -6,14 +6,29 @@ Fixes:
   2. Fixes stale projects stuck in 'planning' status
   3. Logs Group 3 videos (no action needed)
 
-Usage:
-  # Dry run (no changes committed):
-  DRY_RUN=1 railway run --service backend python scripts/fix_broken_records.py
+SAFETY: the default behaviour is dry-run (no database mutations). You must
+pass ``--apply`` to actually commit changes to the database. An accidental
+``python scripts/fix_broken_records.py`` will show the plan and exit zero
+without touching anything.
 
-  # Live run:
+Alternatively, you can set DRY_RUN=1 (or any truthy value) to force dry-run
+mode even with --apply.
+
+Usage:
+  # Default: dry run (no changes committed)
   railway run --service backend python scripts/fix_broken_records.py
+
+  # Explicit dry run (same as default)
+  railway run --service backend python scripts/fix_broken_records.py --dry-run
+
+  # Actually apply changes to the database
+  railway run --service backend python scripts/fix_broken_records.py --apply
+
+  # Force dry-run mode (overrides --apply)
+  DRY_RUN=1 railway run --service backend python scripts/fix_broken_records.py --apply
 """
 
+import argparse
 import os
 import sys
 
@@ -58,7 +73,10 @@ from app.models.database_models import Project, Video, VideoAnalysis  # noqa: E4
 engine = create_engine(DATABASE_URL, echo=False)
 Session = sessionmaker(bind=engine)
 
-DRY_RUN = bool(os.environ.get("DRY_RUN"))
+# DRY_RUN defaults to True (safe). If environment variable DRY_RUN is set
+# (to any truthy value), force dry-run mode regardless of --apply flag.
+# This ensures --apply without DRY_RUN=1 actually commits changes.
+ENV_DRY_RUN = bool(os.environ.get("DRY_RUN"))
 
 # ---------------------------------------------------------------------------
 # Video IDs to fix
@@ -219,8 +237,32 @@ def log_info_only(session):
             print(f"  WARN  {vid} — not found in database (reason: {reason})")
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show the plan without committing changes. This is the default.",
+    )
+    group.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually apply changes to the database. Without this flag, "
+             "the script is read-only.",
+    )
+    return parser.parse_args()
+
+
 def main():
-    mode = "DRY RUN" if DRY_RUN else "LIVE"
+    args = parse_args()
+
+    # Default to dry-run unless --apply is passed.
+    # Also: if DRY_RUN env var is set, force dry-run regardless of --apply.
+    apply = args.apply and not ENV_DRY_RUN
+    dry_run = not apply
+
+    mode = "DRY-RUN" if dry_run else "APPLY"
     print(f"=== fix_broken_records.py ({mode}) ===\n")
 
     session = Session()
@@ -254,8 +296,8 @@ def main():
         print(f"  Videos skipped:   {videos_skipped}")
         print(f"  Projects updated: {projects_updated}")
 
-        if DRY_RUN:
-            print(f"\n  DRY RUN — rolling back all changes.")
+        if dry_run:
+            print(f"\n  DRY-RUN (use --apply to execute) — rolling back all changes.")
             session.rollback()
         else:
             print(f"\n  Committing changes...")

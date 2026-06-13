@@ -120,6 +120,7 @@ def _setup_test_db(tmp_path):
         Column("status", String(50), default="pending"),
         Column("started_at", DateTime),
         Column("completed_at", DateTime),
+        Column("error_message", Text),
     )
 
     meta.create_all(bind=engine)

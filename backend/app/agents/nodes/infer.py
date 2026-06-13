@@ -109,6 +109,7 @@ Generate multiple inferences per chunk if appropriate."""
                     "inferences": None,
                     "current_step": "infer",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         logger.info(f"[INFER] Generated inferences for {len(inferences)} chunks")

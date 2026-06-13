@@ -32,6 +32,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { DeleteProjectDialog } from "../components/projects/DeleteProjectDialog";
 import { EditProjectDialog } from "../components/projects/EditProjectDialog";
+import { parseErrorMessage } from "../lib/parseError";
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -56,6 +57,10 @@ export default function ProjectDetailPage() {
 
   // Nielsen #1: Visibility of system status - Track when analysis was triggered
   const [analysisTriggered, setAnalysisTriggered] = useState(false);
+
+  const parsedProjectError = projectAnalysis?.error_message
+    ? parseErrorMessage(projectAnalysis.error_message)
+    : null;
 
   // Display state for cross-video analysis tabs
   const metaPatternsDisplay = useAnalysisDisplay("metaPatterns");
@@ -473,7 +478,8 @@ export default function ProjectDetailPage() {
                   </Button>
                 }
               >
-                There was an error analyzing patterns across videos. This might be due to rate limits or processing issues.
+                {parsedProjectError?.message
+                  ?? "There was an error analyzing patterns across videos. This might be due to rate limits or processing issues."}
               </AlertBanner>
             )}
 

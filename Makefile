@@ -12,7 +12,7 @@ test-backend:
 	cd backend && python -m pytest tests/ -v --tb=short
 
 test-frontend:
-	cd frontend && npm run build
+	cd frontend && npm test -- --run
 
 test: test-backend test-frontend
 

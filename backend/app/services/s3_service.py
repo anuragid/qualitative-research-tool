@@ -37,7 +37,15 @@ class S3Service:
                 region_name="auto",
                 config=BotoConfig(
                     signature_version="s3v4",
-                    retries={"max_attempts": 3, "mode": "standard"},
+                    # Standard retry mode retries on connect/read timeouts too,
+                    # so worst case against a fully stalled endpoint is
+                    # max_attempts × (connect_timeout + read_timeout)
+                    # = 2 × (10 + 160) = 340 s < Celery task_time_limit=360 s.
+                    # max_attempts=2 trades some transient-5xx resilience; the
+                    # bounded Celery task-level retry covers that class.
+                    retries={"max_attempts": 2, "mode": "standard"},
+                    connect_timeout=settings.R2_CONNECT_TIMEOUT_SECONDS,
+                    read_timeout=settings.R2_READ_TIMEOUT_SECONDS,
                 ),
             )
         return self._s3_client
@@ -167,6 +175,21 @@ class S3Service:
     def head_object(self, s3_key: str) -> dict:
         """Check if an object exists in R2 and return its metadata."""
         return self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_key)
+
+    def get_object_range(self, s3_key: str, length: int) -> bytes:
+        """Fetch the first ``length`` bytes of an object via a ranged GET.
+
+        Used by the presigned-upload confirmation path to sniff an object's
+        magic bytes without downloading the whole (potentially large) file.
+        The HTTP ``Range`` header is inclusive, so byte 0..length-1 is
+        requested. ``length`` is expected to be small (a few bytes).
+        """
+        response = self.s3_client.get_object(
+            Bucket=self.bucket_name,
+            Key=s3_key,
+            Range=f"bytes=0-{length - 1}",
+        )
+        return response["Body"].read()
 
     def delete_video(self, s3_key: str) -> bool:
         """

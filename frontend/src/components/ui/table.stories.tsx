@@ -3,7 +3,7 @@ import { expect, within } from "storybook/test";
 import {
   Table, TableBody, TableCaption, TableCell,
   TableHead, TableHeader, TableRow, TableFooter,
-} from "./Table";
+} from "./table";
 
 const meta = {
   title: "UI/Table",

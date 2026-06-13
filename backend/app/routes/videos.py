@@ -19,6 +19,7 @@ from app.dependencies.byok_gate import require_byok_credits
 from app.models.database_models import Project, Transcript, Video, VideoAnalysis
 from app.models.schemas import TranscriptResponse, VideoAnalysisResponse, VideoResponse, VideoUploadResponse
 from app.rate_limit import limiter
+from app.services.media_validation import MAGIC_BYTE_PROBE_LEN, is_valid_media_header
 from app.services.openrouter_balance import BalanceInfo
 from app.services.s3_service import s3_service
 from app.state import (
@@ -29,28 +30,50 @@ from app.state import (
     VideoEvent,
     VideoStateMachine,
 )
+from app.utils.row_locking import lock_rows
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# confirm-upload size envelope: the actual R2 object may be at most this
+# multiple of the size the client claimed at /upload-url. Absorbs container
+# muxing/metadata overhead and JS ``File.size`` rounding (a few percent)
+# while still rejecting an object smuggled in far larger than its claim.
+# A 1 MB absolute floor (applied at the call site) keeps tiny uploads from
+# being rejected over rounding noise.
+UPLOAD_SIZE_TOLERANCE = 1.10
 
 
 def _get_video_with_ownership(
     video_id: UUID,
     current_user_id: str,
     db: Session,
+    *,
+    for_update: bool = False,
 ) -> Video:
     """
     Fetch a video and verify ownership through the project relationship.
 
     Raises HTTPException 404 if the video doesn't exist or the user doesn't own it.
+
+    ``for_update``: when True, the Video row is selected ``FOR UPDATE`` so the
+    mutating status-transition routes (transcribe / analyze) serialize against
+    concurrent requests on the SAME video — the second request blocks until the
+    first commits, then re-reads the post-commit state and hits its 409 guard
+    instead of racing through it (audit R-H2 compare-and-swap). No-op on SQLite.
+    The join filters on Project but only the Video row is locked (single-row
+    lock — see deadlock note in app/utils/row_locking.py).
     """
-    video = (
+    query = (
         db.query(Video)
         .join(Project, Video.project_id == Project.id)
         .filter(Video.id == video_id, Project.user_id == current_user_id)
-        .first()
     )
+    if for_update:
+        # Lock only the Video row, not the joined Project (of=Video).
+        query = lock_rows(query, of=Video)
+    video = query.first()
     if not video:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -200,6 +223,20 @@ async def confirm_upload(
       uploaded  -> verify bytes still exist (defensive) -> uploaded (no-op)
       error     -> verify bytes -> uploaded (recovery from a previous false-negative)
       anything else -> 400
+
+    Server-side enforcement (security findings H1/H2/H3). The presigned PUT
+    URL only pins Bucket/Key/ContentType, so R2 will accept an object of any
+    size and any bytes at the agreed key — the size check at /upload-url only
+    saw the *client-claimed* size. confirm-upload is the single
+    server-controlled checkpoint after the client PUT, so it re-validates:
+      1. ContentLength <= MAX_FILE_SIZE_MB (absolute ceiling).
+      2. ContentLength within a tolerance envelope of the size the client
+         claimed when it requested the URL (catches "claimed 10MB, PUT 5GB").
+      3. The first bytes pass the same magic-byte validator the legacy
+         /upload path uses (catches non-media content under a video MIME).
+    On any of these, the row is driven to ERROR via the state machine and
+    the offending object is deleted from R2 so the upload can be retried
+    cleanly without leaving an orphaned object or a stuck row.
     """
     current_user_id = current_user["id"]
     video = _get_video_with_ownership(video_id, current_user_id, db)
@@ -209,6 +246,27 @@ async def confirm_upload(
             status_code=400,
             detail=f"Video is in '{video.status}' state, cannot confirm upload",
         )
+
+    async def _reject(status_code: int, detail: str) -> None:
+        """Drive the row to ERROR, delete the offending R2 object, and raise.
+
+        Cleanup is best-effort: a failed delete must not mask the original
+        validation rejection (the user still needs the 4xx). The row is
+        always transitioned + committed so it never stays stuck in
+        'uploading'.
+        """
+        VideoStateMachine.transition(
+            video, VideoEvent.UPLOAD_REJECTED, db=db, error_message=detail
+        )
+        db.commit()
+        try:
+            await asyncio.to_thread(s3_service.delete_video, video.s3_key)
+        except Exception as cleanup_err:  # noqa: BLE001 - cleanup is best-effort
+            logger.error(
+                f"Failed to delete rejected upload object for video {video.id}: {cleanup_err}"
+            )
+        logger.warning(f"Rejected upload for video {video.id}: {detail}")
+        raise HTTPException(status_code=status_code, detail=detail)
 
     # Verify the object actually exists in R2 and is not empty
     try:
@@ -220,6 +278,55 @@ async def confirm_upload(
         raise
     except Exception:
         raise HTTPException(status_code=400, detail="File not found in storage. Upload may not have completed.")
+
+    # H1: absolute size ceiling. The presigned URL did not constrain object
+    # size, so an attacker can PUT an arbitrarily large object regardless of
+    # the size they claimed at /upload-url. Reject + clean up.
+    max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    if content_length > max_bytes:
+        await _reject(
+            413,
+            f"Uploaded file is too large ({content_length} bytes). "
+            f"Maximum: {settings.MAX_FILE_SIZE_MB}MB.",
+        )
+
+    # H2: claimed-size envelope. The /upload-url size check only saw the
+    # client-claimed file_size; enforce that the actual object is within a
+    # tolerance of it. A small slack (UPLOAD_SIZE_TOLERANCE) absorbs
+    # container/metadata overhead and JS File.size rounding without letting a
+    # caller smuggle a vastly larger object under a small claimed size.
+    claimed = video.file_size_bytes or 0
+    if claimed > 0:
+        envelope = max(int(claimed * UPLOAD_SIZE_TOLERANCE), claimed + 1024 * 1024)
+        if content_length > envelope:
+            await _reject(
+                400,
+                f"Uploaded file size ({content_length} bytes) exceeds the "
+                f"declared size ({claimed} bytes) by more than the allowed "
+                f"tolerance.",
+            )
+
+    # H3: content sniffing. The presigned URL pinned only the Content-Type
+    # header, which the client controls and R2 does not verify against the
+    # bytes. Fetch the first bytes via a ranged GET and run them through the
+    # shared magic-byte validator. Reject non-media content + clean up.
+    try:
+        header = await asyncio.to_thread(
+            s3_service.get_object_range, video.s3_key, MAGIC_BYTE_PROBE_LEN
+        )
+    except Exception:
+        # If we cannot read the bytes back, treat it like a missing object
+        # rather than silently accepting unvalidated content.
+        raise HTTPException(
+            status_code=400,
+            detail="File not found in storage. Upload may not have completed.",
+        )
+    if not is_valid_media_header(header):
+        await _reject(
+            400,
+            "Uploaded file does not appear to be a valid media file. "
+            "Content does not match an allowed video/audio format.",
+        )
 
     # Flip to "uploaded". The state machine handles all three legal
     # source states in its transition table (UPLOADING, UPLOADED,
@@ -306,36 +413,14 @@ async def upload_video(
                 detail=f"File too large. Maximum size: {settings.MAX_FILE_SIZE_MB}MB"
             )
 
-        # Validate file content by magic bytes
-        header = await file.read(12)
+        # Validate file content by magic bytes (shared with the presigned
+        # confirm-upload path via app.services.media_validation so the two
+        # upload routes can never disagree on what counts as valid media).
+        header = await file.read(MAGIC_BYTE_PROBE_LEN)
         await file.seek(0)  # Reset file position
         if len(header) < 2:
             raise HTTPException(status_code=400, detail="File too small to be a valid media file")
-
-        # Check for known video/audio file signatures
-        is_valid_magic = False
-        # Video: MP4/MOV/M4A (ftyp box)
-        if len(header) >= 8 and header[4:8] == b'ftyp':
-            is_valid_magic = True
-        # Video: WebM/MKV (EBML)
-        elif header[:4] == b'\x1a\x45\xdf\xa3':
-            is_valid_magic = True
-        # Video: AVI / Audio: WAV (both RIFF-based)
-        elif header[:4] == b'RIFF':
-            is_valid_magic = True
-        # Audio: MP3 with ID3v2 tag
-        elif header[:3] == b'ID3':
-            is_valid_magic = True
-        # Audio: MP3 frame sync / AAC ADTS (0xFFE0+)
-        elif len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
-            is_valid_magic = True
-        # Audio: OGG Vorbis/Opus
-        elif header[:4] == b'OggS':
-            is_valid_magic = True
-        # Audio: FLAC
-        elif header[:4] == b'fLaC':
-            is_valid_magic = True
-        if not is_valid_magic:
+        if not is_valid_media_header(header):
             raise HTTPException(status_code=400, detail="File does not appear to be a valid media file")
 
         # Get file size
@@ -544,7 +629,12 @@ async def start_transcription(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # Lock the video row for the guard+transition+commit so two concurrent
+        # /transcribe POSTs serialize: the second blocks until the first
+        # commits, re-reads status='transcribing', and 409s (no double submit).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Reject if the upload hasn't been confirmed yet. Previously this was silently
         # accepted, which produced a confusing UX where the upload widget showed a
@@ -641,7 +731,14 @@ async def trigger_video_analysis(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # Lock the video row so two concurrent /analyze (retry) clicks
+        # serialize: the second blocks until the first commits its
+        # ANALYZE_DISPATCHED transition, re-reads status='analyzing', and 409s
+        # — closing the duplicate-chain dispatch race (audit R-H2; the same
+        # race was confirmed for project retry in PR #40 review).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Race condition: reject if already analyzing
         if video.status in ("analyzing",):
@@ -670,11 +767,10 @@ async def trigger_video_analysis(
             )
 
         # Set video status to "analyzing" inside the request transaction to close
-        # the concurrent-double-click race. Two requests hitting this endpoint
-        # back-to-back will both reach this point, but only one will win the
-        # commit — the other will see status == "analyzing" on its next read
-        # and reject via the status check above. The chunk step's matching
-        # reassignment later is idempotent (ANALYZING -> ANALYZING self-loop).
+        # the concurrent-double-click race. The FOR UPDATE on the video row
+        # above already serializes the two requests, so only one wins the
+        # commit and the other 409s on the status check. The chunk step's
+        # matching reassignment later is idempotent (ANALYZING -> ANALYZING).
         VideoStateMachine.transition(
             video, VideoEvent.ANALYZE_DISPATCHED, db=db
         )
@@ -685,8 +781,13 @@ async def trigger_video_analysis(
         # every step and the retry is a no-op. See
         # docs/production-readiness/prs/pr19-5-retry-swallow.md and PR #19.5
         # for the full root-cause story (Kathleen video 4b1f4b25, 2026-04-07).
-        analysis = db.query(VideoAnalysis).filter(
-            VideoAnalysis.video_id == video_id
+        # Lock the VideoAnalysis row too: although the video-row lock already
+        # serializes manual double-clicks, this also serializes a manual retry
+        # against the worker's auto-dispatch path (transcription_tasks), so the
+        # error->pending reset and the chunk step's pending->processing can't
+        # interleave.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
         ).first()
         if analysis and analysis.status == "error":
             # RETRY_RESET: error -> pending. The companion JSONB clears
@@ -1017,11 +1118,26 @@ async def trigger_chunk_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
         # Block only if a step is currently mid-execution.  Coarser checks on
         # video.status would deadlock the step-by-step pipeline (see _is_any_step_processing).
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1045,7 +1161,15 @@ async def trigger_chunk_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_chunk_step
-        task = analyze_chunk_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_chunk_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="chunk"
+            ),
+        )
         logger.info(f"CHUNK step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1079,9 +1203,24 @@ async def trigger_infer_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1100,7 +1239,15 @@ async def trigger_infer_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_infer_step
-        task = analyze_infer_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_infer_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="infer"
+            ),
+        )
         logger.info(f"INFER step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1134,9 +1281,24 @@ async def trigger_relate_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1155,7 +1317,15 @@ async def trigger_relate_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_relate_step
-        task = analyze_relate_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_relate_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="relate"
+            ),
+        )
         logger.info(f"RELATE step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1189,9 +1359,24 @@ async def trigger_explain_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1210,7 +1395,15 @@ async def trigger_explain_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_explain_step
-        task = analyze_explain_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_explain_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="explain"
+            ),
+        )
         logger.info(f"EXPLAIN step started for video {video_id}, task_id: {task.id}")
 
         return {
@@ -1244,9 +1437,24 @@ async def trigger_activate_step(
     """
     current_user_id = current_user["id"]
     try:
-        video = _get_video_with_ownership(video_id, current_user_id, db)
+        # GLOBAL LOCK ORDER: Video FIRST, then VideoAnalysis — same order as
+        # /analyze. This route mutates video.status (ANALYZE_DISPATCHED), so
+        # its commit takes the Video row lock anyway; acquiring it explicitly
+        # up-front (instead of implicitly at flush, AFTER the VideoAnalysis
+        # lock below) prevents a lock-order inversion against /analyze that
+        # was a reproducible Postgres deadlock (PR #48 review finding).
+        video = _get_video_with_ownership(
+            video_id, current_user_id, db, for_update=True
+        )
 
-        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id).first()
+        # Lock the VideoAnalysis row so the _is_any_step_processing guard +
+        # ANALYZE_DISPATCHED transition serialize against a concurrent step
+        # dispatch on the same video (audit R-H2). The second request blocks
+        # until the first commits, then sees the step marked 'processing' and
+        # 409s instead of double-dispatching the same step.
+        analysis = lock_rows(
+            db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
+        ).first()
         if _is_any_step_processing(analysis):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1265,7 +1473,15 @@ async def trigger_activate_step(
         db.commit()
 
         from app.tasks.analysis_steps import analyze_activate_step
-        task = analyze_activate_step.delay(str(video_id), current_user_id)
+        from app.tasks.pipeline_errors import handle_pipeline_error
+
+        video_id_str = str(video_id)
+        task = analyze_activate_step.apply_async(
+            args=[video_id_str, current_user_id],
+            link_error=handle_pipeline_error.s(
+                video_id=video_id_str, step_name="activate"
+            ),
+        )
         logger.info(f"ACTIVATE step started for video {video_id}, task_id: {task.id}")
 
         return {

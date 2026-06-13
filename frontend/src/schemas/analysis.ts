@@ -182,3 +182,38 @@ export const AnalysisStatusResponseSchema = z.object({
 });
 
 export type AnalysisStatusResponse = z.infer<typeof AnalysisStatusResponseSchema>;
+
+/**
+ * Lightweight analysis embed returned in list/polled contexts.
+ *
+ * Shape matches backend ``VideoAnalysisStatusEmbed`` — contains only status
+ * and step-tracking fields, NOT the 5 heavy JSONB blobs (chunks, inferences,
+ * patterns, insights, design_principles).
+ *
+ * Deploy-window tolerance: blob fields are explicitly stripped from the
+ * backend in this PR. During the ~build-time window between backend deploy
+ * and frontend deploy, the old backend may still send blobs. Using
+ * `.passthrough()` means extra fields are retained without schema failure,
+ * so the frontend never throws a SchemaValidationError during the rollout.
+ *
+ * Full blobs are only available via `GET /api/videos/:id/analysis`
+ * (non-polled), which uses `VideoAnalysisSchema`.
+ */
+export const VideoAnalysisStatusEmbedSchema = z
+  .object({
+    id: z.string().uuid().nullable(),
+    video_id: z.string().uuid(),
+    status: AnalysisStatusSchema,
+    started_at: z.string().nullable(),
+    completed_at: z.string().nullable(),
+    current_step: z.string().nullable(),
+    step_status: z.record(z.string(), z.string()).nullable(),
+    chunk_completed_at: z.string().nullable().optional(),
+    infer_completed_at: z.string().nullable().optional(),
+    relate_completed_at: z.string().nullable().optional(),
+    explain_completed_at: z.string().nullable().optional(),
+    activate_completed_at: z.string().nullable().optional(),
+  })
+  .passthrough(); // tolerates blob fields from old backend during deploy window
+
+export type VideoAnalysisStatusEmbed = z.infer<typeof VideoAnalysisStatusEmbedSchema>;

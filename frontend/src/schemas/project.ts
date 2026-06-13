@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { VideoSchema } from "./video";
+import { VideoStubSchema } from "./video";
 import { AnalysisStatusSchema } from "./analysis";
 
 /**
@@ -34,7 +34,11 @@ export const ProjectSchema = z
     updated_at: z.string(),
     status: ProjectStatusSchema,
     error_message: z.string().nullable().optional(),
-    videos: z.array(VideoSchema).optional(),
+    // ``VideoStubSchema`` — only id/status/uploaded_at, no analysis embed.
+    // This keeps the projects-list response free of video_analyses DB reads.
+    // Deploy-window tolerance: VideoStubSchema uses .passthrough() so an old
+    // backend that sends full VideoListItemResponse objects still validates.
+    videos: z.array(VideoStubSchema).optional(),
   })
   .passthrough();
 

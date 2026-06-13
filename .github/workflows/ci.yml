@@ -7,6 +7,39 @@ on:
     branches: [main]
 
 jobs:
+  gitleaks:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # We run the pinned gitleaks CLI directly instead of
+      # gitleaks/gitleaks-action@v2 because the action does not support
+      # baselines (its args are hardcoded in src/gitleaks.js) and it only
+      # scans the push/PR commit range, not full history.
+      #
+      # Config: .gitleaks.toml allowlists test-fixture paths (backend/tests/,
+      # *.test.*, *.stories.*) and shared fake fixture values, so new tests
+      # using those fixtures never trip the scan. .gitleaks-baseline.json
+      # covers the remaining true historical one-offs (incl. an
+      # already-leaked Clerk sk_test key slated for rotation — see
+      # docs/production-readiness/runbooks/secret-rotation.md).
+      # Any NEW finding fails this job.
+      # Checksum verified against gitleaks_8.30.0_checksums.txt on the release.
+      - name: Install gitleaks v8.30.0
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz
+          echo "79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Gitleaks scan (full history, baseline-filtered)
+        run: gitleaks detect --redact -v --baseline-path .gitleaks-baseline.json --exit-code 1
+
   backend-ci:
     name: Backend CI
     runs-on: ubuntu-latest
@@ -29,11 +62,86 @@ jobs:
         run: |
           pip install -r requirements.txt -r requirements-dev.txt
 
+      # pip-audit is installed via requirements-dev.txt above.
+      # BLOCKING: the dependency-upgrade PR (#38) cleared all known vulns,
+      # so any new finding here must fail CI.
+      - name: Dependency audit (pip-audit)
+        run: pip-audit -r requirements.txt
+
       - name: Lint with ruff
         run: ruff check .
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+  alembic-drift-check:
+    name: Alembic Migration Drift Gate
+    runs-on: ubuntu-latest
+    # Must run against real Postgres — JSONB/UUID/ARRAY types require it.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      # Stub values — only DATABASE_URL is exercised by this job.
+      REDIS_URL: redis://localhost:6379/0
+      R2_ACCESS_KEY_ID: ci
+      R2_SECRET_ACCESS_KEY: ci
+      R2_ENDPOINT_URL: https://ci.r2.cloudflarestorage.com
+      R2_BUCKET_NAME: ci
+      OPENROUTER_API_KEY: ci
+      ASSEMBLYAI_API_KEY: ci
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Apply all migrations (alembic upgrade head)
+        run: alembic upgrade head
+
+      - name: Assert single migration head
+        # Fails if someone accidentally created a branch in the migration chain.
+        run: |
+          HEAD_COUNT=$(alembic heads 2>&1 | grep -c "(head)" || true)
+          echo "Migration heads found: $HEAD_COUNT"
+          if [ "$HEAD_COUNT" -ne 1 ]; then
+            echo "ERROR: Expected exactly 1 alembic head, found $HEAD_COUNT"
+            alembic heads
+            exit 1
+          fi
+          echo "OK: single head confirmed"
+
+      - name: Check model-vs-migration drift
+        # Runs alembic autogenerate check and fails on any drift not listed in
+        # scripts/ci/known_schema_drift.txt.
+        #
+        # The original 12 known-drift items (7 missing indexes + 5 schema
+        # mismatches) were resolved by the "add missing indexes + reconcile
+        # model/schema drift" PR. known_schema_drift.txt is now EMPTY and must
+        # stay that way — any new entry is a regression.
+        run: python3 ../scripts/ci/check_migration_drift.py
 
   frontend-ci:
     name: Frontend CI
@@ -66,12 +174,20 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The vitest storybook project runs in real Chromium via
+      # @vitest/browser-playwright (see frontend/vite.config.ts).
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test (vitest)
+        run: npm test -- --run
+
       - name: Build (includes typecheck)
         run: npm run build
 
   deploy-frontend:
     name: Deploy Frontend
-    needs: frontend-ci
+    needs: [frontend-ci, gitleaks]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
@@ -127,23 +243,18 @@ jobs:
           command: pages deploy dist/ --project-name=methodex-frontend --branch=main --commit-dirty=true
           workingDirectory: frontend
 
-  wait-backend-deploy:
-    name: Wait for Railway Backend Deploy
-    needs: backend-ci
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Wait for Railway deployment to reach SUCCESS
-        env:
-          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-          RAILWAY_PROJECT_ID: "154d302f-8609-4897-a10c-1f0d5bfc4f06"
-          RAILWAY_BACKEND_SERVICE_ID: "2b70a900-042c-4083-b00b-0d01f3ece5dc"
-          COMMIT_SHA: ${{ github.sha }}
-        run: python3 scripts/ci/wait-for-railway-deploy.py
+  # NOTE: There is deliberately NO "wait for Railway deploy" job in this workflow.
+  #
+  # Railway's "Wait for CI" gate (checkSuites=true on the deployment trigger,
+  # set via `python3 scripts/railway-service-config.py --apply`) holds the
+  # Railway deployment in WAITING until every check suite on the pushed commit
+  # concludes. A job in THIS workflow that polls for the Railway deployment
+  # would deadlock: the deployment cannot start until this check suite
+  # completes, and the suite cannot complete while a job is waiting for the
+  # deployment. Every main push would hang ~10 minutes and go red.
+  #
+  # Post-deploy failure handling lives on the Railway side instead:
+  # healthcheck on /health/ready + ON_FAILURE restart policy (railway.toml).
+  # Manual verification tool: scripts/ci/wait-for-railway-deploy.py (run
+  # locally, never from this workflow).
+  # See docs/production-readiness/runbooks/deploy-gating.md.

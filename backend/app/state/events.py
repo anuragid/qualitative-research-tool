@@ -19,6 +19,7 @@ class VideoEvent(str, Enum):
 
     UPLOAD_URL_REQUESTED = "upload_url_requested"
     UPLOAD_CONFIRMED = "upload_confirmed"
+    UPLOAD_REJECTED = "upload_rejected"  # confirm-upload server-side validation failed
 
     TRANSCRIBE_REQUESTED = "transcribe_requested"
     TRANSCRIBE_SUCCEEDED = "transcribe_succeeded"
@@ -55,6 +56,7 @@ class ProjectAnalysisEvent(str, Enum):
     """Events that transition a ProjectAnalysis row."""
 
     ROW_CREATED = "row_created"               # cross_relate creates the row directly as processing
+    RETRY_RESET = "retry_reset"               # route-level retry flips an errored row back to processing
     CHAIN_STEP_PROGRESS = "chain_step_progress"  # idempotent re-set to processing
     CHAIN_SUCCEEDED = "chain_succeeded"
     CHAIN_FAILED = "chain_failed"

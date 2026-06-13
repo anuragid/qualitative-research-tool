@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 from uuid import UUID
 
@@ -16,17 +17,42 @@ from app.models.database_models import Project, ProjectAnalysis, Video, VideoAna
 from app.models.schemas import (
     ProjectAnalysisResponse,
     ProjectCreate,
+    ProjectListResponse,
     ProjectResponse,
     ProjectUpdate,
-    VideoResponse,
+    VideoListItemResponse,
 )
 from app.rate_limit import limiter
 from app.services.openrouter_balance import BalanceInfo
 from app.services.s3_service import s3_service
+from app.state import (
+    ProjectAnalysisEvent,
+    ProjectAnalysisStateMachine,
+)
+from app.utils.row_locking import lock_rows
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Columns to load for lightweight list/poll payloads. Excludes the 5 JSONB
+# blobs (chunks, inferences, patterns, insights, design_principles) that can
+# be 50–500 KB per video. The full blobs are only needed on the detail/analysis
+# endpoint which is NOT polled.
+_ANALYSIS_STATUS_COLS = [
+    VideoAnalysis.id,
+    VideoAnalysis.video_id,
+    VideoAnalysis.status,
+    VideoAnalysis.started_at,
+    VideoAnalysis.completed_at,
+    VideoAnalysis.current_step,
+    VideoAnalysis.step_status,
+    VideoAnalysis.chunk_completed_at,
+    VideoAnalysis.infer_completed_at,
+    VideoAnalysis.relate_completed_at,
+    VideoAnalysis.explain_completed_at,
+    VideoAnalysis.activate_completed_at,
+]
 
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -78,7 +104,7 @@ async def create_project(
         )
 
 
-@router.get("/", response_model=List[ProjectResponse])
+@router.get("/", response_model=List[ProjectListResponse])
 async def list_projects(
     skip: int = 0,
     limit: int = 50,
@@ -104,16 +130,38 @@ async def list_projects(
         skip = max(skip, 0)
         skip = min(skip, 10000)
 
+        # selectinload pages the PROJECTS first (LIMIT/OFFSET apply to project
+        # rows), then issues one IN-list SELECT for the videos of exactly
+        # those projects.  load_only() restricts that second SELECT to the
+        # three columns the projects-list UI needs:
+        #   - video.id          (React key + thumbnail slot)
+        #   - video.status      (FolderStatusIcon + polling gate)
+        #   - video.uploaded_at (sort key for "3 most-recent" thumbnails)
+        #
+        # The video_analyses table is never touched — that was the heavy
+        # second level of the old two-level selectinload chain.
+        #
+        # NOTE: do NOT replace this with outerjoin + contains_eager + LIMIT.
+        # SQL LIMIT applies to JOIN ROWS, so a user with a few multi-video
+        # projects silently loses projects off the end of the list (e.g.
+        # 3 projects x 20 videos = 60 rows > limit 50).  Locked by
+        # test_list_projects_pagination_counts_projects_not_join_rows.
         projects = db.query(Project)\
             .filter(Project.user_id == current_user_id)\
-            .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
+            .options(
+                selectinload(Project.videos).load_only(
+                    Video.id,
+                    Video.status,
+                    Video.uploaded_at,
+                )
+            )\
             .order_by(Project.created_at.desc())\
             .offset(skip)\
             .limit(limit)\
             .all()
 
         logger.info(f"Retrieved {len(projects)} projects")
-        return projects
+        return [ProjectListResponse.model_validate(p) for p in projects]
 
     except Exception as e:
         logger.error(f"Error listing projects: {e}")
@@ -123,7 +171,7 @@ async def list_projects(
         )
 
 
-@router.get("/{project_id}", response_model=ProjectResponse)
+@router.get("/{project_id}", response_model=ProjectListResponse)
 async def get_project(
     project_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
@@ -142,8 +190,20 @@ async def get_project(
     """
     current_user_id = current_user["id"]
     try:
+        # Same optimised pattern as list_projects: selectinload restricted to
+        # (id/status/uploaded_at), no touch of video_analyses.
+        #
+        # NOTE: do NOT use outerjoin + contains_eager here either — .first()
+        # emits LIMIT 1 which would truncate the joined rows to a single
+        # video.  Locked by test_get_project_returns_all_videos.
         project = db.query(Project)\
-            .options(selectinload(Project.videos).selectinload(Video.video_analysis))\
+            .options(
+                selectinload(Project.videos).load_only(
+                    Video.id,
+                    Video.status,
+                    Video.uploaded_at,
+                )
+            )\
             .filter(Project.id == project_id)\
             .filter(Project.user_id == current_user_id)\
             .first()
@@ -155,7 +215,7 @@ async def get_project(
             )
 
         logger.info(f"Retrieved project: {project_id}")
-        return project
+        return ProjectListResponse.model_validate(project)
 
     except HTTPException:
         raise
@@ -285,7 +345,7 @@ async def delete_project(
         )
 
 
-@router.get("/{project_id}/videos", response_model=List[VideoResponse])
+@router.get("/{project_id}/videos", response_model=List[VideoListItemResponse])
 async def list_project_videos(
     project_id: UUID,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_READ)),
@@ -314,15 +374,18 @@ async def list_project_videos(
                 detail=f"Project {project_id} not found"
             )
 
-        # Get all videos for this project
+        # Get all videos for this project — load only analysis status fields,
+        # not the JSONB blobs, since this endpoint is polled every 4-20s.
         videos = db.query(Video)\
-            .options(selectinload(Video.video_analysis))\
+            .options(
+                selectinload(Video.video_analysis).load_only(*_ANALYSIS_STATUS_COLS)
+            )\
             .filter(Video.project_id == project_id)\
             .order_by(Video.uploaded_at.desc())\
             .all()
 
         logger.info(f"Retrieved {len(videos)} videos for project {project_id}")
-        return videos
+        return [VideoListItemResponse.model_validate(v) for v in videos]
 
     except HTTPException:
         raise
@@ -386,10 +449,64 @@ async def trigger_project_analysis(
 
         video_ids = [video.id for video in analyzed_videos]
 
-        # Dispatch the cross-video analysis chain. The first chain link
-        # (analyze_cross_relate_step) is responsible for creating or
-        # resetting the ProjectAnalysis row — this route is now a pure
-        # dispatcher.
+        # Look up any existing ProjectAnalysis row so we can guard against a
+        # double-dispatch and reset a stale errored row before redispatching.
+        # Lock it FOR UPDATE so two simultaneous retry clicks serialize: the
+        # second blocks until the first commits its reset-to-processing, then
+        # re-reads status == "processing" and 409s below — the chain is
+        # dispatched exactly once (the duplicate-chain race confirmed in
+        # PR #40 review). When no row exists yet there is nothing to lock; the
+        # first chain link creates it.
+        existing_analysis = lock_rows(
+            db.query(ProjectAnalysis).filter(ProjectAnalysis.project_id == project_id)
+        ).first()
+
+        # Race condition / double-click guard: reject if a cross-video
+        # analysis is already in flight. Mirrors the video route's
+        # `video.status in ("analyzing",)` 409 (videos.py ~647-651). Two
+        # back-to-back retry clicks both reach here, but the first one's
+        # reset-to-processing commit makes the second see status ==
+        # "processing" and bail, so the chain is dispatched exactly once.
+        if existing_analysis is not None and existing_analysis.status == "processing":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Project analysis is already in progress",
+            )
+
+        # Retry path: if the ProjectAnalysis row is in "error" state, reset
+        # it BEFORE dispatching the chain. Otherwise the first chain link
+        # (analyze_cross_relate_step) sees status == "error" in its precheck,
+        # returns {"status": "skipped"}, the later steps skip via
+        # _check_project_cancellation, the chain "succeeds", and the row
+        # stays error forever — the retry is a silent no-op and the user
+        # can't recover without a DB edit. Mirrors the video retry path
+        # (videos.py ~691-712 + PR #19.5).
+        #
+        # RETRY_RESET (error -> processing) goes through the state machine so
+        # we never write status directly (project invariant #3). Like the
+        # video route, this block only fires for error rows: a deliberate
+        # re-trigger of a COMPLETED analysis is left untouched here and the
+        # idempotent chain simply recomputes it.
+        if existing_analysis is not None and existing_analysis.status == "error":
+            ProjectAnalysisStateMachine.transition(
+                existing_analysis, ProjectAnalysisEvent.RETRY_RESET, db=db
+            )
+            existing_analysis.started_at = datetime.now(timezone.utc)
+            existing_analysis.completed_at = None
+            # Clear the stale error payload from the failed run — mirrors
+            # VideoStateMachine, which clears error_message as a RETRY_RESET
+            # side effect (state/video_state.py). A fresh failure rewrites it.
+            existing_analysis.error_message = None
+            # Clear stale partial cross-video results so the new run doesn't
+            # mix old blobs in. The chain steps repopulate these.
+            existing_analysis.cross_video_patterns = None
+            existing_analysis.cross_video_insights = None
+            existing_analysis.cross_video_principles = None
+            db.commit()
+
+        # Dispatch the cross-video analysis chain. When no row exists yet the
+        # first chain link (analyze_cross_relate_step) creates it; on retry
+        # the reset above has already flipped it to a runnable state.
         from celery import chain
 
         from app.tasks.pipeline_errors import handle_project_pipeline_error

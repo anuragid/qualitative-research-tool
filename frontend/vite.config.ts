@@ -29,6 +29,21 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: "hidden", // Generate source maps for Sentry but don't expose to browser
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // Split stable vendor packages into a long-lived cached chunk.
+        // React + DOM + Router change infrequently; keeping them out of
+        // the app entry means a code-only deploy doesn't bust the vendor cache.
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/react-router') ||
+              id.includes('node_modules/scheduler/')) {
+            return 'vendor-react';
+          }
+        },
+      },
+    },
   },
   test: {
     coverage: {
@@ -42,6 +57,12 @@ export default defineConfig({
     projects: [
       {
         extends: true,
+        // Inject dev-bypass env flag so unit tests match the local-dev contract
+        // (VITE_DEV_AUTH_BYPASS=true is always set locally; without it the auth
+        // hook resolves to the Clerk wrapper and api.ts never sets a Bearer token).
+        define: {
+          'import.meta.env.VITE_DEV_AUTH_BYPASS': '"true"',
+        },
         test: {
           name: 'unit',
           include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

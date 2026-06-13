@@ -139,6 +139,120 @@ class TestS3ServiceDownloadFile:
 
 
 # ---------------------------------------------------------------------------
+# S3Service boto3 client timeout config
+# ---------------------------------------------------------------------------
+
+
+class TestS3ServiceClientTimeouts:
+    """R2 boto3 client must carry explicit connect/read timeouts.
+
+    A stalled R2 connection with no timeout would hang the worker thread until
+    Celery's task_time_limit (360 s) SIGKILLs it. These tests assert that the
+    BotoConfig passed to boto3.client contains both timeouts sourced from
+    settings so a hung socket is cut loose well before the SIGKILL threshold.
+
+    IMPORTANT: botocore standard retry mode RETRIES on ConnectTimeoutError /
+    ReadTimeoutError, so timeouts multiply by max_attempts. The real invariant:
+        max_attempts × (connect_timeout + read_timeout) < task_time_limit
+        = 2 × (10 + 160) = 340 s < 360 s
+    For the large-file download_file path, read_timeout applies per-socket-read
+    (the deadline for a single recv() call), not for the whole transfer, so
+    large downloads are not capped at 160 s — only 160 s of total socket
+    silence kills them.
+    """
+
+    def test_client_config_has_connect_timeout(self):
+        """boto3 client config must set connect_timeout from settings."""
+        from app.config import settings
+        from app.services.s3_service import S3Service
+
+        captured_configs = []
+
+        def capturing_client(*args, **kwargs):
+            cfg = kwargs.get("config")
+            if cfg is not None:
+                captured_configs.append(cfg)
+            # Return a MagicMock so no real network call happens
+            return MagicMock()
+
+        service = S3Service()
+        with patch("boto3.client", side_effect=capturing_client):
+            _ = service.s3_client  # triggers lazy init
+
+        assert len(captured_configs) == 1, "boto3.client was not called with a config"
+        assert captured_configs[0].connect_timeout == settings.R2_CONNECT_TIMEOUT_SECONDS
+
+    def test_client_config_has_read_timeout(self):
+        """boto3 client config must set read_timeout from settings."""
+        from app.config import settings
+        from app.services.s3_service import S3Service
+
+        captured_configs = []
+
+        def capturing_client(*args, **kwargs):
+            cfg = kwargs.get("config")
+            if cfg is not None:
+                captured_configs.append(cfg)
+            return MagicMock()
+
+        service = S3Service()
+        with patch("boto3.client", side_effect=capturing_client):
+            _ = service.s3_client
+
+        assert len(captured_configs) == 1
+        assert captured_configs[0].read_timeout == settings.R2_READ_TIMEOUT_SECONDS
+
+    def test_timeout_math_within_task_limit(self):
+        """Worst-case retried timeout must stay below task_time_limit.
+
+        botocore standard retry mode retries on ConnectTimeoutError and
+        ReadTimeoutError, so a fully stalled endpoint costs
+        max_attempts × (connect_timeout + read_timeout) of wall-clock time
+        (plus bounded back-off). That product MUST be < Celery's
+        task_time_limit=360 s, or a hung R2 connection gets SIGKILLed instead
+        of failing cleanly and being retried at the task level.
+
+        This contract test reads max_attempts from the ACTUAL BotoConfig the
+        client is built with, so bumping any of the three numbers past the
+        budget fails loudly here.
+
+        Note: read_timeout is per-socket-read for streaming transfers (e.g.
+        download_file); this ceiling is the worst case for a completely
+        silent endpoint, not a cap on healthy large transfers.
+        """
+        from app.services.s3_service import S3Service
+
+        TASK_TIME_LIMIT_SECONDS = 360
+
+        captured_configs = []
+
+        def capturing_client(*args, **kwargs):
+            cfg = kwargs.get("config")
+            if cfg is not None:
+                captured_configs.append(cfg)
+            return MagicMock()
+
+        service = S3Service()
+        with patch("boto3.client", side_effect=capturing_client):
+            _ = service.s3_client
+
+        assert len(captured_configs) == 1, "boto3.client was not called with a config"
+        cfg = captured_configs[0]
+
+        max_attempts = cfg.retries["max_attempts"]
+        connect_timeout = cfg.connect_timeout
+        read_timeout = cfg.read_timeout
+        worst_case = max_attempts * (connect_timeout + read_timeout)
+
+        assert worst_case < TASK_TIME_LIMIT_SECONDS, (
+            f"max_attempts ({max_attempts}) × (connect_timeout ({connect_timeout}s) "
+            f"+ read_timeout ({read_timeout}s)) = {worst_case}s exceeds "
+            f"task_time_limit={TASK_TIME_LIMIT_SECONDS}s — a stalled R2 connection "
+            f"would be SIGKILLed instead of failing cleanly"
+        )
+
+
+# ---------------------------------------------------------------------------
 # AssemblyAIService.upload_file
 # ---------------------------------------------------------------------------
 

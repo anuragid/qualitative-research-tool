@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFolderColor } from "../../lib/noise";
 import { Button } from "../ui/button";
-import type { Project, Video } from "../../types";
+import type { Project, VideoStub } from "../../types";
 import {
   MoreHorizontal,
   Edit,
@@ -36,7 +36,7 @@ const THUMBNAIL_GRADIENTS = [
   ["#fbc2eb", "#a6c1ee"],
 ];
 
-function getRecentVideos(videos: Video[] | undefined): Video[] {
+function getRecentVideos(videos: VideoStub[] | undefined): VideoStub[] {
   if (!videos || videos.length === 0) return [];
   return [...videos]
     .sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())

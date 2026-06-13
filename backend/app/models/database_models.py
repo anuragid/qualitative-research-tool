@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import ARRAY, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import ARRAY, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -37,11 +37,27 @@ class User(Base):
 
     __tablename__ = "users"
 
+    # The DB (migration ``add_user_auth_001``) has THREE distinct objects on
+    # these columns, declared via ``__table_args__`` below so autogenerate
+    # matches them exactly (named constraints, non-unique index):
+    #   - ``users_email_key``    UNIQUE constraint on email
+    #   - ``users_username_key`` UNIQUE constraint on username
+    #   - ``ix_users_email``     plain (non-unique) btree index on email
+    # NOTE: do NOT put ``unique=True`` on the columns — that emits an *unnamed*
+    # unique constraint AND turns ``ix_users_email`` into a UNIQUE index, both
+    # of which diverge from the live schema.
+    __table_args__ = (
+        UniqueConstraint("email", name="users_email_key"),
+        UniqueConstraint("username", name="users_username_key"),
+    )
+
     id = Column(String(255), primary_key=True)  # Clerk user ID (user_xxx format)
-    email = Column(String(255), index=True)  # Indexed for lookup
+    # NOT NULL enforced in the DB by ``add_user_auth_001``; ``index=True`` maps
+    # to the non-unique ``ix_users_email`` index.
+    email = Column(String(255), nullable=False, index=True)  # Indexed for lookup
     first_name = Column(String(255))
     last_name = Column(String(255))
-    username = Column(String(255))
+    username = Column(String(255))  # uniqueness via users_username_key (above)
     role = Column(String(50), nullable=False, default="user")  # admin, user, viewer
     preferred_model = Column(String(255))  # OpenRouter model ID for BYOK
     model_tier = Column(String(10), nullable=False, server_default="included")  # "included" or "byok"
@@ -85,6 +101,9 @@ class Project(Base):
     # Status enforced at the SQLAlchemy layer by ProjectStatus.  ``native_enum=False``
     # keeps the on-disk type as VARCHAR so existing rows and the Alembic chain
     # stay compatible — see docs/production-readiness/prs/pr22-state-machine-enums.md.
+    # NOT NULL + server_default enforced in the DB by migrations
+    # ``d484f4320746`` / ``208ec29c043f``. The model must declare nullable=False
+    # so autogenerate does not try to DROP the NOT NULL constraint.
     status = Column(
         SQLEnum(
             ProjectStatus,
@@ -92,6 +111,8 @@ class Project(Base):
             values_callable=_enum_values,
             length=50,
         ),
+        nullable=False,
+        server_default=ProjectStatus.PLANNING.value,
         default=ProjectStatus.PLANNING.value,
         index=True,
     )
@@ -239,6 +260,7 @@ class ProjectAnalysis(Base):
     )
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
+    error_message = Column(Text(), nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="project_analyses")

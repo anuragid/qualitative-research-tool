@@ -6,6 +6,7 @@ import {
   SystemPrincipleSchema,
   MetaPatternSchema,
 } from "../project";
+import { parseErrorMessage } from "../../lib/parseError";
 
 describe("ProjectStatusSchema", () => {
   it("accepts every backend-supported status including archived", () => {
@@ -92,6 +93,49 @@ describe("ProjectAnalysisSchema", () => {
       error_message: null,
     };
     expect(() => ProjectAnalysisSchema.parse(completed)).not.toThrow();
+  });
+});
+
+describe("ProjectAnalysisSchema error_message field", () => {
+  const BASE = {
+    id: "c4a0f0d0-0000-4000-a000-000000000000",
+    project_id: "8b894631-2d32-4593-ae2a-e76e6d9f84f3",
+    video_ids: [],
+    cross_video_patterns: null,
+    patterns_completed_at: null,
+    cross_video_insights: null,
+    insights_completed_at: null,
+    cross_video_principles: null,
+    principles_completed_at: null,
+    status: "error" as const,
+    started_at: null,
+    completed_at: null,
+  };
+
+  it("parses when error_message is null", () => {
+    const parsed = ProjectAnalysisSchema.parse({ ...BASE, error_message: null });
+    expect(parsed.error_message).toBeNull();
+  });
+
+  it("parses when error_message field is null (simulates backend omitting the field)", () => {
+    // The field is z.string().nullable(); passing null simulates a backend
+    // that returns the field as null (new rows before any error occurs).
+    const parsed = ProjectAnalysisSchema.parse({ ...BASE, error_message: null });
+    expect(parsed.error_message).toBeNull();
+  });
+
+  it("parses when error_message is a JSON-encoded error string", () => {
+    const jsonError = JSON.stringify({
+      step: "cross_relate",
+      error_type: "ValueError",
+      retryable: false,
+      message: "rate limit exceeded",
+    });
+    const parsed = ProjectAnalysisSchema.parse({ ...BASE, error_message: jsonError });
+    expect(parsed.error_message).toBe(jsonError);
+    // Verify that parseErrorMessage can decode it
+    const decoded = parseErrorMessage(parsed.error_message!);
+    expect(decoded.message).toBe("rate limit exceeded");
   });
 });
 

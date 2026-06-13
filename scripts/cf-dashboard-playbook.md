@@ -100,8 +100,9 @@ Only needed once, the first time you run the companion script.
     ```
     then, if the dry-run output looks correct:
     ```bash
-    python3 scripts/cf-apply-rules.py
+    python3 scripts/cf-apply-rules.py --apply
     ```
+    Note: the script defaults to dry-run; `--apply` is required for any mutation.
 11. Clear the token from your shell history when done:
     `unset CF_API_TOKEN` and `history -d <line>` if needed.
 
@@ -125,8 +126,9 @@ challenge on first setup), finish it here.
    keep storage minimal.
 8. **Frequency**: High.
 9. **Submit** → complete the R2 ownership challenge when prompted.
-10. Back in terminal, re-run `python3 scripts/cf-apply-rules.py` — the
-    script will now see the existing job and skip.
+10. Back in terminal, re-run `python3 scripts/cf-apply-rules.py --apply` — the
+    script will now see the existing job and skip. (The default without
+    `--apply` is dry-run.)
 
 ## 7. After everything is applied
 

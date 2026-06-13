@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import UUID
 
+import sentry_sdk
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.agents.nodes.activate import activate_node
@@ -50,6 +52,17 @@ def _check_cancellation(db: Session, video_id: str, require_existing: bool = Tru
             it). When False, a missing row is treated as "not cancelled" —
             used by analyze_chunk_step, which is the first chain link and
             is responsible for creating the row if it doesn't yet exist.
+
+    Raises:
+        OperationalError: A transient DB outage (connection lost/refused)
+            is *not* swallowed. Returning False here would let the step
+            proceed and burn an LLM call (and BYOK credits) on work that
+            may already be cancelled. Re-raising lets the task's
+            ``autoretry_for=(Exception,)`` decorator retry the precheck with
+            bounded backoff (``max_retries=3``) until the DB recovers, at
+            which point we read the real cancellation state. A *missing*
+            row is a clean signal (handled via ``require_existing``), not an
+            error — only genuine query failures propagate.
     """
     try:
         db.expire_all()
@@ -61,9 +74,19 @@ def _check_cancellation(db: Session, video_id: str, require_existing: bool = Tru
         if analysis.status == "error":
             return True
         return False
-    except Exception:
-        logger.exception("_check_cancellation failed, proceeding")
-        return False
+    except OperationalError:
+        # Transient DB outage — surface it so Celery autoretries instead of
+        # guessing "not cancelled" and proceeding to burn an LLM call.
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(
+            "_check_cancellation: transient DB error for %s — re-raising "
+            "for autoretry",
+            video_id,
+        )
+        raise
 
 
 class NonRetryableAnalysisError(Exception):
@@ -220,6 +243,64 @@ def _build_insufficient_credits_error_json(step_name: str, exc: "InsufficientCre
     return json.dumps(payload)
 
 
+def _is_retryable_step_exc(exc: Exception | None) -> bool:
+    """Decide whether the exception that ended a step will be *autoretried*
+    by Celery (``autoretry_for=(Exception,)``) rather than failing the chain.
+
+    Non-retryable failures (``NonRetryableAnalysisError`` and its
+    ``InsufficientCreditsNonRetryable`` subclass) are excluded from autoretry
+    via ``dont_autoretry_for`` — for those the row should be stamped ``error``
+    immediately so the user sees the failure without waiting for the watchdog.
+
+    Every *other* exception that reaches a step's ``except`` block (a retryable
+    node error, a transient ``OperationalError``, an unexpected bug) WILL be
+    re-run by Celery on the same task. For those we must NOT stamp ``error``:
+    the in-progress row has to stay ``processing`` so the retried attempt's
+    cancellation precheck (which short-circuits on ``status == "error"``) does
+    not swallow it. The chain's terminal ``.on_error`` handler stamps ``error``
+    once retries are truly exhausted, and the watchdog is the final backstop.
+    """
+    return not isinstance(exc, NonRetryableAnalysisError)
+
+
+def _handle_step_failure(
+    db: Session,
+    video_id: str,
+    step_name: str,
+    exc: Exception | None = None,
+):
+    """Single failure-policy entry point for the 5 per-video step ``except``
+    blocks.
+
+    - Retryable failure -> discard the dirty partial transaction (rollback)
+      and leave the row ``processing`` so Celery's autoretry can re-run the
+      step's node and finish. Stamping ``error`` here would make the retry's
+      cancellation precheck skip the step, turning a transient hiccup into a
+      permanent error (the bug this PR fixes).
+    - Non-retryable failure -> stamp the row ``error`` immediately via
+      :func:`_update_analysis_error` (unchanged behaviour, incl. the BYOK
+      0-balance structured payload).
+
+    Centralised so the retryable/non-retryable policy lives in ONE place
+    instead of being duplicated across the five step bodies.
+    """
+    if _is_retryable_step_exc(exc):
+        # Retryable: just clean the session so the connection is returned to
+        # the pool uncorrupted. The row stays ``processing`` for the retry.
+        try:
+            db.rollback()
+        except Exception:
+            logger.warning(
+                "Rollback after retryable %s failure for %s failed; "
+                "session will be reset by the task lifecycle",
+                step_name,
+                video_id,
+                exc_info=True,
+            )
+        return
+    _update_analysis_error(db, video_id, step_name, exc=exc)
+
+
 def _update_analysis_error(
     db: Session,
     video_id: str,
@@ -242,6 +323,22 @@ def _update_analysis_error(
     historical behaviour of leaving ``error_message`` untouched (the
     full-pipeline path in ``analysis_tasks.analyze_video_task`` writes
     its own structured payload).
+
+    Raises:
+        Exception: If writing the *error state itself* fails (e.g. the
+            commit raises because the DB is still down), the failure is
+            **not** swallowed. Previously a bare ``pass`` here meant the row
+            stayed ``processing`` with no reason until the watchdog reset it
+            ~17 min later. We now log, capture to Sentry, roll back, and
+            re-raise so the failure surfaces to Celery's autoretry / the
+            chain's ``.on_error`` handler within the same attempt.
+
+            This is loop-safe: ``_update_analysis_error`` is only ever
+            called from a step task's ``except Exception as e`` block and
+            never recursively (nor from ``handle_pipeline_error``). The
+            re-raise therefore replaces the pending ``raise`` in the caller
+            and surfaces *exactly once* — the next Celery attempt re-runs
+            the step fresh rather than re-entering this writer.
     """
     try:
         db.rollback()
@@ -288,11 +385,23 @@ def _update_analysis_error(
 
         db.commit()
     except Exception as commit_error:
-        logger.error(f"Failed to update error status for {step_name}: {commit_error}")
+        logger.error(
+            f"Failed to update error status for {step_name}: {commit_error}",
+            exc_info=True,
+        )
+        # Capture explicitly: if the error-state write itself fails, this is
+        # the only place that knows the row is now stuck. The re-raise below
+        # would reach Celery's Sentry integration anyway, but we report here
+        # too so the failure is never lost if a caller later swallows it.
+        sentry_sdk.capture_exception(commit_error)
         try:
             db.rollback()
         except Exception:
             pass
+        # Surface the failure instead of swallowing it — see the docstring's
+        # loop-safety note. The original step exception is preserved as the
+        # __context__ of this one.
+        raise
 
 
 @celery_app.task(
@@ -394,7 +503,7 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"CHUNK step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "chunk", exc=e)
+        _handle_step_failure(self.db, video_id, "chunk", exc=e)
         raise
 
 
@@ -469,7 +578,7 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"INFER step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "infer", exc=e)
+        _handle_step_failure(self.db, video_id, "infer", exc=e)
         raise
 
 
@@ -541,7 +650,7 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"RELATE step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "relate", exc=e)
+        _handle_step_failure(self.db, video_id, "relate", exc=e)
         raise
 
 
@@ -614,7 +723,7 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"EXPLAIN step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "explain", exc=e)
+        _handle_step_failure(self.db, video_id, "explain", exc=e)
         raise
 
 
@@ -707,5 +816,5 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
 
     except Exception as e:
         logger.error(f"ACTIVATE step failed for video {video_id}: {e}")
-        _update_analysis_error(self.db, video_id, "activate", exc=e)
+        _handle_step_failure(self.db, video_id, "activate", exc=e)
         raise

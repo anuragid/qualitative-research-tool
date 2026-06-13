@@ -130,6 +130,7 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
                     "insights": None,
                     "current_step": "explain",
                     "error": f"Output validation failed: {ve2}",
+                    "error_type": "llm_error",
                 }
 
         logger.info(f"[EXPLAIN] Generated {len(insights)} insights")

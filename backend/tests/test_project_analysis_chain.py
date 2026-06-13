@@ -294,3 +294,464 @@ class TestCrossProjectCancellationPrecheck:
 
         assert result == {"project_id": str(project.id), "status": "skipped"}
         assert called["hit"] is False
+
+
+class TestCrossProjectCancellationTransientDB:
+    """A transient DB outage inside the project cancellation precheck must
+    RAISE (Celery autoretry path), not silently proceed to a cross-video
+    LLM call on possibly-cancelled work."""
+
+    def test_check_project_cancellation_reraises_on_operational_error(self, db_session):
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.query.side_effect = OperationalError(
+            "SELECT ...", {}, Exception("connection reset by peer")
+        )
+
+        with pytest.raises(OperationalError):
+            project_analysis_steps._check_project_cancellation(
+                broken_db, str(project.id)
+            )
+
+    def test_cross_explain_raises_for_autoretry_when_precheck_db_fails(
+        self, db_session, monkeypatch
+    ):
+        """cross_explain must surface the OperationalError instead of
+        proceeding to the BYOK/LLM resolution."""
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        byok_calls: list = []
+
+        def _spy_byok(db, user_id, step, *, force_refresh=False):
+            byok_calls.append(step)
+            return (None, None)
+
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            _spy_byok,
+        )
+
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.query.side_effect = OperationalError(
+            "SELECT ...", {}, Exception("server closed connection")
+        )
+
+        mock_self = MagicMock()
+        mock_self.db = broken_db
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+        with pytest.raises(OperationalError):
+            unbound(mock_self, str(project.id), "dev_user_local")
+
+        assert byok_calls == [], (
+            "cross_explain proceeded to BYOK/LLM resolution despite unknown "
+            "cancellation state."
+        )
+
+
+class TestProjectErrorWriterSurfacesCommitFailure:
+    """_update_project_analysis_error must re-raise if writing the error
+    state itself fails, surfacing exactly once without recursing."""
+
+    def test_update_project_analysis_error_reraises_when_commit_fails(self, db_session):
+        from sqlalchemy.exc import OperationalError
+
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        broken_db = MagicMock(wraps=db_session)
+        broken_db.commit.side_effect = OperationalError(
+            "COMMIT", {}, Exception("WAL write failed")
+        )
+
+        call_count = {"n": 0}
+        orig = project_analysis_steps._update_project_analysis_error
+
+        def _counting(*args, **kwargs):
+            call_count["n"] += 1
+            return orig(*args, **kwargs)
+
+        project_analysis_steps._update_project_analysis_error = _counting
+        try:
+            with pytest.raises(OperationalError):
+                project_analysis_steps._update_project_analysis_error(
+                    broken_db, str(project.id), "cross_explain"
+                )
+        finally:
+            project_analysis_steps._update_project_analysis_error = orig
+
+        assert call_count["n"] == 1  # surfaced once, no recursion
+
+
+# ---------------------------------------------------------------------------
+# Crash-injection: result+status atomicity for the cross-video chain
+# ---------------------------------------------------------------------------
+
+
+class _SimulatedWorkerKill(BaseException):
+    """BaseException so it escapes the step's ``except Exception`` block —
+    simulates a SIGKILL/OOM where the process dies mid-function and no
+    error-writer runs."""
+
+
+class _CountingKillSession:
+    """Proxies a real Session but raises ``_SimulatedWorkerKill`` on the Nth
+    ``commit()``, rolling back first so the killed transaction's lock is
+    released and its pending writes are discarded (the net effect of a
+    dropped connection)."""
+
+    def __init__(self, real_session, kill_on_commit: int):
+        self._real = real_session
+        self._kill_on = kill_on_commit
+        self.commit_count = 0
+
+    def commit(self):
+        self.commit_count += 1
+        if self.commit_count == self._kill_on:
+            try:
+                self._real.rollback()
+            except Exception:
+                pass
+            raise _SimulatedWorkerKill(
+                f"worker killed at commit #{self.commit_count}"
+            )
+        return self._real.commit()
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+class TestCrossStepCommitAtomicity:
+    """Each cross-video step persists its result and its state transition in
+    a SINGLE commit. A kill before that commit lands must leave the PA row in
+    its pre-step state (no torn partial), and re-delivery must complete it."""
+
+    def test_cross_explain_crash_then_redelivery_is_atomic(
+        self, db_session, monkeypatch
+    ):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        calls = {"node": 0}
+
+        def _node(state):
+            calls["node"] += 1
+            return {"cross_video_insights": [{"id": "CI1", "text": "ins"}]}
+
+        monkeypatch.setattr(project_analysis_steps, "cross_explain_node", _node)
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+
+        # cross_explain makes exactly ONE commit (results). Kill it.
+        kill = _CountingKillSession(db_session, kill_on_commit=1)
+        s1 = MagicMock()
+        s1.db = kill
+        with pytest.raises(_SimulatedWorkerKill):
+            unbound(s1, str(project.id), "dev_user_local")
+
+        # Durable state: insights never persisted (atomic single commit),
+        # status still 'processing' (recoverable).
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.cross_video_insights is None
+        assert row.status == "processing"
+
+        # Re-delivery completes it.
+        s2 = MagicMock()
+        s2.db = db_session
+        result = unbound(s2, str(project.id), "dev_user_local")
+        assert result["status"] == "success"
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.cross_video_insights == [{"id": "CI1", "text": "ins"}]
+        assert calls["node"] == 2  # re-ran once per delivery
+
+    def test_cross_activate_crash_leaves_no_partial_completion(
+        self, db_session, monkeypatch
+    ):
+        """The terminal step writes results + CHAIN_SUCCEEDED in one commit.
+        A kill before it must NOT leave status=completed without principles,
+        nor principles without completed status."""
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+            cross_video_insights=[{"id": "CI1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        def _node(state):
+            return {"cross_video_principles": [{"id": "CDP1"}]}
+
+        monkeypatch.setattr(project_analysis_steps, "cross_activate_node", _node)
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_activate_step._orig_run.__func__
+        kill = _CountingKillSession(db_session, kill_on_commit=1)
+        s1 = MagicMock()
+        s1.db = kill
+        with pytest.raises(_SimulatedWorkerKill):
+            unbound(s1, str(project.id), "dev_user_local")
+
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        principles = row.cross_video_principles
+        is_completed = row.status == "completed"
+        assert not (is_completed and principles is None), (
+            "cross_activate: status=completed WITHOUT principles — torn write."
+        )
+        assert not (principles is not None and not is_completed), (
+            "cross_activate: principles WITHOUT completed status — torn write."
+        )
+        # Surviving state is the recoverable pre-completion one.
+        assert principles is None
+        assert row.status == "processing"
+
+        # Re-delivery finishes it atomically.
+        s2 = MagicMock()
+        s2.db = db_session
+        unbound(s2, str(project.id), "dev_user_local")
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.status == "completed"
+        assert row.cross_video_principles == [{"id": "CDP1"}]
+        assert row.completed_at is not None
+
+
+class TestCrossStepFailurePolicy:
+    """Cross-video failure policy mirrors the per-video one: retryable
+    failures keep the PA row 'processing' for Celery's autoretry; only
+    non-retryable failures stamp 'error' immediately."""
+
+    def test_cross_explain_retryable_node_error_leaves_processing(
+        self, db_session, monkeypatch
+    ):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        # Retryable node error.
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "cross_explain_node",
+            lambda state: {"error": "rate limited", "error_type": "rate_limit"},
+        )
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+        s = MagicMock()
+        s.db = db_session
+        with pytest.raises(Exception):
+            unbound(s, str(project.id), "dev_user_local")
+
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.status == "processing"  # runnable for autoretry, not error
+
+    def test_cross_explain_nonretryable_node_error_stamps_error(
+        self, db_session, monkeypatch
+    ):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        from app.tasks.analysis_steps import NonRetryableAnalysisError
+
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "cross_explain_node",
+            lambda state: {"error": "bad schema", "error_type": "validation_error"},
+        )
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+        s = MagicMock()
+        s.db = db_session
+        with pytest.raises(NonRetryableAnalysisError):
+            unbound(s, str(project.id), "dev_user_local")
+
+        db_session.expire_all()
+        row = db_session.query(ProjectAnalysis).filter_by(project_id=project.id).first()
+        assert row.status == "error"  # stamped immediately
+
+
+class TestErrorMessagePersistence:
+    """_update_project_analysis_error and handle_project_pipeline_error must
+    write a structured error_message to the PA row."""
+
+    def test_update_project_analysis_error_writes_error_message(self, db_session):
+        """_update_project_analysis_error should set error_message with step + exc info."""
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        exc = ValueError("rate limit exceeded")
+        project_analysis_steps._update_project_analysis_error(
+            db_session, str(project.id), "cross_relate", exc=exc
+        )
+
+        db_session.refresh(pa)
+        assert pa.error_message is not None
+        parsed = json.loads(pa.error_message)
+        assert parsed["step"] == "cross_relate"
+        assert "rate limit exceeded" in parsed["message"]
+
+    def test_update_project_analysis_error_writes_fallback_when_no_exc(self, db_session):
+        """Without an exc argument, error_message should fall back to a generic string."""
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        project_analysis_steps._update_project_analysis_error(
+            db_session, str(project.id), "cross_explain"
+        )
+
+        db_session.refresh(pa)
+        assert pa.error_message is not None
+        parsed = json.loads(pa.error_message)
+        assert parsed["step"] == "cross_explain"
+
+    def test_handle_project_pipeline_error_writes_error_message(self, db_session):
+        """handle_project_pipeline_error should set error_message on the PA row."""
+        from app.tasks import pipeline_errors
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="processing", video_ids=[]
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        # Inject the test session directly into the task's thread-local store
+        pipeline_errors.handle_project_pipeline_error._thread_local.db = db_session
+
+        exc = RuntimeError("OpenRouter credits exhausted")
+        fake_request = MagicMock()
+        fake_request.task = "analyze_cross_relate_step"
+
+        pipeline_errors.handle_project_pipeline_error.run(
+            fake_request, exc, "fake-traceback", str(project.id)
+        )
+
+        db_session.refresh(pa)
+        assert pa.error_message is not None
+        parsed = json.loads(pa.error_message)
+        assert parsed["step"] == "cross_relate"
+        assert "OpenRouter credits exhausted" in parsed["message"]
+
+    def test_project_analysis_response_schema_includes_error_message(self):
+        """ProjectAnalysisResponse.model_validate should include error_message."""
+        from uuid import uuid4
+
+        from app.models.database_models import ProjectAnalysis
+        from app.models.schemas import ProjectAnalysisResponse
+
+        error_json = '{"step": "cross_relate", "error_type": "ValueError", "retryable": false, "message": "bad input"}'
+        pa = ProjectAnalysis(
+            id=uuid4(),
+            project_id=uuid4(),
+            status="error",
+            video_ids=[],
+            error_message=error_json,
+        )
+
+        response = ProjectAnalysisResponse.model_validate(pa)
+        assert response.error_message is not None
+        assert "cross_relate" in response.error_message
+
+    def test_project_analysis_response_error_message_nullable(self):
+        """ProjectAnalysisResponse.error_message should be None when not set."""
+        from uuid import uuid4
+
+        from app.models.database_models import ProjectAnalysis
+        from app.models.schemas import ProjectAnalysisResponse
+
+        pa = ProjectAnalysis(
+            id=uuid4(),
+            project_id=uuid4(),
+            status="completed",
+            video_ids=[],
+        )
+
+        response = ProjectAnalysisResponse.model_validate(pa)
+        assert response.error_message is None
