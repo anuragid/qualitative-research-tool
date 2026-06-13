@@ -166,6 +166,12 @@ async def client(tmp_path):
         Column("status", String(50), default="pending"),
         Column("started_at", DateTime),
         Column("completed_at", DateTime),
+        # Mirror of the ProjectAnalysis model column (database_models.py) and the
+        # add_project_analyses_error_message migration. Omitting it made the
+        # delete_project cascade SELECT over project_analyses raise
+        # "no such column: project_analyses.error_message" — only surfaced once
+        # a test exercised that cascade (project delete tests).
+        Column("error_message", Text),
     )
 
     meta.create_all(bind=test_engine)
