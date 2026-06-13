@@ -50,6 +50,18 @@ async def _add_video(client, mock_s3, project_id: str, filename: str = "test.mp4
     return video_id
 
 
+async def _video_ids(client, project_id: str) -> set:
+    """Return the set of video ids that currently have a DB row in this project.
+
+    Reads the row state directly via GET /projects/{id}/videos so a test can
+    assert an individual video row survived, independent of whether the parent
+    project row still exists / whether the cascade fired.
+    """
+    r = await client.get(f"/api/projects/{project_id}/videos")
+    assert r.status_code == 200, r.text
+    return {v["id"] for v in r.json()}
+
+
 # ---------------------------------------------------------------------------
 # Failing test 1: R2 error on first video → request fails (no DB deletion)
 # ---------------------------------------------------------------------------
@@ -112,9 +124,9 @@ async def test_project_delete_r2_failure_one_of_several_videos(client, mock_s3):
     because R2 DeleteObject on a missing key is a no-op 204).
     """
     project_id = await _create_project(client)
-    await _add_video(client, mock_s3, project_id, "video1.mp4")
-    await _add_video(client, mock_s3, project_id, "video2.mp4")
-    await _add_video(client, mock_s3, project_id, "video3.mp4")
+    v1 = await _add_video(client, mock_s3, project_id, "video1.mp4")
+    v2 = await _add_video(client, mock_s3, project_id, "video2.mp4")
+    v3 = await _add_video(client, mock_s3, project_id, "video3.mp4")
 
     call_count = 0
 
@@ -139,6 +151,97 @@ async def test_project_delete_r2_failure_one_of_several_videos(client, mock_s3):
     assert get_resp.status_code == 200, (
         "Project was deleted from DB despite partial R2 failure — video-2's s3_key is now a permanent orphan."
     )
+
+    # Assert EVERY video row survived directly (not just via the project GET).
+    # In particular video-1, whose R2 object was already deleted before the
+    # failure: a future impl that deletes video rows outside the project
+    # cascade (e.g. db.delete(video) inside the loop) would lose video-1's
+    # s3_key reference here and this assertion would catch it.
+    surviving = await _video_ids(client, project_id)
+    assert surviving == {v1, v2, v3}, (
+        f"Expected all 3 video rows to survive the failed delete, got {surviving}. "
+        f"A video row was deleted despite the request failing — its s3_key is now orphaned."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Retry test — the whole value proposition: a delete that fails on R2 can be
+# safely re-attempted once R2 recovers, because the DB rows (and their s3_keys)
+# were preserved and re-deleting an already-gone R2 object is a no-op.
+# ---------------------------------------------------------------------------
+
+async def test_project_delete_retry_after_r2_failure_succeeds(client, mock_s3):
+    """First DELETE fails on video-2's R2 delete; second DELETE (R2 healthy) succeeds.
+
+    This is the end-to-end proof that the fix is recoverable:
+
+      Call 1 — R2 delete of video-2 raises:
+        * returns 500
+        * project row + ALL THREE video rows still exist (nothing orphaned)
+
+      Call 2 — R2 healthy (all deletes succeed, including re-deleting video-1
+               and video-3 whose objects the first call already removed — safe
+               because R2 DeleteObject on a missing key is a no-op 204):
+        * returns 204
+        * project + all video rows gone from DB
+
+    Without the fix, call 1 would have 204'd and cascade-deleted video-2's row,
+    leaving its R2 object orphaned with no DB reference to ever retry against —
+    so there would be nothing to test here.
+    """
+    project_id = await _create_project(client)
+    v1 = await _add_video(client, mock_s3, project_id, "video1.mp4")
+    v2 = await _add_video(client, mock_s3, project_id, "video2.mp4")
+    v3 = await _add_video(client, mock_s3, project_id, "video3.mp4")
+
+    # --- Call 1: R2 fails on the second video ---
+    call_count = 0
+
+    def _fail_second(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise Exception("R2 intermittent error on video 2")
+        return None
+
+    with patch(_PROJECTS_S3_PATCH) as proj_s3:
+        proj_s3.delete_video.side_effect = _fail_second
+        first = await client.delete(f"/api/projects/{project_id}")
+
+    assert first.status_code == 500, (
+        f"Expected first delete to fail with 500, got {first.status_code}"
+    )
+
+    # Project + every video row survived → s3_keys are all still recoverable.
+    assert (await client.get(f"/api/projects/{project_id}")).status_code == 200
+    surviving = await _video_ids(client, project_id)
+    assert surviving == {v1, v2, v3}, (
+        f"After the failed first delete, expected all 3 video rows intact, got {surviving}"
+    )
+
+    # --- Call 2: R2 has recovered; retry the exact same delete ---
+    deleted_keys = []
+
+    def _succeed_all(s3_key, *args, **kwargs):
+        # Re-deleting v1/v3 (already removed in call 1) is a no-op in real R2;
+        # here the mock simply succeeds, modeling DeleteObject's 204-on-missing.
+        deleted_keys.append(s3_key)
+        return None
+
+    with patch(_PROJECTS_S3_PATCH) as proj_s3:
+        proj_s3.delete_video.side_effect = _succeed_all
+        second = await client.delete(f"/api/projects/{project_id}")
+
+    assert second.status_code == 204, (
+        f"Expected retry delete to succeed with 204, got {second.status_code}: {second.text}"
+    )
+    # All three videos' R2 objects were (re-)deleted on the successful retry.
+    assert len(deleted_keys) == 3, (
+        f"Expected the retry to attempt all 3 R2 deletes, got {len(deleted_keys)}"
+    )
+
+    # Project (and all video rows via cascade) is now gone — clean final state.
+    assert (await client.get(f"/api/projects/{project_id}")).status_code == 404
 
 
 # ---------------------------------------------------------------------------

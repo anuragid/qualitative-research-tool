@@ -334,9 +334,14 @@ async def delete_project(
                 await asyncio.to_thread(s3_service.delete_video, video.s3_key)
             except Exception as e:
                 logger.error(f"Failed to delete R2 object for video {video.id}: {e}")
+                # Roll back so the session is clean (symmetrical with delete_video
+                # and every other mutation route). Harmless today since nothing is
+                # written before the R2 loop, but a latent bug if any write is ever
+                # added above; keep the error path defensive.
+                db.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to delete video file from storage; project not deleted",
+                    detail="Failed to delete video file from storage",
                 )
 
         db.delete(project)
