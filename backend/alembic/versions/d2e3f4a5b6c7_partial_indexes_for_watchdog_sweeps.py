@@ -46,6 +46,23 @@ the model predicate ``status = 'processing'`` and the Postgres-reflected
 ``(status)::text = 'processing'::text`` as equivalent — verified on
 postgres:15-alpine.)
 
+PLAN-CACHE CAVEAT (driver-dependent index usage)
+------------------------------------------------
+The watchdog candidate SELECT binds ``status`` as a parameter, so the planner
+only chooses these partial indexes when it can see the *literal* value
+``'processing'`` at plan time (a custom plan). This holds with our current
+stack: ``app/database.py`` builds the engine with psycopg2's default
+client-side parameter binding (no server-side prepared statements, no
+``prepare_threshold``/``executemany_mode`` override), so Postgres receives the
+literal and plans a custom plan that matches the partial predicate — confirmed
+via a real psycopg2 EXPLAIN with bound params (Index Scan, not Seq Scan).
+WARNING: under a FORCED generic plan (``plan_cache_mode=force_generic_plan``,
+or psycopg3 with server-side prepared statements where Postgres caches a
+generic plan with ``$1``), the planner cannot prove ``$1 = 'processing'`` and
+SILENTLY falls back to a Seq Scan — correctness is unaffected but the watchdog
+sweeps lose this index. If the DB driver or plan-cache config ever changes,
+re-check the EXPLAIN for these three sweeps.
+
 CONCURRENTLY / autocommit / idempotency
 ---------------------------------------
 Mirrors b8c4d2e3f5a6 exactly. ``CREATE INDEX CONCURRENTLY`` cannot run inside
