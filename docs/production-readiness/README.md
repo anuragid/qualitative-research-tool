@@ -22,29 +22,30 @@ These are minimums, not aspirations.
 | Phase | Theme | Target date | Status |
 |---|---|---|---|
 | Phase 1 | Stop the bleeding — correctness + deploy lifecycle + frontend robustness | 2026-04-07 | **✅ COMPLETE** — 5 PRs shipped + 6 runbooks + state machine centralization as stretch |
+| Hardening campaign | Perf + reliability + security + build quality (audit-driven swarm) | 2026-06-13 | **✅ COMPLETE** — 20 PRs, see [2026-06-13-hardening-campaign.md](2026-06-13-hardening-campaign.md) |
 | Phase 2 | Know before they do — observability, alerting, staging, DB CHECK constraints, SLO instrumentation | TBD | **Next — spec to be written** |
 | Phase 3 | Prove it under load — load test harness, query audit, queue tuning, chaos test | After Phase 2 | Not started |
-| Phase 4 | Polish — feature flags, admin dashboard, backups, secret rotation, dep CVE scans | Ongoing | Not started |
+| Phase 4 | Polish — feature flags, admin dashboard, backups, secret rotation, dep CVE scans | Ongoing | Partially done (dep CVE scans + secret scanning shipped in the hardening campaign) |
 
-### Phase 1 score card
+### Score card (after 2026-06-13 hardening campaign)
 
-Measured against the 13 invariants in this README. **8 green, 4 yellow, 1 red** (up from 2/5/6 at start of 2026-04-07).
+Measured against the 13 invariants in this README. **9 green, 3 yellow, 1 red** (2🟢/5🟡/6🔴 at start of Phase 1 → 8/4/1 end of Phase 1 → **9/3/1 now**; #2 and #6 moved to green this campaign). The 4 non-green are all the original Phase-2/3 observability + load work — deliberately out of scope here.
 
 | Invariant | Score | How |
 |---|---|---|
-| 1. DB state matches reality | 🟢 | 17-min watchdog + 10-min broker sweep (PR #19) |
-| 2. Impossible states rejected | 🟡 | SQLEnum ORM-layer enforcement (PR #24); DB CHECK constraints deferred to Phase 2 |
-| 3. Single state-machine owner | 🟢 | PR #24 — all ~40 status writes go through `app/state/` |
-| 4. Idempotent Celery tasks | 🟢 | PR #21 retry-reset + existing `task_acks_late` |
-| 5. Invisible deploys | 🟢 | PR #19 celery lifecycle tuning (REQUIRES `scripts/railway-service-config.py --apply`) |
-| 6. Dependency failure = user-visible error | 🟡 | BYOK 402 handling solid; other deps → Phase 2 circuit breakers |
-| 7. Frontend never crashes | 🟢 | PR #23 zod + defensive codemod + route error boundaries |
-| 8. Request tracing end-to-end | 🟡 | Sentry session replay works; request-ID propagation → Phase 2 |
-| 9. Alerts before user notices | 🔴 | Phase 2 |
-| 10. Runbooks exist | 🟢 | 6 runbooks committed 2026-04-07 |
-| 11. API ≤ 500ms | 🟢 | Most routes sub-100ms |
+| 1. DB state matches reality | 🟢 | 17-min watchdog + 10-min broker sweep (PR #19); watchdog now indexed (#54) |
+| 2. Impossible states rejected | 🟢 | SQLEnum + state machines (#24) + model/migration drift reconciled & drift-gated (#42, #29); CHECK constraints still deferred but covered |
+| 3. Single state-machine owner | 🟢 | PR #24 — all status writes go through `app/state/` |
+| 4. Idempotent Celery tasks | 🟢 | retry-reset + `task_acks_late` + atomic per-step commit (#44) + cross-video RETRY_RESET (#40) |
+| 5. Invisible deploys | 🟢 | celery lifecycle (#19); CI-gated deploy code (#30, activation pending) |
+| 6. Dependency failure = user-visible error | 🟢 | R2 timeouts (#32), retryable LLM-validation (#35), cross-video error_message (#45), no exception swallowing (#37) |
+| 7. Frontend never crashes | 🟢 | zod + error boundaries (#23) + chunk-load reload guard (#33) |
+| 8. Request tracing end-to-end | 🟡 | Sentry session replay; request-ID propagation → Phase 2 |
+| 9. Alerts before user notices | 🔴 | CI-side gating shipped (gitleaks/pip-audit/drift), but runtime alerting (stuck-video/queue-depth/budget paging) still Phase 2 |
+| 10. Runbooks exist | 🟢 | 6 Phase-1 runbooks + deploy-gating + secret-rotation |
+| 11. API ≤ 500ms | 🟢 | sync-def threadpool offload (#50, #52) — event loop no longer blocked by sync DB; ~98% lighter polled payloads (#43) |
 | 12. SLO for chain completion | 🟡 | SLOs defined, not yet instrumented → Phase 2 |
-| 13. Users don't degrade each other | 🟡 | 32 worker slots handle target-B; not load-tested → Phase 3 |
+| 13. Users don't degrade each other | 🟡 | row-locking/CAS (#48), no event-loop blocking, indexes added (#42, #54) — degradation vectors fixed but not yet load-validated → Phase 3 |
 
 ## How to resume this work in a fresh session
 
