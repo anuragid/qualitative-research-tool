@@ -29,10 +29,16 @@ def reset_limiter():
 
 
 def test_rate_limit_upload_setting():
-    """Config should have upload rate limit."""
+    """Config should have upload rate limit sized to the 20-video project quota.
+
+    A full 20-video batch makes 20 upload-url + 20 confirm-upload calls, so the
+    limit is set to 20/minute (matching the per-project quota in
+    routes/videos.py) rather than 10/minute, which would 429 a legitimate batch
+    at call 11.
+    """
     from app.config import settings
     assert hasattr(settings, "RATE_LIMIT_UPLOAD")
-    assert settings.RATE_LIMIT_UPLOAD == "10/minute"
+    assert settings.RATE_LIMIT_UPLOAD == "20/minute"
 
 
 def test_upload_routes_have_rate_limit_decorator():
@@ -52,7 +58,11 @@ def test_upload_routes_have_rate_limit_decorator():
     from app.config import settings
     from app.main import limiter  # triggers route registration via import
 
-    expected_limit_str = settings.RATE_LIMIT_UPLOAD  # "10/minute"
+    expected_limit_str = settings.RATE_LIMIT_UPLOAD  # "20/minute"
+    # "20/minute" parses to "20 per 1 minute" in the limits-library repr;
+    # derive the leading count from the setting so the check tracks the
+    # configured value rather than hardcoding it.
+    expected_count = expected_limit_str.split("/")[0]  # "20"
     # Keys in _route_limits use the full module-qualified name.
     handler_names = {
         "app.routes.videos.get_upload_url",
@@ -66,10 +76,9 @@ def test_upload_routes_have_rate_limit_decorator():
         )
         limits = limiter._route_limits[name]
         limit_strs = [str(lim.limit) for lim in limits]
-        # "10/minute" parses to "10 per 1 minute" in limits-library repr;
-        # check both forms so the assertion is resilient to repr changes.
+        # Check both forms so the assertion is resilient to repr changes.
         matched = any(
-            expected_limit_str in s or s.startswith("10 per")
+            expected_limit_str in s or s.startswith(f"{expected_count} per")
             for s in limit_strs
         )
         assert matched, (
@@ -204,8 +213,8 @@ async def test_activate_step_rate_limit(reset_limiter):
     _assert_burst_trips_at(codes, _STEP_LIMIT)
 
 
-_UPLOAD_LIMIT = 10  # must match settings.RATE_LIMIT_UPLOAD
-_UPLOAD_BURST = 12
+_UPLOAD_LIMIT = 20  # must match settings.RATE_LIMIT_UPLOAD
+_UPLOAD_BURST = 22
 _UPLOAD_URL_BODY = {
     "filename": "interview.mp4",
     "file_size": 1_000_000,
@@ -239,10 +248,10 @@ async def _burst_post_upload(path: str, n: int, *, json_body=None) -> list[int]:
 
 @pytest.mark.asyncio
 async def test_upload_url_rate_limit(reset_limiter):
-    """POST /api/videos/{project_id}/upload-url should 429 after 10/minute.
+    """POST /api/videos/{project_id}/upload-url should 429 after 20/minute.
 
-    The limiter fires before the route body runs; requests 1-10 fail with 500
-    (no DB in the burst environment) and request 11 onwards returns 429.
+    The limiter fires before the route body runs; requests 1-20 fail with 500
+    (no DB in the burst environment) and request 21 onwards returns 429.
 
     We must supply a valid JSON body because FastAPI validates request bodies
     before calling the handler — without one, a 422 is returned from
@@ -259,15 +268,15 @@ async def test_upload_url_rate_limit(reset_limiter):
 
 @pytest.mark.asyncio
 async def test_confirm_upload_rate_limit(reset_limiter):
-    """POST /api/videos/{video_id}/confirm-upload should 429 after 10/minute.
+    """POST /api/videos/{video_id}/confirm-upload should 429 after 20/minute.
 
     confirm-upload is the key R2 amplification vector: each call triggers a
     HEAD and a ranged GET against R2.  The rate limit caps that upstream fan-out.
 
-    Requests 1-10 return 500 in the burst environment (no test DB tables for
+    Requests 1-20 return 500 in the burst environment (no test DB tables for
     the video lookup).  ``raise_app_exceptions=False`` prevents the uncaught
     SQLAlchemy error from crashing the test loop so the codes list is fully
-    populated and request 11 onwards is observed to return 429.
+    populated and request 21 onwards is observed to return 429.
     """
     codes = await _burst_post_upload(
         f"/api/videos/{_DUMMY_UUID}/confirm-upload", _UPLOAD_BURST

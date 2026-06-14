@@ -88,7 +88,13 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_DEFAULT: str = "60/minute"
-    RATE_LIMIT_UPLOAD: str = "10/minute"
+    # Sized to the per-project video quota (max 20 videos, enforced in
+    # routes/videos.py): a full 20-video batch maps to 20 upload-url + 20
+    # confirm-upload calls, so 20/minute lets a legitimate batch (and the
+    # frontend's confirm-upload recovery probe) complete without a false
+    # 429, while still capping the confirm-upload R2 HEAD+ranged-GET
+    # amplification at 20/min/user vs. 60/min under RATE_LIMIT_DEFAULT.
+    RATE_LIMIT_UPLOAD: str = "20/minute"
     RATE_LIMIT_AUTH: str = "20/minute"
     RATE_LIMIT_TRANSCRIBE: str = "5/minute"
     RATE_LIMIT_ANALYZE: str = "5/minute"

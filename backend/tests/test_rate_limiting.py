@@ -21,10 +21,15 @@ def test_rate_limit_default_setting():
 
 
 def test_rate_limit_upload_setting():
-    """P1-2: Upload rate limit should be 10/minute."""
+    """P1-2: Upload rate limit should be 20/minute.
+
+    Sized to the per-project video quota (max 20 videos): a full batch makes
+    20 upload-url + 20 confirm-upload calls, so 20/minute avoids a false 429
+    on a legitimate batch while still capping the confirm-upload R2 fan-out.
+    """
     from app.config import settings
 
-    assert settings.RATE_LIMIT_UPLOAD == "10/minute"
+    assert settings.RATE_LIMIT_UPLOAD == "20/minute"
 
 
 def test_rate_limit_auth_setting():
