@@ -43,12 +43,32 @@ from app.services.openrouter_balance import (
 logger = logging.getLogger(__name__)
 
 
-async def require_byok_credits(
+def require_byok_credits(
     request: Request,  # noqa: ARG001 — kept for symmetry with other gate deps
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
 ) -> BalanceInfo | None:
     """Block the request if the BYOK user's balance is known-zero.
+
+    Declared as a **plain ``def``** (not ``async def``) on purpose. FastAPI
+    runs ``async def`` dependencies directly on the event loop, but offloads
+    plain ``def`` dependencies to its anyio threadpool — exactly like plain
+    ``def`` route handlers (the mechanism PR #50 relied on for routes, which
+    did NOT touch dependencies). This body is fully synchronous and blocking:
+    a sync ``db.query(User)`` and, on a balance cache miss / TTL expiry,
+    ``get_cached_balance`` → ``refresh_and_persist`` → two blocking
+    ``httpx.Client().get()`` calls (10 s timeout each). If this were
+    ``async def``, a single cold-cache Analyze trigger would stall the WHOLE
+    event loop for up to ~20 s. Keeping it sync lets FastAPI run it in a
+    worker thread so other requests keep flowing.
+
+    FastAPI fully supports a sync dependency that ``Depends`` on async
+    sub-dependencies (``get_current_user_id`` is ``async def``): it awaits
+    those during dependency resolution, then calls this sync function in the
+    threadpool with the already-resolved values. ``get_db`` is a sync
+    generator and is consumed normally. ``HTTPException`` raised here still
+    propagates correctly — FastAPI re-raises exceptions surfaced from the
+    threadpool.
 
     Returns:
         - ``None`` for non-BYOK users (no ``encrypted_api_key`` configured)

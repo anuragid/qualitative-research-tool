@@ -281,12 +281,41 @@ def _set_byok_user(TestSession, meta, *, with_key: bool = True) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Threadpool-offload invariant
+# ---------------------------------------------------------------------------
+
+
+def test_require_byok_credits_is_sync_def_for_threadpool_offload():
+    """``require_byok_credits`` MUST be a plain ``def``, not ``async def``.
+
+    FastAPI runs ``async def`` dependencies directly on the event loop and
+    only offloads plain ``def`` dependencies to its anyio threadpool. The
+    gate body is fully synchronous and blocking (a sync ``db.query`` plus,
+    on a cold balance cache, two 10 s-timeout ``httpx.Client().get()``
+    calls). If it were ``async def`` a single cold-cache Analyze trigger
+    would stall the WHOLE event loop ~20 s — the P-C1 bug class.
+
+    Asserting ``inspect.iscoroutinefunction`` is False locks the
+    threadpool-offload property so a future refactor can't silently
+    re-introduce the stall by adding ``async``.
+    """
+    import inspect
+
+    assert not inspect.iscoroutinefunction(require_byok_credits), (
+        "require_byok_credits must be a plain `def` so FastAPI offloads it "
+        "to the threadpool. An `async def` here runs on the event loop and "
+        "blocks it for the duration of the sync DB query / blocking httpx "
+        "balance fetch (~20 s on a cold cache) — the exact event-loop stall "
+        "this gate's sync-def conversion fixed."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Unit tests: require_byok_credits dependency
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_non_byok_user_returns_none():
+def test_require_byok_credits_non_byok_user_returns_none():
     """Non-BYOK users (no encrypted_api_key) skip the gate entirely.
 
     No call to ``get_cached_balance`` is made — proves the gate is a
@@ -302,7 +331,7 @@ async def test_require_byok_credits_non_byok_user_returns_none():
     with patch(
         "app.dependencies.byok_gate.get_cached_balance",
     ) as mock_get_balance:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
@@ -310,8 +339,7 @@ async def test_require_byok_credits_non_byok_user_returns_none():
     mock_get_balance.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_included_tier_with_key_skips_gate():
+def test_require_byok_credits_included_tier_with_key_skips_gate():
     """User has encrypted_api_key AND model_tier='included' -> gate returns
     None without calling get_cached_balance. The key exists but the user
     chose the included tier, so no balance check occurs.
@@ -326,7 +354,7 @@ async def test_require_byok_credits_included_tier_with_key_skips_gate():
     with patch(
         "app.dependencies.byok_gate.get_cached_balance",
     ) as mock_get_balance:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
@@ -334,8 +362,7 @@ async def test_require_byok_credits_included_tier_with_key_skips_gate():
     mock_get_balance.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_byok_tier_without_key_passes_through():
+def test_require_byok_credits_byok_tier_without_key_passes_through():
     """User has model_tier='byok' but no encrypted_api_key -> gate returns
     None. Downstream task surfaces the missing-key error, not the gate.
     """
@@ -349,7 +376,7 @@ async def test_require_byok_credits_byok_tier_without_key_passes_through():
     with patch(
         "app.dependencies.byok_gate.get_cached_balance",
     ) as mock_get_balance:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
@@ -357,8 +384,7 @@ async def test_require_byok_credits_byok_tier_without_key_passes_through():
     mock_get_balance.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_byok_tier_with_key_zero_balance_402():
+def test_require_byok_credits_byok_tier_with_key_zero_balance_402():
     """User has model_tier='byok', has encrypted_api_key, $0 balance -> 402
     with structured error detail including error_type and balance payload.
     """
@@ -376,7 +402,7 @@ async def test_require_byok_credits_byok_tier_with_key_zero_balance_402():
         return_value=empty,
     ):
         with pytest.raises(HTTPException) as exc_info:
-            await require_byok_credits(
+            require_byok_credits(
                 request=MagicMock(), db=db, current_user_id="user_xyz",
             )
 
@@ -389,8 +415,7 @@ async def test_require_byok_credits_byok_tier_with_key_zero_balance_402():
     assert detail["balance"]["has_credits"] is False
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_unknown_user_returns_none():
+def test_require_byok_credits_unknown_user_returns_none():
     """If the user row doesn't exist (race / orphaned token), gate
     short-circuits to a pass-through. Lets normal auth handle it later.
     """
@@ -400,7 +425,7 @@ async def test_require_byok_credits_unknown_user_returns_none():
     with patch(
         "app.dependencies.byok_gate.get_cached_balance",
     ) as mock_get_balance:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_ghost",
         )
 
@@ -408,8 +433,7 @@ async def test_require_byok_credits_unknown_user_returns_none():
     mock_get_balance.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_healthy_balance_returns_balance():
+def test_require_byok_credits_healthy_balance_returns_balance():
     """BYOK user with positive balance: dependency returns the
     BalanceInfo so handlers can read it.
     """
@@ -426,7 +450,7 @@ async def test_require_byok_credits_healthy_balance_returns_balance():
         "app.dependencies.byok_gate.get_cached_balance",
         return_value=healthy,
     ) as mock_get_balance:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
@@ -438,8 +462,7 @@ async def test_require_byok_credits_healthy_balance_returns_balance():
     assert kwargs.get("max_age_seconds") == _settings.BALANCE_CACHE_TTL_SECONDS
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_fresh_cache_zero_network_calls():
+def test_require_byok_credits_fresh_cache_zero_network_calls():
     """When a fresh cached balance exists, the gate must use it and perform
     ZERO calls to ``get_cached_balance`` with a force-refresh (max_age_seconds=0).
 
@@ -475,7 +498,7 @@ async def test_require_byok_credits_fresh_cache_zero_network_calls():
     ) as mock_get_balance, _patch(
         "app.services.openrouter_balance.fetch_balance_sync",
     ) as mock_fetch:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
@@ -495,8 +518,7 @@ async def test_require_byok_credits_fresh_cache_zero_network_calls():
     assert result.has_credits is True
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_stale_cache_triggers_exactly_one_refresh():
+def test_require_byok_credits_stale_cache_triggers_exactly_one_refresh():
     """When the cached balance is stale (older than TTL), the gate must
     trigger exactly ONE ``get_cached_balance`` call which internally does
     a live fetch — it must NOT call the balance function twice.
@@ -520,7 +542,7 @@ async def test_require_byok_credits_stale_cache_triggers_exactly_one_refresh():
         "app.dependencies.byok_gate.get_cached_balance",
         return_value=fresh_balance,
     ) as mock_get_balance:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
@@ -535,8 +557,7 @@ async def test_require_byok_credits_stale_cache_triggers_exactly_one_refresh():
     assert result.has_credits is True
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_zero_balance_raises_402():
+def test_require_byok_credits_zero_balance_raises_402():
     """BYOK user with zero balance: dependency raises HTTP 402 with the
     structured detail body the frontend renders as the "Add credits" alert.
     """
@@ -554,7 +575,7 @@ async def test_require_byok_credits_zero_balance_raises_402():
         return_value=empty,
     ):
         with pytest.raises(HTTPException) as exc_info:
-            await require_byok_credits(
+            require_byok_credits(
                 request=MagicMock(), db=db, current_user_id="user_xyz",
             )
 
@@ -570,8 +591,7 @@ async def test_require_byok_credits_zero_balance_raises_402():
     assert "checked_at" in detail["balance"]
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_db_query_failure_passes_through():
+def test_require_byok_credits_db_query_failure_passes_through():
     """Defense in depth: a DB-level failure on the user lookup (e.g.
     transient connection blip in prod, missing tables in tests) must
     degrade to a pass-through, not 500 the request.
@@ -584,7 +604,7 @@ async def test_require_byok_credits_db_query_failure_passes_through():
     with patch(
         "app.dependencies.byok_gate.get_cached_balance",
     ) as mock_get_balance:
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
@@ -592,8 +612,7 @@ async def test_require_byok_credits_db_query_failure_passes_through():
     mock_get_balance.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_require_byok_credits_balance_fetch_error_passes_through():
+def test_require_byok_credits_balance_fetch_error_passes_through():
     """If OpenRouter is unreachable, the gate logs and passes through
     so the task layer can surface any mid-process 402.
     """
@@ -608,7 +627,7 @@ async def test_require_byok_credits_balance_fetch_error_passes_through():
         "app.dependencies.byok_gate.get_cached_balance",
         side_effect=OpenRouterBalanceError("upstream 503"),
     ):
-        result = await require_byok_credits(
+        result = require_byok_credits(
             request=MagicMock(), db=db, current_user_id="user_xyz",
         )
 
