@@ -28,6 +28,56 @@ def reset_limiter():
     limiter.reset()
 
 
+def test_rate_limit_upload_setting():
+    """Config should have upload rate limit."""
+    from app.config import settings
+    assert hasattr(settings, "RATE_LIMIT_UPLOAD")
+    assert settings.RATE_LIMIT_UPLOAD == "10/minute"
+
+
+def test_upload_routes_have_rate_limit_decorator():
+    """upload-url, confirm-upload and legacy /upload must be registered in limiter._route_limits.
+
+    slowapi registers each @limiter.limit-decorated function into
+    ``limiter._route_limits`` keyed by ``"<module>.<funcname>"``.  We verify
+    that all three upload handlers appear in that registry with the correct
+    limit string.  This is a belt-and-suspenders static check that catches
+    accidental decorator removal even if the burst tests are temporarily
+    skipped.
+
+    Note: the burst tests below exercise the end-to-end 429 behaviour in
+    the live ASGI transport, so this test is complementary not redundant.
+    """
+    from app.main import limiter  # triggers route registration via import
+    import app.routes.videos  # noqa: F401 — ensures decorators run
+    from app.config import settings
+
+    expected_limit_str = settings.RATE_LIMIT_UPLOAD  # "10/minute"
+    # Keys in _route_limits use the full module-qualified name.
+    handler_names = {
+        "app.routes.videos.get_upload_url",
+        "app.routes.videos.confirm_upload",
+        "app.routes.videos.upload_video",
+    }
+    for name in handler_names:
+        assert name in limiter._route_limits, (
+            f"{name} is not in limiter._route_limits — "
+            "@limiter.limit was not applied (or the function was renamed)"
+        )
+        limits = limiter._route_limits[name]
+        limit_strs = [str(lim.limit) for lim in limits]
+        # "10/minute" parses to "10 per 1 minute" in limits-library repr;
+        # check both forms so the assertion is resilient to repr changes.
+        matched = any(
+            expected_limit_str in s or s.startswith("10 per")
+            for s in limit_strs
+        )
+        assert matched, (
+            f"{name} limit strings {limit_strs!r} do not match "
+            f"expected '{expected_limit_str}'"
+        )
+
+
 def test_rate_limit_transcribe_setting():
     """Config should have transcribe rate limit."""
     from app.config import settings
@@ -152,6 +202,77 @@ async def test_activate_step_rate_limit(reset_limiter):
         f"/api/videos/{_DUMMY_UUID}/analyze/activate", _BURST_SIZE
     )
     _assert_burst_trips_at(codes, _STEP_LIMIT)
+
+
+_UPLOAD_LIMIT = 10  # must match settings.RATE_LIMIT_UPLOAD
+_UPLOAD_BURST = 12
+_UPLOAD_URL_BODY = {
+    "filename": "interview.mp4",
+    "file_size": 1_000_000,
+    "content_type": "video/mp4",
+}
+
+
+async def _burst_post_upload(path: str, n: int, *, json_body=None) -> list[int]:
+    """POST ``path`` ``n`` times and return HTTP status codes.
+
+    Unlike the generic ``_burst_post`` helper, this variant:
+    - Passes ``raise_app_exceptions=False`` to ASGITransport so that
+      unhandled exceptions from routes that lack a top-level try/except
+      (e.g. confirm-upload hitting a missing test DB table) surface as 500
+      instead of propagating out of the ASGI transport and crashing the test.
+    - Accepts an optional ``json_body`` so upload-url gets a syntactically
+      valid body; without one, FastAPI body-validation fires a 422 *before*
+      slowapi's wrapper runs, so the rate-limit counter is never incremented
+      and the 429 never arrives.
+    """
+    from app.main import app
+
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    codes: list[int] = []
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        for _ in range(n):
+            r = await ac.post(path, headers=_AUTH, json=json_body)
+            codes.append(r.status_code)
+    return codes
+
+
+@pytest.mark.asyncio
+async def test_upload_url_rate_limit(reset_limiter):
+    """POST /api/videos/{project_id}/upload-url should 429 after 10/minute.
+
+    The limiter fires before the route body runs; requests 1-10 fail with 500
+    (no DB in the burst environment) and request 11 onwards returns 429.
+
+    We must supply a valid JSON body because FastAPI validates request bodies
+    before calling the handler — without one, a 422 is returned from
+    FastAPI's validation layer before slowapi's wrapper runs, so the
+    rate-limit counter is never incremented.
+    """
+    codes = await _burst_post_upload(
+        f"/api/videos/{_DUMMY_UUID}/upload-url",
+        _UPLOAD_BURST,
+        json_body=_UPLOAD_URL_BODY,
+    )
+    _assert_burst_trips_at(codes, _UPLOAD_LIMIT)
+
+
+@pytest.mark.asyncio
+async def test_confirm_upload_rate_limit(reset_limiter):
+    """POST /api/videos/{video_id}/confirm-upload should 429 after 10/minute.
+
+    confirm-upload is the key R2 amplification vector: each call triggers a
+    HEAD and a ranged GET against R2.  The rate limit caps that upstream fan-out.
+
+    Requests 1-10 return 500 in the burst environment (no test DB tables for
+    the video lookup).  ``raise_app_exceptions=False`` prevents the uncaught
+    SQLAlchemy error from crashing the test loop so the codes list is fully
+    populated and request 11 onwards is observed to return 429.
+    """
+    codes = await _burst_post_upload(
+        f"/api/videos/{_DUMMY_UUID}/confirm-upload", _UPLOAD_BURST
+    )
+    _assert_burst_trips_at(codes, _UPLOAD_LIMIT)
 
 
 @pytest.mark.asyncio
