@@ -38,7 +38,7 @@ describe("videosService", () => {
 
       const result = await videosService.getByProject("proj-1");
 
-      expect(mockedApi.get).toHaveBeenCalledWith("/api/projects/proj-1/videos/");
+      expect(mockedApi.get).toHaveBeenCalledWith("/api/projects/proj-1/videos");
       expect(result).toEqual(videos);
     });
 
@@ -66,7 +66,7 @@ describe("videosService", () => {
 
       const result = await videosService.getById("vid-1");
 
-      expect(mockedApi.get).toHaveBeenCalledWith("/api/videos/vid-1/");
+      expect(mockedApi.get).toHaveBeenCalledWith("/api/videos/vid-1");
       expect(result).toEqual(mockVideo);
     });
 
@@ -223,7 +223,7 @@ describe("videosService", () => {
 
       await videosService.delete("vid-1");
 
-      expect(mockedApi.delete).toHaveBeenCalledWith("/api/videos/vid-1/");
+      expect(mockedApi.delete).toHaveBeenCalledWith("/api/videos/vid-1");
     });
 
     it("propagates errors", async () => {

@@ -10,7 +10,7 @@ export const projectsService = {
 
   // Get single project
   getById: async (id: string): Promise<Project> => {
-    const response = await api.get(`/api/projects/${id}/`);
+    const response = await api.get(`/api/projects/${id}`);
     return response.data;
   },
 
@@ -22,12 +22,12 @@ export const projectsService = {
 
   // Update project
   update: async (id: string, data: UpdateProjectDto): Promise<Project> => {
-    const response = await api.patch(`/api/projects/${id}/`, data);
+    const response = await api.patch(`/api/projects/${id}`, data);
     return response.data;
   },
 
   // Delete project
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/projects/${id}/`);
+    await api.delete(`/api/projects/${id}`);
   },
 };

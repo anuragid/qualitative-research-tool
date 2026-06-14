@@ -4,19 +4,19 @@ import type { Transcript, SpeakerLabel, LabelSpeakerDto } from "../types";
 export const transcriptionsService = {
   // Start transcription
   start: async (videoId: string): Promise<{ task_id: string }> => {
-    const response = await api.post(`/api/videos/${videoId}/transcribe/`);
+    const response = await api.post(`/api/videos/${videoId}/transcribe`);
     return response.data;
   },
 
   // Get transcript
   get: async (videoId: string): Promise<Transcript> => {
-    const response = await api.get(`/api/videos/${videoId}/transcript/`);
+    const response = await api.get(`/api/videos/${videoId}/transcript`);
     return response.data;
   },
 
   // Get speaker labels
   getSpeakers: async (transcriptId: string): Promise<SpeakerLabel[]> => {
-    const response = await api.get(`/api/transcripts/${transcriptId}/speakers/`);
+    const response = await api.get(`/api/transcripts/${transcriptId}/speakers`);
     return response.data;
   },
 
