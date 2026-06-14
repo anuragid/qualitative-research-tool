@@ -117,9 +117,11 @@ class UploadUrlResponse(BaseModel):
 
 
 @router.post("/{project_id}/upload-url", response_model=UploadUrlResponse, status_code=status.HTTP_200_OK)
+@limiter.limit(settings.RATE_LIMIT_UPLOAD)
 async def get_upload_url(
     project_id: UUID,
     request_body: UploadUrlRequest,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.VIDEO_UPLOAD)),
     db: Session = Depends(get_db),
 ):
@@ -204,8 +206,10 @@ async def get_upload_url(
 
 
 @router.post("/{video_id}/confirm-upload", response_model=VideoResponse, status_code=status.HTTP_200_OK)
+@limiter.limit(settings.RATE_LIMIT_UPLOAD)
 async def confirm_upload(
     video_id: UUID,
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_permissions(Permission.VIDEO_UPLOAD)),
     db: Session = Depends(get_db),
 ):
@@ -345,8 +349,10 @@ async def confirm_upload(
 
 
 @router.post("/{project_id}/upload", response_model=VideoUploadResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(settings.RATE_LIMIT_UPLOAD)
 async def upload_video(
     project_id: UUID,
+    request: Request,
     file: UploadFile = File(...),
     current_user: Dict[str, Any] = Depends(require_permissions_upload(Permission.VIDEO_UPLOAD)),
     db: Session = Depends(get_db)
