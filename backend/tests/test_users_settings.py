@@ -146,6 +146,26 @@ class TestGetSettings:
         assert "model_tier" in body
         assert body["model_tier"] == "included"
 
+    async def test_includes_low_balance_threshold_from_config(
+        self, client, db_user_factory
+    ):
+        """GET /settings serializes the server-driven low-balance threshold.
+
+        Locks the byok-balance contract: the threshold is sourced from
+        settings.LOW_BALANCE_THRESHOLD_USD, not a frontend fallback.
+        """
+        from app.config import settings
+
+        db_user_factory(model_tier="included")
+        response = await client.get(
+            "/api/users/settings",
+            headers=_AUTH,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert "low_balance_threshold_usd" in body
+        assert body["low_balance_threshold_usd"] == settings.LOW_BALANCE_THRESHOLD_USD
+
     async def test_returns_byok_model_tier(self, client, db_user_factory):
         """GET /settings for a BYOK user returns model_tier='byok'."""
         db_user_factory(

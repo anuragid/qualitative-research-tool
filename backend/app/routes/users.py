@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth_bridge import get_current_user
+from app.config import settings
 from app.constants import (
     DEFAULT_STANDARD_MODEL,
     MODEL_TIER_BYOK,
@@ -218,6 +219,7 @@ def get_user_settings(
         key_validated_at=db_user.key_validated_at,
         available_models=STANDARD_MODELS,
         balance=_balance_to_response(balance),
+        low_balance_threshold_usd=settings.LOW_BALANCE_THRESHOLD_USD,
     )
 
 
@@ -299,6 +301,7 @@ def add_api_key(
         key_validated_at=db_user.key_validated_at,
         available_models=STANDARD_MODELS,
         balance=_balance_to_response(fresh_balance),
+        low_balance_threshold_usd=settings.LOW_BALANCE_THRESHOLD_USD,
     )
 
 
@@ -306,7 +309,7 @@ def add_api_key(
     "/settings/preferred-model",
     response_model=UserSettingsResponse,
 )
-@limiter.limit("20/minute")
+@limiter.limit(settings.RATE_LIMIT_AUTH)
 def update_preferred_model(
     request: Request,
     payload: PreferredModelUpdateRequest,
@@ -387,6 +390,7 @@ def update_preferred_model(
         key_validated_at=db_user.key_validated_at,
         available_models=STANDARD_MODELS,
         balance=_balance_to_response(fresh_balance),
+        low_balance_threshold_usd=settings.LOW_BALANCE_THRESHOLD_USD,
     )
 
 
