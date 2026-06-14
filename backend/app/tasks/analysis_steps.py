@@ -38,6 +38,61 @@ from app.utils.error_classification import (
 logger = logging.getLogger(__name__)
 
 
+# Monotonic rank for per-step ``step_status`` values. A step can only ever move
+# FORWARD through these ranks; an update is dropped if it would move a key
+# backward. ``completed`` and ``error`` are both terminal (rank 2): a step that
+# has reached either must never be silently bounced back to ``processing`` /
+# ``pending`` by a stale, re-delivered earlier-step write. An unknown value is
+# treated as the lowest rank so a real, known state always wins over garbage.
+_STEP_STATUS_RANK = {
+    "pending": 0,
+    "processing": 1,
+    "completed": 2,
+    "error": 2,
+}
+
+
+def _step_status_rank(value: Any) -> int:
+    return _STEP_STATUS_RANK.get(value, -1)
+
+
+def _merge_step_status(
+    current: Dict[str, str] | None,
+    updates: Dict[str, str],
+) -> Dict[str, str]:
+    """Monotonically merge ``updates`` into ``current`` step_status.
+
+    For each key in ``updates`` the new value is applied ONLY if its rank is
+    ``>=`` the existing value's rank (see ``_STEP_STATUS_RANK``). This makes
+    every step_status write idempotent and forward-only, so a re-delivered
+    earlier step (Celery ``acks_late`` + ``visibility_timeout`` re-running the
+    chain's first link while the original is still in flight) can never
+    DOWNGRADE a later step that already advanced.
+
+    Concretely, the production bug this fixes: the re-delivered
+    ``analyze_chunk_step`` applied a whole-map reset
+    ``{chunk:"processing", infer:"pending", ...}`` that clobbered
+    ``explain``/``activate`` rows already ``"completed"``, persisting an
+    impossible map (chain order is chunk -> infer -> relate -> explain ->
+    activate) that the frontend rendered as a step stuck "processing" forever.
+    Routed through this helper, that same reset becomes a no-op for any step
+    that already moved on, while still SEEDING never-run keys.
+
+    Returns a NEW dict (does not mutate ``current`` or ``updates``), preserving
+    the whole-dict-reassignment pattern the step tasks rely on for SQLAlchemy
+    JSONB change-tracking.
+
+    NOTE: This is deliberately NOT used by the explicit retry-from-error reset
+    in ``routes/videos.py`` — that is a user-initiated, row-locked, TRUE reset
+    of the whole row and must clear step_status to ``{}`` outright.
+    """
+    merged: Dict[str, str] = dict(current or {})
+    for key, new_value in updates.items():
+        if _step_status_rank(new_value) >= _step_status_rank(merged.get(key)):
+            merged[key] = new_value
+    return merged
+
+
 def _check_cancellation(db: Session, video_id: str, require_existing: bool = True) -> bool:
     """Return True if the analysis should stop (watchdog error, row gone).
 
@@ -356,7 +411,9 @@ def _update_analysis_error(
                     f"transition for {video_id}: {exc_trans}"
                 )
         if analysis:
-            analysis.step_status = {**(analysis.step_status or {}), step_name: "error"}
+            analysis.step_status = _merge_step_status(
+                analysis.step_status, {step_name: "error"}
+            )
 
         # Stamp structured error_type for the BYOK 0-balance case so the
         # frontend can render the dedicated "Add credits" alert. This must
@@ -454,13 +511,25 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
             analysis, VideoAnalysisEvent.CHAIN_STARTED, db=self.db
         )
         analysis.current_step = "chunk"
-        analysis.step_status = {
-            "chunk": "processing",
-            "infer": "pending",
-            "relate": "pending",
-            "explain": "pending",
-            "activate": "pending",
-        }
+        # MONOTONIC reset: seed the five keys via _merge_step_status so a
+        # RE-DELIVERED chunk task (Celery acks_late + visibility_timeout
+        # re-running this first link while the original is still in flight)
+        # only fills in never-run keys and marks chunk processing — it can NEVER
+        # pull a downstream step that already advanced (e.g. an explain/activate
+        # already "completed") back to "pending"/"processing". On a genuinely
+        # fresh row every key is missing, so this seeds the full pending map.
+        # The deliberate retry-from-error reset (routes/videos.py, row-locked)
+        # is a separate TRUE reset and does NOT go through this merge.
+        analysis.step_status = _merge_step_status(
+            analysis.step_status,
+            {
+                "chunk": "processing",
+                "infer": "pending",
+                "relate": "pending",
+                "explain": "pending",
+                "activate": "pending",
+            },
+        )
         analysis.started_at = datetime.now(timezone.utc)
 
         # Mark the video as analyzing and clear any previous error. The
@@ -491,7 +560,9 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
         # Save results
         analysis.chunks = result.get("chunks")
         analysis.chunk_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**(analysis.step_status or {}), "chunk": "completed"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"chunk": "completed"}
+        )
         self.db.commit()
 
         logger.info(f"CHUNK step completed for video {video_id}")
@@ -548,7 +619,9 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
 
         # Update status
         analysis.current_step = "infer"
-        analysis.step_status = {**(analysis.step_status or {}), "infer": "processing"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"infer": "processing"}
+        )
         self.db.commit()
 
         # Run infer node
@@ -566,7 +639,9 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
         # Save results
         analysis.inferences = result.get("inferences")
         analysis.infer_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**(analysis.step_status or {}), "infer": "completed"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"infer": "completed"}
+        )
         self.db.commit()
 
         logger.info(f"INFER step completed for video {video_id}")
@@ -620,7 +695,9 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
 
         # Update status
         analysis.current_step = "relate"
-        analysis.step_status = {**(analysis.step_status or {}), "relate": "processing"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"relate": "processing"}
+        )
         self.db.commit()
 
         # Run relate node
@@ -638,7 +715,9 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
         # Save results
         analysis.patterns = result.get("patterns")
         analysis.relate_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**(analysis.step_status or {}), "relate": "completed"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"relate": "completed"}
+        )
         self.db.commit()
 
         logger.info(f"RELATE step completed for video {video_id}")
@@ -692,7 +771,9 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
 
         # Update status
         analysis.current_step = "explain"
-        analysis.step_status = {**(analysis.step_status or {}), "explain": "processing"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"explain": "processing"}
+        )
         self.db.commit()
 
         # Run explain node - include chunks for evidence (explain_node uses them)
@@ -711,7 +792,9 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
         # Save results
         analysis.insights = result.get("insights")
         analysis.explain_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**(analysis.step_status or {}), "explain": "completed"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"explain": "completed"}
+        )
         self.db.commit()
 
         logger.info(f"EXPLAIN step completed for video {video_id}")
@@ -765,7 +848,9 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
 
         # Update status
         analysis.current_step = "activate"
-        analysis.step_status = {**(analysis.step_status or {}), "activate": "processing"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"activate": "processing"}
+        )
         self.db.commit()
 
         # Run activate node
@@ -783,7 +868,9 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
         # Save results
         analysis.design_principles = result.get("design_principles")
         analysis.activate_completed_at = datetime.now(timezone.utc)
-        analysis.step_status = {**(analysis.step_status or {}), "activate": "completed"}
+        analysis.step_status = _merge_step_status(
+            analysis.step_status, {"activate": "completed"}
+        )
         # CHAIN_SUCCEEDED: processing -> completed
         VideoAnalysisStateMachine.transition(
             analysis, VideoAnalysisEvent.CHAIN_SUCCEEDED, db=self.db
