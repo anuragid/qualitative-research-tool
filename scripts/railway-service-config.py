@@ -366,9 +366,12 @@ def enable_check_suites_gate(
                 print(f"    [DRY] would set checkSuites=True on trigger {trigger_id}")
                 continue
 
+            # Railway's deploymentTriggerUpdate returns DeploymentTrigger!, so the
+            # mutation MUST select at least one subfield or the API rejects it with
+            # GRAPHQL_VALIDATION_FAILED ("must have a selection of subfields").
             mutation = """
             mutation GateOnCI($id: String!, $input: DeploymentTriggerUpdateInput!) {
-                deploymentTriggerUpdate(id: $id, input: $input)
+                deploymentTriggerUpdate(id: $id, input: $input) { id }
             }
             """
             gql(
