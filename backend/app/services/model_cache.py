@@ -1,8 +1,9 @@
 """Redis-backed cache for validated OpenRouter models.
 
 The periodic validate_openrouter_models task writes to this cache;
-routes and the LLM service read from it.  Falls back to the hardcoded
-constants when the cache is empty (e.g. first boot, Redis unavailable).
+the models route reads the valid IDs from it via get_valid_model_ids().
+Falls back to the hardcoded constants when the cache is empty
+(e.g. first boot, Redis unavailable).
 """
 
 import json
@@ -12,7 +13,6 @@ from typing import List, Optional, Set
 import redis
 
 from app.config import settings
-from app.constants import STANDARD_MODEL_FALLBACKS, STANDARD_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -43,25 +43,3 @@ def get_valid_model_ids() -> Optional[Set[str]]:
     except (redis.RedisError, json.JSONDecodeError) as e:
         logger.warning(f"Failed to read model cache: {e}")
     return None
-
-
-def get_valid_standard_models() -> list:
-    """Return STANDARD_MODELS filtered to only currently valid ones.
-
-    Falls back to the full hardcoded list when the cache is unavailable.
-    """
-    valid_ids = get_valid_model_ids()
-    if valid_ids is None:
-        return STANDARD_MODELS
-    return [m for m in STANDARD_MODELS if m["id"] in valid_ids]
-
-
-def get_valid_fallbacks() -> List[str]:
-    """Return STANDARD_MODEL_FALLBACKS filtered to only currently valid ones.
-
-    Falls back to the full hardcoded list when the cache is unavailable.
-    """
-    valid_ids = get_valid_model_ids()
-    if valid_ids is None:
-        return STANDARD_MODEL_FALLBACKS
-    return [m for m in STANDARD_MODEL_FALLBACKS if m in valid_ids]

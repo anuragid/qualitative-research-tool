@@ -51,23 +51,9 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from sqlalchemy.orm import Query, Session
+from sqlalchemy.orm import Query
 
 T = TypeVar("T")
-
-
-def _is_postgres(db: Session) -> bool:
-    """Return True iff the bound engine speaks PostgreSQL.
-
-    ``FOR UPDATE`` / ``SKIP LOCKED`` only have teeth on Postgres; on
-    SQLite SQLAlchemy ignores ``with_for_update()`` entirely. We gate the
-    ``skip_locked`` flag on this because, although ``with_for_update`` is a
-    no-op on SQLite, passing ``skip_locked=True`` to a dialect that does
-    not support it would raise at compile time on some backends — keeping
-    the call dialect-aware is the conservative choice.
-    """
-    bind = db.get_bind()
-    return bind.dialect.name == "postgresql"
 
 
 def lock_rows(query: Query[T], *, skip_locked: bool = False, of=None) -> Query[T]:

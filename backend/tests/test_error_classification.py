@@ -1,9 +1,8 @@
 """Tests for the error classification utility.
 
-Covers: classify_error, is_retryable, build_structured_error, structured_error_json.
+Covers: classify_error, is_retryable, build_structured_error.
 """
 
-import json
 
 import httpx
 from openai import APIConnectionError, APIError, APIStatusError, RateLimitError
@@ -20,7 +19,6 @@ from app.utils.error_classification import (
     build_structured_error,
     classify_error,
     is_retryable,
-    structured_error_json,
 )
 
 # ---------------------------------------------------------------------------
@@ -235,26 +233,3 @@ class TestBuildStructuredError:
         )
         err = build_structured_error("chunk", exc)
         assert err["retryable"] is True
-
-
-class TestStructuredErrorJson:
-    """structured_error_json returns a valid JSON string."""
-
-    def test_valid_json(self):
-        result = structured_error_json("chunk", ValueError("bad"))
-        parsed = json.loads(result)
-        assert parsed["step"] == "chunk"
-        assert parsed["error_type"] == ERROR_TYPE_VALIDATION
-
-    def test_custom_args(self):
-        result = structured_error_json(
-            "infer", Exception("x"), message="msg", details="det"
-        )
-        parsed = json.loads(result)
-        assert parsed["message"] == "msg"
-        assert parsed["details"] == "det"
-
-    def test_unicode_in_message(self):
-        result = structured_error_json("chunk", Exception("unicode: \u00e9\u00e0\u00fc"))
-        parsed = json.loads(result)
-        assert "\u00e9" in parsed["message"]

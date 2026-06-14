@@ -6,50 +6,12 @@ per-step task handles retry + backoff directly, and
 ``test_analysis_step_non_retryable.py`` covers the
 ``NonRetryableAnalysisError`` short-circuit path.
 
-What remains here is coverage of the structured-error + sanitization
-helpers that moved from the deleted ``analysis_tasks.py`` into the
-shared ``app.tasks._pipeline_utils`` module.
+What remains here is coverage of the ``sanitize_error`` helper that
+moved from the deleted ``analysis_tasks.py`` into the shared
+``app.tasks._pipeline_utils`` module.
 """
 
-import json
-
-from app.tasks._pipeline_utils import (
-    PipelineError,
-    build_pipeline_error_json,
-    sanitize_error,
-)
-
-
-class TestBuildPipelineErrorJson:
-    """Tests for build_pipeline_error_json."""
-
-    def test_basic_output_format(self):
-        result = json.loads(build_pipeline_error_json("chunk", "something broke"))
-        assert result["step"] == "chunk"
-        assert result["error_type"] == "unknown"
-        assert result["retryable"] is False
-        assert "chunk" in result["message"]
-        assert result["details"] == "something broke"
-
-    def test_with_error_type(self):
-        result = json.loads(
-            build_pipeline_error_json("infer", "rate limited", "rate_limit")
-        )
-        assert result["error_type"] == "rate_limit"
-        assert result["retryable"] is True
-
-    def test_none_error_type_defaults_to_unknown(self):
-        result = json.loads(
-            build_pipeline_error_json("relate", "error msg", None)
-        )
-        assert result["error_type"] == "unknown"
-        assert result["retryable"] is False
-
-    def test_valid_json(self):
-        """Output should always be valid JSON."""
-        raw = build_pipeline_error_json("explain", "error with \"quotes\" and \\slashes")
-        parsed = json.loads(raw)
-        assert isinstance(parsed, dict)
+from app.tasks._pipeline_utils import sanitize_error
 
 
 class TestSanitizeError:
@@ -84,17 +46,3 @@ class TestSanitizeError:
         result = sanitize_error(msg)
         assert "aaaaaabbbbbb" not in result
         assert "1111222233334444" not in result
-
-
-class TestPipelineErrorException:
-    """Integration-style tests verifying the PipelineError exception class."""
-
-    def test_pipeline_error_class(self):
-        """PipelineError carries structured JSON."""
-        err = PipelineError("msg", structured_json='{"step":"chunk"}')
-        assert str(err) == "msg"
-        assert err.structured_json == '{"step":"chunk"}'
-
-    def test_pipeline_error_without_json(self):
-        err = PipelineError("just a message")
-        assert err.structured_json is None
