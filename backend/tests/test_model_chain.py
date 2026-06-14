@@ -20,7 +20,7 @@ These tests pin DeepSeek as the primary so a future edit can't silently
 re-promote Scout/Nemotron and reintroduce the regression.
 """
 
-from app.config import settings
+from app.config import Settings
 from app.constants import (
     DEFAULT_STANDARD_MODEL,
     RECOMMENDED_MODELS,
@@ -49,9 +49,14 @@ def test_default_standard_model_is_deepseek():
 
 
 def test_default_model_config_is_deepseek():
-    """The hardcoded config default (also the BYOK last-resort fallback) is
-    DeepSeek V3, not Scout."""
-    assert settings.DEFAULT_MODEL == DEEPSEEK
+    """The shipped config default for DEFAULT_MODEL (also the BYOK last-resort
+    fallback) is DeepSeek V3, not Scout.
+
+    Asserts the pydantic field default on the Settings *class* rather than the
+    live ``settings`` singleton, which a developer's local ``backend/.env``
+    ``DEFAULT_MODEL=...`` would override (CI passes only because .env is
+    gitignored). The field default is what actually ships."""
+    assert Settings.model_fields["DEFAULT_MODEL"].default == DEEPSEEK
 
 
 def test_fallback_chain_tries_deepseek_first():
