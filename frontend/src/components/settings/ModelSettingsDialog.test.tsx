@@ -28,7 +28,7 @@ const STANDARD_MODELS = [
   { id: "deepseek/deepseek-chat-v3-0324", name: "DeepSeek V3", tier: "standard", provider: "DeepSeek" },
 ];
 
-const DEFAULT_STANDARD_MODEL = "meta-llama/llama-4-scout";
+const DEFAULT_STANDARD_MODEL = "deepseek/deepseek-chat-v3-0324";
 
 function makeSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
@@ -567,10 +567,11 @@ describe("ModelSettingsDialog — BYOK section", () => {
     // Click remove key
     await user.click(screen.getByRole("button", { name: /remove/i }));
 
-    // After removal, included radios should be visible and selected
+    // After removal, included radios should be visible and the default
+    // standard model (DeepSeek V3) selected.
     await waitFor(() => {
-      const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
-      expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
+      const deepseekRadio = screen.getByRole("radio", { name: /deepseek/i });
+      expect(deepseekRadio.getAttribute("aria-checked")).toBe("true");
     });
 
     // Combobox should be gone (replaced by add-key form)
@@ -698,7 +699,7 @@ describe("ModelSettingsDialog — key management", () => {
     vi.spyOn(settingsService, "deleteApiKey").mockResolvedValue();
     let currentSettings = makeSettings({
       model_tier: "included",
-      preferred_model: "meta-llama/llama-4-scout",
+      preferred_model: "deepseek/deepseek-chat-v3-0324",
       has_api_key: true,
       key_hint: "1234",
       balance: healthyBalance(),
@@ -715,8 +716,8 @@ describe("ModelSettingsDialog — key management", () => {
     });
 
     // Included radio should be checked (included tier is active)
-    const llamaRadio = screen.getByRole("radio", { name: /llama 4 scout/i });
-    expect(llamaRadio.getAttribute("aria-checked")).toBe("true");
+    const deepseekRadio = screen.getByRole("radio", { name: /deepseek/i });
+    expect(deepseekRadio.getAttribute("aria-checked")).toBe("true");
 
     // But the "Remove" button in BYOK section should still be clickable
     const removeBtn = screen.getByRole("button", { name: /remove/i });
@@ -725,7 +726,7 @@ describe("ModelSettingsDialog — key management", () => {
     // After removal, the add-key form should appear
     currentSettings = makeSettings({
       model_tier: "included",
-      preferred_model: "meta-llama/llama-4-scout",
+      preferred_model: "deepseek/deepseek-chat-v3-0324",
       has_api_key: false,
     });
     await user.click(removeBtn);
@@ -736,7 +737,7 @@ describe("ModelSettingsDialog — key management", () => {
 
     // Included radios should still be selected — removing key doesn't change tier
     expect(
-      screen.getByRole("radio", { name: /llama 4 scout/i }).getAttribute("aria-checked"),
+      screen.getByRole("radio", { name: /deepseek/i }).getAttribute("aria-checked"),
     ).toBe("true");
   });
 });

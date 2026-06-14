@@ -67,6 +67,23 @@ OPENROUTER_HEADERS = {
 # The Methodex key must never be used with premium models.
 _METHODEX_ALLOWED_MODELS = set(STANDARD_MODEL_FALLBACKS)
 
+# Per-model max output-token caps. Some demoted fallback models have a hard
+# output ceiling below the largest max_tokens our nodes request (infer asks for
+# 32K; chunk/explain/relate ask for 16K). Requesting more than a model's cap
+# makes it return NULL content with finish_reason=length — a wasted call. We
+# clamp the *request* to the model's known cap so a fallback model at least has
+# a chance to produce usable (if shorter) output instead of failing outright.
+#
+# IMPORTANT: only list models with a KNOWN hard cap. Models NOT in this map
+# (DeepSeek V3 — our primary — and all BYOK/premium models) are left untouched,
+# so we never truncate a legitimate large output from a model that can handle
+# it. DeepSeek tolerates the full 32K infer request, which is why it stays out.
+_MODEL_OUTPUT_CAPS = {
+    # Nemotron 3 Super 120B advertises a ~16K completion ceiling; asking for
+    # more (e.g. infer's 32K) yields finish_reason=length with null content.
+    "nvidia/nemotron-3-super-120b-a12b": 16384,
+}
+
 
 class LLMService:
     """Service for interacting with LLMs via OpenRouter (OpenAI-compatible API)."""
@@ -123,9 +140,21 @@ class LLMService:
         """
         from openai import APIConnectionError, APIError
         try:
+            # Clamp the requested output to the model's known cap (if any) so
+            # models with a hard ceiling (e.g. Nemotron) don't fail outright on
+            # large requests. Models without a cap (DeepSeek, BYOK/premium) are
+            # left untouched to avoid truncating legitimate large outputs.
+            model_cap = _MODEL_OUTPUT_CAPS.get(model)
+            effective_max_tokens = min(max_tokens, model_cap) if model_cap else max_tokens
+            if model_cap and effective_max_tokens < max_tokens:
+                logger.info(
+                    f"Clamped max_tokens {max_tokens} -> {effective_max_tokens} "
+                    f"for model {model} (known output cap)."
+                )
+
             kwargs = {
                 "model": model,
-                "max_tokens": max_tokens,
+                "max_tokens": effective_max_tokens,
                 "temperature": temperature,
                 "messages": [
                     {"role": "system", "content": system_prompt},
@@ -165,7 +194,7 @@ class LLMService:
             if response.choices[0].finish_reason == "length":
                 logger.warning(
                     f"LLM response was truncated (finish_reason=length, "
-                    f"max_tokens={max_tokens}). "
+                    f"max_tokens={effective_max_tokens}). "
                     f"Output may be incomplete/malformed JSON."
                 )
 
