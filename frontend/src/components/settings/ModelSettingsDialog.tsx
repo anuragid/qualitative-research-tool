@@ -35,8 +35,11 @@ interface ModelSettingsDialogProps {
 
 /**
  * The default standard model selected when falling back to included tier.
+ * Must match the backend's DEFAULT_STANDARD_MODEL (app/constants.py): DeepSeek
+ * V3 is the reliable primary; Scout/Nemotron only ever fail first and fall back
+ * to it, so assigning them by default just wastes retries on every step.
  */
-const DEFAULT_STANDARD_MODEL = "meta-llama/llama-4-scout";
+const DEFAULT_STANDARD_MODEL = "deepseek/deepseek-chat-v3-0324";
 
 function isStandardId(id: string | null | undefined, settings: UserSettings | undefined): boolean {
   if (!id || !settings?.available_models) return false;

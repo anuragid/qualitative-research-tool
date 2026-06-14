@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     # AI APIs - OpenRouter (OpenAI-compatible)
     OPENROUTER_API_KEY: str
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    DEFAULT_MODEL: str = "meta-llama/llama-4-scout"
+    DEFAULT_MODEL: str = "deepseek/deepseek-chat-v3-0324"
     ASSEMBLYAI_API_KEY: str
 
     # Authentication (Clerk)
