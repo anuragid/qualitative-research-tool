@@ -48,9 +48,9 @@ def test_upload_routes_have_rate_limit_decorator():
     Note: the burst tests below exercise the end-to-end 429 behaviour in
     the live ASGI transport, so this test is complementary not redundant.
     """
-    from app.main import limiter  # triggers route registration via import
     import app.routes.videos  # noqa: F401 — ensures decorators run
     from app.config import settings
+    from app.main import limiter  # triggers route registration via import
 
     expected_limit_str = settings.RATE_LIMIT_UPLOAD  # "10/minute"
     # Keys in _route_limits use the full module-qualified name.
