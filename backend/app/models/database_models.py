@@ -2,11 +2,23 @@
 
 import uuid
 
-from sqlalchemy import ARRAY, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 from app.database import Base
 
@@ -162,6 +174,25 @@ class Transcript(Base):
 
     __tablename__ = "transcripts"
 
+    # Watchdog hot path (reset_stuck_transcripts): the 5-minute sweep filters
+    # ``status = 'processing' AND created_at < cutoff``. A PARTIAL index on
+    # created_at restricted to the 'processing' subset is the tightest fit —
+    # the watchdog ALWAYS filters status='processing', and the index stays
+    # tiny because nearly all rows are terminal (completed/error). Created
+    # CONCURRENTLY by migration d2e3f4a5b6c7. Declared here (not via plain
+    # ``index=True``) so the autogenerate drift gate sees model == DB —
+    # see check_migration_drift.py. NOTE: ``postgresql_where`` is rendered
+    # ``status = 'processing'`` but Postgres reflects it back with explicit
+    # casts ``(status)::text = 'processing'::text``; SQLAlchemy 2.0
+    # autogenerate treats the two as equivalent, so the gate stays green.
+    __table_args__ = (
+        Index(
+            "ix_transcripts_status_created",
+            "created_at",
+            postgresql_where=text("status = 'processing'"),
+        ),
+    )
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
     assemblyai_id = Column(String(255), unique=True)
@@ -203,6 +234,20 @@ class VideoAnalysis(Base):
 
     __tablename__ = "video_analyses"
 
+    # Watchdog hot path (reset_stuck_video_analyses): the 5-minute sweep
+    # filters ``status = 'processing' AND started_at < cutoff``. PARTIAL index
+    # on started_at restricted to the 'processing' subset — see the matching
+    # note on Transcript above. Created CONCURRENTLY by migration
+    # d2e3f4a5b6c7; declared here so the autogenerate drift gate sees
+    # model == DB.
+    __table_args__ = (
+        Index(
+            "ix_video_analyses_status_started",
+            "started_at",
+            postgresql_where=text("status = 'processing'"),
+        ),
+    )
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
     chunks = Column(JSONB)  # Step 1: List of chunks
@@ -241,6 +286,20 @@ class ProjectAnalysis(Base):
     """Cross-video analysis synthesizing multiple videos."""
 
     __tablename__ = "project_analyses"
+
+    # Watchdog hot path (reset_stuck_project_analyses): the 5-minute sweep
+    # filters ``status = 'processing' AND started_at < cutoff``. PARTIAL index
+    # on started_at restricted to the 'processing' subset — see the matching
+    # note on Transcript above. Created CONCURRENTLY by migration
+    # d2e3f4a5b6c7; declared here so the autogenerate drift gate sees
+    # model == DB.
+    __table_args__ = (
+        Index(
+            "ix_project_analyses_status_started",
+            "started_at",
+            postgresql_where=text("status = 'processing'"),
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
