@@ -94,15 +94,6 @@ export interface UpdateProjectDto {
   status?: import("../schemas/project").ProjectStatus;
 }
 
-// ---------- Inference inner item (kept as nominal alias for legacy call sites) ----------
-
-export interface InferenceItem {
-  inference_id: string;
-  meaning: string;
-  importance: string;
-  context: string;
-}
-
 // ---------- Transcript request DTOs ----------
 
 export interface LabelSpeakerDto {
