@@ -13,6 +13,7 @@ The desired behavior:
 3. Transient errors (5xx, rate limit, connection) DO still retry/fallback.
 """
 
+import json
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -20,7 +21,11 @@ import pytest
 from openai import APIConnectionError, APIStatusError
 
 from app.constants import STANDARD_MODEL_FALLBACKS
-from app.services.llm_service import LLMService
+from app.services.llm_service import (
+    LLMService,
+    LLMUnusableResponseError,
+    _should_retry_llm_exception,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -172,3 +177,63 @@ class TestCallLLMNoFallbackOnPermanentError:
             f"{len(STANDARD_MODEL_FALLBACKS)} fallback models), "
             f"got {mock_client.chat.completions.create.call_count}"
         )
+
+
+class TestDecodeFailureIsTransient:
+    """Sentry PYTHON-FASTAPI-R/-12 (Cluster D): OpenRouter returned HTTP 200
+    with a malformed body, so the OpenAI SDK's ``response.json()`` raised a
+    bare ``json.JSONDecodeError`` *inside* ``client.chat.completions.create``.
+    It was not in the tenacity retry predicate, so it surfaced as an unhandled
+    error instead of being retried. It must be treated as transient."""
+
+    def test_should_retry_predicate_includes_json_decode_error(self):
+        assert _should_retry_llm_exception(
+            json.JSONDecodeError("Expecting value", "line 147 garbage", 803)
+        ) is True
+
+    def test_should_retry_predicate_includes_remote_protocol_error(self):
+        assert _should_retry_llm_exception(
+            httpx.RemoteProtocolError("peer closed connection mid-body")
+        ) is True
+
+    def test_call_llm_single_retries_decode_error_then_succeeds(self, service):
+        """A transient body-decode failure on the first attempt must be retried
+        in-place by tenacity and recover on the second attempt."""
+        client = MagicMock()
+        ok = MagicMock()
+        ok.choices = [MagicMock(message=MagicMock(content="ok", refusal=None), finish_reason="stop")]
+        client.chat.completions.create.side_effect = [
+            json.JSONDecodeError("Expecting value", "garbage", 803),
+            ok,
+        ]
+        result = service._call_llm_single(
+            system_prompt="sys",
+            user_message="msg",
+            max_tokens=100,
+            temperature=0.0,
+            model="deepseek/deepseek-chat-v3-0324",
+            client=client,
+        )
+        assert result == "ok"
+        assert client.chat.completions.create.call_count == 2
+
+
+class TestNullContentRaisesTypedError:
+    """Null content must raise the typed LLMUnusableResponseError (a ValueError
+    subclass) so it (a) classifies as retryable llm_error and (b) still flows
+    through call_llm's existing ``except ValueError`` model-fallback loop."""
+
+    def test_null_content_raises_llm_unusable_response_error(self, service):
+        client = MagicMock()
+        client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content=None, refusal=None), finish_reason="length")]
+        )
+        with pytest.raises(LLMUnusableResponseError):
+            service._call_llm_single(
+                system_prompt="sys",
+                user_message="msg",
+                max_tokens=100,
+                temperature=0.0,
+                model="deepseek/deepseek-chat-v3-0324",
+                client=client,
+            )

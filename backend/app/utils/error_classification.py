@@ -4,6 +4,7 @@ Used by analysis nodes and tasks to produce structured error information
 that the frontend can use to show meaningful error messages.
 """
 
+import json
 import logging
 from typing import Any, Dict
 
@@ -42,6 +43,15 @@ def classify_error(exc: Exception) -> str:
         "llm_error", "llm_permanent", "insufficient_credits", "timeout",
         "unknown".
     """
+    # LLM produced no usable content (null/empty/unparseable) OR the OpenAI SDK
+    # failed to decode a malformed HTTP body. Both are TRANSIENT — a retry or
+    # model fallback can recover — so classify as retryable llm_error, NOT the
+    # non-retryable validation_error a bare ValueError would otherwise get.
+    # Checked before the generic ValueError branch because both subclass it.
+    # Local import avoids any import-ordering coupling with llm_service.
+    from app.services.llm_service import LLMUnusableResponseError
+    if isinstance(exc, (LLMUnusableResponseError, json.JSONDecodeError)):
+        return ERROR_TYPE_LLM
     if isinstance(exc, ValueError):
         return ERROR_TYPE_VALIDATION
     if isinstance(exc, RateLimitError):

@@ -296,6 +296,121 @@ class TestCrossProjectCancellationPrecheck:
         assert called["hit"] is False
 
 
+class TestCrossRedeliveryOnCompletedRowIsNoOp:
+    """Sentry PYTHON-FASTAPI-13/-14 (Cluster A): a Celery-redelivered cross-video
+    step runs against a ProjectAnalysis the original delivery already drove to
+    ``completed``. The redelivered step must be a clean no-op — it must NOT
+    re-run the (billable) LLM node, and it must NOT fire a state-machine
+    transition from ``completed`` (which raised InvalidTransitionError:
+    CHAIN_STEP_PROGRESS / CHAIN_SUCCEEDED not allowed from completed).
+
+    A *legitimate* re-run is a different path: the /analyze route fires
+    RERUN_REQUESTED to reset the row to ``processing`` BEFORE dispatch (see
+    test_project_analysis_retry.test_rerun_resets_completed_row_and_dispatches),
+    so a genuine re-run never reaches these steps with status=='completed'.
+    """
+
+    def _patch_resolver(self, monkeypatch):
+        from app.tasks import project_analysis_steps
+
+        monkeypatch.setattr(
+            project_analysis_steps,
+            "_resolve_byok_or_raise_credits_error",
+            lambda db, user_id, step, *, force_refresh=False: (None, None),
+        )
+
+    def test_cross_relate_skips_when_pa_completed(self, db_session, monkeypatch):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="completed", video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+            cross_video_insights=[{"id": "CI1"}],
+            cross_video_principles=[{"id": "CDP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        called = {"hit": False}
+
+        def fake_node(state):
+            called["hit"] = True
+            return {"cross_video_patterns": [{"id": "CP2"}]}
+
+        monkeypatch.setattr(project_analysis_steps, "cross_relate_node", fake_node)
+        self._patch_resolver(monkeypatch)
+
+        mock_self = MagicMock()
+        mock_self.db = db_session
+        unbound = project_analysis_steps.analyze_cross_relate_step._orig_run.__func__
+        result = unbound(mock_self, str(project.id), "dev_user_local")
+
+        assert result == {"project_id": str(project.id), "status": "skipped"}
+        assert called["hit"] is False, "redelivered cross_relate re-ran the LLM node (duplicate spend)"
+        db_session.refresh(pa)
+        assert pa.status == "completed"
+
+    def test_cross_explain_skips_when_pa_completed(self, db_session, monkeypatch):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="completed", video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+            cross_video_insights=[{"id": "CI1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        called = {"hit": False}
+
+        def fake_node(state):
+            called["hit"] = True
+            return {"cross_video_insights": [{"id": "CI2"}]}
+
+        monkeypatch.setattr(project_analysis_steps, "cross_explain_node", fake_node)
+        self._patch_resolver(monkeypatch)
+
+        mock_self = MagicMock()
+        mock_self.db = db_session
+        unbound = project_analysis_steps.analyze_cross_explain_step._orig_run.__func__
+        result = unbound(mock_self, str(project.id), "dev_user_local")
+
+        assert result == {"project_id": str(project.id), "status": "skipped"}
+        assert called["hit"] is False
+
+    def test_cross_activate_skips_when_pa_completed(self, db_session, monkeypatch):
+        from app.tasks import project_analysis_steps
+
+        project = _seed_project_with_completed_videos(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id, status="completed", video_ids=[],
+            cross_video_patterns=[{"id": "CP1"}],
+            cross_video_insights=[{"id": "CI1"}],
+            cross_video_principles=[{"id": "CDP1"}],
+        )
+        db_session.add(pa)
+        db_session.commit()
+
+        called = {"hit": False}
+
+        def fake_node(state):
+            called["hit"] = True
+            return {"cross_video_principles": [{"id": "CDP2"}]}
+
+        monkeypatch.setattr(project_analysis_steps, "cross_activate_node", fake_node)
+        self._patch_resolver(monkeypatch)
+
+        mock_self = MagicMock()
+        mock_self.db = db_session
+        unbound = project_analysis_steps.analyze_cross_activate_step._orig_run.__func__
+        result = unbound(mock_self, str(project.id), "dev_user_local")
+
+        assert result == {"project_id": str(project.id), "status": "skipped"}
+        assert called["hit"] is False, "redelivered cross_activate re-ran the LLM node (duplicate spend)"
+
+
 class TestCrossProjectCancellationTransientDB:
     """A transient DB outage inside the project cancellation precheck must
     RAISE (Celery autoretry path), not silently proceed to a cross-video

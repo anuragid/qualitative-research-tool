@@ -7,7 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import RELATE_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
-from app.utils.error_classification import classify_error
+from app.utils.error_classification import classify_error, is_retryable
 from app.utils.input_sanitizer import sanitize_for_prompt
 from app.utils.output_validator import OutputValidationError, validate_patterns
 
@@ -118,7 +118,7 @@ Group related inferences into patterns and explain what each pattern represents.
             try:
                 validate_patterns(patterns)
             except OutputValidationError as ve2:
-                logger.error(f"[RELATE] Output validation failed after retry: {ve2}")
+                logger.warning(f"[RELATE] Output validation failed after retry: {ve2}")
                 return {
                     **state,
                     "patterns": None,
@@ -149,7 +149,8 @@ Group related inferences into patterns and explain what each pattern represents.
 
     except Exception as e:
         error_type = classify_error(e)
-        logger.error(f"[RELATE] Error in relate_node: {type(e).__name__}: {e}", exc_info=True)
+        log = logger.warning if is_retryable(error_type) else logger.error
+        log(f"[RELATE] Error in relate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "patterns": None,

@@ -8,7 +8,7 @@ from typing import Any, Dict
 from app.agents.prompts import EXPLAIN_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
-from app.utils.error_classification import classify_error
+from app.utils.error_classification import classify_error, is_retryable
 from app.utils.input_sanitizer import sanitize_for_prompt
 from app.utils.output_validator import OutputValidationError, validate_insights
 
@@ -124,7 +124,7 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
             try:
                 validate_insights(insights)
             except OutputValidationError as ve2:
-                logger.error(f"[EXPLAIN] Output validation failed after retry: {ve2}")
+                logger.warning(f"[EXPLAIN] Output validation failed after retry: {ve2}")
                 return {
                     **state,
                     "insights": None,
@@ -182,7 +182,8 @@ Generate non-consensus insights that challenge assumptions and reveal fundamenta
 
     except Exception as e:
         error_type = classify_error(e)
-        logger.error(f"[EXPLAIN] Error in explain_node: {type(e).__name__}: {e}", exc_info=True)
+        log = logger.warning if is_retryable(error_type) else logger.error
+        log(f"[EXPLAIN] Error in explain_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "insights": None,

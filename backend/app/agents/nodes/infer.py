@@ -7,7 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import INFER_SYSTEM_PROMPT
 from app.agents.states import VideoAnalysisState
 from app.services.llm_service import llm_service
-from app.utils.error_classification import classify_error
+from app.utils.error_classification import classify_error, is_retryable
 from app.utils.output_validator import OutputValidationError, validate_inferences
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ Generate multiple inferences per chunk if appropriate."""
             try:
                 validate_inferences(inferences)
             except OutputValidationError as ve2:
-                logger.error(f"[INFER] Output validation failed after retry: {ve2}")
+                logger.warning(f"[INFER] Output validation failed after retry: {ve2}")
                 return {
                     **state,
                     "inferences": None,
@@ -123,7 +123,8 @@ Generate multiple inferences per chunk if appropriate."""
 
     except Exception as e:
         error_type = classify_error(e)
-        logger.error(f"[INFER] Error in infer_node: {type(e).__name__}: {e}", exc_info=True)
+        log = logger.warning if is_retryable(error_type) else logger.error
+        log(f"[INFER] Error in infer_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "inferences": None,

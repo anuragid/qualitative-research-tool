@@ -45,6 +45,15 @@ def _check_project_cancellation(db: Session, project_id: str) -> bool:
     steps 2 and 3; step 1 (cross_relate) passes require_existing=False
     since it's responsible for creating the row.
 
+    A row already in a TERMINAL state ('error' or 'completed') is also a stop
+    signal. 'completed' specifically guards against a Celery-redelivered step
+    (acks_late + visibility_timeout, amplified by --pool=threads voiding
+    task_time_limit) re-running against a row the original delivery already
+    finished — which would burn a duplicate LLM call and then fire a state
+    transition illegal from 'completed' (Sentry PYTHON-FASTAPI-13/-14). A
+    legitimate re-run resets the row to 'processing' via RERUN_REQUESTED in the
+    /analyze route BEFORE dispatch, so it never reaches here as 'completed'.
+
     Raises:
         OperationalError: A transient DB outage is re-raised (not swallowed
             as "not cancelled") so the task's ``autoretry_for=(Exception,)``
@@ -58,7 +67,7 @@ def _check_project_cancellation(db: Session, project_id: str) -> bool:
         pa = db.query(ProjectAnalysis).filter(
             ProjectAnalysis.project_id == UUID(project_id)
         ).first()
-        if pa is None or pa.status == "error":
+        if pa is None or pa.status in ("error", "completed"):
             return True
         return False
     except OperationalError:
@@ -202,19 +211,27 @@ def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None)
     try:
         logger.info(f"Starting CROSS_RELATE step for project {project_id}")
 
-        # First chain link: skip only on explicit error state (not on
-        # missing PA row — we create it below). A transient DB outage is
-        # re-raised (not swallowed as "proceed") so Celery autoretries
-        # instead of burning a cross-video LLM call on possibly-cancelled
-        # work. The outer ``except Exception`` routes it through
-        # _update_project_analysis_error + re-raise -> autoretry.
+        # First chain link: skip on a TERMINAL state — 'error' (a prior failure)
+        # or 'completed' (the original delivery already finished this analysis).
+        # The 'completed' guard makes a Celery-redelivered cross_relate a clean
+        # no-op instead of re-running the (billable) LLM node and then firing
+        # CHAIN_STEP_PROGRESS, which is illegal from 'completed' and raised
+        # InvalidTransitionError in production (Sentry PYTHON-FASTAPI-13/-14).
+        # A legitimate re-run resets the row to 'processing' (RERUN_REQUESTED)
+        # in the /analyze route BEFORE dispatch, so it never lands here as
+        # 'completed'. We don't skip on a missing PA row — we create it below.
+        # A transient DB outage is re-raised (not swallowed as "proceed") so
+        # Celery autoretries instead of burning a cross-video LLM call on
+        # possibly-cancelled work. The outer ``except Exception`` routes it
+        # through _update_project_analysis_error + re-raise -> autoretry.
         self.db.expire_all()
         existing = self.db.query(ProjectAnalysis).filter(
             ProjectAnalysis.project_id == UUID(project_id)
         ).first()
-        if existing is not None and existing.status == "error":
+        if existing is not None and existing.status in ("error", "completed"):
             logger.info(
-                f"Skipping cross_relate for {project_id} — already in error state"
+                f"Skipping cross_relate for {project_id} — "
+                f"already in terminal state ({existing.status})"
             )
             return {"project_id": project_id, "status": "skipped"}
 
@@ -271,7 +288,14 @@ def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None)
         return {"project_id": project_id, "status": "success"}
 
     except Exception as e:
-        logger.error(f"CROSS_RELATE step failed for project {project_id}: {e}")
+        # Retryable transients (autoretried by Celery) log WARNING so they
+        # don't surface as Sentry issues *while retries remain*; only
+        # non-retryable failures log ERROR. NOTE: on final retry exhaustion
+        # Celery re-raises the original exception and the Celery integration
+        # captures it once — i.e. a genuinely-stuck analysis still pages once,
+        # by design; it is the per-attempt noise we suppress here.
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"CROSS_RELATE step failed for project {project_id}: {e}")
         _handle_project_step_failure(self.db, project_id, "cross_relate", exc=e)
         raise
 
@@ -294,7 +318,8 @@ def analyze_cross_explain_step(self, project_id: str, user_id: str | None = None
 
         if _check_project_cancellation(self.db, project_id):
             logger.info(
-                f"Skipping cross_explain for {project_id} — already in error state"
+                f"Skipping cross_explain for {project_id} — "
+                f"already in terminal state (error/completed)"
             )
             return {"project_id": project_id, "status": "skipped"}
 
@@ -326,7 +351,8 @@ def analyze_cross_explain_step(self, project_id: str, user_id: str | None = None
         return {"project_id": project_id, "status": "success"}
 
     except Exception as e:
-        logger.error(f"CROSS_EXPLAIN step failed for project {project_id}: {e}")
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"CROSS_EXPLAIN step failed for project {project_id}: {e}")
         _handle_project_step_failure(self.db, project_id, "cross_explain", exc=e)
         raise
 
@@ -349,7 +375,8 @@ def analyze_cross_activate_step(self, project_id: str, user_id: str | None = Non
 
         if _check_project_cancellation(self.db, project_id):
             logger.info(
-                f"Skipping cross_activate for {project_id} — already in error state"
+                f"Skipping cross_activate for {project_id} — "
+                f"already in terminal state (error/completed)"
             )
             return {"project_id": project_id, "status": "skipped"}
 
@@ -386,6 +413,7 @@ def analyze_cross_activate_step(self, project_id: str, user_id: str | None = Non
         return {"project_id": project_id, "status": "success"}
 
     except Exception as e:
-        logger.error(f"CROSS_ACTIVATE step failed for project {project_id}: {e}")
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"CROSS_ACTIVATE step failed for project {project_id}: {e}")
         _handle_project_step_failure(self.db, project_id, "cross_activate", exc=e)
         raise
