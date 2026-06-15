@@ -344,6 +344,53 @@ class TestStepTasksShortCircuitWhenCancelled:
 
         assert result == {"video_id": str(video.id), "status": "skipped"}
 
+    @pytest.mark.parametrize("step_name,task_attr", [
+        ("chunk", "analyze_chunk_step"),
+        ("infer", "analyze_infer_step"),
+        ("relate", "analyze_relate_step"),
+        ("explain", "analyze_explain_step"),
+        ("activate", "analyze_activate_step"),
+    ])
+    def test_step_returns_skipped_when_analysis_completed(
+        self, db_session, step_name, task_attr, monkeypatch
+    ):
+        """Sentry Cluster A (per-video sibling): a Celery-redelivered step on an
+        already-'completed' VideoAnalysis must be a clean no-op — NOT re-run the
+        LLM node and NOT fire a transition illegal from 'completed' (e.g.
+        analyze_chunk_step's CHAIN_STARTED). Mirrors the cross-video guard."""
+        from unittest.mock import MagicMock
+
+        from app.tasks import analysis_steps
+
+        _, video = _seed_project_video_transcript(db_session)
+        analysis = VideoAnalysis(
+            video_id=video.id,
+            status="completed",  # original delivery already finished the chain
+            step_status={step_name: "completed"},
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        # Guard the LLM boundary: if the precheck failed to skip, this would be
+        # called and the assertion below (status==skipped) would also fail —
+        # belt-and-suspenders that no duplicate spend happens.
+        node_attr = f"{step_name}_node"
+        if hasattr(analysis_steps, node_attr):
+            monkeypatch.setattr(
+                analysis_steps, node_attr,
+                lambda *a, **k: pytest.fail(f"{node_attr} ran on a completed (redelivered) row"),
+                raising=False,
+            )
+
+        task = getattr(analysis_steps, task_attr)
+        mock_self = MagicMock()
+        mock_self.db = db_session
+
+        unbound = task._orig_run.__func__
+        result = unbound(mock_self, str(video.id), None)
+
+        assert result == {"video_id": str(video.id), "status": "skipped"}
+
 
 class TestChunkStepInitialStateSetup:
     """Task 3.4: analyze_chunk_step takes over the chain-start state

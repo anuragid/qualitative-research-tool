@@ -7,7 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import CROSS_ACTIVATE_SYSTEM_PROMPT
 from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
-from app.utils.error_classification import classify_error
+from app.utils.error_classification import classify_error, is_retryable
 from app.utils.output_validator import OutputValidationError, validate_system_principles
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ Create design principles that provide strategic direction for the entire system.
             try:
                 validate_system_principles(system_principles)
             except OutputValidationError as ve2:
-                logger.error(f"[CROSS_ACTIVATE] Output validation failed after retry: {ve2}")
+                logger.warning(f"[CROSS_ACTIVATE] Output validation failed after retry: {ve2}")
                 return {
                     **state,
                     "cross_video_principles": None,
@@ -129,7 +129,8 @@ Create design principles that provide strategic direction for the entire system.
 
     except Exception as e:
         error_type = classify_error(e)
-        logger.error(f"[CROSS_ACTIVATE] Error in cross_activate_node: {type(e).__name__}: {e}", exc_info=True)
+        log = logger.warning if is_retryable(error_type) else logger.error
+        log(f"[CROSS_ACTIVATE] Error in cross_activate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "cross_video_principles": None,

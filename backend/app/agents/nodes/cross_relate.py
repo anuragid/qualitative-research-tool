@@ -7,7 +7,7 @@ from typing import Any, Dict
 from app.agents.prompts import CROSS_RELATE_SYSTEM_PROMPT
 from app.agents.states import ProjectAnalysisState
 from app.services.llm_service import llm_service
-from app.utils.error_classification import classify_error
+from app.utils.error_classification import classify_error, is_retryable
 from app.utils.output_validator import OutputValidationError, validate_meta_patterns
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ Find patterns that transcend individual videos and reveal system-level themes.""
             try:
                 validate_meta_patterns(cross_patterns)
             except OutputValidationError as ve2:
-                logger.error(f"[CROSS_RELATE] Output validation failed after retry: {ve2}")
+                logger.warning(f"[CROSS_RELATE] Output validation failed after retry: {ve2}")
                 return {
                     **state,
                     "cross_video_patterns": None,
@@ -130,7 +130,8 @@ Find patterns that transcend individual videos and reveal system-level themes.""
 
     except Exception as e:
         error_type = classify_error(e)
-        logger.error(f"[CROSS_RELATE] Error in cross_relate_node: {type(e).__name__}: {e}", exc_info=True)
+        log = logger.warning if is_retryable(error_type) else logger.error
+        log(f"[CROSS_RELATE] Error in cross_relate_node: {type(e).__name__}: {e}", exc_info=True)
         return {
             **state,
             "cross_video_patterns": None,

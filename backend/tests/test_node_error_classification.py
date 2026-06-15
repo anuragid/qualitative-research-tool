@@ -6,12 +6,14 @@ returned state when an exception occurs, and that the type matches
 the exception kind.
 """
 
+import json
 from unittest.mock import patch
 
 import httpx
 import pytest
 from openai import APIConnectionError, APIError, RateLimitError
 
+from app.services.llm_service import LLMUnusableResponseError
 from app.utils.error_classification import (
     ERROR_TYPE_LLM,
     ERROR_TYPE_NETWORK,
@@ -116,6 +118,20 @@ _ERROR_SCENARIOS = [
         "value_error",
         ValueError("bad input"),
         ERROR_TYPE_VALIDATION,
+    ),
+    # LLM produced unusable output (null content / unparseable). Transient —
+    # must classify as retryable llm_error, NOT validation_error, so the step
+    # autoretries instead of permanently failing (Sentry clusters B/C).
+    (
+        "llm_unusable_response",
+        LLMUnusableResponseError("LLM returned null content (model=x). Finish reason: length"),
+        ERROR_TYPE_LLM,
+    ),
+    # OpenAI SDK failed to decode a malformed HTTP body (Sentry cluster D).
+    (
+        "json_decode_error",
+        json.JSONDecodeError("Expecting value", "line 147 garbage", 803),
+        ERROR_TYPE_LLM,
     ),
 ]
 

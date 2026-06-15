@@ -792,6 +792,17 @@ def trigger_video_analysis(
         # against the worker's auto-dispatch path (transcription_tasks), so the
         # error->pending reset and the chunk step's pending->processing can't
         # interleave.
+        #
+        # FOLLOW-UP (per-video re-run of a *completed* video): unlike the
+        # cross-video route, there is no RERUN_REQUESTED reset for a 'completed'
+        # VideoAnalysis here, so this branch only resets 'error' rows. With the
+        # chunk step's cancellation precheck now skipping on 'completed' (to make
+        # a Celery redelivery a safe no-op), a deliberate re-analysis of an
+        # already-completed video would be a no-op rather than the previous
+        # InvalidTransitionError (CHAIN_STARTED illegal from completed). Neither
+        # is a working re-run; supporting it needs a VideoAnalysisEvent.
+        # RERUN_REQUESTED (completed -> pending) + a reset branch here, mirroring
+        # ProjectAnalysis. Tracked as a follow-up; not a live Sentry issue.
         analysis = lock_rows(
             db.query(VideoAnalysis).filter(VideoAnalysis.video_id == video_id)
         ).first()

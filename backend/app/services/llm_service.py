@@ -5,6 +5,7 @@ import logging
 import re
 from typing import Any, Optional
 
+import httpx
 from tenacity import (
     RetryError,
     before_sleep_log,
@@ -18,6 +19,22 @@ from app.config import settings
 from app.constants import STANDARD_MODEL_FALLBACKS
 
 logger = logging.getLogger(__name__)
+
+
+class LLMUnusableResponseError(ValueError):
+    """The LLM call completed but produced no usable content.
+
+    Covers: empty/missing choices, ``content is None`` (e.g. finish_reason
+    ``length``/``stop``/``error``), an explicit refusal, an empty string, or
+    output that could not be parsed as JSON after every strategy.
+
+    Subclasses :class:`ValueError` so ``call_llm``'s existing
+    ``except ValueError`` model-fallback loop still advances to the next model.
+    It is classified as a *retryable* ``llm_error`` (see
+    ``app.utils.error_classification.classify_error``) — a single bad model
+    response is transient and must NOT permanently fail the analysis.
+    """
+
 
 # HTTP status codes that are PERMANENT — no retry or model fallback can fix
 # them with the same key. 404 is excluded (model removed → fallback can help)
@@ -42,8 +59,15 @@ def _should_retry_llm_exception(exc: BaseException) -> bool:
     - APIStatusError with 400/401/402/403/422 → DO NOT retry (permanent)
     - APIStatusError with 404 → DO NOT retry here; let model fallback handle it
     - APIError (no specific status) → retry (assume transient)
+    - json.JSONDecodeError / httpx.RemoteProtocolError → retry. OpenRouter
+      occasionally returns HTTP 200 with a malformed/truncated body; the OpenAI
+      SDK then raises one of these *inside* ``create()`` while deserializing the
+      envelope (Sentry PYTHON-FASTAPI-R/-12). That is a transient transport
+      glitch, so retry in place before falling back.
     """
     from openai import APIConnectionError, APIError, APIStatusError, NotFoundError, RateLimitError
+    if isinstance(exc, (json.JSONDecodeError, httpx.RemoteProtocolError, httpx.DecodingError)):
+        return True
     if isinstance(exc, (APIConnectionError, RateLimitError)):
         return True
     if isinstance(exc, NotFoundError):
@@ -168,7 +192,7 @@ class LLMService:
 
             # Guard against empty/missing response choices
             if not response.choices:
-                raise ValueError(
+                raise LLMUnusableResponseError(
                     f"LLM returned empty choices (model={model}). "
                     f"This may indicate the request was filtered or the model is unavailable."
                 )
@@ -178,8 +202,8 @@ class LLMService:
                 # Some models return null content with a refusal or tool_calls
                 refusal = getattr(response.choices[0].message, "refusal", None)
                 if refusal:
-                    raise ValueError(f"LLM refused the request: {refusal}")
-                raise ValueError(
+                    raise LLMUnusableResponseError(f"LLM refused the request: {refusal}")
+                raise LLMUnusableResponseError(
                     f"LLM returned null content (model={model}). "
                     f"Finish reason: {response.choices[0].finish_reason}"
                 )
@@ -201,10 +225,17 @@ class LLMService:
             return content
 
         except (APIError, APIConnectionError) as e:
-            logger.error(f"LLM API error (model={model}): {e}")
+            # Inner helper: log at WARNING, not ERROR. tenacity (retries) and
+            # call_llm (model fallback) decide whether this is truly fatal —
+            # if they recover, an ERROR here would be a false Sentry issue.
+            logger.warning(f"LLM API error (model={model}): {e}")
             raise
         except Exception as e:
-            logger.error(f"Unexpected LLM error (model={model}): {e}")
+            # Same rationale: a handled/recoverable failure (e.g. null content
+            # routed to the next fallback model, or a decode error tenacity will
+            # retry) must not surface as an ERROR-level Sentry event here. The
+            # outer layers log ERROR if the whole operation ultimately fails.
+            logger.warning(f"LLM call did not return usable content (model={model}): {e}")
             raise
 
     def call_llm(
@@ -363,7 +394,7 @@ class LLMService:
             ValueError: If JSON cannot be parsed after all strategies
         """
         if not response or not response.strip():
-            raise ValueError("Empty response from LLM")
+            raise LLMUnusableResponseError("Empty response from LLM")
 
         response = response.strip()
 
@@ -431,12 +462,15 @@ class LLMService:
         except Exception as repair_error:
             logger.warning(f"json-repair also failed: {repair_error}")
 
-        # Strategy 6: Last resort - log length (and truncated content in dev only)
+        # Strategy 6: Last resort. Log at WARNING (not ERROR): the caller (node)
+        # turns this into a retryable llm_error and the step autoretries, so it
+        # is a handled/recoverable condition, not a Sentry-worthy event. The
+        # node logs ERROR only if the error is genuinely non-retryable.
         if settings.APP_ENV == "development":
-            logger.error(f"Failed to parse JSON from response (length: {len(response)}): {response[:200]}...")
+            logger.warning(f"Failed to parse JSON from response (length: {len(response)}): {response[:200]}...")
         else:
-            logger.error(f"Failed to parse JSON from LLM response (length: {len(response)})")
-        raise ValueError("Could not parse JSON from LLM response")
+            logger.warning(f"Failed to parse JSON from LLM response (length: {len(response)})")
+        raise LLMUnusableResponseError("Could not parse JSON from LLM response")
 
     @staticmethod
     def _unwrap_single_key_object(parsed: Any) -> Any:
@@ -613,7 +647,10 @@ class LLMService:
                 )
                 return [retry_result]
 
-        raise ValueError(
+        # A wrong-shaped (non-list, non-dict) result is an unusable LLM response,
+        # not a data-validation error of ours: treat it as retryable (a re-run
+        # may return the expected array) rather than permanently failing.
+        raise LLMUnusableResponseError(
             f"Expected list from LLM but got {type(result).__name__}: "
             f"{str(result)[:200]}"
         )

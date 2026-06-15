@@ -126,7 +126,17 @@ def _check_cancellation(db: Session, video_id: str, require_existing: bool = Tru
         ).first()
         if analysis is None:
             return require_existing
-        if analysis.status == "error":
+        # Skip on a TERMINAL state. 'error' is the existing retry-precheck
+        # signal; 'completed' guards against a Celery-redelivered step (acks_late
+        # + visibility_timeout, amplified by --pool=threads voiding
+        # task_time_limit) re-running against a row the original delivery already
+        # finished — which would burn a duplicate LLM call and, for the first
+        # link (chunk), fire CHAIN_STARTED, illegal from 'completed'. This
+        # mirrors the cross-video guard in project_analysis_steps.py. NOTE: a
+        # deliberate re-analysis of an already-completed video has no route-level
+        # reset today (routes/videos.py only resets 'error' rows), so it is not a
+        # supported flow; see the follow-up note in that route.
+        if analysis.status in ("error", "completed"):
             return True
         return False
     except OperationalError:
@@ -489,7 +499,7 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
         # chain link: tolerate missing VideoAnalysis row (we'll create it
         # below via get_video_analysis_state).
         if _check_cancellation(self.db, video_id, require_existing=False):
-            logger.info(f"Skipping chunk for {video_id} — already in error state")
+            logger.info(f"Skipping chunk for {video_id} — already in terminal state (error/completed)")
             return {"video_id": video_id, "status": "skipped"}
 
         # Get state from database (also creates VideoAnalysis row if missing)
@@ -573,7 +583,13 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        logger.error(f"CHUNK step failed for video {video_id}: {e}")
+        # Retryable transients (autoretried by Celery) log WARNING so they
+        # don't surface as Sentry issues *while retries remain*; only
+        # non-retryable failures log ERROR. On final retry exhaustion Celery
+        # re-raises the original exception and the Celery integration captures
+        # it once — a genuinely-stuck analysis still pages once, by design.
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"CHUNK step failed for video {video_id}: {e}")
         _handle_step_failure(self.db, video_id, "chunk", exc=e)
         raise
 
@@ -599,7 +615,7 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
 
         # Cancellation precheck — watchdog or prior halted step
         if _check_cancellation(self.db, video_id):
-            logger.info(f"Skipping infer for {video_id} — already in error state")
+            logger.info(f"Skipping infer for {video_id} — already in terminal state (error/completed)")
             return {"video_id": video_id, "status": "skipped"}
 
         # Get analysis record
@@ -652,7 +668,8 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        logger.error(f"INFER step failed for video {video_id}: {e}")
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"INFER step failed for video {video_id}: {e}")
         _handle_step_failure(self.db, video_id, "infer", exc=e)
         raise
 
@@ -677,7 +694,7 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
 
         # Cancellation precheck — watchdog or prior halted step
         if _check_cancellation(self.db, video_id):
-            logger.info(f"Skipping relate for {video_id} — already in error state")
+            logger.info(f"Skipping relate for {video_id} — already in terminal state (error/completed)")
             return {"video_id": video_id, "status": "skipped"}
 
         # Get analysis record
@@ -728,7 +745,8 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        logger.error(f"RELATE step failed for video {video_id}: {e}")
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"RELATE step failed for video {video_id}: {e}")
         _handle_step_failure(self.db, video_id, "relate", exc=e)
         raise
 
@@ -753,7 +771,7 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
 
         # Cancellation precheck — watchdog or prior halted step
         if _check_cancellation(self.db, video_id):
-            logger.info(f"Skipping explain for {video_id} — already in error state")
+            logger.info(f"Skipping explain for {video_id} — already in terminal state (error/completed)")
             return {"video_id": video_id, "status": "skipped"}
 
         # Get analysis record
@@ -805,7 +823,8 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        logger.error(f"EXPLAIN step failed for video {video_id}: {e}")
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"EXPLAIN step failed for video {video_id}: {e}")
         _handle_step_failure(self.db, video_id, "explain", exc=e)
         raise
 
@@ -830,7 +849,7 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
 
         # Cancellation precheck — watchdog or prior halted step
         if _check_cancellation(self.db, video_id):
-            logger.info(f"Skipping activate for {video_id} — already in error state")
+            logger.info(f"Skipping activate for {video_id} — already in terminal state (error/completed)")
             return {"video_id": video_id, "status": "skipped"}
 
         # Get analysis record
@@ -902,6 +921,7 @@ def analyze_activate_step(self, video_id: str, user_id: str | None = None):
         }
 
     except Exception as e:
-        logger.error(f"ACTIVATE step failed for video {video_id}: {e}")
+        log = logger.warning if _is_retryable_step_exc(e) else logger.error
+        log(f"ACTIVATE step failed for video {video_id}: {e}")
         _handle_step_failure(self.db, video_id, "activate", exc=e)
         raise
