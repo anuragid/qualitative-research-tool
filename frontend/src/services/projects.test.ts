@@ -68,7 +68,7 @@ describe("projectsService", () => {
 
       const result = await projectsService.getById("proj-1");
 
-      expect(mockedApi.get).toHaveBeenCalledWith("/api/projects/proj-1/");
+      expect(mockedApi.get).toHaveBeenCalledWith("/api/projects/proj-1");
       expect(result).toEqual(mockProject);
     });
 
@@ -119,7 +119,7 @@ describe("projectsService", () => {
       const result = await projectsService.update("proj-1", updateDto);
 
       expect(mockedApi.patch).toHaveBeenCalledWith(
-        "/api/projects/proj-1/",
+        "/api/projects/proj-1",
         updateDto
       );
       expect(result.name).toBe("Updated Name");
@@ -143,7 +143,7 @@ describe("projectsService", () => {
 
       await projectsService.delete("proj-1");
 
-      expect(mockedApi.delete).toHaveBeenCalledWith("/api/projects/proj-1/");
+      expect(mockedApi.delete).toHaveBeenCalledWith("/api/projects/proj-1");
     });
 
     it("propagates errors from api", async () => {

@@ -5,13 +5,13 @@ import type { Video } from "../types";
 export const videosService = {
   // Get videos for a project
   getByProject: async (projectId: string): Promise<Video[]> => {
-    const response = await api.get(`/api/projects/${projectId}/videos/`);
+    const response = await api.get(`/api/projects/${projectId}/videos`);
     return response.data;
   },
 
   // Get single video
   getById: async (id: string): Promise<Video> => {
-    const response = await api.get(`/api/videos/${id}/`);
+    const response = await api.get(`/api/videos/${id}`);
     return response.data;
   },
 
@@ -164,7 +164,7 @@ export const videosService = {
 
   // Delete video
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/videos/${id}/`);
+    await api.delete(`/api/videos/${id}`);
   },
 
   // Get playback URL (returns pre-signed URL for streaming)

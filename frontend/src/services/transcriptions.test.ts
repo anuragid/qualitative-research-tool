@@ -67,7 +67,7 @@ describe("transcriptionsService", () => {
       const result = await transcriptionsService.start("vid-1");
 
       expect(mockedApi.post).toHaveBeenCalledWith(
-        "/api/videos/vid-1/transcribe/"
+        "/api/videos/vid-1/transcribe"
       );
       expect(result).toEqual({ task_id: "task-123" });
     });
@@ -92,7 +92,7 @@ describe("transcriptionsService", () => {
       const result = await transcriptionsService.get("vid-1");
 
       expect(mockedApi.get).toHaveBeenCalledWith(
-        "/api/videos/vid-1/transcript/"
+        "/api/videos/vid-1/transcript"
       );
       expect(result).toEqual(mockTranscript);
     });
@@ -117,7 +117,7 @@ describe("transcriptionsService", () => {
       const result = await transcriptionsService.getSpeakers("trans-1");
 
       expect(mockedApi.get).toHaveBeenCalledWith(
-        "/api/transcripts/trans-1/speakers/"
+        "/api/transcripts/trans-1/speakers"
       );
       expect(result).toEqual(mockSpeakerLabels);
       expect(result).toHaveLength(2);
