@@ -67,6 +67,10 @@ class UserSettingsResponse(BaseModel):
     # never successfully fetched their balance. Stale=True when the
     # last refresh failed but we still have a cached value to show.
     balance: Optional[BalanceInfoResponse] = None
+    # Server-driven low-balance warning threshold (USD). Sourced from
+    # settings.LOW_BALANCE_THRESHOLD_USD so the frontend stops relying on
+    # its hardcoded fallback. See docs/byok-balance-contract.md.
+    low_balance_threshold_usd: float = 0.50
 
 
 class ApiKeyAddRequest(BaseModel):
