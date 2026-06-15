@@ -499,10 +499,8 @@ def trigger_project_analysis(
         # (videos.py ~691-712 + PR #19.5).
         #
         # RETRY_RESET (error -> processing) goes through the state machine so
-        # we never write status directly (project invariant #3). Like the
-        # video route, this block only fires for error rows: a deliberate
-        # re-trigger of a COMPLETED analysis is left untouched here and the
-        # idempotent chain simply recomputes it.
+        # we never write status directly (project invariant #3). This block
+        # fires only for error rows (recovery from a failed run).
         if existing_analysis is not None and existing_analysis.status == "error":
             ProjectAnalysisStateMachine.transition(
                 existing_analysis, ProjectAnalysisEvent.RETRY_RESET, db=db
@@ -515,6 +513,30 @@ def trigger_project_analysis(
             existing_analysis.error_message = None
             # Clear stale partial cross-video results so the new run doesn't
             # mix old blobs in. The chain steps repopulate these.
+            existing_analysis.cross_video_patterns = None
+            existing_analysis.cross_video_insights = None
+            existing_analysis.cross_video_principles = None
+            db.commit()
+
+        # Re-run path: if the row already COMPLETED (a finished analysis the
+        # user is deliberately re-running — e.g. a new video was added), reset
+        # it to a runnable state BEFORE dispatching, via the dedicated
+        # RERUN_REQUESTED event (completed -> processing). Without this the row
+        # is left at "completed" and the first chain link's CHAIN_STEP_PROGRESS
+        # is rejected from "completed" (InvalidTransitionError); the step then
+        # retry-loops, the error handler can't transition either, the row stays
+        # completed, and the re-run never finishes — burning LLM credits with
+        # no visible progress (the production deadlock). The chain's cross_relate
+        # step re-aggregates the current set of completed videos at runtime, so a
+        # newly-added video is included in the synthesis without rewriting the
+        # stored video_ids here (mirrors the error-retry path above).
+        elif existing_analysis is not None and existing_analysis.status == "completed":
+            ProjectAnalysisStateMachine.transition(
+                existing_analysis, ProjectAnalysisEvent.RERUN_REQUESTED, db=db
+            )
+            existing_analysis.started_at = datetime.now(timezone.utc)
+            existing_analysis.completed_at = None
+            existing_analysis.error_message = None
             existing_analysis.cross_video_patterns = None
             existing_analysis.cross_video_insights = None
             existing_analysis.cross_video_principles = None

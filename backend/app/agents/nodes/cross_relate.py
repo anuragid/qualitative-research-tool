@@ -93,7 +93,7 @@ Find patterns that transcend individual videos and reveal system-level themes.""
         llm_kwargs = dict(
             system_prompt=CROSS_RELATE_SYSTEM_PROMPT,
             user_message=user_message,
-            max_tokens=8192,
+            max_tokens=16384,  # Cross-video synthesis aggregates patterns across all videos; 8192 truncated the response (finish_reason=length) -> JSON parse fail. Matches per-video relate.
             api_key=state.get("api_key"),
             model=state.get("model"),
         )

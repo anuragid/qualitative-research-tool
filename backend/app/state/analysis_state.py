@@ -139,6 +139,17 @@ PROJECT_ANALYSIS_TRANSITIONS: dict[
     (VideoAnalysisStatus.ERROR, ProjectAnalysisEvent.RETRY_RESET): VideoAnalysisStatus.PROCESSING,
     (VideoAnalysisStatus.PROCESSING, ProjectAnalysisEvent.RETRY_RESET): VideoAnalysisStatus.PROCESSING,
 
+    # Re-run reset: a DELIBERATE re-run of a finished analysis (the /analyze
+    # route's completed branch — e.g. the user added a new video and wants the
+    # cross-video synthesis redone). This is the completed -> processing edge
+    # RETRY_RESET deliberately does NOT cover. Without it the first chain link's
+    # CHAIN_STEP_PROGRESS is rejected from `completed` (InvalidTransitionError)
+    # and the re-run dies in a retry loop while the row stays completed — the
+    # user sees a re-run that never finishes. Idempotent PROCESSING self-loop so
+    # a racing re-run click can't raise.
+    (VideoAnalysisStatus.COMPLETED, ProjectAnalysisEvent.RERUN_REQUESTED): VideoAnalysisStatus.PROCESSING,
+    (VideoAnalysisStatus.PROCESSING, ProjectAnalysisEvent.RERUN_REQUESTED): VideoAnalysisStatus.PROCESSING,
+
     # Idempotent progress writes inside the chain steps.
     (VideoAnalysisStatus.PROCESSING, ProjectAnalysisEvent.CHAIN_STEP_PROGRESS): VideoAnalysisStatus.PROCESSING,
 
