@@ -274,7 +274,7 @@ def _build_insufficient_credits_error_json(step_name: str, exc: "InsufficientCre
     """Build a structured error_message JSON payload for the
     insufficient-credits case.
 
-    Mirrors the shape used by ``analysis_tasks._build_pipeline_error_json``
+    Mirrors the structured error_message shape the analysis pipeline emits
     so the frontend's ``parseError`` consumer doesn't have to special-case
     step-task errors. Includes the ``balance`` block so
     ``InsufficientCreditsAlert.tsx`` can render the user's actual numbers

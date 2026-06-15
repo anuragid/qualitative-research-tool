@@ -7,9 +7,8 @@ structured-error logic.
 
 import json
 import re
-from typing import Optional
 
-from app.utils.error_classification import build_structured_error, is_retryable
+from app.utils.error_classification import build_structured_error
 
 # Pattern matches common API key formats (OpenRouter sk-or-*, generic long tokens)
 _API_KEY_PATTERN = re.compile(
@@ -38,23 +37,3 @@ def build_error_json(step: str, exc: Exception, message: str) -> str:
         exc=exc,
         message=sanitize_error(message),
     ))
-
-
-def build_pipeline_error_json(failed_step: str, error_str: str, error_type: Optional[str] = None) -> str:
-    """Build a structured error JSON string for a pipeline node failure."""
-    etype = error_type or "unknown"
-    return json.dumps({
-        "step": failed_step,
-        "error_type": etype,
-        "retryable": is_retryable(etype),
-        "message": f"Analysis failed at step '{failed_step}': {error_str}",
-        "details": error_str,
-    })
-
-
-class PipelineError(Exception):
-    """Internal exception carrying structured error JSON from the pipeline."""
-
-    def __init__(self, message: str, structured_json: Optional[str] = None):
-        super().__init__(message)
-        self.structured_json = structured_json

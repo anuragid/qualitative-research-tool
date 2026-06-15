@@ -4,7 +4,6 @@ Used by analysis nodes and tasks to produce structured error information
 that the frontend can use to show meaningful error messages.
 """
 
-import json
 import logging
 from typing import Any, Dict
 
@@ -113,16 +112,3 @@ def build_structured_error(
         "message": message or str(exc),
         "details": details or f"{type(exc).__name__}: {exc}",
     }
-
-
-def structured_error_json(
-    step: str,
-    exc: Exception,
-    message: str | None = None,
-    details: str | None = None,
-) -> str:
-    """Build a structured error and serialize to JSON string.
-
-    Suitable for storing in Text columns like video.error_message.
-    """
-    return json.dumps(build_structured_error(step, exc, message, details))
