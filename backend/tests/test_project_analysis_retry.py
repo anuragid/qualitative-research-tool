@@ -264,6 +264,75 @@ async def test_retry_resets_errored_row_and_dispatches(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_rerun_resets_completed_row_and_dispatches(tmp_path):
+    """Seed a ProjectAnalysis in ``completed`` with stale blobs (the state a
+    project is in after a successful cross-video run), POST the trigger route
+    (a deliberate re-run, e.g. because a new video was added), and assert:
+    (1) the chain WAS dispatched, (2) the row is reset to a runnable state
+    (processing), (3) the stale ``cross_video_*`` blobs are cleared.
+
+    Without the reset, the route leaves the ``completed`` row untouched, the
+    first chain link (``analyze_cross_relate_step``) writes patterns and then
+    calls ``CHAIN_STEP_PROGRESS``, which the state machine rejects from
+    ``completed`` (InvalidTransitionError). The step then retry-loops, the
+    error handler can't transition either, the row stays ``completed``, and
+    the user sees a re-run that never finishes — the production deadlock this
+    fixes. Re-run goes through RERUN_REQUESTED (completed -> processing),
+    distinct from the error path's RETRY_RESET."""
+    TestSession, meta, ids = _setup_test_db(tmp_path, pa_status="completed")
+
+    from app.database import get_db
+    from app.dependencies.byok_gate import require_byok_credits
+    from app.main import app
+
+    app.dependency_overrides[get_db] = _override_db(TestSession)
+    app.dependency_overrides[require_byok_credits] = lambda: None
+    mock_chain, pipeline = _make_mock_chain()
+    try:
+        with patch("celery.chain", mock_chain):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.post(
+                    f"/api/projects/{ids['project']}/analyze",
+                    headers={"Authorization": "Bearer dev-bypass"},
+                )
+
+        assert response.status_code == 202, (
+            f"Expected 202, got {response.status_code}: {response.text}"
+        )
+
+        # The chain MUST have been dispatched — re-run is not a no-op.
+        assert mock_chain.called, "Chain was not dispatched on re-run"
+        assert pipeline.apply_async.called
+
+        # The completed row must be reset to a runnable state and the stale
+        # partial blobs cleared so the new run doesn't mix old results in.
+        verify = TestSession()
+        try:
+            row = verify.execute(
+                meta.tables["project_analyses"].select().where(
+                    meta.tables["project_analyses"].c.id == ids["pa"].hex
+                )
+            ).mappings().first()
+        finally:
+            verify.close()
+
+        assert row is not None
+        assert row["status"] == "processing", (
+            f"Completed row not reset for re-run; still {row['status']!r} — "
+            f"the chain will deadlock on CHAIN_STEP_PROGRESS"
+        )
+        assert row["cross_video_patterns"] in (None, []), (
+            f"Stale cross_video_patterns not cleared: {row['cross_video_patterns']!r}"
+        )
+        assert row["cross_video_insights"] in (None, [])
+        assert row["cross_video_principles"] in (None, [])
+        assert row["error_message"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
 async def test_retry_while_processing_does_not_double_dispatch(tmp_path):
     """Guard: a ProjectAnalysis already mid-flight (status=processing) +
     a racing retry click must NOT dispatch a second chain. Mirror of the

@@ -184,13 +184,41 @@ def test_project_analysis_retry_reset_idempotent_on_processing() -> None:
 
 
 def test_project_analysis_retry_reset_from_completed_raises() -> None:
-    """Mirror of the video policy: RETRY_RESET is NOT allowed from
-    COMPLETED. A deliberate re-trigger of a completed cross-video
-    analysis must not be silently clobbered by the reset block — the
-    route's reset block only fires for error rows, exactly like the
-    video route. This pins the intended semantics."""
+    """RETRY_RESET stays reserved for error recovery: it is NOT allowed
+    from COMPLETED. A deliberate re-run of a completed cross-video analysis
+    uses the distinct RERUN_REQUESTED event instead (see
+    ``test_project_analysis_rerun_requested_from_completed``), so the two
+    intents — recover-from-error vs redo-a-finished-run — never collapse
+    into one transition. This pins that separation."""
     pa = _make_pa(status=VideoAnalysisStatus.COMPLETED.value)
     with pytest.raises(InvalidTransitionError):
         ProjectAnalysisStateMachine.transition(
             pa, ProjectAnalysisEvent.RETRY_RESET
         )
+
+
+def test_project_analysis_rerun_requested_from_completed() -> None:
+    """A deliberate re-run of a COMPLETED cross-video analysis (e.g. a new
+    video was added) flips the row back to PROCESSING via the dedicated
+    RERUN_REQUESTED event. RETRY_RESET stays reserved for error recovery
+    (see ``test_project_analysis_retry_reset_from_completed_raises``);
+    RERUN_REQUESTED is the completed -> processing path the /analyze route
+    uses so the chain's first CHAIN_STEP_PROGRESS no longer hits
+    InvalidTransitionError on a finished row (the production deadlock)."""
+    pa = _make_pa(status=VideoAnalysisStatus.COMPLETED.value)
+    result = ProjectAnalysisStateMachine.transition(
+        pa, ProjectAnalysisEvent.RERUN_REQUESTED
+    )
+    assert result is VideoAnalysisStatus.PROCESSING
+    assert pa.status == VideoAnalysisStatus.PROCESSING.value
+
+
+def test_project_analysis_rerun_requested_idempotent_on_processing() -> None:
+    """RERUN_REQUESTED on a row already PROCESSING is an idempotent
+    self-loop so a racing re-run click can't raise InvalidTransitionError."""
+    pa = _make_pa(status=VideoAnalysisStatus.PROCESSING.value)
+    result = ProjectAnalysisStateMachine.transition(
+        pa, ProjectAnalysisEvent.RERUN_REQUESTED
+    )
+    assert result is VideoAnalysisStatus.PROCESSING
+    assert pa.status == VideoAnalysisStatus.PROCESSING.value

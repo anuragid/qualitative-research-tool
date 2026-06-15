@@ -444,3 +444,38 @@ def test_cross_activate_node_succeeds_on_bare_string_response():
     assert sps is not None and len(sps) == 2
     texts = {p["principle"] for p in sps}
     assert "The system should adapt to context" in texts
+
+
+# ---------------------------------------------------------------------------
+# Regression: cross-video nodes must request enough output tokens
+# ---------------------------------------------------------------------------
+
+# Cross-video synthesis aggregates patterns/insights/principles across ALL
+# videos, so its output is at least as large as the per-video synthesis nodes
+# (relate/explain request 16384). The cross nodes originally requested only
+# 8192, which truncated the response (finish_reason=length) -> JSON parse
+# failure on every model in the fallback chain -> the cross-video step died in
+# a retry loop. Pin a >=16384 floor so a too-small value can't regress.
+_CROSS_NODE_MAXTOK_CASES = [
+    pytest.param(cross_relate_module, cross_relate_node, id="cross_relate"),
+    pytest.param(cross_explain_module, cross_explain_node, id="cross_explain"),
+    pytest.param(cross_activate_module, cross_activate_node, id="cross_activate"),
+]
+
+
+@pytest.mark.parametrize("module,node_fn", _CROSS_NODE_MAXTOK_CASES)
+def test_cross_node_requests_adequate_max_tokens(module, node_fn):
+    bare = ["Meta theme one", "Meta theme two"]
+    with patch.object(module, "llm_service", create=True) as mock_llm:
+        mock_llm.call_with_json_list_response.return_value = bare
+        node_fn(_project_state())
+
+    assert mock_llm.call_with_json_list_response.called, (
+        f"{node_fn.__name__} never called the LLM"
+    )
+    kwargs = mock_llm.call_with_json_list_response.call_args.kwargs
+    requested = kwargs.get("max_tokens", 0)
+    assert requested >= 16384, (
+        f"{node_fn.__name__} requested max_tokens={requested}; too small for "
+        f"cross-video output (truncates -> finish_reason=length -> parse fail)"
+    )

@@ -97,7 +97,7 @@ Generate insights that reveal truths about the system as a whole, not just indiv
         llm_kwargs = dict(
             system_prompt=CROSS_EXPLAIN_SYSTEM_PROMPT,
             user_message=user_message,
-            max_tokens=8192,
+            max_tokens=16384,  # Cross-video synthesis aggregates insights across all videos; 8192 truncated the response (finish_reason=length) -> JSON parse fail. Matches per-video explain.
             api_key=state.get("api_key"),
             model=state.get("model"),
         )
