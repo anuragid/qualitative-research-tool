@@ -59,14 +59,21 @@ WORKSPACE_ID = "37eb4e96-0873-4033-a392-3c6593a68802"
 TARGET: dict[str, dict[str, Any]] = {
     "backend": {
         "id": "2b70a900-042c-4083-b00b-0d01f3ece5dc",
-        "numReplicas": 2,
+        # Scaled 2 -> 1 on 2026-08-19: real traffic was ~0 (24h of backend logs
+        # were 154 scanner 404s + 4 health probes + 3 API hits), and 2 replicas
+        # put project memory at ~0.87 GB / ~$8.9-mo, well over the Hobby plan's
+        # included $5 usage. At 1 replica each for backend+worker the project
+        # sits at ~0.48 GB / ~$4.9-mo, which is the billing floor — reducing
+        # further saves nothing. RAISE BACK TO 2 when semester load returns.
+        "numReplicas": 1,
         "healthcheckPath": "/health/ready",
         "healthcheckTimeout": 10,
         "drainingSeconds": 30,
     },
     "worker": {
         "id": "08097b12-1501-4dff-a990-edcd95c73ed4",
-        "numReplicas": 2,
+        # Scaled 2 -> 1 on 2026-08-19 alongside backend — see note above.
+        "numReplicas": 1,
         # workers have no HTTP endpoint — leave healthcheckPath unset
         "healthcheckPath": None,
         # PR #19: must allow in-flight chain steps (up to task_time_limit=360s)
@@ -230,6 +237,20 @@ def ensure_beat_service_exists(
     # Set SERVICE_TYPE=beat. Source config (repo + Dockerfile) still has
     # to be wired up by hand in the Railway dashboard the first time —
     # see Task 4.7 of the WS4 plan for the manual step.
+    #
+    # WARNING (learned the hard way 2026-08-19): this sets SERVICE_TYPE and
+    # NOTHING ELSE, so a beat service provisioned here starts with an env set
+    # that cannot satisfy app.config.Settings under APP_ENV=production. beat
+    # silently crash-looped for 2 months on a missing CLERK_ISSUER — it burned
+    # its 10 ON_FAILURE retries, then sat there reporting deployment status
+    # SUCCESS with numReplicas=1 while running nothing, so no watchdog
+    # (reset_stuck_analyses) or model validation fired the entire time.
+    # Railway shows no failure for this state; the only tells are an empty log
+    # stream and a memory metric series that stops.
+    # If you add a REQUIRED setting to Settings, propagate it to backend,
+    # worker AND beat. Verify with:
+    #   railway variables -s beat --kv | sed 's/=.*//' | sort
+    # diffed against the same for backend.
     variable_mutation = """
     mutation SetVar($input: VariableUpsertInput!) {
         variableUpsert(input: $input)
@@ -359,7 +380,7 @@ def enable_check_suites_gate(
                 continue
 
             if current is True:
-                print(f"    already gated — no change needed")
+                print("    already gated — no change needed")
                 continue
 
             if not apply:
