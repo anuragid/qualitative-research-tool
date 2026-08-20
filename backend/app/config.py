@@ -5,6 +5,8 @@ from typing import List, Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.constants import DEFAULT_STANDARD_MODEL, DEMOTED_MODELS
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -55,7 +57,12 @@ class Settings(BaseSettings):
     # AI APIs - OpenRouter (OpenAI-compatible)
     OPENROUTER_API_KEY: str
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    DEFAULT_MODEL: str = "deepseek/deepseek-chat-v3-0324"
+    # Derived from constants.STANDARD_MODELS[0] so the primary model has ONE
+    # source of truth. Previously this was a duplicated literal, and Railway
+    # additionally set DEFAULT_MODEL=meta-llama/llama-4-scout -- a model
+    # constants.py documents as returning NULL content on every call -- which
+    # silently overrode both. See the DEMOTED_MODELS validator below.
+    DEFAULT_MODEL: str = DEFAULT_STANDARD_MODEL
     ASSEMBLYAI_API_KEY: str
 
     # Authentication (Clerk)
@@ -111,6 +118,29 @@ class Settings(BaseSettings):
             self.CELERY_BROKER_URL = self.REDIS_URL
         if not self.CELERY_RESULT_BACKEND:
             self.CELERY_RESULT_BACKEND = self.REDIS_URL
+
+    @model_validator(mode="after")
+    def _reject_demoted_default_model(self) -> "Settings":
+        """Refuse to boot with a known-broken model as the shared-key default.
+
+        Scout and Nemotron are retained in STANDARD_MODEL_FALLBACKS as
+        last-ditch options, but constants.py documents both as returning NULL
+        content, so as the DEFAULT they burn a full round-trip on every
+        non-BYOK request before falling back. This exact misconfiguration sat
+        in Railway for ~2 months (DEFAULT_MODEL=meta-llama/llama-4-scout),
+        silently overriding the code default and undoing the chain-ordering
+        fix. Failing loudly at import beats degrading quietly -- the same
+        lesson as the CLERK_ISSUER outage.
+        """
+        if self.DEFAULT_MODEL in DEMOTED_MODELS:
+            raise ValueError(
+                f"DEFAULT_MODEL={self.DEFAULT_MODEL!r} is a demoted fallback "
+                f"model that returns NULL content on every call and must not "
+                f"be the default. Unset the DEFAULT_MODEL env var to use the "
+                f"primary ({DEFAULT_STANDARD_MODEL!r}), or pick another "
+                f"standard model."
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_production_secrets(self) -> "Settings":
