@@ -12,7 +12,7 @@ methodex's Celery broker and result store.
 This is the live value as of 2026-10-24 (double-quoted; earlier copies of
 this doc used single quotes). It is declared in `.railway/railway.ts`
 (`Redis.deploy.startCommand`).
-Once that file has been applied, change the command there and run
+Since the 2026-10-24 cutover, change the command there and run
 `railway config apply`. A change made through the GraphQL mutation below
 would be reverted by the next apply.
 
