@@ -38,7 +38,7 @@ tenacity==9.0.0
 python-dotenv==1.2.2
 
 # Authentication (Clerk JWT verification)
-PyJWT[crypto]==2.13.0
+PyJWT[crypto]==2.15.1
 cryptography==50.0.0
 
 # Rate Limiting

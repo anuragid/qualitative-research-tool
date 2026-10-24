@@ -19,6 +19,8 @@ Step-by-step recipes for production incidents and routine operations. Each runbo
 | `sentry-triage.md` | New Sentry issue — how to classify, prioritize, and fix |
 | `railway-deploy.md` | How to apply the Railway service config (drainingSeconds, replicas, etc.) |
 | `bootstrap-session.md` | Starting a fresh Claude session — what to load first |
+| `secret-rotation.md` | Rotating one provider credential |
+| `railway-incident-2026-10.md` | Railway's 2026-10-21 env-var breach: rotate everything, in order |
 
 ## Principle
 
