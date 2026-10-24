@@ -50,7 +50,7 @@ ls -la ./backups/
 - **Contains**: Temporary cache, job queues
 
 ### Video Files
-- **Local Path**: `/tmp/qualitative-research-videos/`
+- **Local development**: also Cloudflare R2 (there is no local video folder)
 - **Production**: Cloudflare R2 bucket (S3-compatible)
 - **Contains**: Actual video files
 

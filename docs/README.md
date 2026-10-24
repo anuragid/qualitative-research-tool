@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last Updated:** March 12, 2026
+**Last Updated:** October 24, 2026
 **Authentication:** Clerk
 **Hosting:** Railway (backend) + Cloudflare Pages (frontend)
 
@@ -12,17 +12,20 @@
 - [Quick Context](./QUICK_CONTEXT.md) -- Rapid AI session context
 
 ### Development
-- [System Architecture](./ARCHITECTURE.md) -- LangGraph pipeline design
 - [Data Management](./DATA_MANAGEMENT.md) -- Backup and safety procedures
-- [Usability Fixes](./USABILITY_FIXES_REQUIRED.md) -- Ongoing improvements backlog
+- [BYOK Balance Contract](./byok-balance-contract.md) -- API contract for BYOK OpenRouter key balances
+
+### Operations
+- [Runbooks](./production-readiness/runbooks/README.md) -- Production incidents and routine operations
+- [Production Readiness](./production-readiness/README.md) -- Production hardening phases and status
+- [CI Secrets](./ops/ci-secrets.md) -- GitHub Actions secrets
+- [Redis Config](./ops/redis-config.md) -- Redis service settings
 
 ## Archived Documentation
 
 Historical documents preserved in [archive/](./archive/) folder:
-- AWS deployment guides (infrastructure decommissioned March 2026)
-- Migration plan documents (migration completed March 2026)
-- Previous authentication guides (Cognito, superseded by Clerk)
-- Earlier status documents and setup guides
+- Migration plan from AWS to Railway, R2, Clerk and OpenRouter (completed March 2026)
+- Original production deployment notes (the Clerk setup section still applies)
 
 ## Quick Links
 

@@ -8,15 +8,15 @@ A multi-agent AI system for analyzing video interviews using the 5D analysis fra
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | FastAPI, SQLAlchemy, Celery, LangGraph |
+| Backend | FastAPI, SQLAlchemy, Celery |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui |
 | Database | PostgreSQL 15 |
 | Queue/Cache | Redis 7 |
-| LLM | OpenRouter (free default models + student BYOK) |
+| LLM | OpenRouter (included models + BYOK) |
 | Transcription | AssemblyAI |
 | Auth | Clerk |
 | Video Storage | Cloudflare R2 (S3-compatible) |
-| Hosting | Railway (API + Worker + Postgres + Redis) |
+| Hosting | Railway (API + Worker + Beat + Postgres + Redis) |
 | Frontend Hosting | Cloudflare Pages |
 
 ## Features
@@ -78,7 +78,7 @@ docker compose logs -f worker # Tail worker logs
 qualitative-research-tool/
 ├── backend/
 │   ├── app/
-│   │   ├── agents/          # LangGraph pipeline (nodes/, states, graph)
+│   │   ├── agents/          # Analysis step nodes, prompts, state types
 │   │   ├── models/          # SQLAlchemy models + Pydantic schemas
 │   │   ├── routes/          # FastAPI route handlers
 │   │   ├── services/        # Business logic (s3_service, llm_service, etc.)
@@ -104,8 +104,8 @@ qualitative-research-tool/
 
 - [Project Status](./docs/STATUS.md) -- Current deployment status
 - [Quick Context](./docs/QUICK_CONTEXT.md) -- Rapid context for AI agents
-- [Architecture](./docs/ARCHITECTURE.md) -- LangGraph system design
 - [Data Management](./docs/DATA_MANAGEMENT.md) -- Backup and recovery
+- [Runbooks](./docs/production-readiness/runbooks/README.md) -- Production incidents and routine operations
 
 ## License
 

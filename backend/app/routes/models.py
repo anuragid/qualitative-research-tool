@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from fastapi import APIRouter, Depends, Query
 
-from app.auth_bridge import Permission, require_permissions
+from app.auth import Permission, require_permissions
 from app.config import settings
 from app.constants import RECOMMENDED_MODELS
 from app.services.model_cache import get_valid_model_ids

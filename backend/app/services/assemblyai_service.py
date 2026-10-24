@@ -184,7 +184,7 @@ class AssemblyAIService:
 
     def process_transcript_for_analysis(self, raw_transcript: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process raw transcript into format suitable for LangGraph agents.
+        Process raw transcript into the format the analysis pipeline expects.
 
         Args:
             raw_transcript: Raw transcript from AssemblyAI

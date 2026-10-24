@@ -166,7 +166,7 @@ The system failed to recover automatically. Options:
 
 ## Step 6 — Prevent this next time
 
-1. Confirm `worker.drainingSeconds = 900` is applied on Railway. If not, run `scripts/railway-service-config.py --apply` (see `railway-deploy.md`).
+1. Confirm `worker.drainingSeconds = 900` is applied on Railway. If not, run `scripts/railway-service-config.py --apply`.
 
 2. Time your deploys for low-activity windows if possible. Check `/tmp/methodex-live.log` (if the live monitor is running) or the backend logs for recent `/analyze` POST activity.
 
@@ -184,4 +184,4 @@ Stop and ask for help if:
 
 - `stuck-video.md` — per-video debugging
 - `redis-inspect.md` — Celery queue introspection
-- `railway-deploy.md` — applying Railway config changes
+- `deploy-gating.md` — applying Railway config changes (`scripts/railway-service-config.py`)

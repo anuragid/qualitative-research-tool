@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.auth_bridge import get_current_user
+from app.auth import get_current_user
 from app.config import settings
 from app.constants import (
     DEFAULT_STANDARD_MODEL,

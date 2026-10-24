@@ -24,7 +24,7 @@ If the symptom is instead "it said failed but the video plays fine", that's an u
 Get the video ID. If the user has the URL, parse it: `https://methodex.ai/videos/{video_id}`. Otherwise, ask for the filename and grep the DB.
 
 ```bash
-cd /Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool
+cd ~/code-projects/5d-analysis/qualitative-research-tool
 
 # Get DATABASE_URL from Railway (one-time per session)
 railway service Postgres
@@ -109,7 +109,7 @@ Based on Step 2 + Step 3, pick one:
 
 ### 4a. Chain interrupted by deploy (unacked task exists for this video)
 
-Since the PR #19 Celery lifecycle tuning landed on 2026-04-07, the broker `visibility_timeout` is 600s and the worker `drainingSeconds` is 900s (IF the Railway config has been applied — see `railway-deploy.md`). The orphaned task should be re-delivered within 10 minutes.
+Since the PR #19 Celery lifecycle tuning landed on 2026-04-07, the broker `visibility_timeout` is 600s and the worker `drainingSeconds` is 900s (IF the Railway config has been applied — see `scripts/railway-service-config.py`). The orphaned task should be re-delivered within 10 minutes.
 
 **Action:** Wait 10 minutes. Re-run Step 1 and Step 3. If the task is gone from unacked and the video has advanced, you're done. If not, proceed to 4b.
 

@@ -7,7 +7,7 @@ Starting a brand-new Claude session on methodex with no prior context. Follow th
 ## Step 1 — Load the memory
 
 ```
-cat /Users/idstuart/.claude/projects/-Users-idstuart-Projects-ai-prototyping-5d-analysis/memory/MEMORY.md
+cat ~/.claude/projects/-Users-anuragduddu-code-projects-5d-analysis-qualitative-research-tool/memory/MEMORY.md  # if it exists
 ```
 
 This is your index. Read the short file descriptions and pick the ones relevant to your task. Always load at minimum:
@@ -31,7 +31,7 @@ This tells you what phase the project is in, what SLOs we committed to, and what
 ## Step 3 — Check current git state
 
 ```bash
-cd /Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool
+cd ~/code-projects/5d-analysis/qualitative-research-tool
 git log --oneline -15         # what's on main recently
 git branch --show-current     # what branch you're on
 git status --short            # any uncommitted work

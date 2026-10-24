@@ -16,8 +16,7 @@ Step-by-step recipes for production incidents and routine operations. Each runbo
 | `deploy-interrupt-recovery.md` | A Railway deploy killed in-flight work; users report broken analyses |
 | `redis-inspect.md` | You need to see Celery's queue depth, unacked tasks, or a specific stuck task |
 | `db-snapshot.md` | You need to query production Postgres for a user's project/video state |
-| `sentry-triage.md` | New Sentry issue — how to classify, prioritize, and fix |
-| `railway-deploy.md` | How to apply the Railway service config (drainingSeconds, replicas, etc.) |
+| `deploy-gating.md` | How Railway waits for CI before deploying, and how the service config (replicas, drainingSeconds) is applied |
 | `bootstrap-session.md` | Starting a fresh Claude session — what to load first |
 | `secret-rotation.md` | Rotating one provider credential |
 | `railway-incident-2026-10.md` | Railway's 2026-10-21 env-var breach: rotate everything, in order |

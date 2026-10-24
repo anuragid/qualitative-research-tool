@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth_bridge import Permission, require_permissions
+from app.auth import Permission, require_permissions
 from app.config import settings
 from app.database import get_db
 from app.dependencies.byok_gate import require_byok_credits

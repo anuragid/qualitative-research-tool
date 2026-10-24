@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth_bridge import Permission, require_permissions
+from app.auth import Permission, require_permissions
 from app.database import get_db
 from app.models.database_models import Project, SpeakerLabel, Transcript, Video
 from app.models.schemas import SpeakerLabelCreate, SpeakerLabelResponse, SpeakerLabelUpdate, TranscriptResponse

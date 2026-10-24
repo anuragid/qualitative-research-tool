@@ -16,7 +16,7 @@ You need to see what Celery is doing right now — queue depth, unacked messages
 ## Get the broker URL
 
 ```bash
-cd /Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool
+cd ~/code-projects/5d-analysis/qualitative-research-tool
 railway service Redis
 export REDIS_URL=$(railway variables --service Redis --kv | grep ^REDIS_PUBLIC_URL | cut -d= -f2-)
 # Verify
