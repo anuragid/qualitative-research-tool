@@ -6,8 +6,15 @@ methodex's Celery broker and result store.
 ## Target production startCommand
 
 ```
-/bin/sh -c 'rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH --maxmemory 300mb --maxmemory-policy allkeys-lru'
+/bin/sh -c "rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH --maxmemory 300mb --maxmemory-policy allkeys-lru"
 ```
+
+This is the live value as of 2026-10-24 (double-quoted; earlier copies of
+this doc used single quotes). It is declared in `.railway/railway.ts`
+(`Redis.deploy.startCommand`).
+Once that file has been applied, change the command there and run
+`railway config apply`. A change made through the GraphQL mutation below
+would be reverted by the next apply.
 
 The leading `rm -rf .../lost+found/` clears the ext4 directory that
 Railway's mounted volume always contains — Redis refuses to start if

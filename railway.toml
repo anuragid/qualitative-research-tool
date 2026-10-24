@@ -1,3 +1,7 @@
+# Deprecated Config as Code, superseded by .railway/railway.ts. Railway reads
+# this file on every backend/worker/beat deploy until 2026-12-01 or until it is
+# deleted. Keep it in sync with railway.ts until then, and only delete it after
+# `railway config apply` (see .railway/README.md for the order).
 [build]
 dockerfilePath = "backend/Dockerfile.railway"
 buildContext = "."
