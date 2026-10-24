@@ -222,6 +222,72 @@ def mock_s3():
         yield route_mock
 
 
+class FakeStepStore:
+    """In-memory stand-in for ``app.tasks.step_guard.RedisStepStore``.
+
+    Same semantics (SET NX EX, owner-checked release, TTLs on a monotonic
+    clock) so the step guard runs for real in tests without a Redis server.
+    Set ``fail`` to an exception instance to simulate Redis being down.
+    """
+
+    def __init__(self):
+        self._data: dict[str, tuple[str, float]] = {}
+        self.fail: Exception | None = None
+
+    def _live(self, key):
+        import time
+
+        entry = self._data.get(key)
+        if entry is not None and entry[1] <= time.monotonic():
+            del self._data[key]
+            return None
+        return entry
+
+    def _check(self):
+        if self.fail is not None:
+            raise self.fail
+
+    def acquire(self, key, token, ttl):
+        import time
+
+        self._check()
+        if self._live(key) is not None:
+            return False
+        self._data[key] = (token, time.monotonic() + ttl)
+        return True
+
+    def release(self, key, token):
+        self._check()
+        entry = self._live(key)
+        if entry is not None and entry[0] == token:
+            del self._data[key]
+
+    def put(self, key, ttl):
+        import time
+
+        self._check()
+        self._data[key] = ("1", time.monotonic() + ttl)
+
+    def exists(self, *keys):
+        self._check()
+        return any(self._live(k) is not None for k in keys)
+
+    def expire(self, key):
+        """Test helper: drop a key as if its TTL had run out."""
+        self._data.pop(key, None)
+
+    def keys(self):
+        return [k for k in list(self._data) if self._live(k) is not None]
+
+
+@pytest.fixture(autouse=True)
+def step_store(monkeypatch):
+    """Point the analysis step guard at a fresh in-memory store per test."""
+    store = FakeStepStore()
+    monkeypatch.setattr("app.tasks.step_guard._store", store)
+    return store
+
+
 def make_auth_header(role="user"):
     """Create mock auth header.
 

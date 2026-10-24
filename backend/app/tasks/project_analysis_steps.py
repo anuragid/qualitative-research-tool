@@ -33,6 +33,7 @@ from app.tasks.analysis_steps import (
 )
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
+from app.tasks.step_guard import guarded_step
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,7 @@ def _update_project_analysis_error(db: Session, project_id: str, step_name: str,
     retry_jitter=True,
     max_retries=3,
 )
+@guarded_step("project", "cross_relate")
 def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None):
     """Step 1 of 3: find meta-patterns across videos."""
     try:
@@ -311,6 +313,7 @@ def analyze_cross_relate_step(self, project_id: str, user_id: str | None = None)
     retry_jitter=True,
     max_retries=3,
 )
+@guarded_step("project", "cross_explain")
 def analyze_cross_explain_step(self, project_id: str, user_id: str | None = None):
     """Step 2 of 3: synthesize cross-video insights from meta-patterns."""
     try:
@@ -368,6 +371,7 @@ def analyze_cross_explain_step(self, project_id: str, user_id: str | None = None
     retry_jitter=True,
     max_retries=3,
 )
+@guarded_step("project", "cross_activate")
 def analyze_cross_activate_step(self, project_id: str, user_id: str | None = None):
     """Step 3 of 3: derive system-level design principles. Terminal step."""
     try:

@@ -79,15 +79,17 @@ def test_recommended_standard_model_names_deepseek():
     assert std["name"] == "DeepSeek V3.2"
 
 
-def test_nemotron_output_cap_clamps_large_requests():
-    """Demoted Nemotron has a known output cap; requests above it are clamped
-    so it can produce (shorter) output instead of failing on finish_reason=length.
-    DeepSeek (primary) has NO cap so its large outputs are never truncated."""
-    from app.services.llm_service import _MODEL_OUTPUT_CAPS
+def test_output_limits_cover_the_demoted_models_only():
+    """Scout and Nemotron have known output limits (requests that don't fit
+    skip them; see tests/test_llm_model_limits.py). Neither DeepSeek is listed,
+    so the primary is never skipped for a large request."""
+    from app.services.llm_service import _MODEL_OUTPUT_LIMITS
 
-    assert _MODEL_OUTPUT_CAPS.get(NEMOTRON) == 16384
-    # The primary must NOT be clamped — that would risk truncating legit output.
-    assert DEEPSEEK not in _MODEL_OUTPUT_CAPS
+    assert _MODEL_OUTPUT_LIMITS[NEMOTRON].max_output_tokens == 16384
+    assert _MODEL_OUTPUT_LIMITS[NEMOTRON].usable_output_tokens == 8192
+    assert _MODEL_OUTPUT_LIMITS[SCOUT].usable_output_tokens == 16384
+    assert DEEPSEEK not in _MODEL_OUTPUT_LIMITS
+    assert DEEPSEEK_LEGACY not in _MODEL_OUTPUT_LIMITS
 
 
 def test_demoted_models_cannot_be_the_default_model():

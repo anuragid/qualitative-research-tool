@@ -8,6 +8,7 @@ from celery import Celery, signals
 from sqlalchemy import inspect
 
 from app.config import settings
+from app.constants import BROKER_VISIBILITY_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -150,12 +151,15 @@ celery_app.conf.update(
 
     # Task execution settings
     task_track_started=True,
-    # PR #19: tight lifecycle bounds. Chain steps are designed to be small
-    # (one LLM call + DB write, ~1-5 min). A 6-minute hard kill with a
-    # 30-second soft warning means a stuck step fails fast instead of
-    # hanging out for half an hour and blocking the watchdog.
-    task_time_limit=360,  # 6 min hard kill
-    task_soft_time_limit=330,  # 5.5 min soft warning (SIGUSR1 before SIGKILL)
+    # PR #19 lifecycle bounds. NOTE: the worker runs --pool=threads, which
+    # does NOT enforce these limits (it cannot kill a thread). Analysis steps
+    # are bounded instead by the STEP_* budgets in app/constants.py, enforced
+    # in app/tasks/step_guard.py and app/services/llm_budget.py, and may
+    # legitimately run longer than 6 minutes. These values only take effect
+    # under a prefork pool; the R2 timeout budget in config.py is sized
+    # against them.
+    task_time_limit=360,  # 6 min hard kill (prefork only)
+    task_soft_time_limit=330,  # 5.5 min soft warning (prefork only)
     task_acks_late=True,  # Acknowledge tasks after execution (survives worker crash)
     task_reject_on_worker_lost=True,  # Re-queue tasks if worker dies mid-execution
 
@@ -170,19 +174,22 @@ celery_app.conf.update(
     broker_connection_max_retries=10,  # Max retries before giving up
     broker_connection_timeout=30,  # Timeout per connection attempt
 
-    # PR #19: broker visibility timeout.
+    # Broker visibility timeout.
     # Celery's Redis broker leaves unacked messages in the pending queue
     # until this many seconds have passed, then re-delivers them. Default
     # is 3600s (1 hour) — far longer than our old 35-min watchdog, so an
     # orphaned task (e.g. worker SIGTERM mid-LLM call during a deploy)
     # would sit stranded in Redis while the watchdog stamped the user's
-    # analysis errored. 600s (10 min) is safely > task_time_limit (6 min)
-    # so in-flight tasks aren't double-delivered while still running on
-    # the original worker, and safely < watchdog _ANALYSIS_TIMEOUT (15 min)
-    # so orphans get recovered before the watchdog intervenes.
-    # See tests/test_celery_lifecycle.py for the locked invariants.
+    # analysis errored (PR #19).
+    # It must exceed the longest step run, or a step still running is handed
+    # to a second thread: at 600s that happened on 2026-10-24, because the
+    # threads pool never enforced task_time_limit and one LLM call ran ~11
+    # minutes. It must stay below the watchdog's stall timeout so an orphan is
+    # redelivered before the watchdog gives up on it. The whole chain of
+    # inequalities lives in app/constants.py and is locked by
+    # tests/test_celery_lifecycle.py.
     broker_transport_options={
-        "visibility_timeout": 600,  # 10 min — must be > task_time_limit, < watchdog
+        "visibility_timeout": BROKER_VISIBILITY_TIMEOUT_SECONDS,  # 20 min
     },
 
     # Logging
@@ -214,9 +221,10 @@ celery_app.conf.update(
     # Celery Beat schedule for periodic tasks
     beat_schedule={
         "watchdog-reset-stuck-analyses": {
-            # Every 10 min. The watchdog only resets records older than
-            # _ANALYSIS_TIMEOUT (17 min), so a 10-min cadence still detects a
-            # stuck record within ~10 min of it crossing the threshold while
+            # Every 10 min. The watchdog only resets analyses with no step
+            # activity for _ANALYSIS_TIMEOUT (25 min), so a 10-min cadence
+            # still detects a stuck record within ~10 min of it crossing the
+            # threshold while
             # halving the per-day Celery log volume this task generates (it is
             # by far the most frequent thing in the worker logs).
             "task": "reset_stuck_analyses",

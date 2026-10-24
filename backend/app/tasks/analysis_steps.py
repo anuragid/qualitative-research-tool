@@ -30,6 +30,7 @@ from app.state import (
 )
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
+from app.tasks.step_guard import guarded_step
 from app.utils.error_classification import (
     ERROR_TYPE_INSUFFICIENT_CREDITS,
     is_retryable,
@@ -482,6 +483,7 @@ def _update_analysis_error(
     retry_jitter=True,
     max_retries=3,
 )
+@guarded_step("video", "chunk")
 def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
     """
     Step 1: CHUNK - Break transcript into discrete pieces.
@@ -491,6 +493,10 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
     clear any previous error_message on the Video. This logic moved out
     of the route handler into this first chain link as part of the WS3
     chain refactor so the route stays a pure dispatcher.
+
+    ``guarded_step`` (as on every step task) drops a redelivered copy of
+    this task before it gets here, and bounds the step's LLM time; see
+    app/tasks/step_guard.py.
     """
     try:
         logger.info(f"Starting CHUNK step for video {video_id}")
@@ -605,6 +611,7 @@ def analyze_chunk_step(self, video_id: str, user_id: str | None = None):
     retry_jitter=True,
     max_retries=3
 )
+@guarded_step("video", "infer")
 def analyze_infer_step(self, video_id: str, user_id: str | None = None):
     """
     Step 2: INFER - Interpret meaning from each chunk.
@@ -685,6 +692,7 @@ def analyze_infer_step(self, video_id: str, user_id: str | None = None):
     retry_jitter=True,
     max_retries=3,
 )
+@guarded_step("video", "relate")
 def analyze_relate_step(self, video_id: str, user_id: str | None = None):
     """
     Step 3: RELATE - Find patterns across inferences.
@@ -762,6 +770,7 @@ def analyze_relate_step(self, video_id: str, user_id: str | None = None):
     retry_jitter=True,
     max_retries=3,
 )
+@guarded_step("video", "explain")
 def analyze_explain_step(self, video_id: str, user_id: str | None = None):
     """
     Step 4: EXPLAIN - Generate insights from patterns.
@@ -840,6 +849,7 @@ def analyze_explain_step(self, video_id: str, user_id: str | None = None):
     retry_jitter=True,
     max_retries=3,
 )
+@guarded_step("video", "activate")
 def analyze_activate_step(self, video_id: str, user_id: str | None = None):
     """
     Step 5: ACTIVATE - Create design principles from insights.

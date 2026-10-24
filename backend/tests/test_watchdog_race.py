@@ -323,3 +323,64 @@ class TestErrorHandlerDoesNotOverwriteWatchdog:
 
         # Verify the original watchdog error message is preserved
         assert "watchdog" in video.error_message
+
+
+# ---------------------------------------------------------------------------
+# Test 7: Watchdog measures staleness from the last step progress
+# ---------------------------------------------------------------------------
+
+
+class TestWatchdogMeasuresFromLastProgress:
+    """The watchdog used to reset any analysis whose CHAIN started more than
+    17 min ago. On 2026-10-24 the chunk step alone took 15 min (and a
+    redelivered copy reset started_at mid-chain), so a healthy five-step
+    chain could not finish inside that window. It now resets only analyses
+    with no step progress (a step starting or finishing) for _ANALYSIS_TIMEOUT.
+    """
+
+    def _sweep(self, db):
+        from app.tasks.watchdog_tasks import _ANALYSIS_TIMEOUT, reset_stuck_video_analyses
+
+        now = datetime.now(timezone.utc)
+        return reset_stuck_video_analyses(db, now, now - _ANALYSIS_TIMEOUT)
+
+    def _long_running_analysis(self, db, **step_timestamps):
+        project = _make_project(db)
+        video = _make_video(db, project.id, status="analyzing")
+        va = _make_video_analysis(
+            db, video.id, status="processing",
+            started_at=datetime.now(timezone.utc) - timedelta(minutes=40),
+        )
+        for column, minutes_ago in step_timestamps.items():
+            setattr(va, column, datetime.now(timezone.utc) - timedelta(minutes=minutes_ago))
+        db.commit()
+        return video, va
+
+    def test_recent_step_completion_keeps_a_long_chain_alive(self, db_session):
+        _, va = self._long_running_analysis(
+            db_session, chunk_completed_at=20, infer_completed_at=5,
+        )
+
+        assert self._sweep(db_session) == 0
+        db_session.refresh(va)
+        assert va.status == "processing"
+
+    def test_running_step_keeps_the_analysis_alive(self, db_session, step_store):
+        from app.tasks.step_guard import _activity_key
+
+        video, va = self._long_running_analysis(db_session)
+        step_store.put(_activity_key("video", str(video.id)), 60)
+
+        assert self._sweep(db_session) == 0
+        db_session.refresh(va)
+        assert va.status == "processing"
+
+    def test_analysis_without_progress_is_reset(self, db_session):
+        video, va = self._long_running_analysis(db_session, chunk_completed_at=30)
+
+        assert self._sweep(db_session) == 1
+        db_session.refresh(va)
+        db_session.refresh(video)
+        assert va.status == "error"
+        assert video.status == "error"
+        assert "No analysis progress" in video.error_message
