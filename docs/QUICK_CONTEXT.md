@@ -17,20 +17,20 @@
 | Cache/Queue | Railway (Redis) |
 | Video Storage | Cloudflare R2 |
 | Auth | Clerk |
-| LLM | OpenRouter (free defaults + student BYOK) |
+| LLM | OpenRouter (included models + BYOK) |
 | Transcription | AssemblyAI |
 | Frontend Hosting | Cloudflare Pages |
 
 ## Codebase Location
 
 ```
-/Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool/
+~/code-projects/5d-analysis/qualitative-research-tool/
 ```
 
 ## Key Directories
 
-- `backend/app/agents/nodes/` -- 8 LangGraph analysis nodes (5 per-video + 3 cross-video)
-- `backend/app/services/llm_service.py` -- OpenRouter LLM integration (LiteLLM-based)
+- `backend/app/agents/nodes/` -- 8 analysis step nodes (5 per-video + 3 cross-video), each run as its own Celery task
+- `backend/app/services/llm_service.py` -- OpenRouter LLM integration (OpenAI SDK pointed at OpenRouter)
 - `backend/app/services/s3_service.py` -- R2 storage (S3-compatible via boto3)
 - `frontend/src/contexts/` -- Clerk auth context
 
@@ -54,8 +54,7 @@ docker volume prune            # DELETES DATA
 
 ## Known Local Issues
 
-- No auth bypass for local dev (need valid Clerk token for authenticated endpoints)
+- Local dev auth bypass: with `APP_ENV=development` the backend treats requests with no token (or `Bearer dev-bypass`) as `dev_user_local`; set `VITE_DEV_AUTH_BYPASS=true` in the frontend
 - Docker Compose uses Postgres 15
-- Free OpenRouter models have strict rate limits (~10-20 req/min) -- may get 429s during testing
 
 Last Updated: March 12, 2026

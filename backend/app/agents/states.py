@@ -1,4 +1,4 @@
-"""LangGraph state definitions for analysis pipelines."""
+"""State definitions (TypedDicts) for the analysis pipelines."""
 
 from typing import Any, Dict, List, Optional, TypedDict
 

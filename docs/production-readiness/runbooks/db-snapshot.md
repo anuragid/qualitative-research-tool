@@ -12,7 +12,7 @@ You need to query production Postgres directly — for debugging a user's projec
 ## Get the DB URL
 
 ```bash
-cd /Users/idstuart/Projects/ai-prototyping/5d-analysis/qualitative-research-tool
+cd ~/code-projects/5d-analysis/qualitative-research-tool
 railway service Postgres
 export DATABASE_URL=$(railway variables --service Postgres --kv | grep ^DATABASE_PUBLIC_URL | cut -d= -f2-)
 echo $DATABASE_URL  # verify — should be postgres://postgres:...@ballast.proxy.rlwy.net:45966/railway
@@ -204,4 +204,4 @@ EOF
 
 - `stuck-video.md` — specific recipes for stuck-video debugging
 - `redis-inspect.md` — for Celery queue state
-- `railway-deploy.md` — for applying Railway service config changes
+- `deploy-gating.md` and `scripts/railway-service-config.py` — for applying Railway service config changes

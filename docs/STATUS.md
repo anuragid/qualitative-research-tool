@@ -16,12 +16,12 @@
 
 | Service | Provider | Notes |
 |---------|----------|-------|
-| API + Worker | Railway | FastAPI + Celery in separate Railway services |
+| API + Worker + Beat | Railway | FastAPI, Celery worker and Celery beat in separate Railway services |
 | PostgreSQL | Railway | Managed Postgres |
 | Redis | Railway | Managed Redis |
 | Video Storage | Cloudflare R2 | S3-compatible, zero egress fees |
 | Auth | Clerk | Free tier (10K MAU) |
-| LLM | OpenRouter | Free default models + student BYOK |
+| LLM | OpenRouter | Included models (default DeepSeek V3.2) + BYOK |
 | Transcription | AssemblyAI | Usage-based billing |
 | Frontend | Cloudflare Pages | Free tier |
 | Domain/DNS | Cloudflare | methodex.ai |
@@ -53,8 +53,7 @@ cd frontend && npm install && npm run dev
 
 ## Known Local Issues
 
-- No auth bypass for local dev (need valid Clerk token)
-- Free OpenRouter models have strict rate limits (~10-20 req/min)
+- Local dev auth bypass: with `APP_ENV=development` the backend treats requests with no token (or `Bearer dev-bypass`) as `dev_user_local`; set `VITE_DEV_AUTH_BYPASS=true` in the frontend
 - ENCRYPTION_KEY not set locally (generates ephemeral key, BYOK won't persist across restarts)
 
 ---
