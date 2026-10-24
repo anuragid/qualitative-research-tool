@@ -33,24 +33,29 @@ on databases.
 
 - Railway dashboard access (sign in again; old sessions were revoked).
 - Railway CLI re-authenticated: `railway login && railway link` in the repo root.
-- Admin access to OpenRouter, Clerk, Cloudflare (R2), AssemblyAI, Sentry, and
-  the GitHub repo's Actions secrets.
+- Admin access to OpenRouter, Clerk, Cloudflare (R2 and the
+  `methodex-frontend` Pages project), AssemblyAI, Sentry, and the GitHub
+  repo's Actions secrets.
+- Wrangler authenticated to that Cloudflare account (`wrangler login`), for
+  the Pages secret in step 5.
 
 Services that carry secrets: **backend, worker, beat** (all three run
 `app.config.Settings`, so all three need every app secret), plus the
-Railway-managed **Postgres** and **Redis** services.
+Railway-managed **Postgres** and **Redis** services. Outside Railway, the
+Cloudflare Pages project **methodex-frontend** holds a second copy of
+`CLERK_SECRET_KEY` (step 5).
 
 ## What was exposed, by blast radius
 
 | # | Variable(s) | Lives on | What an attacker can do with it |
 |---|---|---|---|
-| 1 | Postgres password (`DATABASE_URL`, `DATABASE_PUBLIC_URL`, `PG*`) | Postgres, backend, worker, beat | Read and write every project, transcript, analysis and user row from the internet if the public TCP proxy is still on (our runbooks use `DATABASE_PUBLIC_URL`, so it was on). Write access includes `users.role`. |
+| 1 | Postgres password (`DATABASE_URL`, `DATABASE_PUBLIC_URL`, `PG*`) | Postgres, backend, worker, beat | Read and write every project, transcript, analysis and user row from the internet while the public TCP proxy was on. It was on through the exposure window (our runbooks used `DATABASE_PUBLIC_URL`) and was deleted on 2026-10-24. Write access includes `users.role`. |
 | 2 | `ENCRYPTION_KEY` | backend, worker, beat | Combined with #1: decrypt every BYOK user's OpenRouter key in `users.encrypted_api_key`. These keys are exactly what this campaign is after. |
 | 3 | `OPENROUTER_API_KEY` | backend, worker, beat | Spend the shared OpenRouter balance. An AI provider key, which is what the attacker was after. |
 | 4 | `ASSEMBLYAI_API_KEY` | backend, worker, beat | Spend AssemblyAI credit, and list and download every transcript AssemblyAI still holds. The app never deletes transcripts there. Also an AI provider key. |
-| 5 | `CLERK_SECRET_KEY` | backend (and worker/beat if set) | Clerk Backend API: list users, mint sign-in tokens, so they can impersonate any user. |
+| 5 | `CLERK_SECRET_KEY` | backend (and worker/beat if set), Cloudflare Pages `methodex-frontend` | Clerk Backend API: list users, mint sign-in tokens, so they can impersonate any user. |
 | 6 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | backend, worker, beat | List, download, overwrite or delete every uploaded interview recording. |
-| 7 | Redis password (`REDIS_URL`, `REDIS_PASSWORD`) | Redis, backend, worker, beat | Read results (10-min TTL) and enqueue Celery tasks. Celery accepts JSON only, so no pickle RCE. |
+| 7 | Redis password (`REDIS_URL`, `REDIS_PASSWORD`) | Redis, backend, worker, beat | Read results (10-min TTL) and enqueue Celery tasks, from the internet while Redis's TCP proxy was on (deleted 2026-10-24). Celery accepts JSON only, so no pickle RCE. |
 | 8 | `SENTRY_AUTH_TOKEN`, `SENTRY_DSN` | backend (if set) | Token: Sentry API under its scopes. DSN: spam events (low). |
 | 9 | Railway API token, GitHub link | your machine, Railway | Already invalidated by Railway. Local scripts that call the Railway API, and auto-deploy from GitHub, break until replaced. |
 
@@ -103,19 +108,22 @@ Rotation restarts services, and restarts cost logs. Export these first:
 
 ### 1. Postgres password
 
-1. Railway → Postgres service → Database → Credentials → **Regenerate
+1. Railway → Postgres service → Database → Config → **Regenerate
    password**. Use this button rather than editing `PGPASSWORD` by hand or
    running `ALTER USER`: it changes the role password and the service
    variables together. It restarts Postgres.
-2. Check how backend, worker and beat get `DATABASE_URL`. A reference
-   (`${{Postgres.DATABASE_URL}}`) follows the new password automatically. A
-   pasted literal does not: set it again.
+2. backend, worker and beat all set `DATABASE_URL` to the reference
+   `${{Postgres.DATABASE_URL}}`, so they follow the new password with nothing
+   to re-set. Keep it a reference: a pasted literal goes stale on the next
+   regenerate.
 3. Redeploy backend, worker and beat (containers read variables only at
    start).
-4. Railway → Postgres → Settings → Networking: if a **TCP proxy** is still
-   enabled, remove it. For ad-hoc queries, use `railway ssh --service backend`
-   instead of `DATABASE_PUBLIC_URL`. `db-snapshot.md`, `stuck-video.md` and
-   `deploy-interrupt-recovery.md` assume the proxy exists.
+4. Railway → Postgres → Settings → Networking should show no **TCP proxy**.
+   The Postgres and Redis proxies were deleted on 2026-10-24; don't re-enable
+   them. `DATABASE_PUBLIC_URL` no longer reaches the database, so run ad-hoc
+   queries from `railway ssh --service backend`. `db-snapshot.md`,
+   `stuck-video.md`, `deploy-interrupt-recovery.md` and `redis-inspect.md`
+   still assume the proxies exist.
 
 ### 2. ENCRYPTION_KEY and the BYOK keys it protects
 
@@ -161,11 +169,50 @@ traffic.
 
 ### 5. Clerk — `CLERK_SECRET_KEY`
 
-dashboard.clerk.com → production instance → API Keys → add a new secret key →
-set it on every service that has `CLERK_SECRET_KEY` (at least backend) →
-redeploy → revoke the old key. Review users and sessions created since
-2026-10-20 13:58 UTC and the instance's audit or webhook logs for Backend-API
-sign-in tokens you didn't issue.
+The key lives in two places. Update both before you revoke the old key, or
+methodex.ai stops signing anyone in:
+
+- **Railway:** backend (and worker/beat if set).
+- **Cloudflare Pages:** a production secret on the `methodex-frontend`
+  project. The Pages Function `frontend/functions/__clerk/[[path]].ts` sends
+  it as the `Clerk-Secret-Key` header when it proxies Clerk's Frontend API at
+  `methodex.ai/__clerk`. CI's "Deploy Frontend" job doesn't set it, so a
+  deploy alone never changes it.
+
+On 2026-10-24 the key was rotated on Railway only. methodex.ai hung on
+"Loading..." with "The secret key given with this proxy request is invalid"
+until the Pages secret was updated and the frontend redeployed.
+
+1. dashboard.clerk.com → production instance → API Keys → add a new secret
+   key.
+2. Set it in both places from one prompt, so the value stays out of shell
+   history:
+   ```bash
+   read -rs CLERK_SK   # paste the new key, Enter
+   printf '%s' "$CLERK_SK" | railway variable set CLERK_SECRET_KEY --stdin --skip-deploys --service backend   # + worker, beat if set
+   printf '%s' "$CLERK_SK" | wrangler pages secret put CLERK_SECRET_KEY --project-name methodex-frontend
+   unset CLERK_SK
+   ```
+3. Redeploy backend (and worker/beat if you set it there).
+4. Pages secrets only reach new deployments: the live site keeps the old key
+   until the next one. Re-run the "Deploy Frontend" job (GitHub → Actions →
+   CI → latest run on `main` → Re-run jobs → Deploy Frontend), then confirm
+   the newest production deployment is newer than the `secret put`:
+   `wrangler pages deployment list --project-name methodex-frontend --environment production`.
+5. Revoke the old key in Clerk.
+6. Check that this prints `200`, and that you can sign in to methodex.ai and
+   load a project:
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' https://methodex.ai/__clerk/v1/environment
+   ```
+   Only a check after the revoke counts: while the old key is still valid,
+   this returns 200 whichever key Pages has. Anything else (with "The secret
+   key given with this proxy request is invalid" in the body) means the live
+   Pages deployment still has the old key: redo steps 2 and 4.
+7. Review users and sessions created since 2026-10-20 13:58 UTC and the
+   instance's audit or webhook logs for Backend-API sign-in tokens you didn't
+   issue.
+
 While you are in Clerk, close the outstanding item in `secret-rotation.md`:
 the `sk_test_hfvK...` key from git history.
 
@@ -179,12 +226,14 @@ traffic.
 
 ### 7. Redis password
 
-Railway → Redis service → Database → **Regenerate password**. It updates the
-password and the service variables, and restarts Redis; the `--requirepass
-$REDIS_PASSWORD` startCommand in `docs/ops/redis-config.md` picks it up. Then
-re-set `REDIS_URL` on backend, worker and beat if it is a pasted literal (also
-`CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND` if set), and redeploy all
-three.
+Railway → Redis service → Database → Config → **Regenerate password**. It
+updates the password and the service variables, and restarts Redis; the
+`--requirepass $REDIS_PASSWORD` startCommand in `docs/ops/redis-config.md`
+picks it up. backend, worker and beat all set `REDIS_URL` to the reference
+`${{Redis.REDIS_URL}}`, so they follow the new password. `CELERY_BROKER_URL`
+and `CELERY_RESULT_BACKEND` fall back to `REDIS_URL` when unset
+(`backend/app/config.py`); if either is set as a literal, re-set it. Redeploy
+all three.
 
 ### 8. Sentry
 
@@ -209,10 +258,14 @@ If `SENTRY_AUTH_TOKEN` is set on any Railway service: rotate it per
 - `curl -s https://api.methodex.ai/health/ready` returns 200.
 - Sign in to production, upload a short video, and confirm it transcribes and
   analyzes (exercises Clerk, R2, AssemblyAI, OpenRouter, Redis, Postgres).
+- With the old Clerk key revoked,
+  `curl -s -o /dev/null -w '%{http_code}\n' https://methodex.ai/__clerk/v1/environment`
+  prints `200` (exercises the Pages copy of `CLERK_SECRET_KEY`).
 - A BYOK account's Settings page shows its key and balance (exercises
   `ENCRYPTION_KEY`).
 - Old OpenRouter, Clerk, R2, AssemblyAI and Sentry keys are deleted in each
-  provider dashboard, not just replaced in Railway.
+  provider dashboard, not just replaced in Railway and Cloudflare Pages.
+- Railway → Postgres and Redis → Settings → Networking show no TCP proxy.
 - `railway variables --service <svc> --kv` on backend, worker and beat shows a
   single key in `ENCRYPTION_KEY`.
 

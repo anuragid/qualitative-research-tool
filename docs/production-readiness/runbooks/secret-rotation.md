@@ -11,7 +11,8 @@ Rotation procedures for the 5 credentials in `backend/.env`. Env var names below
 
 ## Where live values actually live
 
-- **Railway service env vars** — the only place backend runtime secrets exist in production. Both the **backend** and **worker** services need updating (they share most vars).
+- **Railway service env vars** — where backend runtime secrets live in production. Both the **backend** and **worker** services need updating (they share most vars). `CLERK_SECRET_KEY` also lives on Cloudflare Pages (next item).
+- **Cloudflare Pages project secrets** (`methodex-frontend`, production) — `CLERK_SECRET_KEY` only. The Pages Function `frontend/functions/__clerk/[[path]].ts` sends it to Clerk when it proxies the Frontend API for methodex.ai. Set with `wrangler pages secret put`; CI never sets it. See §5.
 - **GitHub Actions secrets** — used only by `ci.yml` for the frontend build/deploy. Of the 5 credentials in this runbook, only `SENTRY_AUTH_TOKEN` exists as a GitHub Actions secret (for frontend source map upload). The R2 keys, OpenRouter key, AssemblyAI key, and Clerk secret key are NOT in GitHub Actions. (The `CLOUDFLARE_API_TOKEN` / `RAILWAY_API_TOKEN` Actions secrets are separate deploy credentials, not covered here.)
 
 Railway CLI syntax (verified against `railway variable set --help`):
@@ -65,9 +66,18 @@ Env var: `SENTRY_AUTH_TOKEN`
 
 Env var: `CLERK_SECRET_KEY`
 
-- **Rotate:** dashboard.clerk.com → (select application/instance) → Configure → API Keys → Secret keys → Add new key, then revoke the old one after cutover.
-- **Update:** Railway backend service. Not in GitHub Actions (the frontend uses only the publishable key).
-- **Verify:** sign in to the production app and load a project (exercises JWT verification against Clerk); check backend logs for 401s.
+- **Rotate:** dashboard.clerk.com → (select application/instance) → Configure → API Keys → Secret keys → Add new key. Revoke the old one only after both copies below are updated and the frontend is redeployed.
+- **Update:** both places, with the same value. Updating Railway alone caused the 2026-10-24 sign-in outage: methodex.ai hung on "Loading..." with "The secret key given with this proxy request is invalid".
+  - Railway backend service (and worker/beat if set).
+  - Cloudflare Pages project `methodex-frontend` (production secret, read by `frontend/functions/__clerk/[[path]].ts`).
+  ```bash
+  read -rs CLERK_SK   # paste the new key, Enter
+  printf '%s' "$CLERK_SK" | railway variable set CLERK_SECRET_KEY --stdin --service <backend-service>
+  printf '%s' "$CLERK_SK" | wrangler pages secret put CLERK_SECRET_KEY --project-name methodex-frontend
+  unset CLERK_SK
+  ```
+  Pages secrets only reach new deployments, so re-run the CI "Deploy Frontend" job afterwards (GitHub → Actions → CI → latest run on `main` → Re-run jobs → Deploy Frontend). Not in GitHub Actions: the frontend build uses only the publishable key, and CI doesn't set Pages secrets.
+- **Verify:** after revoking the old key, `curl -s -o /dev/null -w '%{http_code}\n' https://methodex.ai/__clerk/v1/environment` prints `200`. Before the revoke this proves nothing, since the old key still works. Anything else means the live Pages deployment still has the old key. Then sign in to the production app and load a project (exercises JWT verification against Clerk); check backend logs for 401s.
 
 ---
 
