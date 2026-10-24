@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth_bridge import Permission, require_permissions, require_permissions_upload
+from app.auth import Permission, require_permissions, require_permissions_upload
 from app.config import settings
 from app.database import get_db
 from app.dependencies.byok_gate import require_byok_credits
