@@ -1,9 +1,10 @@
 // Railway Infrastructure as Code for the methodex project (production).
 //
 // Generated with `railway config migrate --variables=unmanaged` (CLI 5.71) from
-// railway.toml plus the live environment, then corrected to match what the
-// current deployments actually run (see .railway/README.md). Railway does not
-// read this file during deploys: nothing changes until `railway config apply`.
+// the old railway.toml plus the live environment, corrected to match what the
+// deployments actually ran, and applied on 2026-10-24 (see .railway/README.md).
+// Railway does not read this file during deploys: nothing changes until
+// `railway config apply`.
 //
 // Whole-project file, not a partial: an apply can delete any resource that is
 // missing here, so every service, database and volume must stay declared.
@@ -12,9 +13,10 @@ import { defineRailway, github, image, postgres, project, redis, service, volume
 export default defineRailway(() => {
   const qualitativeResearchTool = github("anuragid/qualitative-research-tool", { branch: "main", checkSuites: true });
 
-  // Carried over from railway.toml. ON_FAILURE/10 is also Railway's default, but
-  // it was only ever set by railway.toml, so keep it explicit.
-  const restartPolicy = { restartPolicyType: "ON_FAILURE", restartPolicyMaxRetries: 10 } as const;
+  // No restart policy is declared: railway.toml's ON_FAILURE/10 is Railway's
+  // default, which the platform stores as unset, so declaring it leaves a plan
+  // diff that never clears (seen after the 2026-10-24 apply). Deployments still
+  // resolve it to ON_FAILURE/10 (meta.serviceManifest.deploy.restartPolicyType).
 
   // Pin the images that are running today. Without these, postgres() / redis()
   // fall back to SDK or CLI defaults (postgres:18, postgres-ssl:18,
@@ -39,17 +41,17 @@ export default defineRailway(() => {
     source: qualitativeResearchTool,
     build: { builder: "DOCKERFILE", dockerfilePath: "backend/Dockerfile.railway" },
     replicas: { "us-west2": 1 },
-    deploy: { drainingSeconds: 900, ...restartPolicy },
+    deploy: { drainingSeconds: 900 },
   });
   const backend = service("backend", {
     source: qualitativeResearchTool,
     // The migrator emitted RAILPACK (the dashboard value, never used because
-    // railway.toml's dockerfilePath forces the Dockerfile build).
+    // railway.toml's dockerfilePath forced the Dockerfile build).
     build: { builder: "DOCKERFILE", dockerfilePath: "backend/Dockerfile.railway" },
     healthcheck: "/health/ready",
     healthcheckTimeout: 10,
     replicas: { "us-west2": 1 },
-    deploy: { drainingSeconds: 30, ...restartPolicy },
+    deploy: { drainingSeconds: 30 },
     domains: ["api.methodex.ai"],
   });
   // beat deploys are not gated on CI (scripts/railway-service-config.py gates
@@ -58,7 +60,7 @@ export default defineRailway(() => {
     source: github("anuragid/qualitative-research-tool", { branch: "main", checkSuites: false }),
     build: { builder: "DOCKERFILE", dockerfilePath: "backend/Dockerfile.railway" },
     replicas: { "us-west2": 1 },
-    deploy: { drainingSeconds: 10, ...restartPolicy },
+    deploy: { drainingSeconds: 10 },
   });
 
   // Variables stay owned by the dashboard (managed: false): this file never

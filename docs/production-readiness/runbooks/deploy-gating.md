@@ -46,7 +46,7 @@ We chose deletion: a wrong gate halts production; simplicity wins.
 |-----------|-------|----------------|
 | `checkSuites=true` on main triggers | Railway deployment trigger | Failing tests/lint never deploy |
 | Healthcheck `/health/ready` (timeout 10s) | backend service instance | A deploy that builds but can't serve never receives traffic |
-| `restartPolicyType = ON_FAILURE` (max 10) | `railway.toml` | Crash-looping containers restart |
+| `restartPolicyType = ON_FAILURE` (max 10) | Railway default (left undeclared in `.railway/railway.ts`) | Crash-looping containers restart |
 | `scripts/ci/wait-for-railway-deploy.py` | manual, run locally | Operator confirmation that a specific SHA reached SUCCESS |
 
 Only **main-branch** triggers are gated. PR/preview-environment triggers stay

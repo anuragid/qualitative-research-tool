@@ -267,7 +267,8 @@ jobs:
   # deployment. Every main push would hang ~10 minutes and go red.
   #
   # Post-deploy failure handling lives on the Railway side instead:
-  # healthcheck on /health/ready + ON_FAILURE restart policy (railway.toml).
+  # healthcheck on /health/ready (.railway/railway.ts) + Railway's default
+  # ON_FAILURE restart policy.
   # Manual verification tool: scripts/ci/wait-for-railway-deploy.py (run
   # locally, never from this workflow).
   # See docs/production-readiness/runbooks/deploy-gating.md.

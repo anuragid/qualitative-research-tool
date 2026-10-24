@@ -1,5 +1,5 @@
 # Railway-optimized Dockerfile
-# Build context: project root (set by railway.toml buildContext = ".")
+# Build context: repo root (Railway's default; this path is set in .railway/railway.ts)
 
 # Pinned 2026-04-04 — check for updates quarterly
 FROM python:3.11.12-slim as builder
