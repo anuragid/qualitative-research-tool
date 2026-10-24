@@ -45,14 +45,22 @@ export function TranscriptViewer({
   // Guard flag to ignore scroll events triggered by our own scrollIntoView calls
   const isProgrammaticScrollRef = useRef(false);
 
+  // Word timings and search only exist once AssemblyAI has returned; asking
+  // earlier (the panel renders while the row is pending/processing) 404s.
+  const isTranscriptCompleted = transcript.status === "completed";
+
   // Fetch word-level transcript for highlighting
-  const { data: wordLevelData } = useWordLevelTranscript(videoId);
+  const { data: wordLevelData } = useWordLevelTranscript(videoId, isTranscriptCompleted);
 
   // Debounce search query to avoid too many API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // Search for words in transcript
-  const { data: searchResults, isLoading: searchLoading } = useTranscriptSearch(videoId, debouncedSearchQuery);
+  const { data: searchResults, isLoading: searchLoading } = useTranscriptSearch(
+    videoId,
+    debouncedSearchQuery,
+    isTranscriptCompleted
+  );
 
   // Build a speaker-to-color map based on order of appearance
   const speakerColorMap = useMemo(() => {

@@ -4,6 +4,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import {
+  canVideoHaveTranscript,
   useTranscript,
   useSpeakerLabels,
   useStartTranscription,
@@ -44,9 +45,86 @@ function createWrapper() {
   };
 }
 
+describe("canVideoHaveTranscript", () => {
+  it("is false before transcription has been requested", () => {
+    expect(canVideoHaveTranscript("uploaded")).toBe(false);
+  });
+
+  it("is false while the video hasn't loaded", () => {
+    expect(canVideoHaveTranscript(undefined)).toBe(false);
+  });
+
+  it.each(["transcribing", "transcribed", "analyzing", "analyzed"] as const)(
+    "is true once the video is %s",
+    (status) => {
+      expect(canVideoHaveTranscript(status)).toBe(true);
+    }
+  );
+
+  it("is true for error, which may or may not have a transcript", () => {
+    expect(canVideoHaveTranscript("error")).toBe(true);
+  });
+});
+
 describe("useTranscript", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("stops polling after a 404 instead of re-requesting a missing transcript", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockedService.get.mockRejectedValue({ status: 404 });
+
+      const { result } = renderHook(() => useTranscript("v1"), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      // Longer than the 18s max backoff interval, so a scheduled poll would have fired.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(mockedService.get).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps polling while the transcript is processing", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockedService.get.mockResolvedValue({ id: "t1", video_id: "v1", status: "processing" });
+
+      const { result } = renderHook(() => useTranscript("v1"), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(7_000);
+      });
+      expect(mockedService.get.mock.calls.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts fetching when shouldFetch flips to true", async () => {
+    const transcript = { id: "t1", video_id: "v1", status: "pending" };
+    mockedService.get.mockResolvedValue(transcript);
+
+    const { result, rerender } = renderHook(
+      ({ shouldFetch }) => useTranscript("v1", shouldFetch),
+      { wrapper: createWrapper(), initialProps: { shouldFetch: false } }
+    );
+
+    expect(mockedService.get).not.toHaveBeenCalled();
+
+    rerender({ shouldFetch: true });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedService.get).toHaveBeenCalledWith("v1");
   });
 
   it("fetches transcript when videoId is provided", async () => {
@@ -283,6 +361,25 @@ describe("useStartTranscription", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedService.start).toHaveBeenCalledWith("v1");
+  });
+
+  it("marks the cached video as transcribing so the transcript query enables at once", async () => {
+    mockedService.start.mockResolvedValue({ task_id: "task1" });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    queryClient.setQueryData(["videos", "v1"], { id: "v1", status: "uploaded" });
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const { result } = renderHook(() => useStartTranscription(), { wrapper });
+
+    await act(async () => {
+      result.current.mutate("v1");
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(queryClient.getQueryData(["videos", "v1"])).toMatchObject({ status: "transcribing" });
   });
 
   it("handles error during start", async () => {

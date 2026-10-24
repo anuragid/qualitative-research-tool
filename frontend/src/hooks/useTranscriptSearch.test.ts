@@ -88,6 +88,16 @@ describe("useTranscriptSearch", () => {
     expect(result.current.fetchStatus).toBe("idle");
   });
 
+  it("does not fetch while disabled (transcript not completed yet)", () => {
+    const { result } = renderHook(
+      () => useTranscriptSearch("v1", "design", false),
+      { wrapper: createWrapper() }
+    );
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(mockedApi.get).not.toHaveBeenCalled();
+  });
+
   it("handles error from API", async () => {
     mockedApi.get.mockRejectedValue(new Error("Search failed"));
 
