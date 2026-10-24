@@ -44,7 +44,7 @@ By email:
 ```python
 python3 <<'EOF'
 import os, psycopg2, psycopg2.extras
-EMAIL_SUBSTRING = "anurag"   # case-insensitive substring match
+EMAIL_SUBSTRING = "PASTE_EMAIL_SUBSTRING_HERE"   # case-insensitive substring match
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 cur.execute("""
@@ -62,14 +62,14 @@ conn.close()
 EOF
 ```
 
-Key gotcha: `users.id` IS the Clerk user ID (e.g., `user_3AxdbQcz1lffGHVhwH9diyRLNAL`). There is no separate `clerk_user_id` column.
+Key gotcha: `users.id` IS the Clerk user ID (`user_` followed by 27 letters and digits). There is no separate `clerk_user_id` column.
 
 ## Find a project by name
 
 ```python
 python3 <<'EOF'
 import os, psycopg2, psycopg2.extras
-NAME_SUBSTRING = "haic"
+NAME_SUBSTRING = "PASTE_NAME_SUBSTRING_HERE"
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 cur.execute("""
@@ -91,7 +91,7 @@ Full per-video breakdown of a project:
 ```python
 python3 <<'EOF'
 import os, psycopg2, psycopg2.extras
-PROJECT_ID = "8b894631-2d32-4593-ae2a-e76e6d9f84f3"  # HAIC example
+PROJECT_ID = "PASTE_PROJECT_ID_HERE"  # from "Find a project by name" above
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -183,10 +183,10 @@ Resetting a single stuck video to retriable state (used during the 2026-04-07 in
 # See stuck-video.md Step 4c for the exact reset block
 ```
 
-Always wrap writes in an explicit transaction and include `RETURNING` so you see what changed:
+Always wrap writes in an explicit transaction and include `RETURNING` so you see what changed. Save the script to a file and run it, rather than using a `python3 <<'EOF'` heredoc. In a heredoc, the heredoc is Python's stdin, so `input()` hits end-of-file before you can answer and the write never commits:
 
-```python
-python3 <<'EOF'
+```bash
+cat > /tmp/safe_write.py <<'EOF'
 import os, psycopg2
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor()
@@ -195,15 +195,21 @@ try:
       UPDATE videos SET error_message = '' WHERE id::text = %s RETURNING id, status, error_message;
     """, ("PASTE_ID",))
     print("updated:", cur.fetchone())
-    input("Press Enter to commit, Ctrl-C to rollback...")
-    conn.commit()
-except KeyboardInterrupt:
+    if input("Type 'commit' to commit, anything else rolls back: ").strip() == "commit":
+        conn.commit()
+        print("committed")
+    else:
+        conn.rollback()
+        print("rolled back")
+except (KeyboardInterrupt, EOFError):
     conn.rollback()
     print("rolled back")
 finally:
     cur.close()
     conn.close()
 EOF
+python3 /tmp/safe_write.py
+rm /tmp/safe_write.py
 ```
 
 ## Related runbooks
