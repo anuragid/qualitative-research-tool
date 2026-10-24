@@ -121,9 +121,10 @@ Rotation restarts services, and restarts cost logs. Export these first:
 4. Railway → Postgres → Settings → Networking should show no **TCP proxy**.
    The Postgres and Redis proxies were deleted on 2026-10-24; don't re-enable
    them. `DATABASE_PUBLIC_URL` no longer reaches the database, so run ad-hoc
-   queries from `railway ssh --service backend`. `db-snapshot.md`,
+   queries from `railway ssh --service beat` (same image and variables as
+   backend, but no user traffic to knock over). `db-snapshot.md`,
    `stuck-video.md`, `deploy-interrupt-recovery.md` and `redis-inspect.md`
-   still assume the proxies exist.
+   show how.
 
 ### 2. ENCRYPTION_KEY and the BYOK keys it protects
 
