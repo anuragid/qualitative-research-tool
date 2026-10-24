@@ -48,11 +48,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
-    "@storybook/addon-a11y": "^10.2.17",
-    "@storybook/addon-docs": "^10.2.17",
-    "@storybook/addon-themes": "^10.2.17",
-    "@storybook/addon-vitest": "^10.2.17",
-    "@storybook/react-vite": "^10.2.17",
+    "@storybook/addon-a11y": "^10.6.3",
+    "@storybook/addon-docs": "^10.6.3",
+    "@storybook/addon-themes": "^10.6.3",
+    "@storybook/addon-vitest": "^10.6.3",
+    "@storybook/react-vite": "^10.6.3",
     "@tailwindcss/postcss": "^4.1.16",
     "@tailwindcss/vite": "^4.2.1",
     "@testing-library/react": "^16.3.2",
@@ -68,12 +68,12 @@
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
-    "eslint-plugin-storybook": "^10.2.17",
+    "eslint-plugin-storybook": "^10.6.3",
     "globals": "^16.4.0",
     "jsdom": "^28.1.0",
     "playwright": "^1.58.2",
     "postcss": "^8.5.6",
-    "storybook": "^10.2.17",
+    "storybook": "^10.6.3",
     "tailwindcss": "^4.1.16",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.45.0",
@@ -83,7 +83,7 @@
   "overrides": {
     "protobufjs": "^7.5.9",
     "ws": "^8.21.0",
-    "@vitest/browser": "^4.1.10",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "vite-plus": "^0.1.15"
   }
 }
