@@ -1,0 +1,8 @@
+{
+  "name": "methodex-railway-iac",
+  "private": true,
+  "description": "Railway IaC SDK for .railway/railway.ts (railway config plan / apply). Not part of any deployed image.",
+  "devDependencies": {
+    "railway": "3.16.0"
+  }
+}
