@@ -24,7 +24,10 @@ The deploy timing math:
 ## Prerequisites
 
 - `stuck-video.md` and `redis-inspect.md` runbooks available (you'll cross-reference them)
-- Railway CLI, psycopg2, redis-py
+- Railway CLI, with an SSH key registered (`railway ssh keys list`; add one once with `railway ssh keys add`)
+- psycopg2 and redis-py are already in the backend image, so nothing to install locally
+
+Postgres and Redis are reachable only on Railway's private network. Their public TCP proxies were deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `DATABASE_PUBLIC_URL` and `REDIS_PUBLIC_URL` no longer connect. Do not re-enable the proxies. Steps 1 and 4 run on your laptop; Steps 2, 3 and 5 run inside the backend container.
 
 ## Step 1 — Confirm the deploy landed
 
@@ -43,10 +46,15 @@ Expected: all 3 services (`backend`, `worker`, `beat`) on the same commit, statu
 
 ## Step 2 — Check for orphaned unacked tasks
 
+Open a shell inside the backend container and keep it open for Steps 2, 3 and 5. `REDIS_URL` and `DATABASE_URL` are already set there to the private-network URLs:
+
+```bash
+railway ssh --service backend
+```
+
 ```python
 python3 <<'EOF'
 import os, redis, json, base64
-os.environ.setdefault("REDIS_URL", os.popen("railway variables --service Redis --kv 2>/dev/null | grep ^REDIS_PUBLIC_URL | cut -d= -f2-").read().strip())
 r = redis.from_url(os.environ["REDIS_URL"])
 unacked = r.hgetall("unacked")
 print(f"unacked count: {len(unacked)}")
@@ -72,10 +80,11 @@ Expected post-deploy state:
 
 ## Step 3 — Check for videos stuck in `analyzing` that aren't progressing
 
+In the same `railway ssh --service backend` shell:
+
 ```python
 python3 <<'EOF'
 import os, psycopg2, psycopg2.extras
-os.environ.setdefault("DATABASE_URL", os.popen("railway variables --service Postgres --kv 2>/dev/null | grep ^DATABASE_PUBLIC_URL | cut -d= -f2-").read().strip())
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 # Videos in analyzing state with started_at > 2 min ago (to filter out freshly-started chains)
@@ -104,7 +113,7 @@ Expected post-deploy state:
 
 ## Step 4 — If Step 3 shows multiple stuck videos, check the watchdog
 
-The watchdog runs every 5 min. It should clean up stuck videos within 15-17 min of the deploy. Check worker logs for recent watchdog activity:
+The watchdog runs every 5 min. It should clean up stuck videos within 15-17 min of the deploy. Check worker logs for recent watchdog activity (from your laptop, not the SSH shell):
 
 ```bash
 railway logs --service worker 2>&1 | grep -E "(reset_stuck|Watchdog)" | tail -20
@@ -122,7 +131,7 @@ The system failed to recover automatically. Options:
 
 2. **Manual reset** — use `stuck-video.md` Step 4c to reset each stuck video one at a time.
 
-3. **Emergency: bulk reset** — only if you're seeing a LOT of stuck videos:
+3. **Emergency: bulk reset** — only if you're seeing a LOT of stuck videos. Run it in the `railway ssh --service backend` shell:
 
    ```python
    python3 <<'EOF'

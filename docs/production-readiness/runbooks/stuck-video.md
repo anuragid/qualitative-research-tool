@@ -15,21 +15,24 @@ If the symptom is instead "it said failed but the video plays fine", that's an u
 ## Prerequisites
 
 - Railway CLI installed (`railway --version`)
-- `psycopg2-binary` in your Python (`python3 -c 'import psycopg2'`)
-- `redis` in your Python (`python3 -c 'import redis'`)
 - Railway workspace access (`railway whoami` should show your account)
+- An SSH key registered with Railway (`railway ssh keys list`; add one once with `railway ssh keys add`)
+- Nothing to install locally: `psycopg2` and `redis` are already in the backend image
+
+Postgres and Redis are reachable only on Railway's private network. Their public TCP proxies were deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `DATABASE_PUBLIC_URL` and `REDIS_PUBLIC_URL` no longer connect. Do not re-enable the proxies.
 
 ## Step 1 — Identify the video
 
 Get the video ID. If the user has the URL, parse it: `https://methodex.ai/videos/{video_id}`. Otherwise, ask for the filename and grep the DB.
 
-```bash
-cd ~/code-projects/5d-analysis/qualitative-research-tool
+Open a shell inside the backend container and keep it open. Every Python block in this runbook runs in it:
 
-# Get DATABASE_URL from Railway (one-time per session)
-railway service Postgres
-export DATABASE_URL=$(railway variables --service Postgres --kv | grep ^DATABASE_PUBLIC_URL | cut -d= -f2-)
+```bash
+cd ~/code-projects/5d-analysis/qualitative-research-tool   # linked to the methodex project
+railway ssh --service backend
 ```
+
+`DATABASE_URL` and `REDIS_URL` are already set there to the private-network URLs, so there is nothing to export.
 
 Now query the video state:
 
@@ -70,10 +73,7 @@ Look at the row:
 
 ## Step 3 — Check Redis for in-flight tasks
 
-```bash
-railway service Redis
-export REDIS_URL=$(railway variables --service Redis --kv | grep ^REDIS_PUBLIC_URL | cut -d= -f2-)
-```
+In the same `railway ssh --service backend` shell (`REDIS_URL` is already set):
 
 ```python
 python3 <<'EOF'
@@ -123,7 +123,7 @@ The watchdog at `_ANALYSIS_TIMEOUT = 17 min` (post PR #19) will catch this. If `
 
 You've confirmed the video is in a terminal errored state with no active task. The PR #21 retry-reset-analysis fix is now in prod, so clicking "Retry Analysis" in the UI will now correctly reset and re-dispatch the chain. **Tell the user to click Retry Analysis.**
 
-If the user can't access the UI for some reason, OR if the video's state got into a truly inconsistent place, manually reset:
+If the user can't access the UI for some reason, OR if the video's state got into a truly inconsistent place, manually reset (in the `railway ssh --service backend` shell):
 
 ```python
 python3 <<'EOF'
@@ -190,7 +190,7 @@ If you see any step hang for more than 2 minutes, the LLM is slow — check Sent
 Stop and ask for help if:
 - You've followed 4c (manual reset) twice and the video keeps hitting the same error
 - Sentry shows a burst of errors from other users in the same time window
-- The worker service on Railway is unhealthy (`railway logs --service worker` shows repeated crashes)
+- The worker service on Railway is unhealthy (`railway logs --service worker`, run from your laptop rather than the SSH shell, shows repeated crashes)
 - The user reports data loss (missing chunks/insights/principles from a previously-completed analysis)
 
 ## Related runbooks

@@ -6,23 +6,27 @@ You need to query production Postgres directly — for debugging a user's projec
 
 ## Prerequisites
 
-- Railway CLI installed
-- `psycopg2-binary` installed (`pip install psycopg2-binary` or use the backend venv)
+- Railway CLI installed, with an SSH key registered (`railway ssh keys list`; add one once with `railway ssh keys add`)
+- Nothing to install locally: the backend image already has `psycopg2-binary` and `psql` (`postgresql-client`)
 
-## Get the DB URL
+Postgres is reachable only on Railway's private network. Its public TCP proxy was deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `DATABASE_PUBLIC_URL` no longer connects. Do not re-enable the proxy.
+
+## Open a shell on the private network
 
 ```bash
-cd ~/code-projects/5d-analysis/qualitative-research-tool
-railway service Postgres
-export DATABASE_URL=$(railway variables --service Postgres --kv | grep ^DATABASE_PUBLIC_URL | cut -d= -f2-)
-echo $DATABASE_URL  # verify — should be postgres://postgres:...@ballast.proxy.rlwy.net:45966/railway
+cd ~/code-projects/5d-analysis/qualitative-research-tool   # linked to the methodex project
+railway ssh --service backend
 ```
+
+Run every block below inside that shell. The backend container already has `DATABASE_URL` set to the private Postgres URL (`${{Postgres.DATABASE_URL}}`), so there is nothing to export. Don't `echo` it: it contains the password. The container is also serving live API traffic, so keep queries light and `exit` when you're done.
 
 ## Test the connection
 
 ```bash
 python3 -c "
 import os, psycopg2
+from urllib.parse import urlsplit
+print('host:', urlsplit(os.environ['DATABASE_URL']).hostname)  # expect *.railway.internal
 conn = psycopg2.connect(os.environ['DATABASE_URL'])
 cur = conn.cursor()
 cur.execute('SELECT current_database(), current_user, version();')
@@ -30,6 +34,8 @@ print(cur.fetchone())
 conn.close()
 "
 ```
+
+For a quick interactive SQL prompt, `psql "$DATABASE_URL"` works in the same shell. psql commits every statement as soon as it runs, so for writes either type `BEGIN;` first and finish with `COMMIT;` or `ROLLBACK;`, or use the Python write pattern at the end of this runbook.
 
 ## Find a user
 

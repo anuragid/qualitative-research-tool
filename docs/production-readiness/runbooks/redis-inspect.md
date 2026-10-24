@@ -10,17 +10,22 @@ You need to see what Celery is doing right now — queue depth, unacked messages
 
 ## Prerequisites
 
-- Railway CLI installed
-- `redis` in your Python (`python3 -c 'import redis'`)
+- Railway CLI installed, with an SSH key registered (`railway ssh keys list`; add one once with `railway ssh keys add`)
+- Nothing to install locally: redis-py (`redis`) is already in the backend image. The image has no `redis-cli`, so every check below uses Python
 
-## Get the broker URL
+Redis is reachable only on Railway's private network. Its public TCP proxy was deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `REDIS_PUBLIC_URL` no longer connects. Do not re-enable the proxy.
+
+## Open a shell on the private network
 
 ```bash
-cd ~/code-projects/5d-analysis/qualitative-research-tool
-railway service Redis
-export REDIS_URL=$(railway variables --service Redis --kv | grep ^REDIS_PUBLIC_URL | cut -d= -f2-)
-# Verify
-echo $REDIS_URL  # should be redis://default:...@yamabiko.proxy.rlwy.net:50187
+cd ~/code-projects/5d-analysis/qualitative-research-tool   # linked to the methodex project
+railway ssh --service backend
+```
+
+Run the Python blocks below inside that shell. `REDIS_URL` is already set there to the private Redis URL (`${{Redis.REDIS_URL}}`), which is also the Celery broker (`CELERY_BROKER_URL` falls back to it in `backend/app/config.py`). Don't `echo` it: it contains the password. To confirm you're on the private network:
+
+```bash
+python3 -c "import os; from urllib.parse import urlsplit; print(urlsplit(os.environ['REDIS_URL']).hostname)"  # expect *.railway.internal
 ```
 
 ## Check queue depth
@@ -126,7 +131,7 @@ Preferred alternative: wait for `visibility_timeout` (10 min), or restart the wo
 
 ## Check Celery beat scheduler entries
 
-Beat stores its schedule in a file inside the beat container, not Redis. To check that beat is actually firing, look at the worker logs for `reset_stuck_analyses` entries:
+Beat stores its schedule in a file inside the beat container, not Redis. To check that beat is actually firing, look at the worker logs for `reset_stuck_analyses` entries (from your laptop, not the SSH shell):
 
 ```bash
 railway logs --service worker 2>&1 | grep -E "reset_stuck_analyses|watchdog" | tail -20
