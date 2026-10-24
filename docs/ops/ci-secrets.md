@@ -11,7 +11,9 @@ GitHub Actions secrets required by `.github/workflows/ci.yml`:
 | `VITE_CLERK_PROXY_URL` | `/__clerk` (reverse-proxy path) | Static |
 | `VITE_SENTRY_DSN` | Frontend Sentry DSN | Sentry project settings |
 | `SENTRY_AUTH_TOKEN` | Source-map upload | Sentry account → auth tokens |
-| `RAILWAY_API_TOKEN` | Railway GraphQL token for deploy-wait job | Railway dashboard → Account → Tokens (workspace-scoped) |
+
+`RAILWAY_API_TOKEN` is no longer used: the deploy-wait job was removed
+(see the note at the end of `ci.yml`). Delete the secret if it still exists.
 
 To rotate a secret, create a new one in the dashboard, update the GitHub
 Actions secret, then revoke the old one.

@@ -52,7 +52,7 @@ Railway-managed **Postgres** and **Redis** services.
 | 6 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | backend, worker, beat | List, download, overwrite or delete every uploaded interview recording. |
 | 7 | Redis password (`REDIS_URL`, `REDIS_PASSWORD`) | Redis, backend, worker, beat | Read results (10-min TTL) and enqueue Celery tasks. Celery accepts JSON only, so no pickle RCE. |
 | 8 | `SENTRY_AUTH_TOKEN`, `SENTRY_DSN` | backend (if set) | Token: Sentry API under its scopes. DSN: spam events (low). |
-| 9 | Railway API token, GitHub link | Railway / GitHub Actions | Already invalidated by Railway; CI's deploy-wait job and auto-deploy break until replaced. |
+| 9 | Railway API token, GitHub link | your machine, Railway | Already invalidated by Railway. Local scripts that call the Railway API, and auto-deploy from GitHub, break until replaced. |
 
 Inventory anything else actually set (the table above is what the code reads):
 
@@ -194,9 +194,12 @@ If `SENTRY_AUTH_TOKEN` is set on any Railway service: rotate it per
 
 ### 9. Railway API token and GitHub connection
 
-- Railway → Account → Tokens → create a workspace token → repo Settings →
-  Secrets and variables → Actions → update `RAILWAY_API_TOKEN`. Until you do,
-  the `deploy-wait` CI job fails.
+- CI doesn't use a Railway token: the deploy-wait job was removed in #30
+  (see the note at the end of `.github/workflows/ci.yml`). If a
+  `RAILWAY_API_TOKEN` Actions secret still exists, delete it rather than
+  replace it. Create a new token (Railway → Account → Tokens) only for local
+  use of `scripts/railway-service-config.py` or
+  `scripts/ci/wait-for-railway-deploy.py`, and re-run `railway login`.
 - Railway → each service → Settings → Source: reconnect the GitHub repo if it
   shows as disconnected, or auto-deploy from `main` will not fire.
 - Update your local `backend/.env` with any values you use locally.
