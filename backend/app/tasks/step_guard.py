@@ -7,20 +7,31 @@ passed. ``--pool=threads`` can't kill a slow task, so on 2026-10-24
 first run was still waiting on the LLM, and both runs called the LLM, wrote
 the chunks and set off the rest of the chain.
 
+A step can also come back through a deploy: a worker that is stopped hard
+(SIGKILL after Railway's drain window, or a cold shutdown) leaves its message
+unacked, or kombu re-queues it the moment the worker's channel closes, while
+the old thread may still be running or about to die.
+
 ``guarded_step`` wraps a step task so that every delivery first:
 
-1. takes a lease on (entity, step) in Redis. If another run of the same step
-   holds it, that run is still alive (the lease outlives the longest possible
-   run, ``STEP_MAX_RUNTIME_SECONDS``), so this delivery is a duplicate;
-2. checks that its Celery task id hasn't already completed. A redelivered
-   message keeps its task id, while a new dispatch (the per-step "re-run"
-   routes, or a fresh chain) gets a new one.
+1. checks that its Celery task id hasn't already completed. A redelivered or
+   re-queued message keeps its task id, while a new dispatch (the per-step
+   "re-run" routes, or a fresh chain) gets a new one. A completed task id is
+   dropped: it raises ``celery.exceptions.Ignore``, so the worker acks the
+   message, stores no result and does NOT continue the chain, which the
+   original run already did.
+2. takes a lease on (entity, step) in Redis. If another run of the same step
+   holds it, that run is alive (the lease outlives the longest possible run,
+   ``STEP_MAX_RUNTIME_SECONDS``), but it may yet be killed. So this delivery
+   is neither run nor dropped: it re-publishes itself (same task id, chain
+   and retry count) to look again just after the live run's lease would
+   expire, and acks itself with ``Ignore``. By then the live run has either
+   finished (the copy is dropped by check 1) or died (the lease has expired
+   and the copy runs the step).
 
-A duplicate raises ``celery.exceptions.Ignore``: the worker acks the message,
-stores no result and does NOT continue the chain, which the original run has
-done or will do. The lease is released when the run ends (before Celery's
-autoretry schedules a retry), and it expires before the broker would
-redeliver, so a run whose worker died is picked up again.
+The lease is released when the run ends (before Celery's autoretry schedules
+a retry), and it expires before the broker would redeliver an orphaned
+message, so a run whose worker died is picked up again.
 
 The wrapped run also gets the step's LLM budget (``STEP_DEADLINE_SECONDS``)
 and records activity the watchdog reads (``entity_recently_active``).
@@ -51,6 +62,10 @@ logger = logging.getLogger(__name__)
 _KEY_PREFIX = "methodex:step"
 # A completed task id is remembered well past any redelivery of its message.
 _DONE_TTL_SECONDS = 24 * 3600
+# A deferred copy looks again this long after the live run's lease would
+# expire. Lease TTL + margin stays below the broker's visibility_timeout, so
+# the deferred (ETA) message isn't itself redelivered while it waits.
+_RECHECK_MARGIN_SECONDS = 30
 
 
 class RedisStepStore:
@@ -86,6 +101,10 @@ class RedisStepStore:
     def exists(self, *keys: str) -> bool:
         return self.client.exists(*keys) > 0
 
+    def ttl(self, key: str) -> int:
+        """Seconds until ``key`` expires; negative if it is gone or has no TTL."""
+        return int(self.client.ttl(key))
+
 
 _store = RedisStepStore(settings.REDIS_URL)
 
@@ -108,33 +127,60 @@ class _Lease:
     token: str
 
 
-def _claim(kind: str, entity_id: str, step: str, task_id: Optional[str]) -> Optional[_Lease]:
-    """Take the step lease, or raise Ignore if this delivery is a duplicate.
+def _claim(
+    kind: str, entity_id: str, step: str, task_id: Optional[str]
+) -> tuple[Optional[_Lease], Optional[int]]:
+    """Decide what this delivery does.
 
-    Returns None (run unguarded) when Redis is unavailable.
+    Returns ``(lease, None)`` to run the step, ``(None, None)`` to run it
+    unguarded (Redis unavailable), or ``(None, seconds)`` when another run
+    holds the lease and this delivery should look again in ``seconds``.
+    Raises Ignore when this task id has already completed.
     """
     lease = _Lease(_lease_key(kind, entity_id, step), uuid.uuid4().hex)
+    done = _done_key(task_id) if task_id is not None else None
     try:
-        if not _store.acquire(lease.key, lease.token, STEP_LEASE_TTL_SECONDS):
-            reason = "another run of this step is still in progress"
-        elif task_id is not None and _store.exists(_done_key(task_id)):
+        if done is not None and _store.exists(done):
+            pass  # dropped below
+        elif not _store.acquire(lease.key, lease.token, STEP_LEASE_TTL_SECONDS):
+            remaining = _store.ttl(lease.key)
+            if remaining < 0:  # expired in between, or has no TTL
+                remaining = 0 if remaining == -2 else STEP_LEASE_TTL_SECONDS
+            return None, min(remaining, STEP_LEASE_TTL_SECONDS) + _RECHECK_MARGIN_SECONDS
+        elif done is not None and _store.exists(done):
+            # The live run finished between the two checks.
             _store.release(lease.key, lease.token)
-            reason = "this task already completed"
         else:
             _store.put(_activity_key(kind, entity_id), ANALYSIS_STALL_TIMEOUT_SECONDS)
-            return lease
+            return lease, None
     except redis.RedisError as exc:
         logger.warning(
             f"Step guard unavailable ({exc}); running {step} for {kind} "
             f"{entity_id} without duplicate-delivery protection"
         )
-        return None
+        return None, None
 
     logger.warning(
         f"Ignoring duplicate delivery of task {task_id} ({step} step for "
-        f"{kind} {entity_id}): {reason}"
+        f"{kind} {entity_id}): this task already completed"
     )
-    raise Ignore(reason)
+    raise Ignore("this task already completed")
+
+
+def _defer(task: Any, kind: str, entity_id: str, step: str, seconds: int) -> None:
+    """Re-publish this delivery to run again in ``seconds``, then ack it.
+
+    The copy keeps the task id, chain, error callback and retry count (the
+    same signature Celery's own ``retry`` builds), so it continues the chain
+    exactly as the original delivery would have.
+    """
+    logger.warning(
+        f"Deferring duplicate delivery of task {task.request.id} ({step} step "
+        f"for {kind} {entity_id}): another run of this step is still in "
+        f"progress; checking again in {seconds}s"
+    )
+    task.signature_from_request(task.request, countdown=seconds).apply_async()
+    raise Ignore("another run of this step is still in progress")
 
 
 def _finish(kind: str, entity_id: str, lease: Optional[_Lease], done_task_id: Optional[str]) -> None:
@@ -164,7 +210,9 @@ def guarded_step(kind: str, step: str) -> Callable:
             task_id = getattr(self.request, "id", None)
             if not isinstance(task_id, str):
                 task_id = None  # called directly, outside a worker
-            lease = _claim(kind, entity_id, step, task_id)
+            lease, recheck_in = _claim(kind, entity_id, step, task_id)
+            if recheck_in is not None:
+                _defer(self, kind, entity_id, step, recheck_in)
             succeeded = False
             try:
                 with step_budget(STEP_DEADLINE_SECONDS):

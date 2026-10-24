@@ -9,9 +9,16 @@ delivered to a second worker thread. Both runs called the LLM, and the second
 reset ``started_at`` and was about to write a second set of chunks and set off
 a second chain.
 
-THE FIX: every step delivery takes a Redis lease on (entity, step) and checks
-that its task id hasn't completed. A duplicate raises ``celery.exceptions.Ignore``:
-it is acked, makes no LLM call and does not continue the chain.
+A step can also come back through a deploy (a worker stopped hard leaves its
+message unacked or re-queued while the old thread may still be running).
+
+THE FIX: every step delivery checks that its task id hasn't completed and
+takes a Redis lease on (entity, step).
+- Task id already completed: the copy raises ``celery.exceptions.Ignore``. It
+  is acked, makes no LLM call and does not continue the chain.
+- Lease held by a live run: the copy makes no LLM call either, but it isn't
+  dropped, because the live run may still be killed. It re-publishes itself
+  to look again once that lease would expire, then acks itself.
 
 These tests drive the guard through Celery's real tracer (``build_tracer``),
 so "the chain does not continue" is checked against the same code path the
@@ -29,6 +36,7 @@ from app.constants import STEP_DEADLINE_SECONDS, STEP_LEASE_TTL_SECONDS
 from app.services.llm_budget import current_step_budget
 from app.tasks.celery_app import celery_app
 from app.tasks.step_guard import (
+    _RECHECK_MARGIN_SECONDS,
     _activity_key,
     _done_key,
     _lease_key,
@@ -73,73 +81,126 @@ def guarded_dummy_step(self, video_id: str, user_id: str | None = None):
 NEXT_LINK = celery_app.signature("analyze_infer_step", args=(VIDEO_ID, None), immutable=True)
 
 
-def _deliver(task_id: str = TASK_ID):
+class Delivery:
+    """What one delivery did: its trace result, the chain links it set off,
+    and the deferred copies of itself it re-published."""
+
+    def __init__(self, result, published):
+        self.result = result
+        self.state = result.info.state if result.info is not None else "SUCCESS"
+        self.next_links = [sig for sig in published if sig.task == NEXT_LINK.task]
+        self.deferred = [sig for sig in published if sig.task == guarded_dummy_step.name]
+
+
+def _deliver(task_id: str = TASK_ID, chain=None) -> Delivery:
     """Run one delivery of the dummy step the way a worker does, with the
-    chain's next link attached. Returns (trace result, next-link dispatches)."""
+    chain's next link attached."""
     tracer = build_tracer(
         guarded_dummy_step.name, guarded_dummy_step, eager=True,
         propagate=False, app=celery_app,
     )
-    with patch("celery.canvas.Signature.apply_async") as next_link:
+    chain = [dict(NEXT_LINK)] if chain is None else chain
+    with patch("celery.canvas.Signature.apply_async", autospec=True) as apply_async:
         result = tracer(
             task_id, (VIDEO_ID, None), {},
-            request={"id": task_id, "chain": [dict(NEXT_LINK)]},
+            request={"id": task_id, "chain": chain, "retries": 0},
         )
-    return result, next_link
+    return Delivery(result, [c.args[0] for c in apply_async.call_args_list])
 
 
-class TestDuplicateDeliveryIsDropped:
-    def test_redelivery_while_first_run_holds_lease_is_ignored(self, step_store):
-        """The 2026-10-24 case: the original run is still waiting on the LLM."""
+def _replay(deferred_sig) -> Delivery:
+    """Deliver a deferred copy the way the broker would once its countdown ends."""
+    return _deliver(task_id=deferred_sig.options["task_id"], chain=deferred_sig.options["chain"])
+
+
+class TestDuplicateDelivery:
+    def test_copy_arriving_while_first_run_is_alive_is_deferred_not_run(self, step_store):
+        """2026-10-24: the copy arrived while the original was still waiting on
+        the LLM. It must not call the LLM, and must not be lost either, since
+        the original may still be killed (e.g. by a deploy)."""
         step_store.acquire(_lease_key("video", VIDEO_ID, "chunk"), "original-run", 600)
 
-        result, next_link = _deliver()
+        delivery = _deliver()
 
-        assert result.info is not None and result.info.state == "IGNORED"
-        assert body_calls == [], "the duplicate must not reach the LLM node"
-        next_link.assert_not_called()
+        assert delivery.state == "IGNORED"
+        assert body_calls == [], "the copy must not reach the LLM node"
+        assert delivery.next_links == []
+        [deferred] = delivery.deferred
+        assert deferred.options["task_id"] == TASK_ID
+        assert deferred.options["chain"] == [dict(NEXT_LINK)]
+        assert deferred.options["retries"] == 0, "deferral must not use up a retry"
+        assert deferred.options["countdown"] == 600 + _RECHECK_MARGIN_SECONDS
 
-    def test_redelivery_after_first_run_finished_is_ignored(self, step_store):
-        first, first_next = _deliver()
-        assert first.info is None  # success
-        assert first_next.call_count == 1, "the original run continues the chain"
+    def test_deferred_copy_is_dropped_once_the_first_run_finished(self, step_store):
+        lease_key = _lease_key("video", VIDEO_ID, "chunk")
+        step_store.acquire(lease_key, "original-run", 600)
+        [deferred] = _deliver().deferred
+        # The original run completes: marks its task id done, drops its lease.
+        step_store.put(_done_key(TASK_ID), 3600)
+        step_store.release(lease_key, "original-run")
 
-        second, second_next = _deliver()  # same task id: a redelivery
+        recheck = _replay(deferred)
 
-        assert second.info.state == "IGNORED"
+        assert recheck.state == "IGNORED"
+        assert body_calls == []
+        assert recheck.next_links == [] and recheck.deferred == []
+
+    def test_deferred_copy_runs_the_step_when_the_first_run_died(self, step_store):
+        """A deploy kills the worker mid-step: its lease expires, and the
+        deferred copy runs the step once and continues the chain."""
+        lease_key = _lease_key("video", VIDEO_ID, "chunk")
+        step_store.acquire(lease_key, "killed-run", STEP_LEASE_TTL_SECONDS)
+        [deferred] = _deliver().deferred
+        step_store.expire(lease_key)
+
+        recheck = _replay(deferred)
+
+        assert recheck.state == "SUCCESS"
         assert len(body_calls) == 1
-        second_next.assert_not_called()
+        assert len(recheck.next_links) == 1
+        assert step_store.exists(_done_key(TASK_ID))
+
+    def test_redelivery_after_first_run_finished_is_dropped(self, step_store):
+        first = _deliver()
+        assert first.state == "SUCCESS"
+        assert len(first.next_links) == 1, "the original run continues the chain"
+
+        second = _deliver()  # same task id: a redelivery or a deploy re-queue
+
+        assert second.state == "IGNORED"
+        assert len(body_calls) == 1
+        assert second.next_links == [] and second.deferred == []
 
     def test_new_dispatch_of_a_completed_step_still_runs(self, step_store):
         """The per-step re-run routes dispatch a NEW task id for a step that
         already completed; that is not a duplicate."""
         _deliver(task_id="first-dispatch")
-        result, next_link = _deliver(task_id="user-rerun")
+        delivery = _deliver(task_id="user-rerun")
 
-        assert result.info is None
+        assert delivery.state == "SUCCESS"
         assert [c["task_id"] for c in body_calls] == ["first-dispatch", "user-rerun"]
-        assert next_link.call_count == 1
+        assert len(delivery.next_links) == 1
 
-    def test_lease_of_a_dead_run_expires_and_redelivery_runs(self, step_store):
+    def test_orphan_redelivered_after_its_lease_expired_runs(self, step_store):
         """A worker killed mid-step leaves its lease behind; it expires
         (STEP_LEASE_TTL < visibility_timeout) before the message comes back."""
         key = _lease_key("video", VIDEO_ID, "chunk")
         step_store.acquire(key, "dead-run", STEP_LEASE_TTL_SECONDS)
         step_store.expire(key)
 
-        result, next_link = _deliver()
+        delivery = _deliver()
 
-        assert result.info is None
+        assert delivery.state == "SUCCESS"
         assert len(body_calls) == 1
-        assert next_link.call_count == 1
+        assert len(delivery.next_links) == 1
 
     def test_other_steps_and_videos_are_not_blocked(self, step_store):
         step_store.acquire(_lease_key("video", VIDEO_ID, "infer"), "x", 600)
         step_store.acquire(_lease_key("video", "another-video", "chunk"), "y", 600)
 
-        result, _ = _deliver()
+        delivery = _deliver()
 
-        assert result.info is None
+        assert delivery.state == "SUCCESS"
         assert len(body_calls) == 1
 
 
@@ -164,18 +225,18 @@ class TestLeaseLifecycle:
         monkeypatch.setattr(guarded_dummy_step, "retry", fake_retry)
         _BODY_BEHAVIOUR.append("fail")
 
-        result, next_link = _deliver()
+        delivery = _deliver()
 
-        assert result.info.state == "RETRY"
+        assert delivery.state == "RETRY"
         assert lease_held_at_retry == [False]
         assert not step_store.exists(_done_key(TASK_ID)), "a failed attempt is not done"
-        next_link.assert_not_called()
+        assert delivery.next_links == []
 
         # The retry (same task id) then runs normally.
-        retried, retried_next = _deliver()
-        assert retried.info is None
+        retried = _deliver()
+        assert retried.state == "SUCCESS"
         assert len(body_calls) == 2
-        assert retried_next.call_count == 1
+        assert len(retried.next_links) == 1
 
     def test_step_runs_inside_the_step_budget(self):
         _deliver()
@@ -185,11 +246,11 @@ class TestLeaseLifecycle:
     def test_redis_down_runs_the_step_unguarded(self, step_store, caplog):
         step_store.fail = redis.ConnectionError("connection refused")
 
-        result, next_link = _deliver()
+        delivery = _deliver()
 
-        assert result.info is None
+        assert delivery.state == "SUCCESS"
         assert len(body_calls) == 1
-        assert next_link.call_count == 1
+        assert len(delivery.next_links) == 1
         assert "without duplicate-delivery protection" in caplog.text
         assert entity_recently_active("video", VIDEO_ID) is False
 
@@ -223,6 +284,7 @@ class TestRealStepTasks:
             task._orig_run.__func__(mock_self, entity, None)
 
         mock_self.db.query.assert_not_called()
+        mock_self.signature_from_request.return_value.apply_async.assert_called_once_with()
 
     def test_redelivered_chunk_step_does_not_reset_the_analysis(self, step_store):
         """Specifically: the duplicate chunk run must not re-run chunk_node or

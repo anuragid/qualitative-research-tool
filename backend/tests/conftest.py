@@ -272,6 +272,14 @@ class FakeStepStore:
         self._check()
         return any(self._live(k) is not None for k in keys)
 
+    def ttl(self, key):
+        import math
+        import time
+
+        self._check()
+        entry = self._live(key)
+        return -2 if entry is None else math.ceil(entry[1] - time.monotonic())
+
     def expire(self, key):
         """Test helper: drop a key as if its TTL had run out."""
         self._data.pop(key, None)

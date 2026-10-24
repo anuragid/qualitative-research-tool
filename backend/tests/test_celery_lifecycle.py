@@ -72,6 +72,16 @@ def test_step_lease_expires_before_the_broker_redelivers():
     assert STEP_LEASE_TTL_SECONDS < _visibility_timeout()
 
 
+def test_deferred_copy_is_not_redelivered_while_it_waits():
+    """A copy that finds a live run's lease re-publishes itself with a
+    countdown of up to the lease TTL plus a margin. The worker holds such an
+    ETA message unacked, so the countdown must stay under visibility_timeout
+    or the broker hands out yet another copy."""
+    from app.tasks.step_guard import _RECHECK_MARGIN_SECONDS
+
+    assert STEP_LEASE_TTL_SECONDS + _RECHECK_MARGIN_SECONDS < _visibility_timeout()
+
+
 def test_live_step_acks_before_visibility_timeout():
     """Rule 3: the broker must never redeliver a step that is still running."""
     vt = _visibility_timeout()
