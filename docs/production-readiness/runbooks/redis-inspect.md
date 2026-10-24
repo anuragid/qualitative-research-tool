@@ -11,7 +11,7 @@ You need to see what Celery is doing right now — queue depth, unacked messages
 ## Prerequisites
 
 - Railway CLI installed, with an SSH key registered (`railway ssh keys list`; add one once with `railway ssh keys add`)
-- Nothing to install locally: redis-py (`redis`) is already in the backend image. The image has no `redis-cli`, so every check below uses Python
+- Nothing to install locally: redis-py (`redis`) is already in the backend image, which the `beat` service runs. The image has no `redis-cli`, so every check below uses Python
 
 Redis is reachable only on Railway's private network. Its public TCP proxy was deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `REDIS_PUBLIC_URL` no longer connects. Do not re-enable the proxy.
 
@@ -19,10 +19,10 @@ Redis is reachable only on Railway's private network. Its public TCP proxy was d
 
 ```bash
 cd ~/code-projects/5d-analysis/qualitative-research-tool   # linked to the methodex project
-railway ssh --service backend
+railway ssh --service beat
 ```
 
-Run the Python blocks below inside that shell. `REDIS_URL` is already set there to the private Redis URL (`${{Redis.REDIS_URL}}`), which is also the Celery broker (`CELERY_BROKER_URL` falls back to it in `backend/app/config.py`). Don't `echo` it: it contains the password. To confirm you're on the private network:
+Run the Python blocks below inside that shell. beat runs the same image as backend but serves no users, so nothing you run here competes with API traffic. `REDIS_URL` is already set there to the private Redis URL (`${{Redis.REDIS_URL}}`), which is also the Celery broker (`CELERY_BROKER_URL` falls back to it in `backend/app/config.py`). Don't `echo` it: it contains the password. To confirm you're on the private network:
 
 ```bash
 python3 -c "import os; from urllib.parse import urlsplit; print(urlsplit(os.environ['REDIS_URL']).hostname)"  # expect *.railway.internal

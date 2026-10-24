@@ -3030,8 +3030,9 @@ Verify:
 # SSH into Redis (via Railway CLI) or check Railway logs to confirm the
 # container restarted with the new startCommand.
 # Or read maxmemory from inside the private network. The Redis TCP proxy was
-# deleted on 2026-10-24, and the backend image has redis-py but no redis-cli:
-railway ssh --service backend
+# deleted on 2026-10-24. beat runs the backend image (redis-py, no redis-cli)
+# and serves no users, so use it rather than the API's container:
+railway ssh --service beat
 python3 -c "import os, redis; i = redis.from_url(os.environ['REDIS_URL']).info('memory'); print('maxmemory:' + str(i['maxmemory']))"
 ```
 
@@ -3488,7 +3489,7 @@ Create `docs/ops/post-scaling-operational-notes.md`:
 
 - **Backend returns 503 from /health/ready**: DB or Redis unreachable. Check `railway logs` on the `backend` service for the specific probe failure.
 - **Scheduled tasks firing twice**: check that `beat` is running with `numReplicas=1`. If the worker service accidentally re-added `--beat`, remove it.
-- **Queue backlog**: inside `railway ssh --service backend`, run `python3 -c "import os, redis; print(redis.from_url(os.environ['REDIS_URL']).llen('analyze'))"` (more checks in `docs/production-readiness/runbooks/redis-inspect.md`) — if it's stuck growing, a worker may have died; check `railway logs` on the worker service.
+- **Queue backlog**: inside `railway ssh --service beat`, run `python3 -c "import os, redis; print(redis.from_url(os.environ['REDIS_URL']).llen('analyze'))"` (more checks in `docs/production-readiness/runbooks/redis-inspect.md`) — if it's stuck growing, a worker may have died; check `railway logs` on the worker service.
 ```
 
 - [ ] **Step 2: Commit the runbook**

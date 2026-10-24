@@ -25,9 +25,11 @@ The deploy timing math:
 
 - `stuck-video.md` and `redis-inspect.md` runbooks available (you'll cross-reference them)
 - Railway CLI, with an SSH key registered (`railway ssh keys list`; add one once with `railway ssh keys add`)
-- psycopg2 and redis-py are already in the backend image, so nothing to install locally
+- psycopg2 and redis-py are already in the backend image, which the `beat` service runs, so nothing to install locally
 
-Postgres and Redis are reachable only on Railway's private network. Their public TCP proxies were deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `DATABASE_PUBLIC_URL` and `REDIS_PUBLIC_URL` no longer connect. Do not re-enable the proxies. Steps 1 and 4 run on your laptop; Steps 2, 3 and 5 run inside the backend container.
+Postgres and Redis are reachable only on Railway's private network. Their public TCP proxies were deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `DATABASE_PUBLIC_URL` and `REDIS_PUBLIC_URL` no longer connect. Do not re-enable the proxies.
+
+Use two terminals. Steps 2, 3 and 5 run in a `railway ssh --service beat` shell. beat runs the backend image but serves no users, so a heavy query there can't take down the API. Steps 1, 4 and 6 run in a second terminal on your laptop.
 
 ## Step 1 — Confirm the deploy landed
 
@@ -46,10 +48,10 @@ Expected: all 3 services (`backend`, `worker`, `beat`) on the same commit, statu
 
 ## Step 2 — Check for orphaned unacked tasks
 
-Open a shell inside the backend container and keep it open for Steps 2, 3 and 5. `REDIS_URL` and `DATABASE_URL` are already set there to the private-network URLs:
+Open a shell inside the `beat` container and keep it open for Steps 2, 3 and 5. Use your second, laptop terminal for Steps 1, 4 and 6. `REDIS_URL` and `DATABASE_URL` are already set in the beat shell to the private-network URLs:
 
 ```bash
-railway ssh --service backend
+railway ssh --service beat
 ```
 
 ```python
@@ -80,7 +82,7 @@ Expected post-deploy state:
 
 ## Step 3 — Check for videos stuck in `analyzing` that aren't progressing
 
-In the same `railway ssh --service backend` shell:
+In the same `railway ssh --service beat` shell:
 
 ```python
 python3 <<'EOF'
@@ -113,7 +115,7 @@ Expected post-deploy state:
 
 ## Step 4 — If Step 3 shows multiple stuck videos, check the watchdog
 
-The watchdog runs every 5 min. It should clean up stuck videos within 15-17 min of the deploy. Check worker logs for recent watchdog activity (from your laptop, not the SSH shell):
+The watchdog runs every 5 min. It should clean up stuck videos within 15-17 min of the deploy. Check worker logs for recent watchdog activity (in your laptop terminal, not the SSH shell):
 
 ```bash
 railway logs --service worker 2>&1 | grep -E "(reset_stuck|Watchdog)" | tail -20
@@ -131,7 +133,7 @@ The system failed to recover automatically. Options:
 
 2. **Manual reset** — use `stuck-video.md` Step 4c to reset each stuck video one at a time.
 
-3. **Emergency: bulk reset** — only if you're seeing a LOT of stuck videos. Run it in the `railway ssh --service backend` shell:
+3. **Emergency: bulk reset** — only if you're seeing a LOT of stuck videos. Run it in the `railway ssh --service beat` shell:
 
    ```python
    python3 <<'EOF'
@@ -174,6 +176,8 @@ The system failed to recover automatically. Options:
    **Always dry-run first.** Confirm the row count matches your expectation.
 
 ## Step 6 — Prevent this next time
+
+Run these in your laptop terminal, not the SSH shell.
 
 1. Confirm `worker.drainingSeconds = 900` is applied on Railway. If not, run `scripts/railway-service-config.py --apply`.
 

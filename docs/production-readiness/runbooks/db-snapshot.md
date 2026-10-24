@@ -7,7 +7,7 @@ You need to query production Postgres directly — for debugging a user's projec
 ## Prerequisites
 
 - Railway CLI installed, with an SSH key registered (`railway ssh keys list`; add one once with `railway ssh keys add`)
-- Nothing to install locally: the backend image already has `psycopg2-binary` and `psql` (`postgresql-client`)
+- Nothing to install locally: the `beat` service runs the backend image (`backend/Dockerfile.railway`), which already has `psycopg2-binary` and `psql` (`postgresql-client`)
 
 Postgres is reachable only on Railway's private network. Its public TCP proxy was deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `DATABASE_PUBLIC_URL` no longer connects. Do not re-enable the proxy.
 
@@ -15,10 +15,12 @@ Postgres is reachable only on Railway's private network. Its public TCP proxy wa
 
 ```bash
 cd ~/code-projects/5d-analysis/qualitative-research-tool   # linked to the methodex project
-railway ssh --service backend
+railway ssh --service beat
 ```
 
-Run every block below inside that shell. The backend container already has `DATABASE_URL` set to the private Postgres URL (`${{Postgres.DATABASE_URL}}`), so there is nothing to export. Don't `echo` it: it contains the password. The container is also serving live API traffic, so keep queries light and `exit` when you're done.
+Run every block below inside that shell. beat already has `DATABASE_URL` set to the private Postgres URL (`${{Postgres.DATABASE_URL}}`), so there is nothing to export. Don't `echo` it: it contains the password.
+
+Use beat, not backend. backend is the single API replica, so a heavy query there (such as the unbounded jsonb join under "NEVER run in production") could get the API OOM-killed. beat serves no users. Still keep queries light, because an OOM-killed beat pauses scheduled tasks like the watchdog until Railway restarts it, and `exit` when you're done.
 
 ## Test the connection
 
@@ -35,7 +37,7 @@ conn.close()
 "
 ```
 
-For a quick interactive SQL prompt, `psql "$DATABASE_URL"` works in the same shell. psql commits every statement as soon as it runs, so for writes either type `BEGIN;` first and finish with `COMMIT;` or `ROLLBACK;`, or use the Python write pattern at the end of this runbook.
+For a quick interactive SQL prompt, `psql "$DATABASE_URL"` works in the same shell. psql commits every statement as soon as it runs, so for writes either type `BEGIN;` first and finish with `COMMIT;` or `ROLLBACK;`, or use the Python write pattern at the end of this runbook. The image's `psql` is version 15 (Debian bookworm's `postgresql-client`) and the server is Postgres 17, so backslash commands like `\d` may misbehave. For column lists, use the Python `information_schema` block under "Schema reference".
 
 ## Find a user
 
