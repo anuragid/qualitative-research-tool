@@ -24,6 +24,7 @@ from app.models.database_models import (
 )
 from app.services.assemblyai_service import assemblyai_service
 from app.services.s3_service import s3_service
+from app.services.speaker_prediction import prefill_speaker_labels
 from app.state import (
     InvalidTransitionError,
     TranscriptEvent,
@@ -398,6 +399,26 @@ def check_transcription_task(self, video_id: str, started_at: float | None = Non
             self.db.commit()
 
             logger.info(f"Transcription completed for video {video_id}")
+
+            # Pre-fill speaker names and roles BEFORE dispatching the analyze
+            # chain: its chunk step only keeps participant utterances, and
+            # with empty labels it chunks every speaker. Best-effort like the
+            # dispatch below — the user can still label speakers by hand.
+            if video:
+                try:
+                    project = self.db.query(Project).filter(
+                        Project.id == video.project_id
+                    ).first()
+                    prefill_speaker_labels(
+                        self.db, transcript, project.user_id if project else None
+                    )
+                    self.db.commit()
+                except Exception as label_err:
+                    self.db.rollback()
+                    logger.exception(
+                        f"[speakers] Failed to pre-fill speaker labels for "
+                        f"video {video_id}: {label_err}"
+                    )
 
             # PR #20: Auto-dispatch the analyze chain so the user doesn't have
             # to click "Analyze" manually. Eliminates the

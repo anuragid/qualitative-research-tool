@@ -146,6 +146,17 @@ describe("transcriptionsService", () => {
     });
   });
 
+  describe("predictSpeakers", () => {
+    it("asks the backend to fill empty labels and returns all labels", async () => {
+      mockedApi.post.mockResolvedValue({ data: mockSpeakerLabels });
+
+      const result = await transcriptionsService.predictSpeakers("trans-1");
+
+      expect(mockedApi.post).toHaveBeenCalledWith("/api/transcripts/trans-1/speakers/predict");
+      expect(result).toEqual(mockSpeakerLabels);
+    });
+  });
+
   describe("labelSpeaker", () => {
     it("labels a speaker by posting an array with the label data", async () => {
       const labelDto: LabelSpeakerDto = {

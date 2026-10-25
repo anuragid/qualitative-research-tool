@@ -7,6 +7,7 @@ import {
   canVideoHaveTranscript,
   useTranscript,
   useSpeakerLabels,
+  useAutoPredictSpeakers,
   useStartTranscription,
   useLabelSpeaker,
 } from "../hooks/useTranscriptions";
@@ -232,6 +233,12 @@ export default function VideoDetailPage() {
       new Set(transcript.processed_transcript.utterances.map((u) => u.speaker))
     );
   }, [transcript?.processed_transcript?.utterances]);
+
+  const { isPredicting: isPredictingSpeakers } = useAutoPredictSpeakers(
+    transcript,
+    speakerLabels,
+    uniqueSpeakers.length
+  );
 
   const hasRoleAssignments = useMemo(() => {
     if (uniqueSpeakers.length === 0) return false;
@@ -592,6 +599,7 @@ export default function VideoDetailPage() {
                   setSpeakerRole={setSpeakerRole}
                   onLabelSpeaker={handleLabelSpeaker}
                   uniqueSpeakers={uniqueSpeakers}
+                  isPredictingSpeakers={isPredictingSpeakers}
                 />
               </div>
             )}
