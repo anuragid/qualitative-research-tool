@@ -1,5 +1,17 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// The `@utility text-*` typography classes in index.css. Unregistered, tailwind-merge
+// files them under text colour, so `text-ui text-primary-foreground` keeps only one.
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [
+        { text: ["h1", "h2", "h3", "h4", "body", "body-sm", "ui", "label", "section"] },
+      ],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
