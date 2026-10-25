@@ -59,9 +59,10 @@
   --color-warning: #D3A848;
   --color-warning-foreground: #FFFFFF;
   --color-warning-subtle: rgba(211, 168, 72, 0.12);
-  --color-destructive: rgb(255, 56, 60);
-  --color-destructive-foreground: #FFFFFF;
-  --color-destructive-subtle: rgba(255, 56, 60, 0.10);
+  /* Deep enough that white text on it, and it as text on white, clear 4.5:1. */
+  --color-destructive: rgb(204, 37, 41);
+  --color-destructive-foreground: #FFFFFF;          /* 5.43:1 */
+  --color-destructive-subtle: rgba(204, 37, 41, 0.10);
   --color-info: rgb(0, 136, 255);
   --color-info-foreground: #FFFFFF;
   --color-info-subtle: rgba(0, 136, 255, 0.12);
@@ -75,7 +76,7 @@
   --color-on-brand-crimson: #FFFFFF;           /* 7.81:1 */
   --color-on-brand-burnt-orange: #000000;      /* 5.07:1 (white 4.14, ink 4.13) */
   --color-on-brand-olive: rgb(26, 28, 30);     /* 7.27:1 */
-  --color-on-destructive: rgb(26, 28, 30);     /* 4.79:1 (destructive-foreground is 3.57) */
+  --color-on-destructive: #FFFFFF;             /* 5.43:1 */
 
   /* ===== 8. COLORS — Brand palette ===== */
   /* Logo accent */
@@ -308,7 +309,8 @@
   --color-accent: rgba(237, 235, 233, 0.06);
   --color-accent-foreground: rgb(237, 235, 233);
   --color-destructive: rgb(255, 80, 84);
-  --color-destructive-foreground: #FFFFFF;
+  /* Dark text: a red deep enough for white (3.22:1 here) would drop red text on cards below 4.5. */
+  --color-destructive-foreground: #141618;          /* 5.64:1 */
   --color-border: rgba(237, 235, 233, 0.09);
   --color-input: rgba(237, 235, 233, 0.12);
   --color-ring: rgb(56, 162, 255);

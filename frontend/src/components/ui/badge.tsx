@@ -12,15 +12,15 @@ const badgeVariants = cva(
         default:
           "bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
         secondary:
-          "bg-interactive-fill text-text-secondary [a&]:hover:bg-interactive-hover",
+          "bg-interactive-fill text-text-secondary [a&]:hover:bg-interactive-hover [a&]:hover:text-text-primary",
         destructive:
           "bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90",
         outline:
           "border-border text-text-secondary [a&]:hover:bg-interactive-fill",
         success:
-          "bg-brand-forest text-primary-foreground [a&]:hover:bg-brand-forest/90",
+          "bg-brand-forest text-on-brand-forest [a&]:hover:bg-brand-forest/90",
         warning:
-          "bg-brand-mustard text-primary-foreground [a&]:hover:bg-brand-mustard/90",
+          "bg-brand-mustard text-on-brand-mustard [a&]:hover:bg-brand-mustard/90",
       },
     },
     defaultVariants: {
