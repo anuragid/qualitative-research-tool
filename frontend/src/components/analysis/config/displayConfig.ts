@@ -11,58 +11,58 @@ export type AnalysisStep = (typeof ANALYSIS_STEPS)[number];
 
 // ===== CHUNK TYPES =====
 export const chunkTypeStyles: Record<string, { border: string; badge: string; icon: string }> = {
-  quote: { border: "border-l-brand-forest", badge: "bg-brand-forest text-primary-foreground", icon: "Q" },
-  fact: { border: "border-l-brand-mustard", badge: "bg-brand-mustard text-primary-foreground", icon: "F" },
-  context: { border: "border-l-brand-maroon", badge: "bg-brand-maroon text-primary-foreground", icon: "C" },
-  observation: { border: "border-l-brand-olive", badge: "bg-brand-olive text-primary-foreground", icon: "O" },
+  quote: { border: "border-l-brand-forest", badge: "bg-brand-forest text-on-brand-forest", icon: "Q" },
+  fact: { border: "border-l-brand-mustard", badge: "bg-brand-mustard text-on-brand-mustard", icon: "F" },
+  context: { border: "border-l-brand-maroon", badge: "bg-brand-maroon text-on-brand-maroon", icon: "C" },
+  observation: { border: "border-l-brand-olive", badge: "bg-brand-olive text-on-brand-olive", icon: "O" },
 };
 
 // ===== INSIGHT TYPES =====
 export const insightTypeStyles: Record<string, string> = {
-  "non-consensus": "bg-brand-crimson text-primary-foreground",
-  "first-principles": "bg-brand-forest text-primary-foreground",
-  "surprising": "bg-brand-burnt-orange text-primary-foreground",
-  "revealing": "bg-brand-maroon text-primary-foreground",
+  "non-consensus": "bg-brand-crimson text-on-brand-crimson",
+  "first-principles": "bg-brand-forest text-on-brand-forest",
+  "surprising": "bg-brand-burnt-orange text-on-brand-burnt-orange",
+  "revealing": "bg-brand-maroon text-on-brand-maroon",
 };
 
 // ===== CONFIDENCE =====
 export const confidenceStyles: Record<string, string> = {
-  high: "bg-brand-forest/20 text-brand-forest border-brand-forest/30",
-  medium: "bg-brand-mustard/20 text-brand-mustard border-brand-mustard/30",
-  low: "bg-interactive-fill text-text-tertiary border-border",
+  high: "bg-brand-forest/20 text-text-primary border-brand-forest/30",
+  medium: "bg-brand-mustard/20 text-text-primary border-brand-mustard/30",
+  low: "bg-interactive-fill text-text-secondary border-border",
 };
 
 // ===== PRIORITY =====
 export const priorityStyles: Record<string, { badge: string; border: string }> = {
-  critical: { badge: "bg-destructive text-primary-foreground", border: "border-l-destructive" },
-  high: { badge: "bg-brand-crimson text-primary-foreground", border: "border-l-brand-crimson" },
-  medium: { badge: "bg-brand-mustard text-primary-foreground", border: "border-l-brand-mustard" },
-  low: { badge: "bg-interactive-focus-bg text-interactive-focus", border: "border-l-interactive-focus" },
+  critical: { badge: "bg-destructive text-on-destructive", border: "border-l-destructive" },
+  high: { badge: "bg-brand-crimson text-on-brand-crimson", border: "border-l-brand-crimson" },
+  medium: { badge: "bg-brand-mustard text-on-brand-mustard", border: "border-l-brand-mustard" },
+  low: { badge: "bg-interactive-focus-bg text-text-primary", border: "border-l-interactive-focus" },
 };
 
 // ===== FREQUENCY =====
 export const frequencyStyles: Record<string, string> = {
-  high: "bg-brand-forest/20 text-brand-forest",
-  medium: "bg-brand-mustard/20 text-brand-mustard",
-  low: "bg-interactive-fill text-text-tertiary",
+  high: "bg-brand-forest/20 text-text-primary",
+  medium: "bg-brand-mustard/20 text-text-primary",
+  low: "bg-interactive-fill text-text-secondary",
 };
 
 // ===== RELATIONSHIP TYPE =====
 export const relationshipTypeStyles: Record<string, string> = {
-  convergent: "bg-brand-forest/20 text-brand-forest",
-  divergent: "bg-brand-burnt-orange/20 text-brand-burnt-orange",
-  tension: "bg-brand-crimson/20 text-brand-crimson",
-  causal: "bg-interactive-focus-bg text-interactive-focus",
+  convergent: "bg-brand-forest/20 text-text-primary",
+  divergent: "bg-brand-burnt-orange/20 text-text-primary",
+  tension: "bg-brand-crimson/20 text-text-primary",
+  causal: "bg-interactive-focus-bg text-text-primary",
 };
 
 // ===== CONSISTENCY =====
 export const consistencyStyles: Record<string, string> = {
-  consistent: "bg-brand-forest/20 text-brand-forest",
-  varying: "bg-brand-mustard/20 text-brand-mustard",
-  contradictory: "bg-brand-crimson/20 text-brand-crimson",
-  high: "bg-brand-forest/20 text-brand-forest",
-  medium: "bg-brand-mustard/20 text-brand-mustard",
-  low: "bg-brand-crimson/20 text-brand-crimson",
+  consistent: "bg-brand-forest/20 text-text-primary",
+  varying: "bg-brand-mustard/20 text-text-primary",
+  contradictory: "bg-brand-crimson/20 text-text-primary",
+  high: "bg-brand-forest/20 text-text-primary",
+  medium: "bg-brand-mustard/20 text-text-primary",
+  low: "bg-brand-crimson/20 text-text-primary",
 };
 
 // ===== CONSISTENCY NORMALIZATION =====
@@ -73,10 +73,16 @@ export function normalizeConsistency(value: string): string {
 
 // ===== SCOPE =====
 export const scopeStyles: Record<string, string> = {
-  universal: "bg-interactive-focus-bg text-interactive-focus",
-  "context-dependent": "bg-brand-mustard/20 text-brand-mustard",
-  segmented: "bg-brand-maroon/20 text-brand-maroon",
+  universal: "bg-interactive-focus-bg text-text-primary",
+  "context-dependent": "bg-brand-mustard/20 text-text-primary",
+  segmented: "bg-brand-maroon/20 text-text-primary",
 };
+
+// ===== OTHER BADGES =====
+// Chunk badge when the chunk or its type is unknown.
+export const fallbackBadgeStyle = "bg-interactive-fill text-text-secondary";
+// Video count on meta-patterns.
+export const countBadgeStyle = "bg-interactive-focus-bg text-text-primary";
 
 // ===== SORT OPTIONS =====
 export interface SortOption {

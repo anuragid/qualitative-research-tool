@@ -129,7 +129,7 @@ export function PatternsList({ patterns, viewMode = "list", sort, onSort }: Patt
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {relatedInferences.map((infId) => (
-                        <Badge key={infId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
+                        <Badge key={infId} variant="outline" className="font-mono text-xs border-border">
                           {infId}
                         </Badge>
                       ))}

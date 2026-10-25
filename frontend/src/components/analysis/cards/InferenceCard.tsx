@@ -1,6 +1,6 @@
 import { Badge } from "../../ui/badge";
 import { Lightbulb } from "lucide-react";
-import { chunkTypeStyles } from "../config/displayConfig";
+import { chunkTypeStyles, fallbackBadgeStyle } from "../config/displayConfig";
 import type { Inference, Chunk } from "../../../types";
 
 interface InferenceCardProps {
@@ -13,8 +13,8 @@ export function InferenceCard({ inference, chunk, compact = false }: InferenceCa
   // Defensive guard — jsonb field may be null at runtime. See PR #21.
   const items = inference.inferences ?? [];
   const badgeStyle = chunk
-    ? chunkTypeStyles[chunk.type]?.badge || "bg-interactive-fill text-text-tertiary"
-    : "bg-interactive-fill text-text-tertiary";
+    ? chunkTypeStyles[chunk.type]?.badge || fallbackBadgeStyle
+    : fallbackBadgeStyle;
 
   return (
     <div className="bg-card rounded-xl p-3 sm:p-4">

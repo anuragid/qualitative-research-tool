@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render } from "@testing-library/react";
 import { TranscriptViewer } from "./TranscriptViewer";
 import type { Transcript } from "../../types";
 
@@ -43,6 +43,11 @@ describe("TranscriptViewer request gating", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  // Vitest globals are off, so RTL doesn't auto-cleanup. Without unmounting,
+  // each viewer's 300ms search debounce outlives the file and fires after
+  // jsdom is torn down ("window is not defined"), failing the run.
+  afterEach(cleanup);
 
   // The side panel renders as soon as the transcript row exists, which is
   // while AssemblyAI is still running. /transcript/words and /transcript/search

@@ -67,12 +67,15 @@
   --color-info-subtle: rgba(0, 136, 255, 0.12);
 
   /* ===== 7. COLORS — On-colors (contrast pairing) ===== */
-  --color-on-brand-mustard: #FFFFFF;
-  --color-on-brand-forest: #FFFFFF;
-  --color-on-brand-maroon: #FFFFFF;
-  --color-on-brand-crimson: #FFFFFF;
-  --color-on-brand-burnt-orange: #FFFFFF;
-  --color-on-brand-olive: rgb(26, 28, 30);
+  /* Text on a solid fill of the matching colour. Each pair clears WCAG AA
+     (4.5:1) for small text; displayConfig.contrast.test.ts checks them. */
+  --color-on-brand-mustard: rgb(26, 28, 30);   /* 7.70:1 */
+  --color-on-brand-forest: rgb(26, 28, 30);    /* 5.34:1 */
+  --color-on-brand-maroon: #FFFFFF;            /* 6.86:1 */
+  --color-on-brand-crimson: #FFFFFF;           /* 7.81:1 */
+  --color-on-brand-burnt-orange: #000000;      /* 5.07:1 (white 4.14, ink 4.13) */
+  --color-on-brand-olive: rgb(26, 28, 30);     /* 7.27:1 */
+  --color-on-destructive: rgb(26, 28, 30);     /* 4.79:1 (destructive-foreground is 3.57) */
 
   /* ===== 8. COLORS — Brand palette ===== */
   /* Logo accent */
@@ -275,12 +278,13 @@
   --color-interactive-selected: rgba(237, 235, 233, 0.08);
 
   /* On-colors — dark mode */
-  --color-on-brand-mustard: #FFFFFF;
-  --color-on-brand-forest: #FFFFFF;
-  --color-on-brand-maroon: #FFFFFF;
-  --color-on-brand-crimson: #FFFFFF;
-  --color-on-brand-burnt-orange: #FFFFFF;
-  --color-on-brand-olive: rgb(237, 235, 233);
+  --color-on-brand-mustard: #141618;        /* 9.62:1 */
+  --color-on-brand-forest: #141618;         /* 7.51:1 */
+  --color-on-brand-maroon: #000000;         /* 4.68:1 (white 4.49, ink 4.04) */
+  --color-on-brand-crimson: #FFFFFF;        /* 5.56:1 */
+  --color-on-brand-burnt-orange: #141618;   /* 5.40:1 */
+  --color-on-brand-olive: #141618;          /* 9.61:1 */
+  --color-on-destructive: #141618;          /* 5.64:1 */
 
   /* Feedback subtle — dark mode (slightly higher opacity) */
   --color-success-subtle: rgba(93, 159, 85, 0.15);
