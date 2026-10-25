@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { cn, formatDuration, formatFileSize, formatDate } from "./utils";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { buttonVariants } from "@/components/ui/button";
+
+// Read from disk: Vitest stubs CSS imports, even `?raw` ones, to empty strings.
+const indexCss = readFileSync(resolve(__dirname, "../index.css"), "utf8");
 
 describe("cn", () => {
   it("merges class names correctly", () => {
@@ -27,6 +33,47 @@ describe("cn", () => {
 
   it("handles array inputs", () => {
     expect(cn(["px-2", "py-1"])).toBe("px-2 py-1");
+  });
+
+  describe("custom typography utilities from index.css", () => {
+    // Every `@utility text-*` in index.css, e.g. text-ui, text-label, text-h1.
+    const typographyUtilities = [...indexCss.matchAll(/@utility (text-[\w-]+)/g)].map(
+      (m) => m[1]
+    );
+
+    it("finds the utilities in index.css", () => {
+      expect(typographyUtilities).toEqual(
+        expect.arrayContaining(["text-ui", "text-label", "text-body-sm", "text-h1"])
+      );
+    });
+
+    it.each(typographyUtilities)("keeps a text colour next to %s", (utility) => {
+      expect(cn("text-primary-foreground", utility)).toBe(
+        `text-primary-foreground ${utility}`
+      );
+      expect(cn(utility, "text-text-secondary")).toBe(`${utility} text-text-secondary`);
+    });
+
+    it.each(typographyUtilities)("treats %s as a font size", (utility) => {
+      expect(cn("text-xs", utility)).toBe(utility);
+      expect(cn(utility, "text-xs")).toBe("text-xs");
+    });
+
+    it("resolves conflicts between two custom utilities", () => {
+      expect(cn("text-label", "text-body-sm")).toBe("text-body-sm");
+    });
+
+    it("keeps responsive variants separate", () => {
+      expect(cn("text-h3 sm:text-h2 text-foreground")).toBe(
+        "text-h3 sm:text-h2 text-foreground"
+      );
+    });
+
+    it("keeps the Button base font size with a coloured variant", () => {
+      const classes = cn(buttonVariants({ variant: "default" })).split(" ");
+      expect(classes).toContain("text-ui");
+      expect(classes).toContain("text-primary-foreground");
+    });
   });
 });
 

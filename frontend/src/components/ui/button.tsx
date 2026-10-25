@@ -22,7 +22,8 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 px-3 text-xs has-[>svg]:px-2.5",
+        // text-xs replaces the base text-ui, so restate its medium weight.
+        sm: "h-8 px-3 text-xs font-medium has-[>svg]:px-2.5",
         lg: "h-10 px-8 has-[>svg]:px-4",
         icon: "h-9 w-9",
       },

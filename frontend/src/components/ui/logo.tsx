@@ -4,7 +4,9 @@ const sizeClasses = {
   hero: "text-[64px] leading-none",
   heading: "text-[42px] leading-none",
   section: "text-[28px] leading-none",
-  sidebar: "text-h4",
+  // Inherits the container's font. text-h4 would also switch to DM Serif Display;
+  // the landing nav and footer set their own sans 20px/22px.
+  sidebar: "",
   inline: "text-[inherit] leading-[inherit]",
 } as const;
 
