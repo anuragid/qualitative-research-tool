@@ -67,6 +67,8 @@ export default defineConfig({
           name: 'unit',
           include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
           environment: 'jsdom',
+          // Unmounts rendered trees after each test (Testing Library's auto-cleanup).
+          setupFiles: ['src/test/setup.ts'],
         },
       },
       {

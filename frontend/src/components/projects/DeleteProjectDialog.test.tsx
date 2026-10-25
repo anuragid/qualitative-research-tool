@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -66,10 +66,6 @@ describe("DeleteProjectDialog", () => {
     mockMutate.mockReset();
     mockNavigate.mockReset();
     mockIsPending = false;
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   it("renders the dialog with project name when open", () => {

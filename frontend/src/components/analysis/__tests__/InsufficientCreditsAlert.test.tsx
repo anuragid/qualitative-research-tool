@@ -6,7 +6,7 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { render, screen, cleanup, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InsufficientCreditsAlert } from "../InsufficientCreditsAlert";
 import type { BalanceInfo } from "../../../types";
@@ -47,7 +47,6 @@ describe("InsufficientCreditsAlert", () => {
   });
 
   afterEach(() => {
-    cleanup();
     vi.useRealTimers();
   });
 

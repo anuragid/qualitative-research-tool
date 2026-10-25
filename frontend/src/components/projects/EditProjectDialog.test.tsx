@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { EditProjectDialog } from "./EditProjectDialog";
@@ -58,10 +58,6 @@ describe("EditProjectDialog", () => {
     mockMutate.mockReset();
     mockIsPending = false;
     mockError = null;
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   it("renders the dialog with project data when open", () => {
