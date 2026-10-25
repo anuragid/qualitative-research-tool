@@ -20,6 +20,12 @@ export const transcriptionsService = {
     return response.data;
   },
 
+  // Fill empty speaker names/roles with a prediction; returns all labels
+  predictSpeakers: async (transcriptId: string): Promise<SpeakerLabel[]> => {
+    const response = await api.post(`/api/transcripts/${transcriptId}/speakers/predict`);
+    return response.data;
+  },
+
   // Label speaker
   labelSpeaker: async (
     transcriptId: string,

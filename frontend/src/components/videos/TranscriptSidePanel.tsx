@@ -27,6 +27,7 @@ interface TranscriptSidePanelProps {
   setSpeakerRole: (role: string) => void;
   onLabelSpeaker: (speakerLabel: string, name: string, role?: string) => void;
   uniqueSpeakers: string[];
+  isPredictingSpeakers?: boolean;
 }
 
 function SpeakerRoleEditor({
@@ -39,6 +40,7 @@ function SpeakerRoleEditor({
   speakerRole,
   setSpeakerRole,
   onLabelSpeaker,
+  isPredictingSpeakers,
 }: Pick<
   TranscriptSidePanelProps,
   | "uniqueSpeakers"
@@ -50,6 +52,7 @@ function SpeakerRoleEditor({
   | "speakerRole"
   | "setSpeakerRole"
   | "onLabelSpeaker"
+  | "isPredictingSpeakers"
 >) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -70,10 +73,12 @@ function SpeakerRoleEditor({
         >
           <Users className="h-3 w-3 text-text-placeholder flex-shrink-0" />
           <span className="text-ui text-text-tertiary truncate">
-            {uniqueSpeakers.map(s => {
-              const label = speakerLabels?.find(l => l.speaker_label === s);
-              return `${label?.assigned_name || s}${label?.role ? `: ${label.role}` : ""}`;
-            }).join(" · ")}
+            {isPredictingSpeakers
+              ? "Suggesting speaker names and roles…"
+              : uniqueSpeakers.map(s => {
+                  const label = speakerLabels?.find(l => l.speaker_label === s);
+                  return `${label?.assigned_name || s}${label?.role ? `: ${label.role}` : ""}`;
+                }).join(" · ")}
           </span>
           <Edit2 className="h-2.5 w-2.5 text-text-placeholder flex-shrink-0 ml-auto" />
         </button>
@@ -128,9 +133,14 @@ function SpeakerRoleEditor({
                     </SelectContent>
                   </Select>
                   <div className="flex gap-1">
+                    {/* No text-ui here: tailwind-merge reads the custom text-ui
+                        as a text colour and drops the variant's
+                        text-primary-foreground, which left the icon dark on
+                        the dark button. */}
                     <Button
                       size="sm"
-                      className="rounded-full h-5 text-ui px-2"
+                      className="rounded-full h-5 px-2"
+                      aria-label="Save speaker"
                       onClick={() => {
                         if (speakerRole) {
                           onLabelSpeaker(speaker, speakerName.trim() || speaker, speakerRole || undefined);
@@ -147,6 +157,7 @@ function SpeakerRoleEditor({
                       size="sm"
                       variant="outline"
                       className="rounded-full h-5 text-ui px-2"
+                      aria-label="Cancel"
                       onClick={() => { setEditingSpeaker(null); setSpeakerName(""); setSpeakerRole(""); }}
                     >
                       <X className="h-2.5 w-2.5" />
@@ -193,6 +204,7 @@ export function TranscriptSidePanel({
   setSpeakerRole,
   onLabelSpeaker,
   uniqueSpeakers,
+  isPredictingSpeakers,
 }: TranscriptSidePanelProps) {
   const speakerEditorProps = {
     uniqueSpeakers,
@@ -204,6 +216,7 @@ export function TranscriptSidePanel({
     speakerRole,
     setSpeakerRole,
     onLabelSpeaker,
+    isPredictingSpeakers,
   };
 
   return (
