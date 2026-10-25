@@ -7,14 +7,17 @@ import {
   canVideoHaveTranscript,
   useTranscript,
   useSpeakerLabels,
+  useAutoPredictSpeakers,
   useStartTranscription,
   useLabelSpeaker,
 } from "./useTranscriptions";
+import type { SpeakerLabel, Transcript } from "../types";
 
 vi.mock("../services/transcriptions", () => ({
   transcriptionsService: {
     get: vi.fn(),
     getSpeakers: vi.fn(),
+    predictSpeakers: vi.fn(),
     start: vi.fn(),
     labelSpeaker: vi.fn(),
   },
@@ -25,6 +28,7 @@ import { transcriptionsService } from "../services/transcriptions";
 const mockedService = transcriptionsService as {
   get: ReturnType<typeof vi.fn>;
   getSpeakers: ReturnType<typeof vi.fn>;
+  predictSpeakers: ReturnType<typeof vi.fn>;
   start: ReturnType<typeof vi.fn>;
   labelSpeaker: ReturnType<typeof vi.fn>;
 };
@@ -343,6 +347,123 @@ describe("useSpeakerLabels", () => {
 
     expect(result.current.fetchStatus).toBe("idle");
     expect(mockedService.getSpeakers).not.toHaveBeenCalled();
+  });
+});
+
+describe("useAutoPredictSpeakers", () => {
+  const completed: Pick<Transcript, "id" | "status"> = { id: "t1", status: "completed" };
+  const emptyLabels: SpeakerLabel[] = [
+    { id: "sl1", transcript_id: "t1", speaker_label: "A", assigned_name: null, role: null, created_at: "" },
+    { id: "sl2", transcript_id: "t1", speaker_label: "B", assigned_name: null, role: null, created_at: "" },
+  ];
+  const predicted: SpeakerLabel[] = [
+    { ...emptyLabels[0], assigned_name: "Sam", role: "Interviewer" },
+    { ...emptyLabels[1], assigned_name: "Patricia", role: "Participant" },
+  ];
+
+  function renderAutoPredict(initialProps: {
+    transcript: Pick<Transcript, "id" | "status"> | undefined;
+    labels: SpeakerLabel[] | undefined;
+    speakerCount: number;
+  }) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: queryClient }, children);
+    const hook = renderHook(
+      ({ transcript, labels, speakerCount }) =>
+        useAutoPredictSpeakers(transcript, labels, speakerCount),
+      { wrapper, initialProps }
+    );
+    return { ...hook, queryClient };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("predicts once for a completed transcript with no labelled speakers and caches the result", async () => {
+    mockedService.predictSpeakers.mockResolvedValue(predicted);
+
+    const { result, queryClient } = renderAutoPredict({
+      transcript: completed,
+      labels: emptyLabels,
+      speakerCount: 2,
+    });
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData(["transcripts", "t1", "speakers"])).toEqual(predicted)
+    );
+    expect(mockedService.predictSpeakers).toHaveBeenCalledTimes(1);
+    expect(mockedService.predictSpeakers).toHaveBeenCalledWith("t1");
+    expect(result.current.isPredicting).toBe(false);
+  });
+
+  it("also predicts when no label rows exist yet", async () => {
+    mockedService.predictSpeakers.mockResolvedValue(predicted);
+
+    renderAutoPredict({ transcript: completed, labels: [], speakerCount: 2 });
+
+    await waitFor(() => expect(mockedService.predictSpeakers).toHaveBeenCalledWith("t1"));
+  });
+
+  it("leaves transcripts alone once any speaker is labelled", () => {
+    renderAutoPredict({
+      transcript: completed,
+      labels: [{ ...emptyLabels[0], role: "Interviewer" }, emptyLabels[1]],
+      speakerCount: 2,
+    });
+
+    expect(mockedService.predictSpeakers).not.toHaveBeenCalled();
+  });
+
+  it("waits for the labels to load and for speakers to exist", () => {
+    const { rerender } = renderAutoPredict({ transcript: completed, labels: undefined, speakerCount: 2 });
+    rerender({ transcript: completed, labels: emptyLabels, speakerCount: 0 });
+
+    expect(mockedService.predictSpeakers).not.toHaveBeenCalled();
+  });
+
+  it("waits for the transcript to complete", async () => {
+    mockedService.predictSpeakers.mockResolvedValue(predicted);
+    const { rerender } = renderAutoPredict({
+      transcript: { id: "t1", status: "processing" },
+      labels: [],
+      speakerCount: 2,
+    });
+    expect(mockedService.predictSpeakers).not.toHaveBeenCalled();
+
+    rerender({ transcript: completed, labels: [], speakerCount: 2 });
+
+    await waitFor(() => expect(mockedService.predictSpeakers).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not ask again for the same transcript if nothing could be filled", async () => {
+    mockedService.predictSpeakers.mockResolvedValue(emptyLabels);
+    const { rerender, result } = renderAutoPredict({
+      transcript: completed,
+      labels: emptyLabels,
+      speakerCount: 2,
+    });
+    await waitFor(() => expect(result.current.isPredicting).toBe(false));
+
+    rerender({ transcript: completed, labels: [...emptyLabels], speakerCount: 2 });
+
+    expect(mockedService.predictSpeakers).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the request in flight", async () => {
+    let resolve: (labels: SpeakerLabel[]) => void = () => {};
+    mockedService.predictSpeakers.mockReturnValue(
+      new Promise<SpeakerLabel[]>((r) => { resolve = r; })
+    );
+
+    const { result } = renderAutoPredict({ transcript: completed, labels: emptyLabels, speakerCount: 2 });
+
+    await waitFor(() => expect(result.current.isPredicting).toBe(true));
+    await act(async () => resolve(predicted));
+    await waitFor(() => expect(result.current.isPredicting).toBe(false));
   });
 });
 

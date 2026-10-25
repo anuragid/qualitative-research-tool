@@ -4,13 +4,16 @@ import logging
 from typing import Any, Dict, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import Permission, require_permissions
+from app.config import settings
 from app.database import get_db
 from app.models.database_models import Project, SpeakerLabel, Transcript, Video
 from app.models.schemas import SpeakerLabelCreate, SpeakerLabelResponse, SpeakerLabelUpdate, TranscriptResponse
+from app.rate_limit import limiter
+from app.services.speaker_prediction import prefill_speaker_labels
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +200,51 @@ def save_speaker_labels(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save speaker labels"
+        )
+
+
+@router.post("/{transcript_id}/speakers/predict", response_model=List[SpeakerLabelResponse])
+@limiter.limit(settings.RATE_LIMIT_ANALYZE_STEP)
+def predict_speaker_labels(
+    transcript_id: UUID,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_permissions(Permission.PROJECT_UPDATE)),
+    db: Session = Depends(get_db)
+):
+    """
+    Fill empty speaker names and roles with a prediction (must be owned by the current user).
+
+    New transcripts are pre-filled when transcription completes; this covers
+    transcripts that finished before that. Labels the user set are kept.
+    Returns all speaker labels for the transcript.
+    """
+    current_user_id = current_user["id"]
+    try:
+        transcript = _get_transcript_with_ownership(transcript_id, current_user_id, db)
+
+        if transcript.status != "completed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot predict speaker labels for incomplete transcript"
+            )
+
+        filled = prefill_speaker_labels(db, transcript, current_user_id)
+        db.commit()
+        logger.info(f"Predicted {filled} speaker labels for transcript {transcript_id}")
+
+        return db.query(SpeakerLabel)\
+            .filter(SpeakerLabel.transcript_id == transcript_id)\
+            .order_by(SpeakerLabel.speaker_label)\
+            .all()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error predicting speaker labels: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to predict speaker labels"
         )
 
 

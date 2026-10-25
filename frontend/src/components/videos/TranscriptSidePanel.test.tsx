@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TranscriptSidePanel } from "./TranscriptSidePanel";
 import type { Transcript, SpeakerLabel } from "../../types";
@@ -61,6 +61,7 @@ const defaultProps = {
   setSpeakerRole: vi.fn(),
   onLabelSpeaker: vi.fn(),
   uniqueSpeakers: ["Speaker A", "Speaker B"],
+  isPredictingSpeakers: false,
 };
 
 function renderPanel(overrides: Partial<typeof defaultProps> = {}) {
@@ -145,5 +146,30 @@ describe("TranscriptSidePanel", () => {
     renderPanel();
     // TranscriptViewer is mocked, so we just verify it renders
     expect(screen.getAllByTestId("transcript-viewer").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("says speakers are being suggested while the prediction runs", () => {
+    const { container } = renderPanel({ speakerLabels: [], isPredictingSpeakers: true });
+    expect(within(container).getByText("Suggesting speaker names and roles…")).toBeDefined();
+  });
+
+  it("keeps the save button's icon on the primary foreground colour", () => {
+    // tailwind-merge treats the custom text-ui utility as a text colour, so a
+    // text-ui class on this button used to drop text-primary-foreground and
+    // leave the check icon dark on the dark button.
+    const { container } = renderPanel({ editingSpeaker: "Speaker A", speakerRole: "Participant" });
+    const save = within(container).getByRole("button", { name: "Save speaker" });
+    expect(save.className).toContain("bg-primary");
+    expect(save.className).toContain("text-primary-foreground");
+    expect(save.querySelector("svg")?.getAttribute("class")).not.toMatch(/\btext-/);
+  });
+
+  it("saves the speaker with the chosen role", async () => {
+    const user = userEvent.setup();
+    const { container, props } = renderPanel({ editingSpeaker: "Speaker B", speakerName: "  ", speakerRole: "Participant" });
+
+    await user.click(within(container).getByRole("button", { name: "Save speaker" }));
+
+    expect(props.onLabelSpeaker).toHaveBeenCalledWith("Speaker B", "Speaker B", "Participant");
   });
 });

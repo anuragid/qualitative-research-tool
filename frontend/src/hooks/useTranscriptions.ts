@@ -1,7 +1,7 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transcriptionsService } from "../services/transcriptions";
-import type { LabelSpeakerDto, Video, VideoStatus } from "../types";
+import type { LabelSpeakerDto, SpeakerLabel, Transcript, Video, VideoStatus } from "../types";
 import { useBackoffInterval } from "./useBackoffInterval";
 
 /**
@@ -85,6 +85,44 @@ export function useSpeakerLabels(transcriptId: string | null) {
     queryFn: () => transcriptionsService.getSpeakers(transcriptId!),
     enabled: !!transcriptId,
   });
+}
+
+/**
+ * Fill a completed transcript's speaker names and roles with a prediction
+ * when none of its speakers is labelled yet.
+ *
+ * The worker pre-fills labels when transcription completes; this covers
+ * transcripts that finished before it did. It asks at most once per
+ * transcript per page, and the backend never overwrites a label the user set
+ * (or re-predicts once every speaker has a role).
+ */
+export function useAutoPredictSpeakers(
+  transcript: Pick<Transcript, "id" | "status"> | undefined,
+  speakerLabels: SpeakerLabel[] | undefined,
+  speakerCount: number
+) {
+  const queryClient = useQueryClient();
+  const requested = useRef(new Set<string>());
+  const { mutate, isPending } = useMutation({
+    mutationFn: (transcriptId: string) => transcriptionsService.predictSpeakers(transcriptId),
+    onSuccess: (labels, transcriptId) => {
+      queryClient.setQueryData(["transcripts", transcriptId, "speakers"], labels);
+    },
+  });
+
+  const transcriptId = transcript?.status === "completed" ? transcript.id : null;
+  const unlabelled =
+    speakerLabels !== undefined &&
+    speakerLabels.every((label) => !label.role && !label.assigned_name);
+
+  useEffect(() => {
+    if (!transcriptId || !unlabelled || speakerCount === 0) return;
+    if (requested.current.has(transcriptId)) return;
+    requested.current.add(transcriptId);
+    mutate(transcriptId);
+  }, [transcriptId, unlabelled, speakerCount, mutate]);
+
+  return { isPredicting: isPending };
 }
 
 export function useStartTranscription() {
