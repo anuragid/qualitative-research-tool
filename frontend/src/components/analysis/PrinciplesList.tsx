@@ -141,7 +141,7 @@ export function PrinciplesList({ principles, viewMode = "list", sort, onSort }: 
                     <div className="text-label text-text-placeholder uppercase mb-2">
                       Related Insight
                     </div>
-                    <Badge variant="outline" className="font-mono text-xs text-text-tertiary border-border">
+                    <Badge variant="outline" className="font-mono text-xs border-border">
                       {principle.insight_id}
                     </Badge>
                   </div>

@@ -178,7 +178,7 @@ export function CrossInsightsList({ crossInsights, viewMode = "list", sort, onSo
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {supportingMetaPatterns.map((patternId) => (
-                        <Badge key={patternId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
+                        <Badge key={patternId} variant="outline" className="font-mono text-xs border-border">
                           {patternId}
                         </Badge>
                       ))}
