@@ -8,6 +8,7 @@ import { TranscriptSchema } from "./transcript";
  * "error" is the catch-all for any failure during transcribe/analyze.
  */
 export const VideoStatusSchema = z.enum([
+  "uploading",
   "uploaded",
   "transcribing",
   "transcribed",

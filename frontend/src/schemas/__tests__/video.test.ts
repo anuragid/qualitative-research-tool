@@ -4,6 +4,7 @@ import { VideoSchema, VideoStatusSchema, VideoListSchema, VideoDetailSchema } fr
 describe("VideoStatusSchema", () => {
   it("accepts every backend status value", () => {
     for (const status of [
+      "uploading",
       "uploaded",
       "transcribing",
       "transcribed",

@@ -46,9 +46,12 @@ function createWrapper() {
 }
 
 describe("canVideoHaveTranscript", () => {
-  it("is false before transcription has been requested", () => {
-    expect(canVideoHaveTranscript("uploaded")).toBe(false);
-  });
+  it.each(["uploading", "uploaded"] as const)(
+    "is false while the video is %s (transcription not requested yet)",
+    (status) => {
+      expect(canVideoHaveTranscript(status)).toBe(false);
+    }
+  );
 
   it("is false while the video hasn't loaded", () => {
     expect(canVideoHaveTranscript(undefined)).toBe(false);

@@ -9,12 +9,12 @@ import { useBackoffInterval } from "./useBackoffInterval";
  *
  * POST /api/videos/:id/transcribe creates the transcript row in the same
  * commit that moves the video from "uploaded" to "transcribing", so an
- * "uploaded" video never has one and GET /transcript would only 404.
- * "error" is ambiguous (the failure may have come before or after
+ * "uploading" or "uploaded" video never has one and GET /transcript would
+ * only 404. "error" is ambiguous (the failure may have come before or after
  * transcription started), so callers still ask in that case.
  */
 export function canVideoHaveTranscript(status: VideoStatus | undefined): boolean {
-  return !!status && status !== "uploaded";
+  return !!status && status !== "uploading" && status !== "uploaded";
 }
 
 export function useTranscript(videoId: string | null, shouldFetch: boolean = true) {
