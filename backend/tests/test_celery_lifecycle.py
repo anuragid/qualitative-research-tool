@@ -1,27 +1,52 @@
-"""Invariant tests for Celery task lifecycle bounds (PR #19).
+"""Invariant tests for Celery task lifecycle bounds.
 
-These tests lock the relationship:
+These tests lock the chain of inequalities documented in app/constants.py:
 
-    task_time_limit  <  broker visibility_timeout  <  watchdog _ANALYSIS_TIMEOUT
+    STEP_MAX_RUNTIME  <  STEP_LEASE_TTL  <  broker visibility_timeout
+                      <  watchdog _ANALYSIS_TIMEOUT
 
 so that the deploy/interrupt recovery path stays sound:
 
-    1. Chain steps must finish fast or fail fast (task_time_limit=360s).
-    2. An orphaned `unacked` task (e.g. worker SIGTERM mid-LLM call) must
-       be re-delivered by the broker before the watchdog gives up on it
-       (visibility_timeout=600s, watchdog threshold >= 15 min).
-    3. Any future tuning that violates this order breaks loudly here.
+    1. A step attempt can't outlive its lease, so a redelivered copy always
+       finds the lease held and drops itself (app/tasks/step_guard.py).
+    2. The lease expires before the broker redelivers, so the copy of a run
+       whose worker died is NOT dropped and the step runs again.
+    3. A live step always acks before visibility_timeout, so the broker never
+       hands a running step to a second worker thread.
+    4. An orphaned `unacked` task (e.g. worker SIGTERM mid-LLM call) is
+       redelivered before the watchdog gives up on the analysis.
 
-Background (2026-04-07 production incident): Kathleen video 4b1f4b25
-had task ab793cc0 sit in Redis `unacked` for 61 minutes because the
-default Celery Redis visibility_timeout is 3600s, while the watchdog
-was 35 min. The watchdog stamped the video errored before the broker
-re-delivered. See PR #19 commit body for the full post-mortem.
+Background:
+- 2026-04-07 (PR #19): Kathleen video 4b1f4b25 had task ab793cc0 sit in
+  Redis `unacked` for 61 minutes because the default visibility_timeout is
+  3600s while the watchdog was 35 min (breaks rule 4).
+- 2026-10-24: analyze_chunk_step[ea826ea5] for video 054097a6 ran ~15 min
+  under --pool=threads, which never enforced task_time_limit=360, and was
+  redelivered at the 600s visibility_timeout while still running (broke
+  rule 3). Two runs then called the LLM for the same step.
 """
 
+from app.constants import (
+    LLM_CALL_TIMEOUT_SECONDS,
+    LLM_READ_TIMEOUT_SECONDS,
+    STEP_DEADLINE_SECONDS,
+    STEP_LEASE_TTL_SECONDS,
+    STEP_MAX_RUNTIME_SECONDS,
+)
 
-def test_task_time_limit_is_6_minutes():
-    """Chain steps must be bounded to 6 minutes hard / 5.5 soft. See PR #19."""
+
+def _visibility_timeout() -> int:
+    from app.tasks.celery_app import celery_app
+
+    transport_opts = celery_app.conf.broker_transport_options or {}
+    vt = transport_opts.get("visibility_timeout")
+    assert vt is not None, "visibility_timeout must be explicitly configured"
+    return vt
+
+
+def test_task_time_limits_unchanged_for_prefork():
+    """task_time_limit is inert under --pool=threads but still budgets the
+    R2 timeouts (config.py, test_transcription_tasks.py). Keep it pinned."""
     from app.tasks.celery_app import celery_app
 
     assert celery_app.conf.task_time_limit == 360
@@ -29,21 +54,54 @@ def test_task_time_limit_is_6_minutes():
     assert celery_app.conf.task_soft_time_limit < celery_app.conf.task_time_limit
 
 
+def test_worst_case_step_run_is_deadline_plus_one_read():
+    """A step stops starting LLM work at its deadline; the slowest way past it
+    is one stalled socket read."""
+    assert STEP_MAX_RUNTIME_SECONDS == STEP_DEADLINE_SECONDS + LLM_READ_TIMEOUT_SECONDS
+    # A single call can't be given more time than the whole step has.
+    assert LLM_CALL_TIMEOUT_SECONDS < STEP_DEADLINE_SECONDS
+
+
+def test_step_lease_outlives_the_longest_step_run():
+    """Rule 1: a redelivered copy must always see a live run's lease."""
+    assert STEP_LEASE_TTL_SECONDS > STEP_MAX_RUNTIME_SECONDS
+
+
+def test_step_lease_expires_before_the_broker_redelivers():
+    """Rule 2: a dead run's lease must be gone when its message comes back."""
+    assert STEP_LEASE_TTL_SECONDS < _visibility_timeout()
+
+
+def test_deferred_copy_is_not_redelivered_while_it_waits():
+    """A copy that finds a live run's lease re-publishes itself with a
+    countdown of up to the lease TTL plus a margin. The worker holds such an
+    ETA message unacked, so the countdown must stay under visibility_timeout
+    or the broker hands out yet another copy."""
+    from app.tasks.step_guard import _RECHECK_MARGIN_SECONDS
+
+    assert STEP_LEASE_TTL_SECONDS + _RECHECK_MARGIN_SECONDS < _visibility_timeout()
+
+
+def test_live_step_acks_before_visibility_timeout():
+    """Rule 3: the broker must never redeliver a step that is still running."""
+    vt = _visibility_timeout()
+    assert STEP_MAX_RUNTIME_SECONDS < vt, (
+        f"A step can run {STEP_MAX_RUNTIME_SECONDS}s but visibility_timeout is "
+        f"{vt}s, so a live step would be handed to a second worker thread."
+    )
+
+
 def test_broker_visibility_timeout_under_watchdog():
-    """visibility_timeout must be explicitly set and < watchdog threshold.
+    """Rule 4: visibility_timeout must be < the watchdog threshold.
 
     If visibility_timeout >= watchdog _ANALYSIS_TIMEOUT, a stuck `unacked`
     message can sit in Redis longer than the watchdog will wait, so the
     watchdog stamps the analysis errored before Celery gets a chance to
     re-deliver the orphaned task. That is exactly the bug PR #19 fixes.
     """
-    from app.tasks.celery_app import celery_app
     from app.tasks.watchdog_tasks import _ANALYSIS_TIMEOUT
 
-    transport_opts = celery_app.conf.broker_transport_options or {}
-    vt = transport_opts.get("visibility_timeout")
-    assert vt is not None, "visibility_timeout must be explicitly configured"
-    assert vt == 600
+    vt = _visibility_timeout()
     assert vt < _ANALYSIS_TIMEOUT.total_seconds(), (
         f"visibility_timeout ({vt}s) must be < watchdog threshold "
         f"({_ANALYSIS_TIMEOUT.total_seconds()}s) so orphaned tasks get "
@@ -51,25 +109,11 @@ def test_broker_visibility_timeout_under_watchdog():
     )
 
 
-def test_watchdog_threshold_exceeds_task_time_limit_plus_visibility():
-    """Watchdog must wait at least task_time_limit + visibility_timeout.
-
-    Celery needs room to (a) hit task_time_limit and kill the task, and
-    (b) let the broker's visibility_timeout fire to re-deliver any
-    orphaned unacked message, before the watchdog intervenes. If the
-    watchdog beats either of those, we either double-stamp an
-    already-errored task or lose a task that would have completed on
-    re-delivery.
-    """
-    from app.tasks.celery_app import celery_app
+def test_watchdog_leaves_slack_after_redelivery():
+    """The watchdog measures from the last step activity. An orphaned step's
+    last activity is when it started, and its message comes back
+    visibility_timeout after it was reserved; allow at least 5 minutes on top
+    for the broker's restore sweep and the queue."""
     from app.tasks.watchdog_tasks import _ANALYSIS_TIMEOUT
 
-    task_limit = celery_app.conf.task_time_limit
-    vt = celery_app.conf.broker_transport_options["visibility_timeout"]
-    min_required = task_limit + vt
-    assert _ANALYSIS_TIMEOUT.total_seconds() >= min_required, (
-        f"Watchdog threshold ({_ANALYSIS_TIMEOUT.total_seconds()}s) must be "
-        f">= task_time_limit + visibility_timeout ({min_required}s) so Celery "
-        f"gets both a kill-signal and a re-deliver chance before the watchdog "
-        f"intervenes."
-    )
+    assert _ANALYSIS_TIMEOUT.total_seconds() >= _visibility_timeout() + 300

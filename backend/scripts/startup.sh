@@ -119,7 +119,10 @@ if [ "$SERVICE" = "worker" ]; then
     # --pool=threads: Run concurrent tasks in threads (I/O-bound: LLM calls,
     #   AssemblyAI polling, R2 uploads). Threads share process memory so cost
     #   is ~$0 extra vs solo. Sleeping threads (time.sleep in poll loops)
-    #   don't consume CPU — Railway only bills active CPU.
+    #   don't consume CPU — Railway only bills active CPU. The threads pool
+    #   can't enforce Celery's task_time_limit; analysis steps are bounded by
+    #   the STEP_* budgets in app/constants.py instead (enforced in
+    #   app/tasks/step_guard.py and app/services/llm_budget.py).
     # --concurrency: Number of concurrent tasks. Default 16 post-scaling
     #   handles mix of transcriptions (long, mostly sleeping) + analyses
     #   (chained LLM calls each).

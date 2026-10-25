@@ -3,10 +3,13 @@
 import json
 import logging
 import re
+import time
+from dataclasses import dataclass
 from typing import Any, Optional
 
 import httpx
 from tenacity import (
+    RetryCallState,
     RetryError,
     before_sleep_log,
     retry,
@@ -16,7 +19,19 @@ from tenacity import (
 )
 
 from app.config import settings
-from app.constants import STANDARD_MODEL_FALLBACKS
+from app.constants import (
+    DEMOTED_MODELS,
+    LLM_CALL_TIMEOUT_SECONDS,
+    LLM_READ_TIMEOUT_SECONDS,
+    STANDARD_MODEL_FALLBACKS,
+)
+from app.services.llm_budget import (
+    DeadlineTransport,
+    LLMCallTimeoutError,
+    LLMDeadlineExceededError,
+    call_deadline,
+    current_step_budget,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +49,39 @@ class LLMUnusableResponseError(ValueError):
     ``app.utils.error_classification.classify_error``) — a single bad model
     response is transient and must NOT permanently fail the analysis.
     """
+
+
+class LLMOutputBudgetExhaustedError(LLMUnusableResponseError):
+    """The model hit max_tokens before writing any answer.
+
+    ``finish_reason=length`` with null content: a reasoning model spent the
+    whole output budget thinking. Asking the same model again with the same
+    budget fails the same way, so ``call_llm`` falls back to the next model at
+    once (BYOK included) and skips this model for the rest of the step.
+    """
+
+
+# A model attempt is only started with at least this much step budget left;
+# with less, no model can write a useful answer before the deadline.
+_MIN_ATTEMPT_SECONDS = 30.0
+
+
+def _ensure_step_time_left(model: str) -> None:
+    """Raise LLMDeadlineExceededError if the step budget is (nearly) spent."""
+    budget = current_step_budget()
+    if budget is not None and budget.remaining() < _MIN_ATTEMPT_SECONDS:
+        raise LLMDeadlineExceededError(
+            f"Step LLM budget exhausted before calling {model} "
+            f"({max(budget.remaining(), 0.0):.0f}s left)"
+        )
+
+
+def _stop_at_step_deadline(retry_state: RetryCallState) -> bool:
+    """Tenacity stop: don't sleep into (or past) the step deadline."""
+    budget = current_step_budget()
+    if budget is None:
+        return False
+    return budget.remaining() < retry_state.upcoming_sleep + _MIN_ATTEMPT_SECONDS
 
 
 # HTTP status codes that are PERMANENT — no retry or model fallback can fix
@@ -91,21 +139,41 @@ OPENROUTER_HEADERS = {
 # The Methodex key must never be used with premium models.
 _METHODEX_ALLOWED_MODELS = set(STANDARD_MODEL_FALLBACKS)
 
-# Per-model max output-token caps. Some demoted fallback models have a hard
-# output ceiling below the largest max_tokens our nodes request (infer asks for
-# 32K; chunk/explain/relate ask for 16K). Requesting more than a model's cap
-# makes it return NULL content with finish_reason=length — a wasted call. We
-# clamp the *request* to the model's known cap so a fallback model at least has
-# a chance to produce usable (if shorter) output instead of failing outright.
+@dataclass(frozen=True)
+class _OutputLimit:
+    """How much answer a model can be trusted to write in one call."""
+
+    max_output_tokens: int  # hard completion cap
+    # Tokens a reasoning-by-default model spends thinking before it answers.
+    # They count against max_tokens, so they come out of the answer's budget.
+    reasoning_reserve: int = 0
+
+    @property
+    def usable_output_tokens(self) -> int:
+        return self.max_output_tokens - self.reasoning_reserve
+
+
+# Models whose usable output is smaller than some of our nodes' max_tokens
+# requests (infer asks for 32K; chunk/relate/explain/cross_* for 16K; activate
+# for 8K). A request that doesn't fit is NOT sent to the model: the fallback
+# chain skips it. Clamping max_tokens instead keeps the model in play but
+# truncates the JSON answer, and json-repair then silently keeps a fragment.
+# In production on 2026-10-24 a clamped Nemotron infer call returned
+# inferences for 66 of 155 chunks and the step "succeeded".
 #
-# IMPORTANT: only list models with a KNOWN hard cap. Models NOT in this map
-# (DeepSeek V3 — our primary — and all BYOK/premium models) are left untouched,
-# so we never truncate a legitimate large output from a model that can handle
-# it. DeepSeek tolerates the full 32K infer request, which is why it stays out.
-_MODEL_OUTPUT_CAPS = {
-    # Nemotron 3 Super 120B advertises a ~16K completion ceiling; asking for
-    # more (e.g. infer's 32K) yields finish_reason=length with null content.
-    "nvidia/nemotron-3-super-120b-a12b": 16384,
+# Only list models with a KNOWN limit. Models not listed here (DeepSeek, which
+# is the primary, and every BYOK/premium model) are never skipped by this check.
+_MODEL_OUTPUT_LIMITS = {
+    # OpenRouter's top provider for Scout caps completions at 16384.
+    "meta-llama/llama-4-scout": _OutputLimit(max_output_tokens=16384),
+    # One of Nemotron's providers (DeepInfra) caps completions at 16384, and
+    # the model thinks before answering. With 16384 tokens it used the whole
+    # budget on the chunk and infer prompts (null or truncated output after
+    # 5-13 minutes). The half-budget reserve is an assumption, not a
+    # measurement: it keeps Nemotron only for requests of 8192 tokens or less.
+    "nvidia/nemotron-3-super-120b-a12b": _OutputLimit(
+        max_output_tokens=16384, reasoning_reserve=8192
+    ),
 }
 
 
@@ -121,29 +189,50 @@ class LLMService:
         self.temperature = settings.LLM_TEMPERATURE
         self._client = None
 
+    def _new_client(self, api_key: str):
+        """Build an OpenAI client whose calls honour :func:`call_deadline`.
+
+        ``max_retries=0`` turns off the SDK's own retries (2 by default), which
+        would otherwise re-send a timed-out request behind the deadline's back.
+        Tenacity in ``_call_llm_single`` is the only retry layer, and it checks
+        the step budget before every attempt.
+        """
+        from openai import DefaultHttpxClient, OpenAI
+
+        class _HttpClient(DefaultHttpxClient):
+            # The SDK only closes http clients it created itself. BYOK builds a
+            # client per call, so close ours when it is garbage-collected, as
+            # the SDK's own SyncHttpxClientWrapper does.
+            def __del__(self) -> None:
+                if self.is_closed:
+                    return
+                try:
+                    self.close()
+                except Exception:
+                    pass
+
+        return OpenAI(
+            base_url=self.base_url,
+            api_key=api_key,
+            max_retries=0,
+            http_client=_HttpClient(transport=DeadlineTransport()),
+        )
+
     @property
     def client(self):
         """Return a cached OpenAI client for the Methodex shared key."""
         if self._client is None:
-            from openai import OpenAI
-            self._client = OpenAI(
-                base_url=self.base_url,
-                api_key=self.api_key,
-            )
+            self._client = self._new_client(self.api_key)
         return self._client
 
     def _get_client(self, api_key: Optional[str] = None):
         """Get a sync client, optionally with a BYOK API key."""
         if api_key and api_key != self.api_key:
-            from openai import OpenAI
-            return OpenAI(
-                base_url=self.base_url,
-                api_key=api_key,
-            )
+            return self._new_client(api_key)
         return self.client
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(3) | _stop_at_step_deadline,
         wait=wait_exponential(multiplier=2, min=2, max=30),
         retry=retry_if_exception(_should_retry_llm_exception),
         before_sleep=before_sleep_log(logger, logging.WARNING),
@@ -160,35 +249,43 @@ class LLMService:
         """
         Single LLM call with retries (used internally).
 
-        Raises retryable exceptions so tenacity can handle them.
+        Raises retryable exceptions so tenacity can handle them. Running out of
+        time raises LLMCallTimeoutError / LLMDeadlineExceededError, which
+        tenacity does not retry.
         """
-        from openai import APIConnectionError, APIError
-        try:
-            # Clamp the requested output to the model's known cap (if any) so
-            # models with a hard ceiling (e.g. Nemotron) don't fail outright on
-            # large requests. Models without a cap (DeepSeek, BYOK/premium) are
-            # left untouched to avoid truncating legitimate large outputs.
-            model_cap = _MODEL_OUTPUT_CAPS.get(model)
-            effective_max_tokens = min(max_tokens, model_cap) if model_cap else max_tokens
-            if model_cap and effective_max_tokens < max_tokens:
-                logger.info(
-                    f"Clamped max_tokens {max_tokens} -> {effective_max_tokens} "
-                    f"for model {model} (known output cap)."
-                )
+        from openai import APIConnectionError, APIError, APITimeoutError
 
+        _ensure_step_time_left(model)
+        try:
             kwargs = {
                 "model": model,
-                "max_tokens": effective_max_tokens,
+                "max_tokens": max_tokens,
                 "temperature": temperature,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
                 "extra_headers": OPENROUTER_HEADERS,
-                "timeout": 300.0,  # 5 minute timeout per LLM call
+                # Per socket operation. OpenRouter's keepalive bytes reset it,
+                # so the total is capped separately by call_deadline().
+                "timeout": float(LLM_READ_TIMEOUT_SECONDS),
             }
 
-            response = client.chat.completions.create(**kwargs)
+            with call_deadline(LLM_CALL_TIMEOUT_SECONDS) as deadline:
+                try:
+                    response = client.chat.completions.create(**kwargs)
+                except APITimeoutError as e:
+                    if time.monotonic() < deadline:
+                        raise  # an ordinary read timeout; tenacity retries it
+                    budget = current_step_budget()
+                    if budget is not None and budget.remaining() <= 0:
+                        raise LLMDeadlineExceededError(
+                            f"Step LLM budget ran out during the call to {model}"
+                        ) from e
+                    raise LLMCallTimeoutError(
+                        f"{model} did not finish within "
+                        f"{LLM_CALL_TIMEOUT_SECONDS}s"
+                    ) from e
 
             # Guard against empty/missing response choices
             if not response.choices:
@@ -203,6 +300,11 @@ class LLMService:
                 refusal = getattr(response.choices[0].message, "refusal", None)
                 if refusal:
                     raise LLMUnusableResponseError(f"LLM refused the request: {refusal}")
+                if response.choices[0].finish_reason == "length":
+                    raise LLMOutputBudgetExhaustedError(
+                        f"LLM returned null content (model={model}). "
+                        f"Finish reason: length (max_tokens={max_tokens})"
+                    )
                 raise LLMUnusableResponseError(
                     f"LLM returned null content (model={model}). "
                     f"Finish reason: {response.choices[0].finish_reason}"
@@ -218,7 +320,7 @@ class LLMService:
             if response.choices[0].finish_reason == "length":
                 logger.warning(
                     f"LLM response was truncated (finish_reason=length, "
-                    f"max_tokens={effective_max_tokens}). "
+                    f"max_tokens={max_tokens}). "
                     f"Output may be incomplete/malformed JSON."
                 )
 
@@ -291,6 +393,18 @@ class LLMService:
             )
             chosen_model = self.default_model
 
+        # A demoted model must never lead the chain. The DEFAULT_MODEL
+        # validator in config.py can't see a user's saved preferred_model, and
+        # the settings dialog still offers Scout and Nemotron. A user whose
+        # preference was Nemotron made every step try it first (production,
+        # 2026-10-24). The model keeps its place further down the chain.
+        if chosen_model in DEMOTED_MODELS:
+            logger.warning(
+                f"Preferred model {chosen_model} is a demoted fallback; "
+                f"using {self.default_model} as the primary instead."
+            )
+            chosen_model = self.default_model
+
         # Build list of models to try: primary first, then fallbacks.
         # Shared-key users get the full fallback chain for rate limits.
         # BYOK users get the default standard model as a last resort
@@ -304,8 +418,25 @@ class LLMService:
             if self.default_model not in models_to_try:
                 models_to_try.append(self.default_model)
 
+        budget = current_step_budget()
         last_error: Optional[Exception] = None
         for model_name in models_to_try:
+            limit = _MODEL_OUTPUT_LIMITS.get(model_name)
+            if limit is not None and effective_max_tokens > limit.usable_output_tokens:
+                logger.info(
+                    f"Skipping {model_name}: max_tokens={effective_max_tokens} "
+                    f"exceeds its usable output budget "
+                    f"({limit.usable_output_tokens} tokens)."
+                )
+                continue
+            exhausted_at = budget.exhausted_at.get(model_name) if budget else None
+            if exhausted_at is not None and effective_max_tokens >= exhausted_at:
+                logger.info(
+                    f"Skipping {model_name}: it already ran out of output tokens "
+                    f"at max_tokens={exhausted_at} in this step."
+                )
+                continue
+            _ensure_step_time_left(model_name)
             try:
                 return self._call_llm_single(
                     system_prompt=system_prompt,
@@ -315,6 +446,24 @@ class LLMService:
                     model=model_name,
                     client=client,
                 )
+            except LLMCallTimeoutError as e:
+                logger.warning(f"{e}. Trying next fallback model...")
+                last_error = e
+                continue
+            except LLMOutputBudgetExhaustedError as e:
+                # Not worth a retry: the same budget runs out the same way.
+                # Fall back at once (BYOK too) and remember it for this step.
+                logger.warning(
+                    f"Model {model_name} used its whole output budget without "
+                    f"answering: {e}. Trying next fallback model..."
+                )
+                if budget is not None:
+                    budget.exhausted_at[model_name] = min(
+                        effective_max_tokens,
+                        budget.exhausted_at.get(model_name, effective_max_tokens),
+                    )
+                last_error = e
+                continue
             except NotFoundError as e:
                 # Model was removed/deprecated on OpenRouter.  Always fall
                 # back regardless of BYOK — a missing model can't be fixed
@@ -372,7 +521,10 @@ class LLMService:
             if isinstance(last_error, RetryError) and last_error.__cause__:
                 raise last_error.__cause__
             raise last_error
-        raise RuntimeError("All models failed")
+        raise LLMUnusableResponseError(
+            f"No model in the fallback chain can write max_tokens="
+            f"{effective_max_tokens}: {models_to_try}"
+        )
 
     def parse_json_response(self, response: str) -> Any:
         """

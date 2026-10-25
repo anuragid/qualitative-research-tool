@@ -305,6 +305,31 @@ class TestWatchdogWritesProjectAnalysisErrorMessage:
         assert parsed["error_type"] == "timeout"
         assert "minutes" in parsed["details"]
 
+    def test_project_analysis_with_recent_step_activity_not_reset(self, db_session, step_store):
+        """A cross-video chain older than the timeout is left alone while its
+        steps keep starting/finishing (ProjectAnalysis has no per-step
+        timestamps, so Redis step activity is the progress signal)."""
+        from app.tasks.step_guard import _activity_key
+        from app.tasks.watchdog_tasks import _ANALYSIS_TIMEOUT, reset_stuck_analyses
+
+        project = _seed_project(db_session)
+        pa = ProjectAnalysis(
+            project_id=project.id,
+            status="processing",
+            video_ids=[],
+            started_at=datetime.now(timezone.utc) - _ANALYSIS_TIMEOUT - timedelta(minutes=5),
+        )
+        db_session.add(pa)
+        db_session.commit()
+        step_store.put(_activity_key("project", str(project.id)), 60)
+
+        reset_stuck_analyses._thread_local.db = db_session
+        result = reset_stuck_analyses.run()
+
+        assert result["projects_reset"] == 0
+        db_session.refresh(pa)
+        assert pa.status == "processing"
+
     def test_stuck_project_analysis_without_started_at_not_reset(self, db_session):
         """A PA with no started_at should not be picked up by the watchdog cutoff."""
         from app.tasks.watchdog_tasks import reset_stuck_analyses

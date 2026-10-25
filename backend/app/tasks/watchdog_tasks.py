@@ -52,6 +52,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.exc import OperationalError
 
+from app.constants import ANALYSIS_STALL_TIMEOUT_SECONDS
 from app.models.database_models import (
     ProjectAnalysis,
     Transcript,
@@ -71,19 +72,41 @@ from app.state import (
 )
 from app.tasks.base import DatabaseTask
 from app.tasks.celery_app import celery_app
+from app.tasks.step_guard import entity_recently_active
 from app.utils.row_locking import lock_rows
 
 logger = logging.getLogger(__name__)
 
-# How long a record can sit in "processing" before the watchdog resets it.
-# Must exceed Celery task_time_limit (6 min) + broker visibility_timeout (10 min)
-# so Celery gets a chance to kill AND re-deliver orphaned tasks before the
-# watchdog stamps them errored. 17 min = 6 + 10 + 1 min slack; locked by
-# tests/test_celery_lifecycle.py. See PR #19 (post-mortem on Kathleen video
-# 4b1f4b25 — stuck `unacked` for 61 min because the default 3600s visibility
-# timeout exceeded the old 35-min watchdog threshold).
-_ANALYSIS_TIMEOUT = timedelta(minutes=17)
+# How long an analysis can go without step activity before the watchdog
+# resets it. Measured from the LAST sign of progress, not from chain start: a
+# five-step chain can legitimately take longer than this, but no single step
+# can (each attempt is bounded by STEP_MAX_RUNTIME_SECONDS). Progress is a
+# step starting or finishing (Redis, see step_guard.entity_recently_active)
+# or, for videos, a step's *_completed_at column. Must exceed the broker
+# visibility_timeout so an orphaned step is redelivered before the watchdog
+# stamps it errored; locked by tests/test_celery_lifecycle.py. See PR #19
+# (post-mortem on Kathleen video 4b1f4b25 — stuck `unacked` for 61 min
+# because the default 3600s visibility timeout exceeded the old 35-min
+# watchdog threshold).
+_ANALYSIS_TIMEOUT = timedelta(seconds=ANALYSIS_STALL_TIMEOUT_SECONDS)
 _TRANSCRIPT_TIMEOUT = timedelta(minutes=60)
+
+
+def _video_analysis_last_progress(va):
+    """The latest of started_at and the per-step completion timestamps."""
+    stamps = [
+        va.started_at,
+        va.chunk_completed_at,
+        va.infer_completed_at,
+        va.relate_completed_at,
+        va.explain_completed_at,
+        va.activate_completed_at,
+    ]
+    stamps = [
+        ts if ts is None or ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+        for ts in stamps
+    ]
+    return max((ts for ts in stamps if ts is not None), default=None)
 
 
 def _is_still_stale(ts, cutoff) -> bool:
@@ -153,15 +176,18 @@ def reset_stuck_video_analyses(db, now, analysis_cutoff) -> int:
     for va_id in candidate_ids:
         va = _lock_row(db, VideoAnalysis, va_id)
         # CAS re-check: a live task may have completed (or already errored)
-        # this row, or refreshed started_at, in the window since the candidate
-        # SELECT. Only stamp it if it is STILL stuck under the lock.
+        # this row, or made progress, in the window since the candidate
+        # SELECT. Only stamp it if it is STILL stuck under the lock: no step
+        # finished within the timeout and no step started or finished within
+        # it either (Redis activity, which also covers a step still running).
         if va is None or va.status != "processing" \
-                or not _is_still_stale(va.started_at, analysis_cutoff):
+                or not _is_still_stale(_video_analysis_last_progress(va), analysis_cutoff) \
+                or entity_recently_active("video", str(va.video_id)):
             db.rollback()  # release the (no-op on SQLite) lock cleanly
             continue
 
         error_msg = _watchdog_error_json(
-            f"Stuck in processing state for over "
+            f"No analysis progress for over "
             f"{int(_ANALYSIS_TIMEOUT.total_seconds() // 60)} minutes"
         )
         VideoAnalysisStateMachine.transition(
@@ -266,8 +292,11 @@ def reset_stuck_project_analyses(db, now, analysis_cutoff) -> int:
     reset = 0
     for pa_id in candidate_ids:
         pa = _lock_row(db, ProjectAnalysis, pa_id)
+        # ProjectAnalysis has no per-step timestamps, so step activity in
+        # Redis is the only progress signal beyond started_at.
         if pa is None or pa.status != "processing" \
-                or not _is_still_stale(pa.started_at, analysis_cutoff):
+                or not _is_still_stale(pa.started_at, analysis_cutoff) \
+                or entity_recently_active("project", str(pa.project_id)):
             db.rollback()
             continue
 
@@ -276,7 +305,7 @@ def reset_stuck_project_analyses(db, now, analysis_cutoff) -> int:
         # run was reset, mirroring the Video path.
         timeout_mins = int(_ANALYSIS_TIMEOUT.total_seconds() // 60)
         error_msg = _watchdog_error_json(
-            f"Stuck in processing state for over {timeout_mins} minutes"
+            f"No analysis progress for over {timeout_mins} minutes"
         )
         ProjectAnalysisStateMachine.transition(
             pa, ProjectAnalysisEvent.WATCHDOG_TIMEOUT, db=db
