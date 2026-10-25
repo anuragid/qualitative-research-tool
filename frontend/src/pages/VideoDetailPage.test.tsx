@@ -256,6 +256,12 @@ describe("VideoDetailPage transcript request gating", () => {
     expect(screen.getByRole("button", { name: /start transcription/i })).toBeTruthy();
   });
 
+  it("does not request the transcript while the upload is unconfirmed", () => {
+    renderVideoPage("uploading");
+
+    expect(useTranscript).toHaveBeenLastCalledWith("v-1", false);
+  });
+
   it("does not request the transcript before the video has loaded", () => {
     renderVideoPage(undefined);
 
