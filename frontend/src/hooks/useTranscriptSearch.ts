@@ -10,11 +10,14 @@ import type { TranscriptSearchResult } from "../types";
  *
  * @param videoId - The video ID to search in
  * @param query - Comma-separated words to search for (e.g., "design,prototype,user")
+ * @param enabled - Set false until the transcript is completed; there is
+ *   nothing to search before AssemblyAI returns
  * @returns React Query result with search matches and timestamps
  */
 export function useTranscriptSearch(
   videoId: string | null,
-  query: string
+  query: string,
+  enabled: boolean = true
 ) {
   return useQuery({
     queryKey: ["videos", videoId, "transcript", "search", query],
@@ -24,7 +27,7 @@ export function useTranscriptSearch(
       });
       return response.data;
     },
-    enabled: !!videoId && query.length > 0,
+    enabled: !!videoId && query.length > 0 && enabled,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 }

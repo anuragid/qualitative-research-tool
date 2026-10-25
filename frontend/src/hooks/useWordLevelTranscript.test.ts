@@ -66,6 +66,31 @@ describe("useWordLevelTranscript", () => {
     expect(mockedApi.get).not.toHaveBeenCalled();
   });
 
+  it("does not fetch until enabled (transcript not completed yet)", () => {
+    const { result } = renderHook(() => useWordLevelTranscript("v1", false), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(mockedApi.get).not.toHaveBeenCalled();
+  });
+
+  it("fetches as soon as the transcript completes", async () => {
+    mockedApi.get.mockResolvedValue({ data: { words: [], duration: 0 } });
+
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useWordLevelTranscript("v1", enabled),
+      { wrapper: createWrapper(), initialProps: { enabled: false } }
+    );
+    expect(mockedApi.get).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.get).toHaveBeenCalledTimes(1);
+    expect(mockedApi.get).toHaveBeenCalledWith("/api/videos/v1/transcript/words");
+  });
+
   it("handles error from API", async () => {
     mockedApi.get.mockRejectedValue(new Error("Failed to fetch"));
 

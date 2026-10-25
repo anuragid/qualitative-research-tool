@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { parseErrorMessage } from "../lib/parseError";
 import type { ParsedError } from "../lib/parseError";
+import VideoDetailPage from "./VideoDetailPage";
+import { useVideo } from "../hooks/useVideos";
+import { useTranscript } from "../hooks/useTranscriptions";
+import type { VideoStatus } from "../types";
 
 // ---- Unit tests for parseErrorMessage (extracted utility) ----
 // These test the logic previously inline in VideoDetailPage.
@@ -172,4 +179,95 @@ describe("retry button visibility", () => {
       parsedError.retryable && (canRetryTranscription || canRetryAnalysis);
     expect(showRetry).toBe(false);
   });
+});
+
+// ---- Request gating: the page must not ask for a transcript that can't exist yet ----
+
+vi.mock("@posthog/react", () => ({ usePostHog: () => undefined }));
+vi.mock("../components/Layout", () => ({
+  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+vi.mock("../components/videos/MediaPlayerSection", () => ({ MediaPlayerSection: () => null }));
+vi.mock("../components/videos/TranscriptSidePanel", () => ({ TranscriptSidePanel: () => null }));
+vi.mock("../components/analysis/AnalysisSection", () => ({ AnalysisSection: () => null }));
+vi.mock("../hooks/useVideos", () => ({
+  useVideo: vi.fn(),
+  useVideoPlaybackUrl: () => ({ data: undefined }),
+}));
+vi.mock("../hooks/useProjects", () => ({ useProject: () => ({ data: undefined }) }));
+vi.mock("../hooks/useTranscriptions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../hooks/useTranscriptions")>();
+  const idleMutation = () => ({ mutate: vi.fn(), isPending: false });
+  return {
+    ...actual,
+    useTranscript: vi.fn(() => ({ data: undefined, isLoading: false })),
+    useSpeakerLabels: () => ({ data: undefined }),
+    useStartTranscription: idleMutation,
+    useLabelSpeaker: idleMutation,
+  };
+});
+vi.mock("../hooks/useAnalysis", () => {
+  const idleMutation = () => ({ mutate: vi.fn(), isPending: false });
+  return {
+    useVideoAnalysis: () => ({ data: undefined, isLoading: false }),
+    useVideoAnalysisStatus: () => ({ data: undefined }),
+    useStartFullAnalysis: idleMutation,
+    useStartChunkStep: idleMutation,
+    useStartInferStep: idleMutation,
+    useStartRelateStep: idleMutation,
+    useStartExplainStep: idleMutation,
+    useStartActivateStep: idleMutation,
+  };
+});
+
+function renderVideoPage(status: VideoStatus | undefined) {
+  vi.mocked(useVideo).mockReturnValue({
+    data: status
+      ? {
+          id: "v-1",
+          project_id: "p-1",
+          filename: "interview.mp4",
+          file_size_bytes: 1024,
+          duration_seconds: 60,
+          uploaded_at: "2026-10-24T00:00:00Z",
+          status,
+          error_message: null,
+        }
+      : undefined,
+    isLoading: false,
+  } as unknown as ReturnType<typeof useVideo>);
+
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={["/videos/v-1"]}>
+        <Routes>
+          <Route path="/videos/:videoId" element={<VideoDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+describe("VideoDetailPage transcript request gating", () => {
+  it("does not request the transcript for a freshly uploaded video", () => {
+    renderVideoPage("uploaded");
+
+    expect(useTranscript).toHaveBeenLastCalledWith("v-1", false);
+    expect(screen.getByRole("button", { name: /start transcription/i })).toBeTruthy();
+  });
+
+  it("does not request the transcript before the video has loaded", () => {
+    renderVideoPage(undefined);
+
+    expect(useTranscript).toHaveBeenLastCalledWith("v-1", false);
+  });
+
+  it.each(["transcribing", "transcribed", "analyzing", "analyzed", "error"] as const)(
+    "requests the transcript once the video is %s",
+    (status) => {
+      renderVideoPage(status);
+
+      expect(useTranscript).toHaveBeenLastCalledWith("v-1", true);
+    }
+  );
 });

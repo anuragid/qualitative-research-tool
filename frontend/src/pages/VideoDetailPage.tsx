@@ -3,7 +3,13 @@ import { useParams, Link } from "react-router-dom";
 import { usePostHog } from "@posthog/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideo, useVideoPlaybackUrl } from "../hooks/useVideos";
-import { useTranscript, useSpeakerLabels, useStartTranscription, useLabelSpeaker } from "../hooks/useTranscriptions";
+import {
+  canVideoHaveTranscript,
+  useTranscript,
+  useSpeakerLabels,
+  useStartTranscription,
+  useLabelSpeaker,
+} from "../hooks/useTranscriptions";
 import {
   useVideoAnalysis,
   useVideoAnalysisStatus,
@@ -92,7 +98,10 @@ export default function VideoDetailPage() {
   const { videoId } = useParams<{ videoId: string }>();
   const { data: video, isLoading: videoLoading } = useVideo(videoId || null);
   const { data: playbackUrl } = useVideoPlaybackUrl(videoId || null);
-  const { data: transcript, isLoading: transcriptLoading } = useTranscript(videoId || null);
+  const { data: transcript, isLoading: transcriptLoading } = useTranscript(
+    videoId || null,
+    canVideoHaveTranscript(video?.status)
+  );
   const { data: speakerLabels } = useSpeakerLabels(transcript?.id || null);
   const analysisStatus = useVideoAnalysisStatus(videoId || null);
   const { data: analysis, isLoading: analysisLoading } = useVideoAnalysis(videoId || null);

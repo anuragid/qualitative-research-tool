@@ -1,8 +1,21 @@
 import { useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transcriptionsService } from "../services/transcriptions";
-import type { LabelSpeakerDto } from "../types";
+import type { LabelSpeakerDto, Video, VideoStatus } from "../types";
 import { useBackoffInterval } from "./useBackoffInterval";
+
+/**
+ * Whether a video in this status can have a transcript row yet.
+ *
+ * POST /api/videos/:id/transcribe creates the transcript row in the same
+ * commit that moves the video from "uploaded" to "transcribing", so an
+ * "uploaded" video never has one and GET /transcript would only 404.
+ * "error" is ambiguous (the failure may have come before or after
+ * transcription started), so callers still ask in that case.
+ */
+export function canVideoHaveTranscript(status: VideoStatus | undefined): boolean {
+  return !!status && status !== "uploaded";
+}
 
 export function useTranscript(videoId: string | null, shouldFetch: boolean = true) {
   // Track when we first saw "completed" — the server response doesn't include
@@ -29,6 +42,14 @@ export function useTranscript(videoId: string | null, shouldFetch: boolean = tru
     refetchInterval: (query) => {
       if (document.hidden) return false;
       const transcript = query.state.data;
+
+      // A 404 means the video has no transcript row (e.g. it errored before
+      // transcription started). Polling won't create one; starting a
+      // transcription invalidates this query.
+      if (!transcript && (query.state.error as { status?: number } | null)?.status === 404) {
+        getProcessingInterval(false);
+        return false;
+      }
 
       if (
         !transcript ||
@@ -72,6 +93,13 @@ export function useStartTranscription() {
   return useMutation({
     mutationFn: (videoId: string) => transcriptionsService.start(videoId),
     onSuccess: (_, videoId) => {
+      // The backend has moved the video to "transcribing" and created the
+      // transcript row. Mirror the status locally so the transcript query
+      // (gated on canVideoHaveTranscript) is enabled without waiting for the
+      // video refetch below.
+      queryClient.setQueryData<Video>(["videos", videoId], (video) =>
+        video ? { ...video, status: "transcribing" } : video
+      );
       // Invalidate both video and transcript queries to ensure polling starts
       queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
       queryClient.invalidateQueries({ queryKey: ["videos", videoId, "transcript"] });
