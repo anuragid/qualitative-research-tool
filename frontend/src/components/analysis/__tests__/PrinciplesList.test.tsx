@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
+import { render } from "@testing-library/react";
 import { PrinciplesList } from "../PrinciplesList";
 import type { DesignPrinciple } from "../../../types";
 
@@ -22,8 +22,6 @@ import type { DesignPrinciple } from "../../../types";
  */
 
 describe("PrinciplesList — defensive rendering (regression for JAVASCRIPT-REACT-6)", () => {
-  afterEach(cleanup);
-
   it("renders without crash when principle.how_might_we is null", () => {
     const principles: DesignPrinciple[] = [
       {

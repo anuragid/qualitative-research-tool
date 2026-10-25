@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -100,10 +100,6 @@ beforeEach(() => {
     advanced: { id: "y", name: "y", description: "y" },
   });
   vi.spyOn(settingsService, "searchModels").mockResolvedValue([]);
-});
-
-afterEach(() => {
-  cleanup();
 });
 
 // ── Initialization ──────────────────────────────────────────────────────

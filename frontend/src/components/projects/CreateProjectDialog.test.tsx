@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup, within, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import CreateProjectDialog from "./CreateProjectDialog";
@@ -42,10 +42,6 @@ describe("CreateProjectDialog", () => {
     mockMutateAsync.mockReset();
     mockIsPending = false;
     mockError = null;
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   it("renders the trigger button", () => {
