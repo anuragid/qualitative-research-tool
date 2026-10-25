@@ -2,7 +2,7 @@ import type { Inference, Chunk } from "../../types";
 import { Badge } from "../ui/badge";
 import { Lightbulb } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
-import { chunkTypeStyles } from "./config/displayConfig";
+import { chunkTypeStyles, fallbackBadgeStyle } from "./config/displayConfig";
 import { InferenceCard } from "./cards/InferenceCard";
 import { CardView } from "./display/CardView";
 import { TableView, type TableColumn } from "./display/TableView";
@@ -23,8 +23,8 @@ function makeInferenceColumns(chunks?: Chunk[]): TableColumn<Inference>[] {
     { key: "chunk_id", label: "Chunk", sortable: true, render: (inf) => {
       const chunk = getChunk(inf.chunk_id);
       const badgeStyle = chunk
-        ? chunkTypeStyles[chunk.type]?.badge || "bg-interactive-fill text-text-tertiary"
-        : "bg-interactive-fill text-text-tertiary";
+        ? chunkTypeStyles[chunk.type]?.badge || fallbackBadgeStyle
+        : fallbackBadgeStyle;
       return (
         <div className="flex items-center gap-2">
           <Badge className={`${badgeStyle} text-label`}>{chunk?.type || "unknown"}</Badge>
@@ -109,7 +109,7 @@ export function InferencesList({ inferences, chunks, viewMode = "list", sort, on
                           {items.length} inference
                           {items.length !== 1 ? "s" : ""}
                         </span>
-                        <Badge className={badgeStyle || "bg-interactive-fill text-text-tertiary border-0"}>
+                        <Badge className={badgeStyle || `${fallbackBadgeStyle} border-0`}>
                           {chunk?.type || "unknown"}
                         </Badge>
                       </div>

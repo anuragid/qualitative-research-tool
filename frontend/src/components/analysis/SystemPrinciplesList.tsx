@@ -178,7 +178,7 @@ export function SystemPrinciplesList({ systemPrinciples, viewMode = "list", sort
                       <div className="text-label text-text-placeholder uppercase mb-2">
                         Related Cross-Video Insight
                       </div>
-                      <Badge variant="outline" className="font-mono text-xs text-text-tertiary border-border">
+                      <Badge variant="outline" className="font-mono text-xs border-border">
                         {principle.cross_insight_id}
                       </Badge>
                     </div>

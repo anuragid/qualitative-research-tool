@@ -2,7 +2,7 @@ import type { MetaPattern } from "../../types";
 import { Badge } from "../ui/badge";
 import { Network } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
-import { consistencyStyles, normalizeConsistency } from "./config/displayConfig";
+import { consistencyStyles, countBadgeStyle, normalizeConsistency } from "./config/displayConfig";
 import { MetaPatternCard } from "./cards/MetaPatternCard";
 import { CardView } from "./display/CardView";
 import { TableView, type TableColumn } from "./display/TableView";
@@ -44,7 +44,7 @@ const metaPatternColumns: TableColumn<MetaPattern>[] = [
     label: "Videos",
     sortable: true,
     render: (mp) => (
-      <Badge className="bg-interactive-focus-bg text-interactive-focus text-label">
+      <Badge className={`${countBadgeStyle} text-label`}>
         {(mp.appears_in_videos ?? []).length}
       </Badge>
     ),
@@ -122,7 +122,7 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
                       <Badge className={consistencyStyles[normalizeConsistency(metaPattern.consistency)]}>
                         {normalizeConsistency(metaPattern.consistency)}
                       </Badge>
-                      <Badge className="bg-interactive-focus-bg text-interactive-focus border-0">
+                      <Badge className={`${countBadgeStyle} border-0`}>
                         {appearsIn.length} videos
                       </Badge>
                     </div>
@@ -162,7 +162,7 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {appearsIn.map((videoId, index) => (
-                        <Badge key={videoId} variant="outline" className="text-xs text-text-tertiary border-border">
+                        <Badge key={videoId} variant="outline" className="text-xs border-border">
                           {videoNames?.[videoId] || `Video ${index + 1}`}
                         </Badge>
                       ))}
@@ -175,7 +175,7 @@ export function MetaPatternsList({ metaPatterns, viewMode = "list", sort, onSort
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {relatedPatterns.map((patternId) => (
-                        <Badge key={patternId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
+                        <Badge key={patternId} variant="outline" className="font-mono text-xs border-border">
                           {patternId}
                         </Badge>
                       ))}

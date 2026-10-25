@@ -144,7 +144,7 @@ export function InsightsList({ insights, viewMode = "list", sort, onSort }: Insi
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {supportingPatterns.map((patternId) => (
-                        <Badge key={patternId} variant="outline" className="font-mono text-xs text-text-tertiary border-border">
+                        <Badge key={patternId} variant="outline" className="font-mono text-xs border-border">
                           {patternId}
                         </Badge>
                       ))}

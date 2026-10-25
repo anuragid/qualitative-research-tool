@@ -1,6 +1,6 @@
 import { Badge } from "../../ui/badge";
 import { Network } from "lucide-react";
-import { consistencyStyles, normalizeConsistency } from "../config/displayConfig";
+import { consistencyStyles, countBadgeStyle, normalizeConsistency } from "../config/displayConfig";
 import type { MetaPattern } from "../../../types";
 
 interface MetaPatternCardProps {
@@ -29,7 +29,7 @@ export function MetaPatternCard({ metaPattern, compact = false }: MetaPatternCar
             <Badge className={`${consStyle} text-label`}>
               {normalized}
             </Badge>
-            <Badge className="bg-interactive-focus-bg text-interactive-focus text-label">
+            <Badge className={`${countBadgeStyle} text-label`}>
               {appearsIn.length} video{appearsIn.length !== 1 ? "s" : ""}
             </Badge>
           </div>
