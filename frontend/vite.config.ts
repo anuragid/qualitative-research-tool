@@ -79,6 +79,14 @@ export default defineConfig({
             storybookScript: 'npm run storybook -- --no-open',
           }),
         ],
+        // Stories that render un-mocked API hooks request /api/* from the test
+        // server, and Vite's SPA fallback answers with index.html, which pulls
+        // src/main.tsx into the dep graph mid-run. Without index.html as a scan
+        // entry its deps (posthog-js, sonner, ...) are "new" at that point, the
+        // optimizer re-bundles and reloads the browser, and story files fail.
+        optimizeDeps: {
+          entries: ['index.html'],
+        },
         test: {
           name: 'storybook',
           browser: {
