@@ -6,23 +6,29 @@ You need to query production Postgres directly — for debugging a user's projec
 
 ## Prerequisites
 
-- Railway CLI installed
-- `psycopg2-binary` installed (`pip install psycopg2-binary` or use the backend venv)
+- Railway CLI installed, with an SSH key registered (`railway ssh keys list`; add one once with `railway ssh keys add`)
+- Nothing to install locally: the `beat` service runs the backend image (`backend/Dockerfile.railway`), which already has `psycopg2-binary` and `psql` (`postgresql-client`)
 
-## Get the DB URL
+Postgres is reachable only on Railway's private network. Its public TCP proxy was deleted on 2026-10-24 after Railway's October 2026 security incident (see `railway-incident-2026-10.md`), so `DATABASE_PUBLIC_URL` no longer connects. Do not re-enable the proxy.
+
+## Open a shell on the private network
 
 ```bash
-cd ~/code-projects/5d-analysis/qualitative-research-tool
-railway service Postgres
-export DATABASE_URL=$(railway variables --service Postgres --kv | grep ^DATABASE_PUBLIC_URL | cut -d= -f2-)
-echo $DATABASE_URL  # verify — should be postgres://postgres:...@ballast.proxy.rlwy.net:45966/railway
+cd ~/code-projects/5d-analysis/qualitative-research-tool   # linked to the methodex project
+railway ssh --service beat
 ```
+
+Run every block below inside that shell. beat already has `DATABASE_URL` set to the private Postgres URL (`${{Postgres.DATABASE_URL}}`), so there is nothing to export. Don't `echo` it: it contains the password.
+
+Use beat, not backend. backend is the single API replica, so a heavy query there (such as the unbounded jsonb join under "NEVER run in production") could get the API OOM-killed. beat serves no users. Still keep queries light, because an OOM-killed beat pauses scheduled tasks like the watchdog until Railway restarts it, and `exit` when you're done.
 
 ## Test the connection
 
 ```bash
 python3 -c "
 import os, psycopg2
+from urllib.parse import urlsplit
+print('host:', urlsplit(os.environ['DATABASE_URL']).hostname)  # expect *.railway.internal
 conn = psycopg2.connect(os.environ['DATABASE_URL'])
 cur = conn.cursor()
 cur.execute('SELECT current_database(), current_user, version();')
@@ -31,6 +37,8 @@ conn.close()
 "
 ```
 
+For a quick interactive SQL prompt, `psql "$DATABASE_URL"` works in the same shell. psql commits every statement as soon as it runs, so for writes either type `BEGIN;` first and finish with `COMMIT;` or `ROLLBACK;`, or use the Python write pattern at the end of this runbook. The image's `psql` is version 15 (Debian bookworm's `postgresql-client`) and the server is Postgres 17, so backslash commands like `\d` may misbehave. For column lists, use the Python `information_schema` block under "Schema reference".
+
 ## Find a user
 
 By email:
@@ -38,7 +46,7 @@ By email:
 ```python
 python3 <<'EOF'
 import os, psycopg2, psycopg2.extras
-EMAIL_SUBSTRING = "anurag"   # case-insensitive substring match
+EMAIL_SUBSTRING = "PASTE_EMAIL_SUBSTRING_HERE"   # case-insensitive substring match
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 cur.execute("""
@@ -56,14 +64,14 @@ conn.close()
 EOF
 ```
 
-Key gotcha: `users.id` IS the Clerk user ID (e.g., `user_3AxdbQcz1lffGHVhwH9diyRLNAL`). There is no separate `clerk_user_id` column.
+Key gotcha: `users.id` IS the Clerk user ID (`user_` followed by 27 letters and digits). There is no separate `clerk_user_id` column.
 
 ## Find a project by name
 
 ```python
 python3 <<'EOF'
 import os, psycopg2, psycopg2.extras
-NAME_SUBSTRING = "haic"
+NAME_SUBSTRING = "PASTE_NAME_SUBSTRING_HERE"
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 cur.execute("""
@@ -85,7 +93,7 @@ Full per-video breakdown of a project:
 ```python
 python3 <<'EOF'
 import os, psycopg2, psycopg2.extras
-PROJECT_ID = "8b894631-2d32-4593-ae2a-e76e6d9f84f3"  # HAIC example
+PROJECT_ID = "PASTE_PROJECT_ID_HERE"  # from "Find a project by name" above
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -177,10 +185,10 @@ Resetting a single stuck video to retriable state (used during the 2026-04-07 in
 # See stuck-video.md Step 4c for the exact reset block
 ```
 
-Always wrap writes in an explicit transaction and include `RETURNING` so you see what changed:
+Always wrap writes in an explicit transaction and include `RETURNING` so you see what changed. Save the script to a file and run it, rather than using a `python3 <<'EOF'` heredoc. In a heredoc, the heredoc is Python's stdin, so `input()` hits end-of-file before you can answer and the write never commits:
 
-```python
-python3 <<'EOF'
+```bash
+cat > /tmp/safe_write.py <<'EOF'
 import os, psycopg2
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor()
@@ -189,15 +197,21 @@ try:
       UPDATE videos SET error_message = '' WHERE id::text = %s RETURNING id, status, error_message;
     """, ("PASTE_ID",))
     print("updated:", cur.fetchone())
-    input("Press Enter to commit, Ctrl-C to rollback...")
-    conn.commit()
-except KeyboardInterrupt:
+    if input("Type 'commit' to commit, anything else rolls back: ").strip() == "commit":
+        conn.commit()
+        print("committed")
+    else:
+        conn.rollback()
+        print("rolled back")
+except (KeyboardInterrupt, EOFError):
     conn.rollback()
     print("rolled back")
 finally:
     cur.close()
     conn.close()
 EOF
+python3 /tmp/safe_write.py
+rm /tmp/safe_write.py
 ```
 
 ## Related runbooks

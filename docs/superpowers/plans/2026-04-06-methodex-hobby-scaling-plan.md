@@ -3029,8 +3029,11 @@ Verify:
 ```bash
 # SSH into Redis (via Railway CLI) or check Railway logs to confirm the
 # container restarted with the new startCommand.
-# Alternatively, if Redis responds to AUTH:
-redis-cli -h yamabiko.proxy.rlwy.net -p 50187 -a $REDIS_PASSWORD INFO memory | grep maxmemory
+# Or read maxmemory from inside the private network. The Redis TCP proxy was
+# deleted on 2026-10-24. beat runs the backend image (redis-py, no redis-cli)
+# and serves no users, so use it rather than the API's container:
+railway ssh --service beat
+python3 -c "import os, redis; i = redis.from_url(os.environ['REDIS_URL']).info('memory'); print('maxmemory:' + str(i['maxmemory']))"
 ```
 
 Expected: `maxmemory:314572800` (300 MB in bytes).
@@ -3479,14 +3482,14 @@ Create `docs/ops/post-scaling-operational-notes.md`:
 
 - **Do not scale `beat` above 1 replica**, ever. Multiple beat instances fire scheduled tasks N times.
 - **Postgres backups are NOT yet automated.** Separate future spec. Until then, run a manual `pg_dump` to R2 weekly (or more often during active development).
-- If the Redis service redeploys, the startCommand override (maxmemory) may reset. Verify after any Redis restart with `redis-cli INFO memory | grep maxmemory`.
+- If the Redis service redeploys, the startCommand override (maxmemory) may reset. Verify after any Redis restart with the "Memory check" in `docs/production-readiness/runbooks/redis-inspect.md`.
 - Worker replicas each hold ~16 Celery threads. A stuck thread under-utilizes half of one replica — not catastrophic. The watchdog task (every 5 min via beat) will mark stuck analyses as error.
 
 ## Troubleshooting
 
 - **Backend returns 503 from /health/ready**: DB or Redis unreachable. Check `railway logs` on the `backend` service for the specific probe failure.
 - **Scheduled tasks firing twice**: check that `beat` is running with `numReplicas=1`. If the worker service accidentally re-added `--beat`, remove it.
-- **Queue backlog**: run `redis-cli -h yamabiko.proxy.rlwy.net -p 50187 -a $REDIS_PASSWORD LLEN analyze` — if it's stuck growing, a worker may have died; check `railway logs` on the worker service.
+- **Queue backlog**: inside `railway ssh --service beat`, run `python3 -c "import os, redis; print(redis.from_url(os.environ['REDIS_URL']).llen('analyze'))"` (more checks in `docs/production-readiness/runbooks/redis-inspect.md`) — if it's stuck growing, a worker may have died; check `railway logs` on the worker service.
 ```
 
 - [ ] **Step 2: Commit the runbook**
